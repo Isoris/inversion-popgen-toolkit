@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ###############################################################################
-# helpers/02_bisnps.sh — biSNP discovery per chunk using pest prior
+# STEP_A02_bisnps.sh — biSNP discovery per chunk using pest prior
 # Combines old: S06_run_bisnp_discovery_chunks
 # Called by: run_step1.sh call_bisnps
 ###############################################################################
@@ -15,4 +15,4 @@ PEST="${GLOBAL_DIR}/global_sfs/catfish.global.folded.mean.pest"
 
 N=$(wc -l < "$CHUNK_LIST")
 echo "[$(timestamp)] biSNP discovery: $N chunks"
-echo "[INFO] Submit: sbatch --array=0-$((N-1))%8 helpers/slurm_bisnp_chunk.sh ${CHUNK_LIST}"
+echo "[INFO] Submit: sbatch --array=0-$((N-1))%8 slurm/SLURM_A02_bisnp_chunk.sh ${CHUNK_LIST}"

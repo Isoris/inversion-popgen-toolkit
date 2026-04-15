@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ###############################################################################
-# helpers/06_relatedness.sh — ngsRelate + NAToRA + pruning + plotting
+# STEP_A07_relatedness.sh — ngsRelate + NAToRA + pruning + plotting
 #
 # Runs between structure_all and structure_pruned:
 #   1) ngsRelate on thin-500 whole-genome BEAGLE
@@ -181,4 +181,4 @@ RESULTSFILE="${OUTDIR}/06_relatedness.results"
 
 echo ""
 echo "[$(timestamp)] [DONE] 06_relatedness"
-echo "[$(timestamp)] Next: bash helpers/05_structure.sh --samples ${OUTDIR}/pruned_samples.txt"
+echo "[$(timestamp)] Next: bash steps/STEP_A06_structure.sh --samples ${OUTDIR}/pruned_samples.txt"

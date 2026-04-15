@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ###############################################################################
-# helpers/merge_beagles.sh — Merge per-RF BEAGLEs into whole-genome
+# STEP_A05_merge_beagles.sh — Merge per-RF BEAGLEs into whole-genome
 # Called by: 04_beagles.sh (after all BEAGLE array jobs finish)
 ###############################################################################
 set -euo pipefail

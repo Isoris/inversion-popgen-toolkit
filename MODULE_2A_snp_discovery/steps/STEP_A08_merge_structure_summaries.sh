@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 ###############################################################################
-# helpers/merge_structure_summaries.sh
+# STEP_A08_merge_structure_summaries.sh
 #
 # Merges best-seed-by-K tables from multiple structure runs (e.g. all + pruned)
 # into one combined summary with a sample_set column.
 #
 # Usage:
-#   bash helpers/merge_structure_summaries.sh
+#   bash steps/STEP_A08_merge_structure_summaries.sh
 #
 # Looks for:
 #   ${THIN_DIR}/05_structure_all/canonical_exports/best_seed_by_K.tsv

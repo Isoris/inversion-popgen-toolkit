@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 ###############################################################################
-# helpers/05_structure.sh — Unified structure analysis
+# STEP_A06_structure.sh — Unified structure analysis
 #
 # Runs PCAngsd, NGSadmix, evalAdmix, best-seed-by-K selection, and canonical
 # exports — all in one script. Same script for any sample set.
 #
 # Usage:
-#   bash helpers/05_structure.sh --samples all_samples.txt
-#   bash helpers/05_structure.sh --samples pruned_samples.txt
+#   bash steps/STEP_A06_structure.sh --samples all_samples.txt
+#   bash steps/STEP_A06_structure.sh --samples pruned_samples.txt
 #
 # The --samples flag determines:
 #   - which sample list is used for NGSadmix/PCAngsd
@@ -29,10 +29,10 @@
 #      - sample_main_ancestry_by_K.tsv
 #
 # The practical run order for the full pipeline is:
-#   1) bash helpers/05_structure.sh --samples all_samples.txt      (structure_all)
-#   2) bash helpers/06_relatedness.sh                               (relatedness)
-#   3) bash helpers/05_structure.sh --samples pruned_samples.txt   (structure_pruned)
-#   4) bash helpers/merge_structure_summaries.sh                    (merge both)
+#   1) bash steps/STEP_A06_structure.sh --samples all_samples.txt      (structure_all)
+#   2) bash steps/STEP_A07_relatedness.sh                               (relatedness)
+#   3) bash steps/STEP_A06_structure.sh --samples pruned_samples.txt   (structure_pruned)
+#   4) bash steps/STEP_A08_merge_structure_summaries.sh                    (merge both)
 #
 # Called by: run_step1.sh structure_all / structure_pruned
 ###############################################################################
@@ -99,7 +99,7 @@ for W in "${THIN_FINE[@]}"; do
 done
 
 echo "[INFO] PCAngsd submit command:"
-echo "  sbatch --array=1-<TOTAL>%32 helpers/slurm_pcangsd.sh"
+echo "  sbatch --array=1-<TOTAL>%32 slurm/SLURM_A06a_pcangsd.sh"
 echo "  (using SAMPLE_LIST=${SAMPLES} for --tree-samples)"
 
 # ===========================================================================

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ###############################################################################
-# helpers/01_masks_sfs.sh — Callable mask, RF chunks, SAF, merged SFS, pest
+# STEP_A01_masks_sfs.sh — Callable mask, RF chunks, SAF, merged SFS, pest
 #
 # Combines old: S00_mask_regions, S01_callable_mask, S02_chr_rf_chunks,
 #               S03_angsd_saf_chunks, S04_merge_saf, S05_folded_sfs
@@ -71,10 +71,10 @@ N_CHUNKS=$(wc -l < "${CHUNK_LIST}")
 # ---- 4) Per-chunk SAF (SLURM array) ----
 echo "[$(timestamp)] === SAF per chunk ==="
 echo "[INFO] Submit as SLURM array:"
-echo "  sbatch --array=0-$((N_CHUNKS-1))%8 helpers/slurm_saf_chunk.sh ${CHUNK_LIST}"
+echo "  sbatch --array=0-$((N_CHUNKS-1))%8 slurm/SLURM_A01a_saf_chunk.sh ${CHUNK_LIST}"
 echo ""
 echo "[INFO] Or run sequentially (slow):"
-echo "  for i in \$(seq 0 $((N_CHUNKS-1))); do SLURM_ARRAY_TASK_ID=\$i bash helpers/slurm_saf_chunk.sh ${CHUNK_LIST}; done"
+echo "  for i in \$(seq 0 $((N_CHUNKS-1))); do SLURM_ARRAY_TASK_ID=\$i bash slurm/SLURM_A01a_saf_chunk.sh ${CHUNK_LIST}; done"
 
 # ---- 5) Merge chunk SAFs ----
 GLOBAL_SAF="${OUTDIR}/global_sfs/catfish.global.saf.idx"
@@ -83,7 +83,7 @@ if [[ -s "${GLOBAL_SAF}" ]]; then
 else
   echo "[$(timestamp)] === Merge SAFs ==="
   echo "[INFO] After SAF chunks complete, run:"
-  echo "  sbatch helpers/slurm_merge_saf.sh"
+  echo "  sbatch slurm/SLURM_A01b_merge_sfs.sh"
 fi
 
 # ---- 6) Folded SFS + mean pest ----
@@ -93,7 +93,7 @@ if [[ -s "${PEST}" ]]; then
 else
   echo "[$(timestamp)] === Folded SFS ==="
   echo "[INFO] After SAF merge, run:"
-  echo "  sbatch helpers/slurm_folded_sfs.sh"
+  echo "  sbatch slurm/SLURM_A01b_merge_sfs.sh"
 fi
 
 echo "[$(timestamp)] [DONE] 01_masks_sfs"

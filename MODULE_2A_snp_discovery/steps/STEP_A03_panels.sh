@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ###############################################################################
-# helpers/03_panels.sh — Merge biSNP sites + distance-thin + ANGSD-index
+# STEP_A03_panels.sh — Merge biSNP sites + distance-thin + ANGSD-index
 # Combines old: S07 (200/500/1000), S08 (5k/10k/25k), S09 (summary)
 # Called by: run_step1.sh build_panels
 ###############################################################################

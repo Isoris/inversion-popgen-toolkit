@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 ###############################################################################
-# config.sh — MODULE_2B / STEP_1 centralized configuration
+# 00_module2a_config.sh — MODULE_2A / STEP_1 centralized configuration
 #
 # ALL paths, ANGSD parameters, tool settings, thinning distances, K ranges,
 # seed lists, and output conventions live here. No other script in STEP_1
 # should hardcode these values.
 #
 # Usage:
-#   source config.sh
+#   source 00_module2a_config.sh
 #   # Then all variables below are available in the calling script.
 ###############################################################################
 

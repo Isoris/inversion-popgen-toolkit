@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 ###############################################################################
-# run_step1.sh — MODULE_2B / STEP_1: Variants & Structure Base
+# LAUNCH_module2a.sh — MODULE_2A / STEP_1: Variants & Structure Base
 #
 # ###########################################################################
 # MODULE
-#   MODULE_2B_ModernDNA_Variants_Ancestry / STEP_1_Variants_StructureBase
+#   MODULE_2A_ModernDNA_Variants_Ancestry / STEP_1_Variants_StructureBase
 #
 # PURPOSE
 #   Main user-facing wrapper for the modern DNA variant + structure foundation.
@@ -22,38 +22,38 @@
 #   masks_sfs
 #       Build callable mask, RF/chrom lists, per-chunk SAF, global merged
 #       SAF, folded SFS, and mean pest prior.
-#       Internally calls: helpers/01_masks_sfs.sh
+#       Internally calls: steps/STEP_A01_masks_sfs.sh
 #
 #   call_bisnps
 #       Run chunked ANGSD biSNP discovery using pest prior.
-#       Internally calls: helpers/02_bisnps.sh
+#       Internally calls: steps/STEP_A02_bisnps.sh
 #
 #   build_panels
 #       Merge + thin sites at 200/500/1000 bp and 5/10/25 kb. ANGSD-index.
-#       Internally calls: helpers/03_panels.sh
+#       Internally calls: steps/STEP_A03_panels.sh
 #
 #   make_beagles
 #       Generate BEAGLE GL files per-RF and whole-genome for each panel.
 #       Merge per-RF BEAGLEs into whole-genome BEAGLEs.
-#       Internally calls: helpers/04_beagles.sh
+#       Internally calls: steps/STEP_A04_beagles.sh
 #
 #   structure_all
 #       Run PCAngsd + NGSadmix + evalAdmix + best-seed-by-K on ALL samples.
-#       Internally calls: helpers/05_structure.sh --samples all_samples.txt
+#       Internally calls: steps/STEP_A06_structure.sh --samples all_samples.txt
 #
 #   relatedness
 #       Run ngsRelate, NAToRA multi-cutoff, greedy first-degree pruning,
 #       and 3-panel relatedness figure. Produces pruned_samples.txt.
-#       Internally calls: helpers/06_relatedness.sh
+#       Internally calls: steps/STEP_A07_relatedness.sh
 #
 #   structure_pruned
 #       Same as structure_all but on PRUNED sample set (after relatedness).
-#       Internally calls: helpers/05_structure.sh --samples pruned_samples.txt
+#       Internally calls: steps/STEP_A06_structure.sh --samples pruned_samples.txt
 #
 #   merge_summaries
 #       Merge best-seed-by-K tables from all + pruned into one combined
 #       table with a sample_set column.
-#       Internally calls: helpers/merge_structure_summaries.sh
+#       Internally calls: steps/STEP_A08_merge_structure_summaries.sh
 #
 #   all
 #       Run the full pipeline from current stage (skips completed steps).
@@ -119,33 +119,33 @@
 # INTERNAL TASK MAP
 # ###########################################################################
 #
-#   masks_sfs    -> helpers/01_masks_sfs.sh
+#   masks_sfs    -> steps/STEP_A01_masks_sfs.sh
 #                   (mask_regions_from_fasta.py, angsd sites index,
 #                    make_chr_rf_chunk_list, angsd -doSaf, realSFS cat,
 #                    realSFS -fold -bootstrap)
 #
-#   call_bisnps  -> helpers/02_bisnps.sh
+#   call_bisnps  -> steps/STEP_A02_bisnps.sh
 #                   (angsd -doMaf -SNP_pval -pest per chunk)
 #
-#   build_panels -> helpers/03_panels.sh
+#   build_panels -> steps/STEP_A03_panels.sh
 #                   (merge mafs.gz, awk thinning, angsd sites index)
 #
-#   make_beagles -> helpers/04_beagles.sh
+#   make_beagles -> steps/STEP_A04_beagles.sh
 #                   (angsd -doGlf 2 -doMajorMinor 3 per-RF + WG,
 #                    merge per-RF to WG)
 #
-#   run_ancestry -> helpers/05_ancestry.sh
+#   run_ancestry -> steps/STEP_A06_structure.sh
 #                   (pcangsd per LG×K, NGSadmix per RF×K×seed)
 #
-#   run_evaladmix -> helpers/06_evaladmix.sh
+#   run_evaladmix -> steps/STEP_A06_structure.sh (evalAdmix)
 #                    (evalAdmix per K×seed, summarize_evaladmix.R)
 #
-#   run_relatedness -> helpers/07_relatedness.sh
+#   run_relatedness -> steps/STEP_A07_relatedness.sh
 #                      (ngsRelate, NAToRA multi-cutoff,
 #                       prune_first_degree_pairs.py,
 #                       plot_relatedness_3panel.R)
 #
-#   select_best  -> helpers/08_select_best.sh
+#   select_best  -> utils/select_best_seed_by_K.R
 #                   (select_best_seed_by_K.R)
 #
 # ###########################################################################
@@ -162,7 +162,7 @@
 # ###########################################################################
 #
 #   If something breaks, copy-paste:
-#     1. This entire header (run_step1.sh top section)
+#     1. This entire header (LAUNCH_module2a.sh top section)
 #     2. Your config.sh
 #     3. The exact command you ran
 #     4. The error output
@@ -174,8 +174,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-HELPERS="${SCRIPT_DIR}/helpers"
-CONFIG="${SCRIPT_DIR}/config.sh"
+STEPS="${SCRIPT_DIR}/../steps"
+CONFIG="${SCRIPT_DIR}/../00_module2a_config.sh"
 
 # ---- Parse args ----
 TASK=""
@@ -207,12 +207,12 @@ done
 [[ -f "$CONFIG" ]] || { echo "[ERROR] Config not found: $CONFIG" >&2; exit 1; }
 source "$CONFIG"
 
-export DRY_RUN FORCE RESUME SCRIPT_DIR HELPERS
+export DRY_RUN FORCE RESUME SCRIPT_DIR STEPS
 
 timestamp(){ date '+%F %T'; }
 export -f timestamp
 
-echo "[$(timestamp)] run_step1.sh task=${TASK}"
+echo "[$(timestamp)] LAUNCH_module2a.sh task=${TASK}"
 echo "[$(timestamp)] config=${CONFIG}"
 
 # ---- Dispatch ----
@@ -236,37 +236,37 @@ case "$TASK" in
     ;;
 
   masks_sfs)
-    bash "${HELPERS}/01_masks_sfs.sh"
+    bash "${STEPS}/STEP_A01_masks_sfs.sh"
     ;;
 
   call_bisnps)
-    bash "${HELPERS}/02_bisnps.sh"
+    bash "${STEPS}/STEP_A02_bisnps.sh"
     ;;
 
   build_panels)
-    bash "${HELPERS}/03_panels.sh"
+    bash "${STEPS}/STEP_A03_panels.sh"
     ;;
 
   make_beagles)
-    bash "${HELPERS}/04_beagles.sh"
+    bash "${STEPS}/STEP_A04_beagles.sh"
     ;;
 
   structure_all)
-    bash "${HELPERS}/05_structure.sh" --samples "${SAMPLE_LIST}"
+    bash "${STEPS}/STEP_A06_structure.sh" --samples "${SAMPLE_LIST}"
     ;;
 
   relatedness)
-    bash "${HELPERS}/06_relatedness.sh"
+    bash "${STEPS}/STEP_A07_relatedness.sh"
     ;;
 
   structure_pruned)
     PRUNED="${THIN_DIR}/06_relatedness/pruned_samples.txt"
     [[ -s "$PRUNED" ]] || { echo "[ERROR] Run 'relatedness' first to produce pruned_samples.txt" >&2; exit 1; }
-    bash "${HELPERS}/05_structure.sh" --samples "${PRUNED}"
+    bash "${STEPS}/STEP_A06_structure.sh" --samples "${PRUNED}"
     ;;
 
   merge_summaries)
-    bash "${HELPERS}/merge_structure_summaries.sh"
+    bash "${STEPS}/STEP_A08_merge_structure_summaries.sh"
     ;;
 
   all)
