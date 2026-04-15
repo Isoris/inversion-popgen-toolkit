@@ -1,0 +1,23 @@
+Package: exactplot
+Title: Export ggplot2 Figures with Exact Plot-Area Dimensions
+Version: 0.1.0
+Authors@R: person("Quentin", "Rodriguez", role = c("aut", "cre"),
+           email = "quentin@example.com")
+Description: Provides functions to export ggplot2 figures where the specified
+    width and height refer to the actual plotting area (the panel region
+    bounded by the axes), not the full device including margins, axis labels,
+    titles, and legends. Supports multiple unit systems (cm, in, mm, pt) and
+    allows precise control via coordinate-based specifications. The package
+    uses a two-pass rendering strategy: it first builds the plot to measure
+    non-panel grobs, then inflates the device dimensions so the panel ends
+    up at exactly the requested size.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.1
+Imports: ggplot2 (>= 3.4.0), grid, gtable, grDevices
+Suggests: testthat (>= 3.0.0), ragg
+NeedsCompilation: no
+Packaged: 2026-04-08 15:05:42 UTC; root
+Author: Quentin Rodriguez [aut, cre]
+Maintainer: Quentin Rodriguez <quentin@example.com>
