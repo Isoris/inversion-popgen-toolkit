@@ -9,13 +9,13 @@
 #SBATCH -o logs/evaladmix.%A_%a.out
 #SBATCH -e logs/evaladmix.%A_%a.err
 # =============================================================================
-# STEP_A03_evaladmix_worker.sh — SLURM array: one evalAdmix run per task
+# SLURM_A03_evaladmix_worker.sh — SLURM array: one evalAdmix run per task
 #
 # Same task file as STEP_A02. Requires NGSadmix to have completed.
 #
 # Usage:
 #   N=$(tail -n +2 tasks_ngsadmix.tsv | wc -l)
-#   sbatch --array=1-${N}%16 slurm/STEP_A03_evaladmix_worker.sh tasks_ngsadmix.tsv
+#   sbatch --array=1-${N}%16 slurm/SLURM_A03_evaladmix_worker.sh tasks_ngsadmix.tsv
 # =============================================================================
 set -euo pipefail
 source ~/.bashrc; mamba activate assembly

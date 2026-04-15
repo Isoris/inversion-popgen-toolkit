@@ -9,14 +9,14 @@
 #SBATCH -o logs/ngsadmix.%A_%a.out
 #SBATCH -e logs/ngsadmix.%A_%a.err
 # =============================================================================
-# STEP_A02_ngsadmix_worker.sh — SLURM array: one NGSadmix run per task
+# SLURM_A02_ngsadmix_worker.sh — SLURM array: one NGSadmix run per task
 #
 # Reads task line from STEP_A01 output (skip header).
 # Columns: scope, thin, sample_set, n_samples, samples_file, K, seed, beagle_path
 #
 # Usage:
 #   N=$(tail -n +2 tasks_ngsadmix.tsv | wc -l)
-#   sbatch --array=1-${N}%32 slurm/STEP_A02_ngsadmix_worker.sh tasks_ngsadmix.tsv
+#   sbatch --array=1-${N}%32 slurm/SLURM_A02_ngsadmix_worker.sh tasks_ngsadmix.tsv
 # =============================================================================
 set -euo pipefail
 source ~/.bashrc; mamba activate assembly

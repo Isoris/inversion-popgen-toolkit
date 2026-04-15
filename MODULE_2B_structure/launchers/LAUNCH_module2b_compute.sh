@@ -46,12 +46,12 @@ fi
 m2b_log "Submitting NGSadmix array (${N_TASKS} tasks, max 32 concurrent)..."
 
 if [[ "$DRY_RUN" -eq 1 ]]; then
-  echo "[DRY-RUN] sbatch --array=1-${N_TASKS}%32 ${SLURM_SCRIPTS}/STEP_A02_ngsadmix_worker.sh ${TASK_FILE}"
+  echo "[DRY-RUN] sbatch --array=1-${N_TASKS}%32 ${SLURM_SCRIPTS}/SLURM_A02_ngsadmix_worker.sh ${TASK_FILE}"
   JOB_A02="DRYRUN"
 else
   JOB_A02=$(sbatch --parsable \
     --array=1-${N_TASKS}%32 \
-    "${SLURM_SCRIPTS}/STEP_A02_ngsadmix_worker.sh" "${TASK_FILE}")
+    "${SLURM_SCRIPTS}/SLURM_A02_ngsadmix_worker.sh" "${TASK_FILE}")
   m2b_log "NGSadmix job: ${JOB_A02}"
 fi
 
@@ -59,12 +59,12 @@ fi
 m2b_log "Submitting evalAdmix array (depends on ${JOB_A02})..."
 
 if [[ "$DRY_RUN" -eq 1 ]]; then
-  echo "[DRY-RUN] sbatch --dependency=afterany:${JOB_A02} --array=1-${N_TASKS}%16 ${SLURM_SCRIPTS}/STEP_A03_evaladmix_worker.sh ${TASK_FILE}"
+  echo "[DRY-RUN] sbatch --dependency=afterany:${JOB_A02} --array=1-${N_TASKS}%16 ${SLURM_SCRIPTS}/SLURM_A03_evaladmix_worker.sh ${TASK_FILE}"
 else
   JOB_A03=$(sbatch --parsable \
     --dependency=afterany:${JOB_A02} \
     --array=1-${N_TASKS}%16 \
-    "${SLURM_SCRIPTS}/STEP_A03_evaladmix_worker.sh" "${TASK_FILE}")
+    "${SLURM_SCRIPTS}/SLURM_A03_evaladmix_worker.sh" "${TASK_FILE}")
   m2b_log "evalAdmix job: ${JOB_A03} (depends on ${JOB_A02})"
 fi
 
