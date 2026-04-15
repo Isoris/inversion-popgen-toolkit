@@ -1,60 +1,102 @@
-# MODULE_1_Reads
+# MODULE_1_read_prep
 
-Read-level QC, species verification, alignment, BAM processing, and final filtered BAM preparation for downstream population genomics (ANGSD, PCAngsd, NGSadmix, etc.).
+Read-level QC, species verification, short-read alignment, BAM merging and deduplication, population-genomics filtering, and depth QC. Produces the filtered BAMs consumed by every downstream module.
 
-## Execution Order
+## Pipeline
 
-| Step | Script | Purpose | SLURM? |
-|------|--------|---------|--------|
-| S01 | `S01_fastp_trim_reads.slurm` | Trim/redo fastp on problematic read pairs | Yes |
-| S02 | `S02_fastp_eof_redo_table.sh` | Find corrupted fastp outputs, build redo table | No |
-| S03 | `S03_extract_fastp_qc.sh` | Parse fastp logs → per-sample QC table + summary | No |
-| S04 | `S04_species_assign_mash.slurm` | Mash-based species assignment (Gar vs Mac) per run-lane | Yes |
-| S05 | `S05_species_assign_kmers.sh` | Combined Mash + meryl k-mer species assignment | No |
-| S06 | `S06_plot_species_assign.py` | Plot species assignment results (scatter, histogram, suspicious) | No |
-| S07 | `S07_inventory_fastp_vs_bam.sh` | Cross-check fastp outputs against BAM inventory | No |
-| S08 | `S08_check_bam_bai_pairs.sh` | Verify BAM/BAI consistency across batches | No |
-| S09 | `S09_map_minimap2.slurm` | Map fastp reads with minimap2, per-batch | Yes |
-| S10 | `S10_merge_markdup_clip.slurm` | Merge per-run BAMs → per-sample, fixmate, markdup, clipOverlap, QC | Yes (array) |
-| S11 | `S11_get_tlen_percentiles.sh` | Compute TLEN p95/p99 from a BAM | No |
-| S12 | `S12_get_insert_size_stats.sh` | Detailed insert size statistics (raw + trimmed) | No |
-| S13 | `S13_filter_bam_popgen.slurm` | Filter BAMs: MAPQ≥60, proper-pair, same-chr, TLEN≤p99 | Yes (array) |
-| S14 | `S14_qc_depth_table.slurm` | Comprehensive depth/coverage QC with mosdepth (per-sample, per-chr, by region class) | Yes |
-| S15 | `S15_summarize_bam_qc.sh` | Summarize BAM QC for ANGSD: depth distribution, suggested cutoffs | Yes |
-| S16 | `S16_make_bam_provenance.sh` | Build provenance table linking samples to raw + filtered BAMs | No |
+```
+Raw FASTQ (PE151 Illumina)
+  │
+  ├─ A. QC & trim ────────────────────────────────────────────────────
+  │   S01  fastp trim (redo problematic pairs from EOF table)
+  │   S02  scan for corrupted gzip → build redo table
+  │   S03  parse fastp logs → per-sample QC table + summary
+  │
+  ├─ B. Species verification ─────────────────────────────────────────
+  │   S04  Mash distance (k=31, s=50k) → Gar vs Mac per run-lane
+  │   S05  meryl k-mer (k=21) independent verification
+  │   S06  plot species assignment (scatter, hist, suspicious ranking)
+  │
+  ├─ C. Alignment ────────────────────────────────────────────────────
+  │   S07  inventory check: fastp outputs ↔ BAM completeness
+  │   S08  BAM/BAI pair consistency
+  │   S09  minimap2 -ax sr → per-run sorted BAM (batched)
+  │
+  ├─ D. Merge & dedup ────────────────────────────────────────────────
+  │   S10  merge per-run → per-sample, fixmate, markdup, clipOverlap
+  │   S11  TLEN p95/p99 from merged BAM (MAPQ≥60, proper pair)
+  │   S12  detailed insert size stats (raw + MAD-trimmed)
+  │
+  ├─ E. PopGen filter & QC ───────────────────────────────────────────
+  │   S13  filter: MAPQ≥60, proper pair, same-chr, TLEN≤p99
+  │   S14  mosdepth depth QC (5 region classes, per-sample, per-chr)
+  │   S15  summarize BAM QC → ANGSD depth cutoff suggestions
+  │   S16  provenance table: sample → raw BAM → filtered BAM
+  │
+  └─→ 226 filtered BAMs (~9× mean coverage)
+        consumed by MODULE_2A, MODULE_3, MODULE_4A, MODULE_4B–4H
+```
 
-## Subdirectories
+## Scripts
 
-- `Tables/` — Reserved for output tables referenced in manuscript
-- `Figures/` — Reserved for output figures referenced in manuscript
-- `Manuscript/` — Methods markdown for this module
+| Step | Script | Type | What it does |
+|------|--------|------|-------------|
+| S01 | `S01_fastp_trim_reads.slurm` | SLURM | fastp on TSV-defined read pairs. `--detect_adapter_for_pe`, `--trim_poly_g`, `-q 20`, `-f 5 -F 5 -t 5 -T 5`, `-n 0`, `-l 30`. Parallel per-sample on full node. |
+| S02 | `S02_fastp_eof_redo_table.sh` | bash | Scan fastp outputs for unexpected EOF → `fastp_unexpected_eof_redo.tsv`. Searches uploadku for matching raw reads. |
+| S03 | `S03_extract_fastp_qc.sh` | bash | Parse fastp logs → `fastp_qc_table.tsv` (per-sample) + `fastp_qc_summary.tsv` (min/mean/median/max). |
+| S04 | `S04_species_assign_mash.slurm` | SLURM | Build Mash sketches for Gar and Mac refs (k=31, s=50000, min copies=2). Assign each run-lane by distance margin 0.002. Per-CGA majority vote. |
+| S05 | `S05_species_assign_kmers.sh` | bash | Standalone Mash + meryl k-mer species assignment (k=21, log₂ ratio threshold=1.0). CLI tool, not SLURM-specific. |
+| S06 | `S06_plot_species_assign.py` | python | Scatter of Mash distances, histogram of delta, suspicious-sample ranking. Outputs PNG/PDF + TSV. |
+| S07 | `S07_inventory_fastp_vs_bam.sh` | bash | Cross-check: does every fastp output have a matching BAM? Reports complete/missing/inconsistent. |
+| S08 | `S08_check_bam_bai_pairs.sh` | bash | Verify every `.sr.bam` has a `.sr.bam.bai` and vice versa. |
+| S09 | `S09_map_minimap2.slurm` | SLURM | minimap2 `-ax sr -Y` with RG per run-lane (SM=sample, LB=sample, PU=run.lane, PL=ILLUMINA). Sort + index. |
+| S10 | `S10_merge_markdup_clip.slurm` | SLURM array | Merge per-run BAMs, validate RG/SM consistency, fixmate, markdup (mark-only), BamUtil clipOverlap, flagstat + stats. |
+| S11 | `S11_get_tlen_percentiles.sh` | bash | TLEN p95/p99 from properly paired, primary, non-dup reads with MAPQ≥60 and same-chr mate. |
+| S12 | `S12_get_insert_size_stats.sh` | bash | Raw + MAD-trimmed (median ± 10×MAD) insert size stats. PE151 layout detection. |
+| S13 | `S13_filter_bam_popgen.slurm` | SLURM array | `-f 0x2 -F 0xF0C -q 60` + same-chr mate + abs(TLEN) ≤ p99 (514 bp). Final popgen BAMs. |
+| S14 | `S14_qc_depth_table.slurm` | SLURM | mosdepth across 5 region classes (whole-chr, repeat, nonrepeat, callable, noncallable). Per-sample + per-chr tables. Thresholds at 1×/5×/10×. |
+| S15 | `S15_summarize_bam_qc.sh` | SLURM | Parse flagstat + stats → `all_samples.bam_qc.tsv` + `summary.txt`. Heuristic ANGSD depth cutoffs (minDepthInd, maxDepthInd). |
+| S16 | `S16_make_bam_provenance.sh` | bash | Build `sample_bam_minimap2_vs_P99TLENMAPQ30.tsv` linking each CGA sample to raw + filtered BAM paths. Definitive manifest for all downstream. |
 
-## Origin Mapping
+## Key outputs
 
-| New script | Old script(s) | Notes |
-|------------|--------------|-------|
-| S01 | STEP01_00_fastp_trim_reads.slurm + .arg | Merged script+arg into single self-documenting script |
-| S02 | STEP01_01_make_fastp_eof_redo_table.sh | Cleaned up |
-| S03 | STEP02_00_extract_fastp_qc_tables.sh | Cleaned up |
-| S04 | STEP03_00_species_assign_mash_fastp.slurm + .arg | Merged script+arg |
-| S05 | STEP03_01_species_assign_kmers_mash_meryl.sh + .arg | Merged script+arg |
-| S06 | STEP03_plot_mash_species_assign.py | Cleaned up |
-| S07 | HELPER_STEP01_compare_fastp_and_bam_inventory.sh | Added set -euo, proper tmp cleanup |
-| S08 | STEP03_00_check_sr_bam_bai_pairs.sh | Added arg/results output |
-| S09 | STEP03_01_map_minimap2_batch00.slurm | Generalized batch variable |
-| S10 | STEP03_02_merge_markdup_clip_qc_array.slurm | Cleaned up |
-| S11 | STEP03_03_get_tlen_p95_p99.sh | Added arg/results output |
-| S12 | STEP03_04_get_insert_size_stats.sh | Cleaned up |
-| S13 | STEP03_04_filter_bam_popgen_pp_samechr_tlenp99.slurm | Cleaned up |
-| S14 | STEP03_05_qc_depth_table_final.slurm | Cleaned up |
-| S15 | STEP03_06_summarize_bam_qc_for_angsd.sh | Cleaned up |
-| S16 | STEP03_07_make_bam_provenance_table.sh | Added arg/results output |
+| Output | Description | Used by |
+|--------|-------------|---------|
+| `{sample}.filtered.bam` | PopGen-filtered BAMs (226 samples) | MODULE_2A, MODULE_3, MODULE_4A, unified_ancestry |
+| `{sample}.markdup.bam` | Markdup BAMs (shared, not filtered) | MODULE_4B–4H (DELLY/Manta need unfiltered markdup) |
+| `sample_bam_minimap2_vs_P99TLENMAPQ30.tsv` | Provenance manifest | All modules (sample list) |
+| `all_samples.coverage_context_qc.tsv` | Per-sample depth across 5 region classes | MODULE_2A (ANGSD depth filters) |
+| `fastp_qc_table.tsv` | Per-sample read QC | Manuscript Table S1 |
 
-## Design Conventions
+## Parameters
 
-Every script that produces outputs writes two sidecar files:
+| Parameter | Value | Script |
+|-----------|-------|--------|
+| fastp quality trim | Phred ≥ 20 | S01 |
+| fastp end trim | 5 bp each end, both reads | S01 |
+| fastp min length | 30 bp | S01 |
+| Mash k / sketch / margin | 31 / 50000 / 0.002 | S04 |
+| Aligner | minimap2 `-ax sr` | S09 |
+| Dedup strategy | samtools markdup (mark-only, not removed) | S10 |
+| Overlap clip | BamUtil clipOverlap `--storeOrig OC` | S10 |
+| PopGen MAPQ filter | ≥ 60 | S13 |
+| PopGen flag filter | `-f 0x2 -F 0xF0C` (proper pair, no unmapped/sec/dup/supp) | S13 |
+| PopGen TLEN filter | ≤ sample-specific p99 (514 bp) | S13 |
+| Depth QC | mosdepth, 5 region classes | S14 |
+| Callable genome | 963,905,721 bp | S14–S15 |
 
-1. **`<step>.arg`** — key-value TSV recording all parameters, tool versions, paths, and the exact command(s) run. Written at the start of execution.
-2. **`<step>.results`** — key-value TSV listing all output file paths and a brief description. Written at the end of execution.
+## Dependencies
 
-This makes the pipeline fully auditable: for any output file you can trace back to the exact parameters and commands that produced it.
+fastp (≥0.23), minimap2, samtools, BamUtil (clipOverlap), mosdepth, Mash, meryl (optional for S05), python3 + matplotlib (for S06)
+
+## Sidecar convention
+
+Every script writes two audit files alongside its outputs:
+- **`{step}.arg`** — all parameters, tool versions, paths, exact commands (written at start)
+- **`{step}.results`** — all output file paths + descriptions (written at end)
+
+This makes every output traceable to the exact invocation that produced it.
+
+## Methods
+
+See [`MODULE_1_Reads_methods.md`](MODULE_1_Reads_methods.md) for manuscript-ready methods prose with all parameter values and citations.
