@@ -1,0 +1,163 @@
+#!/usr/bin/env bash
+# =============================================================================
+# 00_ancestry_config.sh — Central config for the unified ancestry module (v12.1)
+#
+# v12.1 REWIRED:
+#   - Added REGISTRY_DIR, LOAD_BRIDGE, SAMPLES_IND for cross-module wiring
+#   - Added SAMPLE_MAP_R path
+#   - init_registry_if_needed() helper for auto-initialization
+#   - Palette unchanged
+#
+# Consumed by:
+#   Engine A (full survey), Engine B (instant Q), Module 2C (SNP support),
+#   Inversion pipeline (via instant_q.R), Stats dispatcher, Region popstats,
+#   Hobs/HWE engine, pipeline_bridge.sh
+# =============================================================================
+
+# ── Project root ─────────────────────────────────────────────────────────────
+export BASE="${BASE:-/scratch/lt200308-agbsci/Quentin_project_KEEP_2026-02-04}"
+
+# ── Reference genome ─────────────────────────────────────────────────────────
+export REF="${BASE}/00-samples/fClaHyb_Gar_LG.fa"
+export REF_FAI="${REF}.fai"
+
+# ── Programs ─────────────────────────────────────────────────────────────────
+export RSCRIPT_BIN="${RSCRIPT_BIN:-/lustrefs/disk/project/lt200308-agbsci/13-programs/mambaforge/envs/assembly/bin/Rscript}"
+export CONDA_ENV="assembly"
+
+# ── Binaries (compile from src/) ─────────────────────────────────────────────
+export INSTANT_Q_BIN="${BASE}/unified_ancestry/src/instant_q"
+export POPSTATS_BIN="${BASE}/unified_ancestry/engines/fst_dxy/region_popstats"
+export HOBS_WINDOWER_BIN="${BASE}/unified_ancestry/engines/hobs_hwe/scripts/hobs_windower"
+
+# ── Cross-module wiring (v12.1) ─────────────────────────────────────────────
+export SAMPLES_IND="${BASE}/het_roh/01_inputs_check/samples.ind"
+export REGISTRY_DIR="${BASE}/sample_registry"
+export LOAD_BRIDGE="${BASE}/inversion_codebase_v8.5/utils/load_bridge.R"
+export SAMPLE_MAP_R="${BASE}/inversion_codebase_v8.5/utils/sample_map.R"
+export SAMPLE_REGISTRY_R="${BASE}/inversion_codebase_v8.5/utils/sample_registry.R"
+
+# ── Step 1 outputs (Engine A → Engine B) ─────────────────────────────────────
+export STEP1_DIR="${BASE}/popstruct_thin"
+export STEP1_BEAGLE_DIR="${STEP1_DIR}/04_beagle_byRF_majmin"
+export STEP1_SITES_DIR="${STEP1_DIR}/03_sites"
+export STEP1_SAMPLE_LIST="${STEP1_DIR}/list_of_samples_one_per_line_same_bamfile_list.tsv"
+export STEP1_PRUNED_LIST="${STEP1_DIR}/06_relatedness/pruned_samples.txt"
+
+# ── BEAGLE directory for Engine B ────────────────────────────────────────────
+export BEAGLE_DIR="${STEP1_BEAGLE_DIR}"
+
+# ── Best NGSadmix run ────────────────────────────────────────────────────────
+export BEST_SEED_TABLE="${STEP1_DIR}/05_ngsadmix_global/runs_thin500/best_seed_by_K.tsv"
+
+# Default K: AUTO-DETECT from best_seed_by_K.tsv
+if [[ -f "${BEST_SEED_TABLE}" && -z "${DEFAULT_K:-}" ]]; then
+  _AUTO_K=$(awk -F'\t' 'NR>1 {print $1, $3}' "${BEST_SEED_TABLE}" 2>/dev/null \
+            | sort -k2 -rn | head -1 | awk '{print $1}')
+  export DEFAULT_K="${_AUTO_K:-8}"
+  unset _AUTO_K
+else
+  export DEFAULT_K="${DEFAULT_K:-8}"
+fi
+
+# Best Q and F
+_BEST_SEED=""
+if [[ -f "${BEST_SEED_TABLE}" ]]; then
+  _BEST_SEED=$(awk -F'\t' -v k="${DEFAULT_K}" 'NR>1 && $1==k {print $2; exit}' "${BEST_SEED_TABLE}" 2>/dev/null)
+fi
+_BEST_SEED="${_BEST_SEED:-1}"
+_K_PAD=$(printf "%02d" "${DEFAULT_K}")
+export BEST_QOPT="${BEST_QOPT:-${STEP1_DIR}/05_ngsadmix_global/runs_thin500/thin500_K${_K_PAD}_seed${_BEST_SEED}.qopt}"
+export BEST_FOPT="${BEST_FOPT:-${STEP1_DIR}/05_ngsadmix_global/runs_thin500/thin500_K${_K_PAD}_seed${_BEST_SEED}.fopt.gz}"
+unset _BEST_SEED _K_PAD
+
+# Aliases
+export QINIT_FILE="${BEST_QOPT}"
+export FOPT_FILE="${BEST_FOPT}"
+export SAMPLE_LIST="${STEP1_SAMPLE_LIST}"
+
+# ── Cache directory (Engine B output) ────────────────────────────────────────
+export LOCAL_Q_DIR="${BASE}/unified_ancestry/local_Q"
+
+# ── Window registry ──────────────────────────────────────────────────────────
+export WINDOW_REGISTRY="${BASE}/inversion_localpca_v7/06_mds_candidates/snake_regions_multiscale/precomp/windows_master.tsv.gz"
+
+# ── Genome ───────────────────────────────────────────────────────────────────
+export GENOME_SIZE=963905721
+export N_SAMPLES=226
+export N_CHROMOSOMES=28
+
+# ── Engine A: NGSadmix parameters ────────────────────────────────────────────
+export K_MIN=2
+export K_MAX=20
+export SEEDS=(1 2 3 4 5)
+export NGSADMIX_MINMAF=0.05
+export NGSADMIX_MAXITER=250
+
+# ── Engine B: Instant Q parameters ──────────────────────────────────────────
+export IQ_WINDOW_SIZE=100
+export IQ_WINDOW_STEP=20
+export IQ_EM_ITER=20
+export IQ_TOL="1e-4"
+export IQ_NCORES=4
+
+# ── ANGSD parameters ─────────────────────────────────────────────────────────
+export ANGSD_GL=1
+export ANGSD_MINQ=25
+export ANGSD_MINMAPQ=25
+export ANGSD_BAQ=1
+export ANGSD_C=50
+export ANGSD_SETMINDEPTHIND=3
+export ANGSD_SETMAXDEPTHIND=57
+export ANGSD_MININD=200
+export ANGSD_SNP_PVAL="1e-6"
+export ANGSD_MINMAF=0.05
+
+# ── Module 2C: SNP Q Support ────────────────────────────────────────────────
+export MODULE_2C_DIR="${BASE}/module02c_snp_q_support"
+export MODULE_2C_WINDOW_COUNT=50
+export MODULE_2C_WINDOW_STEP=25
+
+# ── Stats dispatcher + C popstats ────────────────────────────────────────────
+export STATS_CACHE_DIR="${BASE}/unified_ancestry/region_stats_cache"
+
+# ── Region popstats defaults ────────────────────────────────────────────────
+export POPSTATS_FIXED_WIN="50000:10000"
+export POPSTATS_DOWNSAMPLE=1
+export POPSTATS_TYPE=2
+
+# ── Hobs/HWE engine ─────────────────────────────────────────────────────────
+export HOBS_OUTDIR="${BASE}/hobs_hwe_confirmation"
+
+# ── Inversion pipeline integration ──────────────────────────────────────────
+export INVDIR="${BASE}/inversion_localpca_v7"
+export SNAKE1_DIR="${INVDIR}/06_mds_candidates/snake_regions_multiscale"
+export SNAKE_CAND_FILE="${SNAKE1_DIR}/snake_candidate_regions.tsv.gz"
+
+# ── SLURM defaults ───────────────────────────────────────────────────────────
+export SLURM_ACCOUNT="${SLURM_ACCOUNT:-lt200308}"
+export SLURM_PARTITION="${SLURM_PARTITION:-compute}"
+export SLURM_DEFAULT_TIME="02:00:00"
+export SLURM_DEFAULT_MEM="32G"
+export SLURM_DEFAULT_CPUS=8
+
+# ── Palette ──────────────────────────────────────────────────────────────────
+export ANCESTRY_PALETTE=(
+  "#4E79A7" "#F28E2B" "#E15759" "#76B7B2" "#59A14F"
+  "#EDC948" "#B07AA1" "#FF9DA7" "#9C755F" "#BAB0AC"
+  "#86BCB6" "#D37295"
+)
+
+# ── Convenience ──────────────────────────────────────────────────────────────
+timestamp(){ date '+%F %T'; }
+export -f timestamp
+
+anc_log()  { echo "[$(timestamp)] [ancestry] $*"; }
+anc_die()  { echo "[$(timestamp)] [ancestry] FATAL: $*" >&2; exit 1; }
+anc_check_file() { [[ -s "$1" ]] || anc_die "Missing or empty: $1"; }
+
+anc_init_dirs() {
+  mkdir -p "${LOCAL_Q_DIR}" "${STATS_CACHE_DIR}" "${HOBS_OUTDIR}" \
+           "${REGISTRY_DIR}/groups" "${REGISTRY_DIR}/backups"
+}
+export -f anc_log anc_die anc_check_file anc_init_dirs
