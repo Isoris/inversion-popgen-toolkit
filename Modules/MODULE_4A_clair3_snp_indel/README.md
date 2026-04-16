@@ -2,6 +2,22 @@
 
 Clair3 variant calling with WhatsHap phasing, five-phase post-processing pipeline (parse → phase blocks → rescue → population regenotyping → classification), marker handoff packaging, and downstream cohort-wide analysis suite. Produces phased per-sample VCFs, classified variant tables, marker packages, and population-level catalogs consumed by MODULE_6 (founder packs) and MODULE_CONSERVATION.
 
+## Why this module exists (for the inversion paper)
+
+Per-sample SNP and indel discovery with hard genotypes. This is a **different variant catalog from MODULE_2A**, not a duplicate:
+
+- MODULE_2A uses ANGSD to call **biallelic SNPs** from genotype likelihoods across the cohort. That catalog is designed for low-coverage population genetics — Q estimation, admixture, Fst — where per-sample hard genotypes are never materialized.
+- MODULE_4A uses Clair3 to call **per-sample SNPs and indels** with hard phased genotypes. ANGSD does not call indels, and its biSNP filter drops sites (multi-allelic, low-depth-in-individuals, outside callable regions) that matter for per-sample analyses.
+
+The Clair3 catalog feeds two downstream analyses the inversion paper depends on:
+
+1. **MODULE_6 founder-pack fragment classes** — the 100-INDEL sliding window framework is the backbone of founder-pack analysis. Without a dense, phase-aware indel catalog at cohort scale, founder-pack fragment classes cannot be resolved. `[CONFIRM: founder packs use indels only, not SNPs — based on memory context "100-INDEL windows".]`
+2. **MODULE_CON deleterious-variant scoring** — SnpEff / SIFT4G / VESM annotations on Clair3 variants feed the breeding-concern classification (BC0–BC4) overlaid on inversion candidate regions to identify inversions harboring elevated deleterious burden.
+
+The three-branch rescue system (STEP_P03 through P05) targets indels near variant hotspots where Clair3's confidence is marginal — disproportionately the breakpoint-proximal indels that matter for inversion analysis.
+
+> Numbering gaps in this module (STEP_D02, STEP_X08–X09, STEP_X13–X19) are reserved slots for future steps; current production uses the steps listed in the scripts directory.
+
 ## Pipeline overview
 
 ```

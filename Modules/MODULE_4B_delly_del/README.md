@@ -2,6 +2,14 @@
 
 DELLY2 deletion discovery, site merging, cohort regenotyping, germline filtering, functional annotation, depth support QC, and publication figure suite. Produces the final DEL catalog (226-sample + 81-unrelated subsets) with GT matrices, marker selections, and per-sample burden tables consumed by downstream SV modules and the manuscript.
 
+## Why this module exists (for the inversion paper)
+
+Deletions are not inversions — but patterns of deletion sharing among inversion carriers can test a specific hypothesis: whether an inversion is trapping private deletions in linkage. If INV/INV samples share deletions that are rare or absent in INV/STD samples, that indicates low recombination across the inverted interval, which is the defining functional property of a real inversion.
+
+`[CONFIRM: whether MODULE_5B currently implements the INV-carrier deletion-sharing overlay, or whether this is a planned followup analysis. If planned, framing should be "will support" rather than "supports".]`
+
+MODULE_4B's DEL catalog is intended for consumption by MODULE_5B per-candidate analyses to overlay the deletion landscape on each inversion region. The `select_markers.py` output also supports rare-allele-sharing analyses that use deletions as a complementary signal to SNP doubletons.
+
 ## Pipeline
 
 ```

@@ -2,6 +2,14 @@
 
 Callable-site masking, ANGSD biSNP discovery, distance-thinned panels, BEAGLE GL generation, PCAngsd, NGSadmix, evalAdmix, ngsRelate relatedness pruning, and canonical best-seed-by-K selection. Produces the SNP panels, BEAGLE files, ancestry assignments, and pruned sample lists consumed by every downstream module.
 
+## Why this module exists (for the inversion paper)
+
+Every ancestry-flavored inversion signal is anchored to this module's biallelic SNP panel. ANGSD calls biSNPs from genotype likelihoods at cohort scale — the only statistically appropriate way to work with low-coverage data without hard genotype calls. The thinned panel produced here feeds NGSadmix for global ancestry Q, and Engine B / instant_q for per-window local Q. MODULE_5A's three-snake inversion-discovery consensus computes against those Q estimates — without this module's panel, there is nothing to compute against.
+
+NAToRA first-degree pruning (A07) also produces the 81-unrelated subset used for Hardy-Weinberg-sensitive tests including Hobs confirmation (MODULE_5E) and inversion genotype-frequency tests.
+
+Note: ANGSD biSNPs are **not** the same catalog as Clair3 SNPs (MODULE_4A). ANGSD works in GL space for population-level Q/Fst; Clair3 produces per-sample hard genotypes for per-sample analyses. Both are needed, for different downstream consumers.
+
 ## Pipeline
 
 ```

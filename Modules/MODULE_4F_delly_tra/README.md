@@ -2,6 +2,13 @@
 
 DELLY2 translocation discovery, site merging, cohort regenotyping, germline filtering, functional annotation, and publication plots. Follows the same 6-job SLURM chain as MODULE_4B–4E. Reuses shared markdup BAMs and exclusion BED.
 
+## Why this module exists (for the inversion paper)
+
+Inter-chromosomal translocations are not inversions, but they matter for two reasons:
+
+1. **False-positive control.** A region flagged by MODULE_5A as an inversion candidate could in fact be a local assembly artifact where reads from a translocated segment are misaligning. The TRA catalog lets downstream analyses cross-check every MODULE_5A candidate against known inter-chromosomal signal to rule this out. `[CONFIRM: whether this cross-check is implemented in MODULE_5A2 or 5B, or whether it is a planned followup analysis.]`
+2. **Complex rearrangement detection.** Some inversions are embedded in larger reciprocal translocations. Co-occurrence of MODULE_4F TRA and MODULE_4D INV at the same coordinates identifies these complex events, which require special handling because they violate the simple three-karyotype INV/INV / INV/STD / STD/STD model.
+
 > **Note on numbering:** MODULE_4F was originally 4G. Letters were shifted because DELLY2 INS calling was dropped (unreliable at ~5× short-read coverage). The current MODULE_4 series is: 4A (Clair3), 4B (DEL), 4C (DUP), 4D (INV), 4E (BND), 4F (TRA), 4G (Manta).
 
 ## Pipeline

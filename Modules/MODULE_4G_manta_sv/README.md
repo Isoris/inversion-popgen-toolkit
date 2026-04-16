@@ -2,6 +2,14 @@
 
 Manta structural variant discovery across all SV types (DEL, DUP, INS, INV/BND) in a single per-sample run, with inversion conversion, cohort merging, per-type splitting, evidence-based tiered filtering, and summary reporting. Complements the type-specific DELLY pipelines (MODULE_4B–4F) with Manta's assembly-based approach and insertion detection.
 
+## Why this module exists (for the inversion paper)
+
+Manta is the independent second SV caller. DELLY (MODULE_4B–F) uses discordant read pairs + split reads to genotype known-type SVs; Manta uses de-novo local assembly. They fail on different regions for different reasons — Manta tends to call inversions that DELLY misses in repeat-rich breakpoint zones, and DELLY tends to catch low-coverage signal that Manta's assembler drops.
+
+The inversion paper's SV-concordance argument requires that every MODULE_5A inversion candidate has its breakpoints validated by at least one caller, and ideally both. MODULE_4G runs Manta per-sample, `convertInversion.py` to merge each INV3+INV5 BND pair into a single INV record, then splits the cohort-merged VCF into the six Manta output types (DEL, DUP, INV, BND, INS_small, INS_large). MODULE_5A2 STEP05 computes DELLY×Manta INV concordance for every candidate and flags caller-specific orphans.
+
+Manta is also the **only** caller in the pipeline that reliably detects insertions (INS) at ~5× coverage. DELLY INS calling was dropped from the pipeline for this reason — see MODULE_4E's numbering note.
+
 > **Note on numbering:** MODULE_4G was originally 4H. Letters were shifted because DELLY2 INS calling was dropped. The final MODULE_4 series is: 4A (Clair3), 4B (DEL), 4C (DUP), 4D (INV), 4E (BND), 4F (TRA), 4G (Manta).
 
 ## Pipeline

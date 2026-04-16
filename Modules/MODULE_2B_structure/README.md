@@ -2,6 +2,12 @@
 
 Extended ancestry inference with K=2–20, per-chromosome structure, evalAdmix model diagnostics, K-hierarchy merge tree, and publication-quality figure suite. Consumes MODULE_2A SNP panels and produces the definitive ancestry assignments, kinship figures, and sample registry entries used by all downstream modules.
 
+## Why this module exists (for the inversion paper)
+
+The per-sample K=8 ancestry assignment from this module is the null distribution against which every inversion candidate is tested. An inversion-like region by definition shows local ancestry that disagrees with global ancestry — so the global Q estimated here is the denominator in every Q-residual and Q-contrast calculation downstream.
+
+The K-hierarchy tree and evalAdmix diagnostics answer a separate concern: is the K=8 solution itself biologically meaningful or a statistical artifact of hatchery structure? If K=8 is artifactual, every inversion candidate flagged by Q-contrast is suspect. This module is the sanity check on that assumption.
+
 ## Pipeline
 
 ```

@@ -2,6 +2,14 @@
 
 DELLY2 duplication discovery, site merging, cohort regenotyping, germline filtering, functional annotation, and downstream analysis. Follows the same architecture as MODULE_4B (DEL) with DUP-specific parameters. Reuses the shared markdup BAMs and exclusion BED from MODULE_4B.
 
+## Why this module exists (for the inversion paper)
+
+Segmental duplications at inversion breakpoints are one of the strongest predictors of whether an inversion is recurrent (arising independently multiple times) versus unique. Porubsky et al. 2022 (Cell) showed that inverted-orientation SD pairs flanking an inversion drive high recurrence rates; direct-orientation SD pairs drive CNV disease risk instead.
+
+MODULE_4C produces the DUP catalog that MODULE_5B cross-references against inversion breakpoints from MODULE_4D and MODULE_4G. A duplication flanking an inversion breakpoint in inverted orientation is evidence for an NAHR-mediated origin; in direct orientation, evidence for a twin-priming or MMBIR origin. This is the mechanism-inference layer for the inversion paper.
+
+`[CONFIRM: whether the SD-orientation cross-reference is implemented in MODULE_5B yet, or whether it lives in the cheats list as a planned analysis.]`
+
 ## Pipeline
 
 ```

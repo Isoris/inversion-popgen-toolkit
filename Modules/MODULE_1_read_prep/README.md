@@ -2,6 +2,14 @@
 
 Read-level QC, species verification, short-read alignment, BAM merging and deduplication, population-genomics filtering, and depth QC. Produces the filtered BAMs consumed by every downstream module.
 
+## Why this module exists (for the inversion paper)
+
+The inversion pipeline is only as trustworthy as the alignments that feed it. MODULE_1 produces the filtered BAMs that every downstream inversion signal ultimately rests on: local PCA, GHSL haplotype contrast, DELLY/Manta breakpoints, Hobs heterozygosity, founder-pack fragment classes. Three decisions in this module directly protect the inversion analysis:
+
+1. **Species verification (A04–A06)** — confirms every sample is an F₁ *Clarias gariepinus × C. macrocephalus* hybrid. A misassigned sample would add spurious population structure that could mimic or mask inversion signal.
+2. **PopGen vs markdup-only BAMs (B02, B05)** — two BAM tracks. Filtered BAMs (MAPQ≥60, proper pair, TLEN≤p99) feed ANGSD downstream (MODULE_2A, MODULE_3). Markdup-only BAMs (unfiltered) feed DELLY and Manta (MODULE_4B–4G) because SV callers need the split reads and outlier-TLEN pairs that the popgen filter removes.
+3. **TLEN p99 = 514 bp (B03)** — empirical insert-size cutoff. Larger pairs are treated as discordant by SV callers, so this number is a hard sensitivity parameter for DELLY/Manta at inversion breakpoints.
+
 ## Pipeline
 
 ```

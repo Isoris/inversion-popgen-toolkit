@@ -2,6 +2,12 @@
 
 DELLY2 translocation/breakend discovery, site merging, cohort regenotyping, germline filtering, functional annotation, and publication plots. Follows the same 6-job SLURM chain as MODULE_4B–4D. Reuses shared markdup BAMs and exclusion BED.
 
+## Why this module exists (for the inversion paper)
+
+BND (breakend) records are DELLY's output when the caller sees split-read evidence but cannot assemble the full SV structure. Every inversion creates two BND calls — a `CT=3to3` (right-facing) and a `CT=5to5` (left-facing) junction. When DELLY's INV-typing misses one — because a breakpoint falls in a repeat, or supporting reads are marginal — the two BND records can still recover the inversion.
+
+MODULE_5A2 STEP06 extracts all BND records with inversion-orientation tags, pairs 3to3+5to5 junctions by distance, cross-references against the INV catalog, and flags orphan BNDs: isolated breakpoint evidence where no INV was called. These are the hidden inversions the typer missed and are rescue candidates for MODULE_5A's discovery set.
+
 > **Note on numbering:** MODULE_4E was originally 4F. The letter E was freed because DELLY2 INS calling was dropped — DELLY's insertion detection is unreliable for short-read data at ~5× coverage, and insertions are instead captured by Manta (MODULE_4F) and Clair3 small indels (MODULE_4A).
 
 ## Pipeline
