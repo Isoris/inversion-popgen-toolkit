@@ -2,6 +2,11 @@
 # =============================================================================
 # run_full_pipeline.sh — Orchestrate the complete unified ancestry pipeline
 #
+# v12.2 REWIRED (repo reorg):
+#   - Uses moved-script variables (SNP_Q_SUPPORT_PY, NESTED_COMPOSITION_PY,
+#     CANDIDATE_CLASSIFIER_PY, EXPORT_MODULE5B_PY, HOBS_PLOT_R) from config
+#   - Moved scripts now live under Modules/MODULE_5A/ and Modules/MODULE_5B/
+#
 # v12.1 REWIRED:
 #   - Sources pipeline_bridge.sh at top
 #   - Step 1 (registries) uses sample_registry if available
@@ -40,7 +45,7 @@ fi
 RSCRIPT="${RSCRIPT_BIN:-Rscript}"
 PYTHON="${PYTHON_BIN:-python3}"
 
-anc_log "=== Unified Ancestry Pipeline (v12.1 REWIRED) ==="
+anc_log "=== Unified Ancestry Pipeline (v12.2 REWIRED) ==="
 anc_log "Config: $CONFIG"
 anc_log "Steps: ${START_STEP} to ${END_STEP}"
 anc_log "Registry: ${REGISTRY_DIR:-NOT SET}"
@@ -76,7 +81,7 @@ if [[ $START_STEP -le 3 && $END_STEP -ge 3 ]]; then
     fi
 
     anc_log "  SNP support: ${CHR}..."
-    $PYTHON "${SCRIPT_DIR}/engines/snp_support/snp_q_support.py" \
+    $PYTHON "$SNP_Q_SUPPORT_PY" \
       --beagle "$BGL" \
       --qopt "$BEST_QOPT" \
       --sample_list "$SAMPLE_LIST" \
@@ -95,7 +100,7 @@ if [[ $START_STEP -le 4 && $END_STEP -ge 4 ]]; then
 
   PARENTS="${SNAKE_CAND_FILE:-}"
   if [[ -n "$PARENTS" && -f "$PARENTS" ]]; then
-    $PYTHON "${SCRIPT_DIR}/engines/nested_composition/nested_composition.py" \
+    $PYTHON "$NESTED_COMPOSITION_PY" \
       --q_cache_dir "$LOCAL_Q_DIR" \
       --parents "$PARENTS" \
       --outdir "$NEST_OUTDIR" \
@@ -129,7 +134,7 @@ if [[ $START_STEP -le 5 && $END_STEP -ge 5 ]]; then
 
     NEST_SUMM="${BASE}/unified_ancestry/nested_composition/nested_composition_summary.tsv"
 
-    $PYTHON "${SCRIPT_DIR}/engines/candidate_classifier/candidate_classifier.py" \
+    $PYTHON "$CANDIDATE_CLASSIFIER_PY" \
       --candidates "$PARENTS" \
       ${Q_WIN:+--q_windows "$Q_WIN"} \
       --q_cache_dir "$LOCAL_Q_DIR" \
@@ -159,7 +164,7 @@ if [[ $START_STEP -le 6 && $END_STEP -ge 6 ]]; then
   done
 
   if [[ -n "$SNP_FILE" ]]; then
-    $PYTHON "${SCRIPT_DIR}/engines/module5b_export/export_module5b.py" \
+    $PYTHON "$EXPORT_MODULE5B_PY" \
       --snp_support "$SNP_FILE" \
       --outdir "$EXPORT_OUTDIR" \
       --K "$DEFAULT_K"
@@ -263,7 +268,7 @@ fi
 # ── Step 9: Hobs/HWE plotting ──
 if [[ $START_STEP -le 9 && $END_STEP -ge 9 ]]; then
   anc_log "Step 9: Hobs/HWE plotting suite..."
-  PLOT_SCRIPT="${SCRIPT_DIR}/engines/hobs_hwe/scripts/05_plot_hobs_hwe.R"
+  PLOT_SCRIPT="$HOBS_PLOT_R"
   HOBS_CONFIG="${SCRIPT_DIR}/engines/hobs_hwe/00_hobs_hwe_config.sh"
 
   if [[ -f "$PLOT_SCRIPT" && -f "$HOBS_CONFIG" ]]; then
@@ -275,4 +280,4 @@ if [[ $START_STEP -le 9 && $END_STEP -ge 9 ]]; then
   fi
 fi
 
-anc_log "=== Pipeline complete (v12.1) ==="
+anc_log "=== Pipeline complete (v12.2) ==="

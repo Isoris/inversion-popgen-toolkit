@@ -76,7 +76,7 @@ if [[ $START_STEP -le 4 && $END_STEP -ge 4 ]]; then
     mkdir -p "$OVERLAY_DIR"
     for scale_def in "${WINDOW_SCALES[@]}"; do
       label=$(echo "$scale_def" | cut -d: -f1)
-      python3 "${SCRIPT_DIR}/scripts/04_candidate_overlay.py" \
+      python3 "$HOBS_CANDIDATE_OVERLAY_PY" \
         --candidates "$CAND" \
         --windows_dir "${HOBS_OUTDIR}/03_hobs_windows" \
         --subsets "${HOBS_OUTDIR}/subsets/subset_manifest.tsv" \

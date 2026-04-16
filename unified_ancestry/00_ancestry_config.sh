@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 # =============================================================================
-# 00_ancestry_config.sh — Central config for the unified ancestry module (v12.1)
+# 00_ancestry_config.sh — Central config for the unified ancestry module (v12.2)
+#
+# v12.2 REWIRED (repo reorg):
+#   - All MODULE_* directories moved to Modules/ at repo root
+#   - 12 files moved out of unified_ancestry/engines and utils to
+#     Modules/MODULE_5A_inversion_discovery/ and Modules/MODULE_5B_inversion_followup/
+#   - Added QRES_BIN, RARE_SFS_BIN, MODULE_5B_ENGINES_DIR for moved C engines
+#   - Added SNP_Q_SUPPORT_PY, NESTED_COMPOSITION_PY, CANDIDATE_CLASSIFIER_PY,
+#     EXPORT_MODULE5B_PY, HOBS_CANDIDATE_OVERLAY_PY, HOBS_PLOT_R for moved scripts
 #
 # v12.1 REWIRED:
 #   - Added REGISTRY_DIR, LOAD_BRIDGE, SAMPLES_IND for cross-module wiring
@@ -29,6 +37,24 @@ export CONDA_ENV="assembly"
 export INSTANT_Q_BIN="${BASE}/unified_ancestry/src/instant_q"
 export POPSTATS_BIN="${BASE}/unified_ancestry/engines/fst_dxy/region_popstats"
 export HOBS_WINDOWER_BIN="${BASE}/unified_ancestry/engines/hobs_hwe/scripts/hobs_windower"
+
+# ── Binaries moved to Modules/MODULE_5B_inversion_followup/engines (v12.2) ──
+# These C engines feed 5B R plots (plot_ld_panels.R, 07_plot_rare_sfs_heatmap.R)
+# and were relocated from unified_ancestry/engines/fst_dxy/ to live next to
+# their consumers. See Modules/MODULE_5B_inversion_followup/engines/Makefile.
+export QRES_BIN="${BASE}/Modules/MODULE_5B_inversion_followup/engines/export_q_residual_dosage"
+export RARE_SFS_BIN="${BASE}/Modules/MODULE_5B_inversion_followup/engines/rare_sfs_pairwise"
+export MODULE_5B_ENGINES_DIR="${BASE}/Modules/MODULE_5B_inversion_followup/engines"
+
+# ── Cross-module Python / R scripts (v12.2) ─────────────────────────────────
+# Ancestry-driven candidate analysis/classification moved to MODULE_5A:
+export SNP_Q_SUPPORT_PY="${BASE}/Modules/MODULE_5A_inversion_discovery/analysis/snp_q_support.py"
+export NESTED_COMPOSITION_PY="${BASE}/Modules/MODULE_5A_inversion_discovery/analysis/nested_composition.py"
+export CANDIDATE_CLASSIFIER_PY="${BASE}/Modules/MODULE_5A_inversion_discovery/classification/candidate_classifier.py"
+# Inversion followup utilities / figures moved to MODULE_5B:
+export EXPORT_MODULE5B_PY="${BASE}/Modules/MODULE_5B_inversion_followup/utils/export_module5b.py"
+export HOBS_CANDIDATE_OVERLAY_PY="${BASE}/Modules/MODULE_5B_inversion_followup/analysis/04_candidate_overlay.py"
+export HOBS_PLOT_R="${BASE}/Modules/MODULE_5B_inversion_followup/figures/05_plot_hobs_hwe.R"
 
 # ── Cross-module wiring (v12.1) ─────────────────────────────────────────────
 export SAMPLES_IND="${BASE}/het_roh/01_inputs_check/samples.ind"

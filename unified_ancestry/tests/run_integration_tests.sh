@@ -24,6 +24,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CONFIG="${1:-${SCRIPT_DIR}/00_ancestry_config.sh}"
+# v12.2: source config so moved-script variables (HOBS_PLOT_R, etc.) resolve
+[[ -f "$CONFIG" ]] && source "$CONFIG"
 SINGLE_TEST="${2:-}"
 TMPDIR=$(mktemp -d /tmp/ancestry_test_XXXXXX)
 PASS=0; FAIL=0; SKIP=0
@@ -262,7 +264,7 @@ fi
 # =============================================================================
 run_test T10 "Part 12 plotting suite"
 
-PLOT="${SCRIPT_DIR}/engines/hobs_hwe/scripts/05_plot_hobs_hwe.R"
+PLOT="${HOBS_PLOT_R:-${SCRIPT_DIR}/engines/hobs_hwe/scripts/05_plot_hobs_hwe.R}"
 if [[ -f "$PLOT" ]]; then
   MODES=0
   for m in genome_tracks heatmap outlier_burden subset_compare candidate_stack; do
