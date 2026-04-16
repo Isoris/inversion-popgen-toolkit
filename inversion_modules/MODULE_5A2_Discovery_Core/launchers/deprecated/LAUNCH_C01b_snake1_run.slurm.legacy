@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+#SBATCH -p compute
+#SBATCH -N 1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=127
+#SBATCH --mem=237G
+#SBATCH -t 2:00:00
+#SBATCH -J inv_C01b
+#SBATCH -o logs/inv_C01b_%j.out
+#SBATCH -e logs/inv_C01b_%j.err
+
+# =============================================================================
+# LAUNCH_C01b_snake1_run.slurm
+#
+# Fast snake runner — reads precomputed data from C01a.
+# Each run takes ~2-5 minutes. Rerun with different parameters by editing
+# the STEP_C01b_1_cores.R parameter block (seed thresholds, damage model,
+# merge settings).
+#
+# Usage:
+#   sbatch LAUNCH_C01b_snake1_run.slurm                    # default output
+#   sbatch LAUNCH_C01b_snake1_run.slurm relaxed_v2         # tagged subfolder
+#   sbatch LAUNCH_C01b_snake1_run.slurm strict_z25         # another tag
+# =============================================================================
+
+set -euo pipefail
+source ~/.bashrc
+mamba activate assembly
+
+CONFIG="/scratch/lt200308-agbsci/Quentin_project_KEEP_2026-02-04/inversion_codebase_v8.5/00_inversion_config.sh"
+[[ -f "${CONFIG}" ]] || { echo "Missing config: ${CONFIG}" >&2; exit 1; }
+
+set -a
+source "${CONFIG}"
+set +a
+
+inv_init_dirs
+
+A2_SNAKES="${DISCOVERY2DIR}/snakes"
+
+TAG="${1:-}"
+TAG_ARGS=""
+if [[ -n "${TAG}" ]]; then
+  TAG_ARGS="--tag ${TAG}"
+fi
+
+echo "================================================================"
+echo "  C01b: Snake 1 run (fast, from precomputed data)"
+echo "  Tag: ${TAG:-default}"
+echo "  JobID: ${SLURM_JOB_ID}"
+echo "  Started: $(date)"
+echo "================================================================"
+
+"${RSCRIPT_BIN}" "${A2_SNAKES}/STEP_C01b_1_cores.R" \
+    "${MDS_DIR}/snake_regions_multiscale/precomp" \
+    "${MDS_DIR}/snake_regions_multiscale" \
+    ${TAG_ARGS}
+
+echo "================================================================"
+echo "  C01b complete — $(date)"
+if [[ -n "${TAG}" ]]; then
+  echo "  Output: ${MDS_DIR}/snake_regions_multiscale/${TAG}/"
+else
+  echo "  Output: ${MDS_DIR}/snake_regions_multiscale/"
+fi
+echo "================================================================"

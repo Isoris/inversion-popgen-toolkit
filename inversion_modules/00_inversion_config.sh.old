@@ -1,0 +1,174 @@
+#!/usr/bin/env bash
+# =============================================================================
+# 00_inversion_config.sh — Central configuration for inversion pipeline
+#
+# Source this file at the top of every shell script and SLURM launcher.
+# All paths resolve from BASE. Nothing is hardcoded in individual scripts.
+#
+# Usage:
+#   source "$(dirname "${BASH_SOURCE[0]}")/00_inversion_config.sh"
+#   — or —
+#   source /path/to/00_inversion_config.sh
+# =============================================================================
+
+# ── Project root ─────────────────────────────────────────────────────────────
+BASE="${BASE:-/scratch/lt200308-agbsci/Quentin_project_KEEP_2026-02-04}"
+
+# ── Results root (where pipeline outputs live) ───────────────────────────────
+INVDIR="${BASE}/inversion_localpca_v7"
+
+# ── Code root (the clean codebase) ───────────────────────────────────────────
+CODEBASE="${BASE}/inversion_codebase_v8.5"
+# Legacy alias — the monolithic MODULE_5A was split into 5A1/5A2/5A3 in v8.3.
+# DISCOVERYDIR now points to 5A2 (the core discovery code) for backward compat.
+DISCOVERYDIR="${CODEBASE}/MODULE_5A2_Discovery_Core"
+FOLLOWUPDIR="${CODEBASE}/MODULE_5B_Inversion_Followup"
+LDDIR="${CODEBASE}/MODULE_5C_Inversion_LD"
+FSTDIR="${CODEBASE}/MODULE_5D_Inversion_FST"
+HOBSDIR="${CODEBASE}/MODULE_5E_Inversion_HOBS"
+
+DISCOVERY1DIR="${CODEBASE}/MODULE_5A1_Discovery_Inputs"
+DISCOVERY2DIR="${CODEBASE}/MODULE_5A2_Discovery_Core"
+DISCOVERY3DIR="${CODEBASE}/MODULE_5A3_Discovery_Postprocessing"
+
+# ── Rscript binary ──────────────────────────────────────────────────────────
+RSCRIPT_BIN="/lustrefs/disk/project/lt200308-agbsci/13-programs/mambaforge/envs/assembly/bin/Rscript"
+
+# ── Stable external inputs ───────────────────────────────────────────────────
+HETDIR="${BASE}/het_roh"
+REF="${BASE}/00-samples/fClaHyb_Gar_LG.fa"
+REF_FAI="${REF}.fai"
+BAMLIST="${HETDIR}/01_inputs_check/bamlist_qcpass.txt"
+SAMPLES_IND="${HETDIR}/01_inputs_check/samples.ind"
+
+# ── Results subdirectories ───────────────────────────────────────────────────
+DOSAGE_DIR="${INVDIR}/04_dosage_by_chr"
+LPCA_DIR="${INVDIR}/05_local_pca"
+MDS_DIR="${INVDIR}/06_mds_candidates"
+BRIDGE_DIR="${INVDIR}/07_het_overlap"
+REGIONAL_DIR="${INVDIR}/08_regional_pca"
+COMBINED_DIR="${INVDIR}/09_combined_plots"
+FOLLOWUP_RESULTS="${INVDIR}/20_candidate_followup"
+PLOTS_RESULTS="${INVDIR}/21_candidate_plots"
+
+# ── Shared discovery prefix ──────────────────────────────────────────────────
+# Prefix used by STEP10v2 + snake/consensus/HMM/rescue outputs.
+MDS_PREFIX_BASENAME="inversion_localpca"
+MDS_PREFIX="${MDS_DIR}/${MDS_PREFIX_BASENAME}"
+
+# ── Candidate tables ─────────────────────────────────────────────────────────
+# CONTROL candidates (500 kb fixed-distance merge from STEP10_v2)
+CAND_FILE="${MDS_PREFIX}.candidate_regions.tsv.gz"
+
+# SNAKE candidates (primary method — from STEP10e_v3 merge_A regions)
+SNAKE_CAND_FILE="${MDS_DIR}/snake_regions_multiscale/snake_candidate_regions.tsv.gz"
+
+# ── R config (for R scripts that source a config.R) ─────────────────────────
+R_CONFIG="${FOLLOWUPDIR}/config_inversion_followup.R"
+
+# ── Defaults ─────────────────────────────────────────────────────────────────
+
+# Theta / tP bridge defaults
+THETA_WINDOW_BP_DEFAULT=50000
+THETA_STEP_BP_DEFAULT=10000
+THETA_SCALE_TAG_DEFAULT="win${THETA_WINDOW_BP_DEFAULT}.step${THETA_STEP_BP_DEFAULT}"
+
+# Core local-PCA defaults
+NPC=2
+WINSIZE=100
+WINSTEP=20
+
+# Main MDS / discovery defaults
+# Allowed: chromosome, global, chunked_2x, chunked_3x, chunked_4x
+MDS_MODE_DEFAULT="chunked_2x"
+MDS_SEED_DEFAULT=42
+MDS_DIMS_DEFAULT=20
+Z_THRESH_DEFAULT=3
+
+# Background sampling for chunked MDS
+# chunked_2x = focal windows + 2x background windows
+# chunked_4x = focal windows + 4x background windows
+BACKGROUND_MULTIPLIER_DEFAULT=2
+
+# Positional control merge defaults (CONTROL only, not primary method)
+GAP_BP_CONTROL_DEFAULT=500000
+MIN_WINDOWS_CONTROL_DEFAULT=3
+
+# Snake output directories
+SNAKE1_DIR="${MDS_DIR}/snake_regions_multiscale"
+SNAKE1_DIAG_DIR="${MDS_DIR}/snake_diagnostics_v3"
+SNAKE2_DIR="${MDS_DIR}/snake2_community"
+SNAKE3_DIR="${MDS_DIR}/snake3_ghsl"
+SNAKE4_DIR="${MDS_DIR}/snake4_threeband"
+CONSENSUS_DIR="${MDS_DIR}/three_snake_consensus"
+HMM_DIR="${MDS_DIR}/regime_hmm"
+RESCUE_DIR="${MDS_DIR}/rescue_pass2"
+
+# Backward-compat aliases (used by MODULE_5B config_inversion_followup.R)
+SNAKE_PRIMARY_DIR="${SNAKE1_DIR}"
+SNAKE_SECONDARY_DIR="${SNAKE1_DIR}"
+SNAKE_DIAG_DIR="${SNAKE1_DIAG_DIR}"
+
+# v8.5 output directories
+LANDSCAPE_DIR="${MDS_DIR}/snake_regions_multiscale/landscape"
+TRIANGLE_DIR="${MDS_DIR}/snake_regions_multiscale/triangles"
+SCORING_DIR="${MDS_DIR}/snake_regions_multiscale/scoring"
+DECOMPOSITION_DIR="${MDS_DIR}/snake_regions_multiscale/decomposition"
+REGIME_DIR="${MDS_DIR}/snake_regions_multiscale/regime_engine"
+
+# Current method philosophy
+PRIMARY_CANDIDATE_METHOD="snake"
+CONTROL_CANDIDATE_METHOD="posmerge_500kb"
+
+# ---------------------------------------------------------------------------
+# Original Li & Ralph 2019 / Huang et al. 2020 / Mérot et al. comparison
+# ---------------------------------------------------------------------------
+# These are COMPARISON / CONTROL-style defaults only.
+# They should not override the main snake-primary pipeline unless explicitly used.
+
+CLASSIC_LOCALPCA_OUTLIER_Z_DEFAULT=2
+CLASSIC_MAX_GAP_WINDOWS_DEFAULT=20
+
+# Windowing note:
+# The published approaches often used fixed-bp windows (e.g. 1 kb / 10 kb / 100 kb),
+# whereas the current pipeline primarily uses fixed-SNP windows (e.g. 100 SNP).
+# So these settings define a comparison branch, not an exact one-to-one replication.
+CLASSIC_WINDOW_MODE_DEFAULT="fixed_bp"
+CLASSIC_WINDOW_BP_SET_DEFAULT="1000,10000,100000"
+
+# Classic supporting heuristics
+CLASSIC_LD_R2_THRESHOLD_DEFAULT=0.4
+CLASSIC_MIN_SNPS_FOR_GENOTYPING_DEFAULT=10000
+CLASSIC_OUTLIER_SD_DESCRIPTION="MDS score > 2 SD above mean across windows"
+
+# Regional PCA / genotype interpretation defaults
+REGIONAL_PCA_DEFAULT_K_MIN=2
+REGIONAL_PCA_DEFAULT_K_MAX=5
+LEGACY_K3_REFERENCE_DEFAULT=3
+
+# Reproducibility / comparison labels
+METHOD_BRANCH_DEFAULT="snake_primary"
+METHOD_BRANCH_CLASSIC="lostruct_classic"
+METHOD_BRANCH_CONTROL="posmerge_control"
+
+# ── Helper functions ─────────────────────────────────────────────────────────
+inv_timestamp() { date '+%F %T'; }
+inv_log() { echo "[$(inv_timestamp)] [INV] $*"; }
+inv_err() { echo "[$(inv_timestamp)] [INV] [ERROR] $*" >&2; }
+inv_die() { inv_err "$@"; exit 1; }
+
+inv_check_file() {
+  local f="$1" label="${2:-file}"
+  [[ -s "$f" ]] || inv_die "Missing or empty ${label}: ${f}"
+}
+
+inv_init_dirs() {
+  mkdir -p \
+    "${INVDIR}" \
+    "${DOSAGE_DIR}" "${LPCA_DIR}" "${MDS_DIR}" "${BRIDGE_DIR}" \
+    "${REGIONAL_DIR}" "${COMBINED_DIR}" \
+    "${FOLLOWUP_RESULTS}" "${PLOTS_RESULTS}" \
+    "${LANDSCAPE_DIR}" "${TRIANGLE_DIR}" "${SCORING_DIR}" \
+    "${DECOMPOSITION_DIR}" "${REGIME_DIR}" \
+    "${INVDIR}/logs"
+}

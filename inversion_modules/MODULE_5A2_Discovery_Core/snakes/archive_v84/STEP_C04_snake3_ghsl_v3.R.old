@@ -1,0 +1,698 @@
+#!/usr/bin/env Rscript
+
+# =============================================================================
+# STEP_C04_snake3_ghsl_v3.R
+#
+# SNAKE 3 v3: True group-level haplotype contrast.
+#
+# Measures whether samples in the same PC1 band share haplotype
+# configurations that differ from samples in other bands. This is
+# fundamentally different from v2 (which measured per-sample het rates).
+#
+# STAGES:
+#   1. EXTRACT: per-sample × per-window phased haplotype patterns
+#   2. COMPARE: pairwise concordance (phase-block-aware + IBS fallback)
+#   3. CONTRAST: within-group vs between-group similarity
+#   4. SCORE: per-window GHSL score + het band resolution
+#
+# Inputs:
+#   <precomp_dir>   — precomp RDS files (window grid + PC1 loadings)
+#   <ghsl_prep_dir> — merged phased SNPs from prepare_ghsl_v3_merged.sh
+#   <outdir>        — output directory
+#
+# Usage:
+#   Rscript STEP_C04_snake3_ghsl_v3.R <precomp_dir> <ghsl_prep_dir> <outdir> \
+#     [--chrom C_gar_LG28] [--min_shared 5] [--k 3] [--store_matrices]
+# =============================================================================
+
+suppressPackageStartupMessages({
+  library(data.table)
+})
+
+`%||%` <- function(a, b) if (is.null(a) || length(a) == 0) b else a
+
+args <- commandArgs(trailingOnly = TRUE)
+if (length(args) < 3) stop("Usage: Rscript STEP_C04_snake3_ghsl_v3.R <precomp_dir> <ghsl_prep_dir> <outdir> [opts]")
+
+precomp_dir  <- args[1]
+ghsl_prep_dir <- args[2]
+outdir       <- args[3]
+
+chrom_filter   <- NULL
+MIN_SHARED     <- 5L       # min shared sites for a pair to count
+K_GROUPS       <- 3L       # k for PC1 clustering (2 or 3)
+STORE_MATRICES <- FALSE    # store full concordance matrices for PASS windows
+MIN_SAMPLES_WINDOW <- 15L  # min samples with data for a window to be scored
+MIN_PHASED_HET <- 2L       # min phased het SNPs per sample per window
+QUAL_MIN       <- 20       # min variant quality
+GQ_MIN         <- 10       # min genotype quality
+NCORES         <- as.integer(Sys.getenv("SLURM_CPUS_PER_TASK", "4"))
+
+i <- 4L
+while (i <= length(args)) {
+  a <- args[i]
+  if (a == "--chrom" && i < length(args))         { chrom_filter <- args[i+1]; i <- i+2L }
+  else if (a == "--min_shared" && i < length(args)) { MIN_SHARED <- as.integer(args[i+1]); i <- i+2L }
+  else if (a == "--k" && i < length(args))          { K_GROUPS <- as.integer(args[i+1]); i <- i+2L }
+  else if (a == "--store_matrices")                 { STORE_MATRICES <- TRUE; i <- i+1L }
+  else if (a == "--ncores" && i < length(args))     { NCORES <- as.integer(args[i+1]); i <- i+2L }
+  else { i <- i+1L }
+}
+
+dir.create(outdir, recursive = TRUE, showWarnings = FALSE)
+dir.create(file.path(outdir, "concordance_matrices"), recursive = TRUE, showWarnings = FALSE)
+
+message("[S3v3] Snake 3 v3: GHSL Haplotype Contrast")
+message("[S3v3] Precomp: ", precomp_dir)
+message("[S3v3] GHSL prep: ", ghsl_prep_dir)
+message("[S3v3] Output: ", outdir)
+message("[S3v3] MIN_SHARED=", MIN_SHARED, " K=", K_GROUPS, " NCORES=", NCORES)
+
+# =============================================================================
+# LOAD PRECOMP
+# =============================================================================
+
+rds_files <- sort(list.files(precomp_dir, pattern = "\\.precomp\\.rds$", full.names = TRUE))
+if (length(rds_files) == 0) stop("No .precomp.rds files in: ", precomp_dir)
+
+precomp_list <- list()
+for (f in rds_files) { obj <- readRDS(f); precomp_list[[obj$chrom]] <- obj }
+chroms <- names(precomp_list)
+if (!is.null(chrom_filter)) chroms <- intersect(chroms, chrom_filter)
+
+sample_names <- NULL
+for (chr_tmp in chroms) {
+  pc1_cols <- grep("^PC_1_", names(precomp_list[[chr_tmp]]$dt), value = TRUE)
+  if (length(pc1_cols) > 0) { sample_names <- sub("^PC_1_", "", pc1_cols); break }
+}
+n_samples <- length(sample_names)
+message("[S3v3] ", length(chroms), " chromosomes, ", n_samples, " samples")
+
+# =============================================================================
+# HELPER: k-means band assignment from PC1 loadings
+# =============================================================================
+
+get_pc1_bands <- function(dt, idxs, sample_names, k = 3L) {
+  pc1_cols <- paste0("PC_1_", sample_names)
+  available <- intersect(pc1_cols, names(dt))
+  if (length(available) < 20) return(NULL)
+
+  mat <- as.matrix(dt[idxs, ..available])
+  avg <- colMeans(mat, na.rm = TRUE)
+  valid <- is.finite(avg)
+  if (sum(valid) < 20) return(NULL)
+
+  vals <- avg[valid]
+  snames <- sub("^PC_1_", "", names(vals))
+
+  # Try k groups, fall back to k-1 if smallest group < 5%
+  km <- tryCatch(kmeans(vals, centers = k, nstart = 10), error = function(e) NULL)
+  if (is.null(km)) return(NULL)
+
+  # Check smallest group
+  tab <- table(km$cluster)
+  if (min(tab) < length(vals) * 0.05 && k > 2) {
+    km2 <- tryCatch(kmeans(vals, centers = 2, nstart = 10), error = function(e) NULL)
+    if (!is.null(km2)) { km <- km2; k <- 2L }
+  }
+
+  # Order bands by center value (low → high)
+  co <- order(km$centers[, 1])
+  bands <- integer(length(vals))
+  for (b in seq_len(k)) bands[km$cluster == co[b]] <- b
+
+  setNames(bands, snames)
+}
+
+# =============================================================================
+# HELPER: Extract phased haplotype data for one sample in one window
+# =============================================================================
+
+extract_sample_window <- function(sample_vars, window_start, window_end) {
+  # sample_vars: data.table subset for this sample, already filtered to window
+  if (is.null(sample_vars) || nrow(sample_vars) == 0) {
+    return(list(n_het_phased = 0L, n_hom = 0L, n_blocks = 0L,
+                het_positions = integer(0), het_phases = integer(0),
+                het_block_ids = character(0),
+                hom_positions = integer(0), hom_geno = integer(0),
+                has_data = FALSE))
+  }
+
+  # Hom sites: 0 = hom_ref, 2 = hom_alt
+  hom <- sample_vars[gt_class %in% c("hom_ref", "hom_alt")]
+  hom_pos <- hom$pos
+  hom_geno <- ifelse(hom$gt_class == "hom_ref", 0L, 2L)
+
+  # Het phased sites
+  het <- sample_vars[tolower(gt_class) == "het" & is_phased == 1 &
+                      !is.na(phase_gt) & phase_gt != ""]
+  het_pos <- het$pos
+  # Convert phase_gt to binary: "0|1" → 0, "1|0" → 1
+  het_phase <- ifelse(het$phase_gt == "1|0", 1L, 0L)
+  het_blocks <- as.character(het$phase_block_id)
+
+  n_blocks <- length(unique(het_blocks[!is.na(het_blocks)]))
+
+  list(
+    n_het_phased = length(het_pos),
+    n_hom = length(hom_pos),
+    n_blocks = n_blocks,
+    het_positions = het_pos,
+    het_phases = het_phase,
+    het_block_ids = het_blocks,
+    hom_positions = hom_pos,
+    hom_geno = hom_geno,
+    has_data = (length(het_pos) + length(hom_pos)) >= MIN_SHARED
+  )
+}
+
+# =============================================================================
+# HELPER: Pairwise concordance between two samples in a window
+# =============================================================================
+
+pairwise_concordance <- function(ext_i, ext_j) {
+  if (!ext_i$has_data || !ext_j$has_data) return(NULL)
+
+  # --- MODE A: Phase-block concordance (het × het) ---
+  phase_conc <- NA_real_
+  n_phase_shared <- 0L
+
+  if (ext_i$n_het_phased >= 2 && ext_j$n_het_phased >= 2) {
+    # Find positions where BOTH samples have phased hets
+    shared_het_pos <- intersect(ext_i$het_positions, ext_j$het_positions)
+
+    if (length(shared_het_pos) >= 2) {
+      # Get phase values at shared positions
+      idx_i <- match(shared_het_pos, ext_i$het_positions)
+      idx_j <- match(shared_het_pos, ext_j$het_positions)
+      ph_i <- ext_i$het_phases[idx_i]
+      ph_j <- ext_j$het_phases[idx_j]
+      blk_i <- ext_i$het_block_ids[idx_i]
+      blk_j <- ext_j$het_block_ids[idx_j]
+
+      # Group by shared phase block pairs
+      # Within each pair of overlapping blocks, check concordance
+      # Try both orientations (flip one sample)
+      same <- sum(ph_i == ph_j)
+      flip <- sum(ph_i != ph_j)
+      n_phase_shared <- length(shared_het_pos)
+      phase_conc <- max(same, flip) / n_phase_shared
+    }
+  }
+
+  # --- MODE B: Genotype IBS (all shared sites) ---
+  geno_conc <- NA_real_
+  n_geno_shared <- 0L
+
+  # Build genotype vectors: hom_ref=0, het=1, hom_alt=2
+  # For sample i
+  all_pos_i <- c(ext_i$hom_positions, ext_i$het_positions)
+  all_gt_i  <- c(ext_i$hom_geno, rep(1L, ext_i$n_het_phased))
+  # For sample j
+  all_pos_j <- c(ext_j$hom_positions, ext_j$het_positions)
+  all_gt_j  <- c(ext_j$hom_geno, rep(1L, ext_j$n_het_phased))
+
+  shared_pos <- intersect(all_pos_i, all_pos_j)
+  if (length(shared_pos) >= MIN_SHARED) {
+    idx_i <- match(shared_pos, all_pos_i)
+    idx_j <- match(shared_pos, all_pos_j)
+    gt_i <- all_gt_i[idx_i]
+    gt_j <- all_gt_j[idx_j]
+    n_geno_shared <- length(shared_pos)
+
+    # IBS: fraction of sites with same genotype
+    geno_conc <- sum(gt_i == gt_j) / n_geno_shared
+  }
+
+  # --- COMBINED ---
+  n_total <- n_phase_shared + n_geno_shared
+  if (n_total < MIN_SHARED) return(NULL)
+
+  if (!is.na(phase_conc) && !is.na(geno_conc)) {
+    w_phase <- n_phase_shared / n_total
+    combined <- w_phase * phase_conc + (1 - w_phase) * geno_conc
+  } else if (!is.na(phase_conc)) {
+    combined <- phase_conc
+  } else if (!is.na(geno_conc)) {
+    combined <- geno_conc
+  } else {
+    return(NULL)
+  }
+
+  list(concordance = combined,
+       phase_concordance = phase_conc %||% NA_real_,
+       geno_concordance = geno_conc %||% NA_real_,
+       n_shared = n_total,
+       n_phase_shared = n_phase_shared,
+       n_geno_shared = n_geno_shared)
+}
+
+# =============================================================================
+# HELPER: Process one window — stages 2-4
+# =============================================================================
+
+process_window <- function(window_extracts, bands, sample_names_active) {
+  # window_extracts: named list of extract results per sample
+  # bands: named integer vector (sample → band)
+  # sample_names_active: samples with data in this window
+
+  n_active <- length(sample_names_active)
+  if (n_active < MIN_SAMPLES_WINDOW) {
+    return(list(
+      track = data.table(
+        ghsl_contrast = NA_real_, ghsl_ratio = NA_real_,
+        band_sep_1v2 = NA_real_, band_sep_1v3 = NA_real_, band_sep_2v3 = NA_real_,
+        n_pairs_total = 0L, n_pairs_within = 0L, n_pairs_between = 0L,
+        n_samples_with_data = n_active, mean_shared_sites = 0,
+        mean_within_sim = NA_real_, mean_between_sim = NA_real_,
+        ghsl_quality = "LOW", ghsl_status = "FAIL", phase_coverage = 0
+      ),
+      sample_scores = data.table(),
+      het_resolution = data.table(),
+      conc_matrix = NULL
+    ))
+  }
+
+  # ── Stage 2: Pairwise concordance ──
+  conc_list <- list()
+  for (ii in seq_len(n_active - 1)) {
+    si <- sample_names_active[ii]
+    ei <- window_extracts[[si]]
+    if (!ei$has_data) next
+
+    for (jj in (ii + 1):n_active) {
+      sj <- sample_names_active[jj]
+      ej <- window_extracts[[sj]]
+      if (!ej$has_data) next
+
+      cc <- pairwise_concordance(ei, ej)
+      if (!is.null(cc)) {
+        conc_list[[length(conc_list) + 1L]] <- list(
+          si = si, sj = sj, conc = cc$concordance,
+          n_shared = cc$n_shared, n_phase = cc$n_phase_shared
+        )
+      }
+    }
+  }
+
+  n_pairs <- length(conc_list)
+  if (n_pairs < 10) {
+    return(list(
+      track = data.table(
+        ghsl_contrast = NA_real_, ghsl_ratio = NA_real_,
+        band_sep_1v2 = NA_real_, band_sep_1v3 = NA_real_, band_sep_2v3 = NA_real_,
+        n_pairs_total = n_pairs, n_pairs_within = 0L, n_pairs_between = 0L,
+        n_samples_with_data = n_active, mean_shared_sites = 0,
+        mean_within_sim = NA_real_, mean_between_sim = NA_real_,
+        ghsl_quality = "LOW", ghsl_status = "FAIL",
+        phase_coverage = sum(vapply(window_extracts[sample_names_active],
+                                     function(e) e$n_het_phased > 0, logical(1))) / n_active
+      ),
+      sample_scores = data.table(),
+      het_resolution = data.table(),
+      conc_matrix = NULL
+    ))
+  }
+
+  # ── Stage 3: Contrast ──
+  within_vals  <- numeric(0)
+  between_vals <- numeric(0)
+
+  # Per-band-pair accumulators
+  k <- max(bands, na.rm = TRUE)
+  band_pair_sims <- list()
+  for (a in seq_len(k)) for (b in a:k) band_pair_sims[[paste0(a, "_", b)]] <- numeric(0)
+
+  for (cl in conc_list) {
+    bi <- bands[cl$si]; bj <- bands[cl$sj]
+    if (is.na(bi) || is.na(bj)) next
+
+    key <- paste0(min(bi, bj), "_", max(bi, bj))
+    band_pair_sims[[key]] <- c(band_pair_sims[[key]], cl$conc)
+
+    if (bi == bj) {
+      within_vals <- c(within_vals, cl$conc)
+    } else {
+      between_vals <- c(between_vals, cl$conc)
+    }
+  }
+
+  mean_within  <- if (length(within_vals) > 0) mean(within_vals) else NA_real_
+  mean_between <- if (length(between_vals) > 0) mean(between_vals) else NA_real_
+
+  ghsl_contrast <- if (!is.na(mean_within) && !is.na(mean_between)) {
+    mean_within - mean_between
+  } else NA_real_
+
+  ghsl_ratio <- if (!is.na(mean_within) && !is.na(mean_between) && mean_between > 0.001) {
+    mean_within / mean_between
+  } else NA_real_
+
+  # Band-specific separations
+  get_band_sep <- function(a, b) {
+    aa <- band_pair_sims[[paste0(a, "_", a)]]
+    bb <- band_pair_sims[[paste0(b, "_", b)]]
+    ab_key <- paste0(min(a, b), "_", max(a, b))
+    ab <- band_pair_sims[[ab_key]]
+    within_ab <- c(aa, bb)
+    if (length(within_ab) > 0 && length(ab) > 0) {
+      mean(within_ab) - mean(ab)
+    } else NA_real_
+  }
+
+  band_sep_1v2 <- if (k >= 2) get_band_sep(1, 2) else NA_real_
+  band_sep_1v3 <- if (k >= 3) get_band_sep(1, 3) else NA_real_
+  band_sep_2v3 <- if (k >= 3) get_band_sep(2, 3) else NA_real_
+
+  mean_shared <- mean(vapply(conc_list, function(cl) cl$n_shared, integer(1)))
+  phase_cov <- sum(vapply(window_extracts[sample_names_active],
+                           function(e) e$n_het_phased > 0, logical(1))) / n_active
+
+  # Quality assessment
+  ghsl_quality <- if (n_pairs >= 100 && mean_shared >= 10 && phase_cov >= 0.3) "GOOD"
+                  else if (n_pairs >= 30 && mean_shared >= 5) "MODERATE"
+                  else "LOW"
+
+  # ── Stage 4: Per-sample scores ──
+  # For each sample: mean concordance with own band vs other bands
+  sample_score_rows <- list()
+  het_res_rows <- list()
+
+  for (si in sample_names_active) {
+    bi <- bands[si]
+    if (is.na(bi)) next
+
+    # Get all concordance values involving this sample
+    si_within <- numeric(0)
+    si_between <- numeric(0)
+    si_per_band <- list()
+    for (b in seq_len(k)) si_per_band[[b]] <- numeric(0)
+
+    for (cl in conc_list) {
+      if (cl$si == si) {
+        other <- cl$sj; bo <- bands[other]
+      } else if (cl$sj == si) {
+        other <- cl$si; bo <- bands[other]
+      } else next
+
+      if (is.na(bo)) next
+      si_per_band[[bo]] <- c(si_per_band[[bo]], cl$conc)
+      if (bo == bi) si_within <- c(si_within, cl$conc)
+      else si_between <- c(si_between, cl$conc)
+    }
+
+    within_m <- if (length(si_within) > 0) mean(si_within) else NA_real_
+    between_m <- if (length(si_between) > 0) mean(si_between) else NA_real_
+    sample_ghsl <- if (!is.na(within_m) && !is.na(between_m)) within_m - between_m else NA_real_
+
+    # Best matching band
+    band_means <- vapply(si_per_band, function(v) if (length(v) > 0) mean(v) else NA_real_, numeric(1))
+    best_band <- if (any(is.finite(band_means))) which.max(band_means) else NA_integer_
+
+    conf <- if (!is.na(sample_ghsl) && sample_ghsl > 0.10) "STRONG"
+            else if (!is.na(sample_ghsl) && sample_ghsl > 0) "MODERATE"
+            else "AMBIGUOUS"
+
+    sample_score_rows[[length(sample_score_rows) + 1L]] <- data.table(
+      sample_id = si,
+      pc1_band = bi,
+      n_het_phased = window_extracts[[si]]$n_het_phased,
+      n_hom = window_extracts[[si]]$n_hom,
+      n_phase_blocks = window_extracts[[si]]$n_blocks,
+      within_mean = round(within_m %||% NA_real_, 4),
+      between_mean = round(between_m %||% NA_real_, 4),
+      sample_ghsl = round(sample_ghsl %||% NA_real_, 4),
+      assignment_confidence = conf,
+      best_match_band = best_band %||% NA_integer_,
+      ghsl_confirms_pc1 = if (!is.na(best_band)) best_band == bi else NA
+    )
+
+    # Het resolution: for band 2 (middle) samples
+    if (bi == 2 && k >= 3) {
+      conc_b1 <- if (length(si_per_band[[1]]) > 0) mean(si_per_band[[1]]) else NA_real_
+      conc_b3 <- if (length(si_per_band[[3]]) > 0) mean(si_per_band[[3]]) else NA_real_
+
+      het_score <- if (!is.na(conc_b1) && !is.na(conc_b3)) abs(conc_b1 - conc_b3) else NA_real_
+
+      inferred <- if (is.na(conc_b1) || is.na(conc_b3)) "UNKNOWN"
+                  else if (het_score < 0.05) "INV_HET"
+                  else if (conc_b1 > conc_b3) "INV_LIKE_BAND1"
+                  else "INV_LIKE_BAND3"
+
+      het_res_rows[[length(het_res_rows) + 1L]] <- data.table(
+        sample_id = si,
+        concordance_with_band1 = round(conc_b1 %||% NA_real_, 4),
+        concordance_with_band3 = round(conc_b3 %||% NA_real_, 4),
+        het_score = round(het_score %||% NA_real_, 4),
+        inferred_genotype = inferred
+      )
+    }
+  }
+
+  ss_dt <- if (length(sample_score_rows) > 0) rbindlist(sample_score_rows) else data.table()
+  hr_dt <- if (length(het_res_rows) > 0) rbindlist(het_res_rows) else data.table()
+
+  # GHSL status (adaptive)
+  ghsl_status <- if (!is.na(ghsl_contrast) && ghsl_contrast > 0.05 && ghsl_quality != "LOW") "PASS"
+                 else if (!is.na(ghsl_contrast) && ghsl_contrast > 0.02) "WEAK"
+                 else "FAIL"
+
+  # Build concordance matrix for storage (sparse triplets)
+  conc_mat_dt <- NULL
+  if (STORE_MATRICES && ghsl_status == "PASS") {
+    conc_mat_dt <- rbindlist(lapply(conc_list, function(cl) {
+      data.table(sample_i = cl$si, sample_j = cl$sj,
+                 concordance = round(cl$conc, 4), n_shared = cl$n_shared,
+                 n_phase = cl$n_phase)
+    }))
+  }
+
+  list(
+    track = data.table(
+      ghsl_contrast = round(ghsl_contrast %||% NA_real_, 4),
+      ghsl_ratio = round(ghsl_ratio %||% NA_real_, 4),
+      band_sep_1v2 = round(band_sep_1v2 %||% NA_real_, 4),
+      band_sep_1v3 = round(band_sep_1v3 %||% NA_real_, 4),
+      band_sep_2v3 = round(band_sep_2v3 %||% NA_real_, 4),
+      n_pairs_total = n_pairs,
+      n_pairs_within = length(within_vals),
+      n_pairs_between = length(between_vals),
+      n_samples_with_data = n_active,
+      mean_shared_sites = round(mean_shared, 1),
+      mean_within_sim = round(mean_within %||% NA_real_, 4),
+      mean_between_sim = round(mean_between %||% NA_real_, 4),
+      ghsl_quality = ghsl_quality,
+      ghsl_status = ghsl_status,
+      phase_coverage = round(phase_cov, 3)
+    ),
+    sample_scores = ss_dt,
+    het_resolution = hr_dt,
+    conc_matrix = conc_mat_dt
+  )
+}
+
+# =============================================================================
+# MAIN LOOP
+# =============================================================================
+
+all_track    <- list()
+all_scores   <- list()
+all_het_res  <- list()
+all_pa       <- list()
+all_summary  <- list()
+
+for (chr in chroms) {
+  pc <- precomp_list[[chr]]
+  if (is.null(pc) || pc$n_windows < 20) { message("[S3v3] SKIP ", chr); next }
+
+  dt <- pc$dt
+  n_win <- nrow(dt)
+  message("\n[S3v3] ======= ", chr, " (", n_win, " windows) =======")
+
+  # Load merged phased SNPs
+  ghsl_file <- file.path(ghsl_prep_dir, paste0(chr, ".merged_phased_snps.tsv.gz"))
+  if (!file.exists(ghsl_file)) {
+    message("[S3v3] SKIP ", chr, ": no merged phased SNPs file")
+
+    # Fill with FAIL rows
+    for (wi in seq_len(n_win)) {
+      all_track[[length(all_track) + 1L]] <- data.table(
+        chrom = chr, global_window_id = dt$global_window_id[wi],
+        start_bp = dt$start_bp[wi], end_bp = dt$end_bp[wi],
+        pos_mb = round((dt$start_bp[wi] + dt$end_bp[wi]) / 2e6, 4),
+        ghsl_contrast = NA_real_, ghsl_ratio = NA_real_,
+        band_sep_1v2 = NA_real_, band_sep_1v3 = NA_real_, band_sep_2v3 = NA_real_,
+        n_pairs_total = 0L, n_pairs_within = 0L, n_pairs_between = 0L,
+        n_samples_with_data = 0L, mean_shared_sites = 0,
+        mean_within_sim = NA_real_, mean_between_sim = NA_real_,
+        ghsl_quality = "LOW", ghsl_status = "FAIL", phase_coverage = 0,
+        snake3_pa = 0L
+      )
+    }
+    all_summary[[length(all_summary) + 1L]] <- data.table(
+      chrom = chr, n_windows = n_win, n_pass = 0L, n_weak = 0L, n_fail = n_win
+    )
+    next
+  }
+
+  t_load <- proc.time()
+  ghsl_dt <- fread(ghsl_file)
+  message("[S3v3] Loaded ", nrow(ghsl_dt), " variant records (", ncol(ghsl_dt),
+          " cols) in ", round((proc.time() - t_load)[3], 1), "s")
+
+  # Quality filter
+  if ("qual" %in% names(ghsl_dt)) {
+    ghsl_dt <- ghsl_dt[is.na(qual) | qual >= QUAL_MIN]
+  }
+  if ("gq" %in% names(ghsl_dt)) {
+    ghsl_dt <- ghsl_dt[is.na(gq) | gq >= GQ_MIN]
+  }
+  message("[S3v3] After QC filter: ", nrow(ghsl_dt), " variants")
+
+  # Index by sample
+  ghsl_by_sample <- split(ghsl_dt, ghsl_dt$sample_id)
+  available_samples <- intersect(names(ghsl_by_sample), sample_names)
+  message("[S3v3] Samples with data: ", length(available_samples), " / ", n_samples)
+
+  # Compute PC1 bands (using full chromosome, not per-window)
+  all_idxs <- seq_len(n_win)
+  bands <- get_pc1_bands(dt, all_idxs, sample_names, k = K_GROUPS)
+  if (is.null(bands)) {
+    message("[S3v3] SKIP ", chr, ": cannot compute PC1 bands")
+    next
+  }
+  k_actual <- max(bands, na.rm = TRUE)
+  band_tab <- table(bands)
+  message("[S3v3] PC1 bands (k=", k_actual, "): ",
+          paste(paste0("band", seq_len(k_actual), "=", band_tab), collapse = " "))
+
+  # ── Process windows ──
+  chr_track <- list()
+  chr_scores <- list()
+  chr_het <- list()
+  n_pass <- 0L; n_weak <- 0L; n_fail <- 0L
+
+  t_chr <- proc.time()
+
+  for (wi in seq_len(n_win)) {
+    wid <- dt$global_window_id[wi]
+    w_start <- dt$start_bp[wi]
+    w_end <- dt$end_bp[wi]
+
+    # Stage 1: Extract per-sample data for this window
+    window_extracts <- list()
+    active_samples <- character(0)
+
+    for (si in available_samples) {
+      sp <- ghsl_by_sample[[si]]
+      sp_win <- sp[pos >= w_start & pos <= w_end]
+      ext <- extract_sample_window(sp_win, w_start, w_end)
+      window_extracts[[si]] <- ext
+      if (ext$has_data) active_samples <- c(active_samples, si)
+    }
+
+    # Stages 2-4
+    result <- process_window(window_extracts, bands, active_samples)
+
+    # Track row
+    tr <- result$track
+    tr[, `:=`(chrom = chr, global_window_id = wid,
+              start_bp = w_start, end_bp = w_end,
+              pos_mb = round((w_start + w_end) / 2e6, 4),
+              snake3_pa = as.integer(tr$ghsl_status == "PASS"))]
+    chr_track[[wi]] <- tr
+
+    # Sample scores
+    if (nrow(result$sample_scores) > 0) {
+      result$sample_scores[, `:=`(chrom = chr, global_window_id = wid)]
+      chr_scores[[length(chr_scores) + 1L]] <- result$sample_scores
+    }
+
+    # Het resolution
+    if (nrow(result$het_resolution) > 0) {
+      result$het_resolution[, `:=`(chrom = chr, global_window_id = wid)]
+      chr_het[[length(chr_het) + 1L]] <- result$het_resolution
+    }
+
+    # Store concordance matrix
+    if (!is.null(result$conc_matrix) && nrow(result$conc_matrix) > 0) {
+      result$conc_matrix[, `:=`(chrom = chr, global_window_id = wid)]
+      f_mat <- file.path(outdir, "concordance_matrices",
+                          paste0(chr, "_", wid, ".tsv.gz"))
+      fwrite(result$conc_matrix, f_mat, sep = "\t")
+    }
+
+    if (tr$ghsl_status == "PASS") n_pass <- n_pass + 1L
+    else if (tr$ghsl_status == "WEAK") n_weak <- n_weak + 1L
+    else n_fail <- n_fail + 1L
+
+    if (wi %% 500 == 0) {
+      elapsed <- (proc.time() - t_chr)[3]
+      rate <- wi / elapsed
+      eta <- (n_win - wi) / rate
+      message("[S3v3]   ", chr, " window ", wi, "/", n_win,
+              " (", round(rate, 1), " win/s, ETA ", round(eta / 60, 1), " min)",
+              " PASS:", n_pass, " WEAK:", n_weak)
+    }
+  }
+
+  elapsed_chr <- round((proc.time() - t_chr)[3], 1)
+  message("[S3v3] ", chr, ": PASS=", n_pass, " WEAK=", n_weak, " FAIL=", n_fail,
+          " (", elapsed_chr, "s)")
+
+  # Collect
+  all_track <- c(all_track, chr_track)
+  if (length(chr_scores) > 0) all_scores <- c(all_scores, chr_scores)
+  if (length(chr_het) > 0) all_het_res <- c(all_het_res, chr_het)
+
+  all_summary[[length(all_summary) + 1L]] <- data.table(
+    chrom = chr, n_windows = n_win,
+    n_pass = n_pass, n_weak = n_weak, n_fail = n_fail
+  )
+}
+
+# =============================================================================
+# WRITE OUTPUTS
+# =============================================================================
+
+message("\n[S3v3] Writing outputs...")
+
+track_dt <- if (length(all_track) > 0) rbindlist(all_track, fill = TRUE) else data.table()
+scores_dt <- if (length(all_scores) > 0) rbindlist(all_scores, fill = TRUE) else data.table()
+het_dt <- if (length(all_het_res) > 0) rbindlist(all_het_res, fill = TRUE) else data.table()
+summ_dt <- if (length(all_summary) > 0) rbindlist(all_summary) else data.table()
+
+# Window track
+f_track <- file.path(outdir, "snake3v3_window_track.tsv.gz")
+fwrite(track_dt, f_track, sep = "\t")
+
+# Sample scores
+f_scores <- file.path(outdir, "snake3v3_sample_scores.tsv.gz")
+fwrite(scores_dt, f_scores, sep = "\t")
+
+# Het resolution
+f_het <- file.path(outdir, "snake3v3_het_resolution.tsv.gz")
+fwrite(het_dt, f_het, sep = "\t")
+
+# PA matrix (for integration with C01d scoring)
+pa_dt <- track_dt[, .(chrom, global_window_id, start_bp, end_bp, pos_mb,
+                       snake3_pa, ghsl_contrast)]
+f_pa <- file.path(outdir, "snake3v3_window_pa.tsv.gz")
+fwrite(pa_dt, f_pa, sep = "\t")
+
+# Summary
+f_summ <- file.path(outdir, "snake3v3_summary.tsv")
+fwrite(summ_dt, f_summ, sep = "\t")
+
+message("\n[DONE] Snake 3 v3 GHSL Haplotype Contrast")
+message("  Track:    ", f_track)
+message("  Scores:   ", f_scores)
+message("  Het res:  ", f_het)
+message("  PA:       ", f_pa)
+message("  Summary:  ", f_summ)
+
+if (nrow(summ_dt) > 0) {
+  message("\n  Totals: PASS=", sum(summ_dt$n_pass),
+          " WEAK=", sum(summ_dt$n_weak),
+          " FAIL=", sum(summ_dt$n_fail))
+}

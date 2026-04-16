@@ -1,0 +1,1006 @@
+#!/usr/bin/env Rscript
+
+# =============================================================================
+# STEP_C01c_triangle_regimes.R  (v8.5.3 — detection only)
+#
+# TRIANGLE INSULATION ENGINE — detection + classification + PA matrix.
+# NO PLOTTING. All plots are in plot_triangle_landscape.R.
+#
+# Detects structural domains from a similarity matrix:
+#   A. DIAGONAL TRIANGLES  -- sharp on-diagonal blocks (inversions)
+#   B. OFF-DIAGONAL BLOCKS -- cross-stripe similarity (inversion linkage)
+#   C. DIFFUSE ZONES       -- elevated but unfocused (family structure)
+#   D. TRANSITION ZONES    -- smooth decay (background)
+#
+# SIM_MAT SOURCE (priority order):
+#   1. --sim-mat-file <path>  : load a specific sim_mat RDS (e.g. sim_mat_nn20.rds)
+#   2. Precomp RDS $sim_mat   : use the sim_mat stored in precomp (default, = nn0)
+#
+# Usage:
+#   Rscript STEP_C01c_triangle_regimes.R <precomp_dir> <outdir> \
+#     [--sim-mat-file <rds>] [--chrom <chr>] [--mode hatchery|wild]
+# =============================================================================
+
+suppressPackageStartupMessages({
+  library(data.table)
+})
+
+`%||%` <- function(a, b) if (is.null(a) || length(a) == 0) b else a
+
+args <- commandArgs(trailingOnly = TRUE)
+if (length(args) < 2) stop("Usage: see header")
+
+precomp_dir <- args[1]; outdir <- args[2]
+ancestry_file <- NULL; relate_file <- NULL; samples_file <- NULL; chrom_filter <- NULL
+pop_mode <- "hatchery"  # "hatchery" or "wild"
+sim_mat_file <- NULL     # optional: override sim_mat from separate RDS
+i <- 3L
+while (i <= length(args)) {
+  a <- args[i]
+  if (a == "--ancestry" && i < length(args))      { ancestry_file <- args[i+1]; i <- i+2L }
+  else if (a == "--relatedness" && i < length(args)) { relate_file <- args[i+1]; i <- i+2L }
+  else if (a == "--samples" && i < length(args))   { samples_file <- args[i+1]; i <- i+2L }
+  else if (a == "--chrom" && i < length(args))     { chrom_filter <- args[i+1]; i <- i+2L }
+  else if (a == "--mode" && i < length(args))      { pop_mode <- args[i+1]; i <- i+2L }
+  else if (a == "--sim-mat-file" && i < length(args)) { sim_mat_file <- args[i+1]; i <- i+2L }
+  else { i <- i+1L }
+}
+
+dir.create(outdir, recursive = TRUE, showWarnings = FALSE)
+
+# -- Parameters (mode-dependent) --
+# Hatchery mode: family structure creates false blocks, so require SHARPER
+# boundaries and check SQUARENESS (inversions are square blocks, family
+# blocks are diagonal bands that decay with distance).
+# Wild mode: cleaner signal, lower thresholds sufficient.
+
+BIN_SIZE       <- 2L
+STAIR_K        <- 200L
+MIN_DIAG_BINS  <- 3L
+SHELL_DROP     <- 0.85
+OFFDIAG_MIN_AREA <- 20L
+DIFFUSE_THRESH  <- 0.5
+
+if (pop_mode == "hatchery") {
+  CONTRAST_MIN    <- 0.03   # higher: filter out family blocks
+  BIN_SUPPORT_MIN <- 0.70   # stricter consistency
+  OFFDIAG_THRESH_Q <- 0.92  # stricter off-diagonal
+  SHARPNESS_MIN_STRONG <- 0.03  # sharper edges required
+  SHARPNESS_MIN_MOD    <- 0.015
+  SQUARENESS_MIN <- 0.4    # minimum squareness score for strong/moderate
+  message("[C01c] Mode: HATCHERY (stricter thresholds, squareness check)")
+} else {
+  CONTRAST_MIN    <- 0.02
+  BIN_SUPPORT_MIN <- 0.65
+  OFFDIAG_THRESH_Q <- 0.90
+  SHARPNESS_MIN_STRONG <- 0.02
+  SHARPNESS_MIN_MOD    <- 0.01
+  SQUARENESS_MIN <- 0.0    # no squareness check in wild
+  message("[C01c] Mode: WILD (standard thresholds)")
+}
+
+
+# =============================================================================
+# LOAD DATA
+# =============================================================================
+
+message("[C01c] Loading precomputed data...")
+rds_files <- sort(list.files(precomp_dir, pattern = "\\.precomp\\.rds$", full.names = TRUE))
+if (length(rds_files) == 0) stop("No .precomp.rds files")
+precomp_list <- list()
+for (f in rds_files) { obj <- readRDS(f); precomp_list[[obj$chrom]] <- obj }
+chroms <- names(precomp_list)
+if (!is.null(chrom_filter) && chrom_filter != "all") chroms <- intersect(chroms, chrom_filter)
+message("[C01c] ", length(chroms), " chromosomes")
+
+# Sample names + mapping
+sample_names <- NULL
+for (ch in chroms) {
+  pc1_cols <- grep("^PC_1_", names(precomp_list[[ch]]$dt), value = TRUE)
+  if (length(pc1_cols) > 0) { sample_names <- sub("^PC_1_", "", pc1_cols); break }
+}
+n_samples <- length(sample_names)
+name_map <- NULL; real_sample_names <- sample_names
+if (!is.null(samples_file) && file.exists(samples_file)) {
+  slist <- as.character(fread(samples_file, header = FALSE)[[1]])
+  if (length(slist) == n_samples && grepl("^Ind[0-9]", sample_names[1])) {
+    name_map <- setNames(slist, sample_names)
+    real_sample_names <- slist
+  }
+}
+
+# Q-matrix
+q_mat <- NULL
+if (!is.null(ancestry_file) && file.exists(ancestry_file)) {
+  q_raw <- as.matrix(fread(ancestry_file, header = FALSE))
+  if (nrow(q_raw) == n_samples) {
+    rownames(q_raw) <- real_sample_names
+    colnames(q_raw) <- paste0("K", seq_len(ncol(q_raw)))
+    q_mat <- q_raw
+    message("[C01c] Q-matrix: K=", ncol(q_mat))
+  }
+}
+
+# Relatedness
+relate_dt <- NULL
+if (!is.null(relate_file) && file.exists(relate_file)) {
+  raw_dt <- tryCatch(fread(relate_file), error = function(e) NULL)
+  if (!is.null(raw_dt) && ncol(raw_dt) >= 3) {
+    if (!all(c("sample1", "sample2", "theta") %in% names(raw_dt)))
+      setnames(raw_dt, 1:3, c("sample1", "sample2", "theta"))
+    raw_dt[, theta := as.numeric(theta)]
+    relate_dt <- raw_dt[is.finite(theta) & sample1 %in% real_sample_names & sample2 %in% real_sample_names]
+    message("[C01c] Relatedness: ", nrow(relate_dt), " pairs")
+  }
+}
+
+# =============================================================================
+# CORE FUNCTIONS
+# =============================================================================
+
+# Vectorized binning
+bin_sim_mat <- function(sim_mat, bin_size) {
+  n <- nrow(sim_mat); nb <- n %/% bin_size
+  if (nb < 10) return(NULL)
+  bmat <- matrix(0, nb, nb)
+  for (bi in seq_len(nb)) {
+    ri <- ((bi-1)*bin_size+1):(bi*bin_size)
+    for (bj in bi:nb) {
+      rj <- ((bj-1)*bin_size+1):(bj*bin_size)
+      bmat[bi,bj] <- mean(sim_mat[ri,rj], na.rm = TRUE)
+      bmat[bj,bi] <- bmat[bi,bj]
+    }
+  }
+  bmat
+}
+
+# =============================================================================
+# MULTI-SCALE DETECTION ENGINE (dynamic approach)
+# =============================================================================
+
+# Row profile: for each bin, mean similarity at each distance from diagonal
+compute_row_profiles <- function(bmat) {
+  nb <- nrow(bmat)
+  max_d <- min(STAIR_K, nb %/% 2)
+  profiles <- matrix(NA_real_, nb, max_d)
+  for (d in seq_len(max_d)) {
+    for (bi in seq_len(nb)) {
+      vals <- numeric(0)
+      if (bi - d >= 1) vals <- c(vals, bmat[bi, bi-d])
+      if (bi + d <= nb) vals <- c(vals, bmat[bi, bi+d])
+      if (length(vals) > 0) profiles[bi, d] <- mean(vals)
+    }
+  }
+  profiles
+}
+
+# Multi-scale insulation score (Crane et al. 2015 approach)
+# At each bin, at each scale w, measure cross-boundary similarity.
+# Low insulation = boundary between two blocks.
+compute_insulation <- function(bmat, scales = c(2L, 3L, 5L, 8L, 12L, 20L, 30L, 50L, 80L, 120L, 200L)) {
+  nb <- nrow(bmat)
+  scales <- scales[scales < nb %/% 2]
+  if (length(scales) == 0) return(matrix(NA_real_, nb, 1))
+  ins <- matrix(NA_real_, nb, length(scales))
+  colnames(ins) <- paste0("w", scales)
+  for (si in seq_along(scales)) {
+    w <- scales[si]
+    for (bi in (w+1):(nb-w)) {
+      up <- mean(bmat[(bi-w):(bi-1), (bi-w):(bi-1)], na.rm = TRUE)
+      dn <- mean(bmat[(bi+1):(bi+w), (bi+1):(bi+w)], na.rm = TRUE)
+      cr <- mean(bmat[(bi-w):(bi-1), (bi+1):(bi+w)], na.rm = TRUE)
+      local_bg <- (up + dn) / 2
+      ins[bi, si] <- if (local_bg > 0) cr / local_bg else 1
+    }
+  }
+  ins
+}
+
+# Detect boundaries: local minima in insulation supported by multiple scales
+detect_boundaries <- function(insulation, min_depth = 0.02) {
+  nb <- nrow(insulation); ns <- ncol(insulation)
+  bnd_list <- list()
+  for (si in seq_len(ns)) {
+    ins <- insulation[, si]
+    # Smooth
+    ins_s <- ins
+    for (k in 3:(nb-2)) {
+      v <- ins[(k-2):(k+2)]; v <- v[is.finite(v)]
+      if (length(v) > 0) ins_s[k] <- median(v)
+    }
+    for (bi in 3:(nb-2)) {
+      if (!is.finite(ins_s[bi])) next
+      if (!is.finite(ins_s[bi-1]) || !is.finite(ins_s[bi+1]) ||
+          !is.finite(ins_s[bi-2]) || !is.finite(ins_s[bi+2])) next
+      if (ins_s[bi] < ins_s[bi-1] && ins_s[bi] < ins_s[bi+1] &&
+          ins_s[bi] < ins_s[bi-2] && ins_s[bi] < ins_s[bi+2]) {
+        lp_vals <- ins_s[max(1, bi-8):(bi-1)]
+        rp_vals <- ins_s[(bi+1):min(nb, bi+8)]
+        lp_vals <- lp_vals[is.finite(lp_vals)]
+        rp_vals <- rp_vals[is.finite(rp_vals)]
+        if (length(lp_vals) == 0 || length(rp_vals) == 0) next
+        lp <- max(lp_vals)
+        rp <- max(rp_vals)
+        depth <- min(lp, rp) - ins_s[bi]
+        if (is.finite(depth) && depth > min_depth) {
+          bnd_list[[length(bnd_list)+1]] <- data.table(
+            bin = bi, scale_idx = si, depth = round(depth, 4))
+        }
+      }
+    }
+  }
+  if (length(bnd_list) > 0) rbindlist(bnd_list) else data.table()
+}
+
+# Build intervals from boundaries
+build_intervals_dynamic <- function(bmat, boundaries, bg_median) {
+  nb <- nrow(bmat)
+  if (nrow(boundaries) == 0) {
+    # No boundaries: treat entire chromosome as one interval if above bg
+    whole_mean <- mean(bmat[upper.tri(bmat, diag = TRUE)])
+    if (whole_mean > bg_median + 0.02) {
+      return(list(list(interval_id = 1L, L = 1L, R = nb,
+                       inside_mean = whole_mean, contrast = whole_mean - bg_median)))
+    }
+    return(list())
+  }
+
+  # Score boundaries by multi-scale support
+  bins_at_boundary <- sort(unique(boundaries$bin))
+  bnd_scores <- vapply(bins_at_boundary, function(bi) {
+    nearby <- boundaries[abs(bin - bi) <= 2]
+    nrow(nearby) + sum(nearby$depth)
+  }, numeric(1))
+
+  # Keep strong boundaries
+  strong_thresh <- max(median(bnd_scores), quantile(bnd_scores, 0.4))
+  strong_bins <- sort(bins_at_boundary[bnd_scores >= strong_thresh])
+
+  # Segments between boundaries
+  seg_L <- c(1L, strong_bins)
+  seg_R <- c(strong_bins - 1L, nb)
+
+  intervals <- list(); iid <- 0L
+  for (si in seq_len(length(seg_L))) {
+    L <- seg_L[si]; R <- seg_R[si]
+    if (R - L + 1 < MIN_DIAG_BINS || L > R) next
+    sub <- bmat[L:R, L:R]
+    inside_mean <- mean(sub[upper.tri(sub, diag = TRUE)])
+    contrast <- inside_mean - bg_median
+    if (contrast < 0.005) next
+    iid <- iid + 1L
+    intervals[[iid]] <- list(interval_id = iid, L = L, R = R,
+                             inside_mean = inside_mean, contrast = contrast)
+  }
+  intervals
+}
+
+# Apex score within an interval (for backward compatibility + plotting)
+compute_apex_scores <- function(bmat, profiles, bg_median) {
+  nb <- nrow(bmat)
+  scores <- numeric(nb); extents <- integer(nb)
+  for (bi in seq_len(nb)) {
+    st <- profiles[bi, ]; valid <- st[is.finite(st)]
+    if (length(valid) < 3) next
+    above <- valid > bg_median
+    mass <- sum(pmax(0, valid - bg_median))
+    extents[bi] <- if (any(above)) max(which(above)) else 0L
+    scores[bi] <- mass * mean(above)
+  }
+  list(scores = scores, extents = extents)
+}
+
+# =============================================================================
+# WITHIN-INTERVAL SUB-REGIME DETECTION
+# =============================================================================
+
+detect_sub_regimes <- function(bmat, L, R, bg_median) {
+  n_int <- R - L + 1
+  if (n_int < 6) return(data.table())
+
+  # For each bin in interval, mean similarity to all other bins in interval
+  diag_profile <- vapply(L:R, function(j) mean(bmat[j, L:R], na.rm = TRUE), numeric(1))
+
+  # Quantile-based level assignment
+  q33 <- quantile(diag_profile, 0.33, na.rm = TRUE)
+  q67 <- quantile(diag_profile, 0.67, na.rm = TRUE)
+  level <- fifelse(diag_profile >= q67, "hot",
+           fifelse(diag_profile >= q33, "warm", "cool"))
+
+  # Run-length encode
+  rle_lev <- rle(level)
+  sub_rows <- list(); pos <- 0L
+  for (ri in seq_along(rle_lev$lengths)) {
+    len <- rle_lev$lengths[ri]; state <- rle_lev$values[ri]
+    sL <- L + pos; sR <- L + pos + len - 1; pos <- pos + len
+    if (len < 3) next
+    sub_inside <- mean(bmat[sL:sR, sL:sR], na.rm = TRUE)
+    sub_rows[[length(sub_rows)+1]] <- data.table(
+      sub_L = sL, sub_R = sR, sub_n = len, sub_level = state,
+      sub_inside = round(sub_inside, 4),
+      sub_profile_mean = round(mean(diag_profile[(pos-len+1):pos], na.rm = TRUE), 4)
+    )
+  }
+  if (length(sub_rows) > 0) rbindlist(sub_rows) else data.table()
+}
+
+# =============================================================================
+# RECURSIVE TRIANGLE DESCENT
+# =============================================================================
+# Treat each detected interval as a standalone matrix and re-run detection
+# inside it. This finds nested sub-triangles at finer resolution.
+# Returns a flat table with depth level for each sub-interval.
+
+recursive_triangle_descent <- function(bmat, parent_L, parent_R, bin_pos, bg_median,
+                                        depth = 1L, max_depth = 5L, parent_id = 0L,
+                                        min_sub_bins = 3L) {
+  n_int <- parent_R - parent_L + 1
+  if (n_int < min_sub_bins * 2 || depth > max_depth) return(data.table())
+
+  # Extract sub-matrix for the parent interval
+  sub_bmat <- bmat[parent_L:parent_R, parent_L:parent_R]
+  ns <- nrow(sub_bmat)
+  sub_bg <- median(sub_bmat[upper.tri(sub_bmat)])
+
+  # Compute insulation within the sub-matrix
+  sub_scales <- c(2L, 3L, 5L, 8L, 12L, 20L, 30L)
+  sub_scales <- sub_scales[sub_scales < ns %/% 2]
+  if (length(sub_scales) == 0) return(data.table())
+
+  sub_ins <- tryCatch(compute_insulation(sub_bmat, sub_scales), error = function(e) NULL)
+  if (is.null(sub_ins)) return(data.table())
+
+  sub_boundaries <- tryCatch(detect_boundaries(sub_ins, min_depth = 0.03), error = function(e) data.table())
+  sub_intervals <- build_intervals_dynamic(sub_bmat, sub_boundaries, sub_bg)
+
+  if (length(sub_intervals) < 2) return(data.table())  # need at least 2 sub-intervals
+
+  result_rows <- list()
+  for (iv in sub_intervals) {
+    # Convert local coordinates back to global
+    global_L <- parent_L + iv$L - 1L
+    global_R <- parent_L + iv$R - 1L
+    n_sub <- global_R - global_L + 1
+    if (n_sub < min_sub_bins) next
+
+    sub_inside <- iv$inside_mean
+    contrast <- sub_inside - sub_bg
+
+    # Classify the sub-interval
+    sub_reg <- detect_sub_regimes(bmat, global_L, global_R, sub_bg)
+    cl <- classify_interval_dynamic(bmat, global_L, global_R, sub_bg, sub_reg)
+
+    result_rows[[length(result_rows)+1]] <- data.table(
+      depth = depth,
+      parent_id = parent_id,
+      sub_id = iv$interval_id,
+      global_L = global_L, global_R = global_R,
+      start_mb = bin_pos[min(global_L, length(bin_pos))],
+      end_mb = bin_pos[min(global_R, length(bin_pos))],
+      n_bins = n_sub,
+      sub_inside = round(sub_inside, 4),
+      parent_bg = round(sub_bg, 4),
+      contrast = round(contrast, 4),
+      sub_type = cl$type,
+      sharpness = round(cl$sharpness, 4),
+      n_hot = cl$n_hot_subregimes,
+      frac_hot = round(cl$frac_hot, 3)
+    )
+
+    # Recurse deeper if this sub-interval is large enough
+    if (n_sub >= min_sub_bins * 3 && depth < max_depth) {
+      deeper <- recursive_triangle_descent(
+        bmat, global_L, global_R, bin_pos, sub_bg,
+        depth = depth + 1L, max_depth = max_depth,
+        parent_id = iv$interval_id, min_sub_bins = min_sub_bins
+      )
+      if (nrow(deeper) > 0) result_rows[[length(result_rows)+1]] <- deeper
+    }
+  }
+  if (length(result_rows) > 0) rbindlist(result_rows, fill = TRUE) else data.table()
+}
+
+# =============================================================================
+# INTERVAL CLASSIFICATION (uses sub-regime information)
+# =============================================================================
+
+classify_interval_dynamic <- function(bmat, L, R, bg_median, sub_regimes) {
+  sub <- bmat[L:R, L:R]
+  n_int <- R - L + 1
+  inside_mean <- mean(sub[upper.tri(sub, diag = TRUE)])
+  inside_sd <- sd(sub[upper.tri(sub, diag = TRUE)])
+  contrast <- inside_mean - bg_median
+
+  # Edge sharpness
+  if (n_int >= 6) {
+    ew <- max(1, n_int %/% 5)
+    edge_mean <- mean(c(bmat[L:(L+ew-1), L:R], bmat[(R-ew+1):R, L:R]), na.rm = TRUE)
+    core_mean <- mean(bmat[(L+ew):(R-ew), L:R], na.rm = TRUE)
+    sharpness <- core_mean - edge_mean
+  } else sharpness <- 0
+
+  # SQUARENESS CHECK (hatchery-critical):
+  # A true inversion block is "square" — similarity between distant windows
+  # within the block is just as high as between nearby windows.
+  # A family/demographic block decays with distance — nearby windows are
+  # similar but distant windows within the block are less similar.
+  #
+  # Measure: compare near-diagonal similarity to far-off-diagonal similarity
+  # within the block. High squareness = true structural block (inversion).
+  # Low squareness = distance-dependent decay (family LD).
+  squareness <- 0
+  if (n_int >= 10) {
+    near_d <- max(1, n_int %/% 5)  # near-diagonal: within 20% of block size
+    far_d <- n_int %/% 2            # far: ~50% of block size apart
+
+    near_vals <- numeric(0); far_vals <- numeric(0)
+    for (bi in L:R) {
+      for (bj in bi:R) {
+        d <- bj - bi
+        if (d >= 1 && d <= near_d) near_vals <- c(near_vals, bmat[bi, bj])
+        else if (d >= far_d) far_vals <- c(far_vals, bmat[bi, bj])
+      }
+    }
+    if (length(near_vals) > 5 && length(far_vals) > 5) {
+      mn <- mean(near_vals, na.rm = TRUE)
+      mf <- mean(far_vals, na.rm = TRUE)
+      # Squareness = far/near ratio. Perfect square = 1.0. Decay = < 1.0.
+      squareness <- if (mn > 0.01) mf / mn else 0
+    }
+  }
+
+  # Sub-regime stats
+  has_hot <- nrow(sub_regimes) > 0 && any(sub_regimes$sub_level == "hot")
+  n_hot <- if (nrow(sub_regimes) > 0) sum(sub_regimes$sub_level == "hot") else 0
+  frac_hot <- if (nrow(sub_regimes) > 0 && n_int > 0) {
+    sum(sub_regimes[sub_level == "hot"]$sub_n) / n_int
+  } else 0
+
+  # Internal homogeneity: CV of the diagonal profile
+  diag_p <- vapply(L:R, function(j) mean(bmat[j, L:R], na.rm = TRUE), numeric(1))
+  homogeneity <- 1 - (sd(diag_p) / max(mean(diag_p), 0.01))
+
+  # Classification (mode-aware thresholds)
+  if (contrast > 0.05 && sharpness > SHARPNESS_MIN_STRONG && squareness >= SQUARENESS_MIN) {
+    type <- "strong_triangle"
+  } else if (contrast > 0.03 && sharpness > SHARPNESS_MIN_MOD && squareness >= SQUARENESS_MIN * 0.7) {
+    type <- "moderate_triangle"
+  } else if (contrast > 0.05 && sharpness > SHARPNESS_MIN_STRONG && squareness < SQUARENESS_MIN) {
+    type <- "sharp_but_not_square"  # sharp edges but decays with distance = family block
+  } else if (contrast > CONTRAST_MIN && has_hot && frac_hot < 0.5) {
+    type <- "patchy_signal"
+  } else if (contrast > CONTRAST_MIN && homogeneity > 0.8) {
+    type <- "diffuse_zone"
+  } else if (contrast > 0.01) {
+    type <- "weak_zone"
+  } else {
+    type <- "transition"
+  }
+
+  list(type = type, inside_mean = inside_mean, inside_sd = inside_sd,
+       contrast = contrast, sharpness = sharpness, squareness = squareness,
+       homogeneity = homogeneity,
+       n_hot_subregimes = n_hot, frac_hot = frac_hot)
+}
+
+# Check bin consistency
+check_consistency <- function(bmat, L, R, bg_median) {
+  n_int <- R - L + 1
+  if (n_int < 2) return(0)
+  support <- sum(vapply(L:R, function(j) mean(bmat[j, L:R]) > bg_median, logical(1)))
+  support / n_int
+}
+
+detect_off_diagonal <- function(bmat, bg_median, diag_intervals) {
+  nb <- nrow(bmat)
+  # Threshold for "high" off-diagonal
+  all_offdiag <- bmat[upper.tri(bmat)]
+  thresh <- quantile(all_offdiag, OFFDIAG_THRESH_Q, na.rm = TRUE)
+
+  # Scan: for each pair of diagonal intervals, check cross-similarity
+  offdiag_rows <- list()
+  if (length(diag_intervals) < 2) return(data.table())
+
+  for (i1 in seq_len(length(diag_intervals) - 1)) {
+    iv1 <- diag_intervals[[i1]]
+    for (i2 in (i1+1):length(diag_intervals)) {
+      iv2 <- diag_intervals[[i2]]
+      # Skip if adjacent (that's just the triangle shoulder)
+      if (abs(iv1$R - iv2$L) < 3 || abs(iv2$R - iv1$L) < 3) next
+
+      # Cross-block similarity
+      cross <- bmat[iv1$L:iv1$R, iv2$L:iv2$R]
+      cross_mean <- mean(cross, na.rm = TRUE)
+      cross_above <- mean(cross > thresh, na.rm = TRUE)
+      n_cross <- length(cross)
+
+      if (cross_mean > bg_median + 0.02 && n_cross >= OFFDIAG_MIN_AREA) {
+        offdiag_rows[[length(offdiag_rows) + 1]] <- data.table(
+          interval_id_1 = iv1$interval_id,
+          interval_id_2 = iv2$interval_id,
+          cross_mean = round(cross_mean, 4),
+          cross_above_frac = round(cross_above, 3),
+          bg_median = round(bg_median, 4),
+          cross_contrast = round(cross_mean - bg_median, 4),
+          n_pairs = n_cross,
+          linkage_type = fifelse(cross_mean > thresh, "strong_linkage",
+                        fifelse(cross_mean > bg_median + 0.03, "moderate_linkage",
+                                "weak_linkage"))
+        )
+      }
+    }
+  }
+  if (length(offdiag_rows) > 0) rbindlist(offdiag_rows) else data.table()
+}
+
+# Get PC1 sample composition
+get_composition <- function(dt, win_L, win_R, sample_names, name_map) {
+  pc1_cols <- paste0("PC_1_", sample_names)
+  available <- intersect(pc1_cols, names(dt))
+  if (length(available) < 20) return(NULL)
+  idx <- win_L:min(win_R, nrow(dt))
+  mat <- as.matrix(dt[idx, ..available])
+  avg <- colMeans(mat, na.rm = TRUE)
+  valid <- is.finite(avg); vals <- avg[valid]
+  if (sum(valid) < 20) return(NULL)
+  snames <- sub("^PC_1_", "", names(vals))
+  if (!is.null(name_map)) { m <- name_map[snames]; snames[!is.na(m)] <- m[!is.na(m)] }
+  km <- tryCatch(kmeans(vals, centers = 3, nstart = 10), error = function(e) NULL)
+  if (is.null(km)) return(NULL)
+  co <- order(km$centers[,1])
+  bands <- character(length(vals))
+  for (bi in seq_along(co)) bands[km$cluster == co[bi]] <- paste0("band", bi)
+  data.table(sample = snames, mean_pc1 = round(vals, 4), band = bands)
+}
+
+# Ancestry diversity for a set of samples
+ancestry_eff_k <- function(samples, q_mat) {
+  s <- intersect(samples, rownames(q_mat))
+  if (length(s) < 3) return(NA_real_)
+  mq <- colMeans(q_mat[s, , drop = FALSE])
+  round(1 / sum(mq^2), 2)
+}
+
+
+# =============================================================================
+# MAIN LOOP
+# =============================================================================
+
+all_intervals <- list()
+all_composition <- list()
+all_offdiag <- list()
+all_subtriangles <- list()
+all_subregimes <- list()
+all_comparisons <- list()
+
+for (chr in chroms) {
+  pc <- precomp_list[[chr]]
+  if (is.null(pc) || pc$n_windows < 50) next
+  message("\n[C01c] === ", chr, " ===")
+  dt <- pc$dt
+
+  # Load sim_mat: priority order:
+  #   1. --sim-mat-file argument (explicit override)
+  #   2. Precomp $sim_mat (old format, embedded)
+  #   3. precomp/sim_mats/<chr>.sim_mat_nn0.rds (v8.5.3 format)
+  sim_mat <- NULL
+  
+  if (!is.null(sim_mat_file)) {
+    if (dir.exists(sim_mat_file)) {
+      candidates <- list.files(sim_mat_file, pattern = paste0("^", chr, ".*\\.rds$"),
+                                full.names = TRUE)
+      if (length(candidates) > 0) {
+        sim_mat <- readRDS(candidates[1])
+        message("  sim_mat from: ", basename(candidates[1]))
+      }
+    } else if (file.exists(sim_mat_file)) {
+      sim_mat <- readRDS(sim_mat_file)
+      message("  sim_mat from: ", basename(sim_mat_file))
+    }
+  }
+  
+  if (is.null(sim_mat) && !is.null(pc$sim_mat)) {
+    sim_mat <- pc$sim_mat
+    message("  sim_mat: embedded in precomp")
+  }
+  
+  if (is.null(sim_mat)) {
+    # v8.5.3: sim_mat stored separately
+    sim_dir <- pc$sim_mat_dir %||% file.path(precomp_dir, "sim_mats")
+    nn0_file <- file.path(sim_dir, paste0(chr, ".sim_mat_nn0.rds"))
+    if (file.exists(nn0_file)) {
+      sim_mat <- readRDS(nn0_file)
+      message("  sim_mat from: ", basename(nn0_file))
+    } else {
+      message("  SKIP ", chr, ": no sim_mat found")
+      next
+    }
+  }
+
+  n_w <- nrow(sim_mat)
+
+  # Step 1: Bin
+  bmat <- bin_sim_mat(sim_mat, BIN_SIZE)
+  if (is.null(bmat)) { message("  Too few bins"); next }
+  nb <- nrow(bmat)
+  bg_median <- median(bmat[upper.tri(bmat)])
+  message("  ", n_w, " win -> ", nb, " bins, bg_median=", round(bg_median, 3))
+
+  bin_pos <- vapply(seq_len(nb), function(b) {
+    wi <- (b-1)*BIN_SIZE + 1
+    (dt$start_bp[wi] + dt$end_bp[min(wi+BIN_SIZE-1, n_w)]) / 2e6
+  }, numeric(1))
+
+  # Step 2: Multi-scale insulation + boundary detection
+  profiles <- compute_row_profiles(bmat)
+  insulation <- compute_insulation(bmat)
+  boundaries <- detect_boundaries(insulation)
+  message("  Boundaries: ", nrow(boundaries), " (across scales)")
+
+  # Step 3: Dynamic interval building from boundaries
+  raw_intervals <- build_intervals_dynamic(bmat, boundaries, bg_median)
+  message("  Raw intervals: ", length(raw_intervals))
+
+  # Also compute apex scores for plotting
+  apex_sc <- compute_apex_scores(bmat, profiles, bg_median)
+  bin_scores <- apex_sc$scores; bin_extents <- apex_sc$extents
+
+  # Step 4: Classify each interval + detect sub-regimes
+  diag_intervals <- list()
+  for (iv in raw_intervals) {
+    L <- iv$L; R <- iv$R; n_int <- R - L + 1
+
+    # Consistency check
+    bin_sup <- check_consistency(bmat, L, R, bg_median)
+
+    # Sub-regime detection WITHIN the interval
+    sub_reg <- detect_sub_regimes(bmat, L, R, bg_median)
+
+    # Classify using sub-regime info
+    cl <- classify_interval_dynamic(bmat, L, R, bg_median, sub_reg)
+
+    # Find apex within interval
+    iv_scores <- bin_scores[L:R]
+    apex_bin <- L + which.max(iv_scores) - 1L
+
+    # Window/bp coordinates
+    win_L <- (L-1)*BIN_SIZE + 1; win_R <- min(R*BIN_SIZE, n_w)
+    bp_L <- dt$start_bp[win_L]; bp_R <- dt$end_bp[win_R]
+
+    diag_intervals[[iv$interval_id]] <- list(
+      interval_id = iv$interval_id, apex_bin = apex_bin, L = L, R = R,
+      win_L = win_L, win_R = win_R, start_bp = bp_L, end_bp = bp_R)
+
+    all_intervals[[length(all_intervals)+1]] <- data.table(
+      chrom = chr, interval_id = iv$interval_id, apex_bin = apex_bin,
+      L_bin = L, R_bin = R, n_bins = n_int,
+      start_bp = bp_L, end_bp = bp_R,
+      start_mb = round(bp_L/1e6, 3), end_mb = round(bp_R/1e6, 3),
+      inside_mean = round(cl$inside_mean, 4), bg_median = round(bg_median, 4),
+      contrast = round(cl$contrast, 4), sharpness = round(cl$sharpness, 4),
+      squareness = round(cl$squareness, 4),
+      homogeneity = round(cl$homogeneity, 3),
+      bin_support = round(bin_sup, 3), apex_score = round(bin_scores[apex_bin], 4),
+      interval_type = cl$type,
+      n_hot_subregimes = cl$n_hot_subregimes, frac_hot = round(cl$frac_hot, 3)
+    )
+
+    # Store sub-regimes
+    if (nrow(sub_reg) > 0) {
+      sub_reg[, `:=`(chrom = chr, interval_id = iv$interval_id)]
+      # Convert bin positions to Mb
+      sub_reg[, start_mb := bin_pos[pmin(sub_L, nb)]]
+      sub_reg[, end_mb := bin_pos[pmin(sub_R, nb)]]
+      all_subregimes[[length(all_subregimes)+1]] <- sub_reg
+    }
+
+    # Composition
+    comp <- get_composition(dt, win_L, win_R, sample_names, name_map)
+    if (!is.null(comp)) {
+      comp[, `:=`(chrom = chr, interval_id = iv$interval_id, interval_type = cl$type,
+                  start_mb = round(bp_L/1e6,3), end_mb = round(bp_R/1e6,3))]
+      if (!is.null(q_mat)) {
+        for (b in paste0("band", 1:3)) {
+          bs <- comp[band == b]$sample
+          comp[band == b, eff_K := ancestry_eff_k(bs, q_mat)]
+        }
+      }
+      all_composition[[length(all_composition)+1]] <- comp
+    }
+  }
+  message("  Final intervals: ", length(diag_intervals),
+          " (types: ", paste(vapply(raw_intervals, function(x) {
+            cl <- classify_interval_dynamic(bmat, x$L, x$R, bg_median,
+                                            detect_sub_regimes(bmat, x$L, x$R, bg_median))
+            cl$type
+          }, character(1)), collapse=", "), ")")
+
+  # Step 4b: Recursive descent into large intervals
+  for (iv in diag_intervals) {
+    if (iv$R - iv$L + 1 < 8) next  # only recurse into large intervals
+    nested <- recursive_triangle_descent(
+      bmat, iv$L, iv$R, bin_pos, bg_median,
+      depth = 1L, max_depth = 5L, parent_id = iv$interval_id
+    )
+    if (nrow(nested) > 0) {
+      nested[, chrom := chr]
+      nested[, parent_interval := iv$interval_id]
+      all_subtriangles[[length(all_subtriangles)+1]] <- nested
+      message("  Recursive in I", iv$interval_id, ": ",
+              nrow(nested), " sub-intervals (max depth ",
+              max(nested$depth), ")")
+    }
+  }
+
+  # Step 5: Off-diagonal blocks
+  offdiag <- detect_off_diagonal(bmat, bg_median, diag_intervals)
+  if (nrow(offdiag) > 0) {
+    offdiag[, chrom := chr]
+    all_offdiag[[length(all_offdiag)+1]] <- offdiag
+    message("  Off-diagonal: ", nrow(offdiag))
+  }
+
+  # Step 6: Compare intervals
+  chr_comps <- all_composition[vapply(all_composition, function(x) x$chrom[1]==chr, logical(1))]
+  if (length(chr_comps) >= 2) {
+    for (i1 in seq_len(length(chr_comps)-1)) {
+      for (i2 in (i1+1):length(chr_comps)) {
+        c1 <- chr_comps[[i1]]; c2 <- chr_comps[[i2]]
+        jac <- numeric(3)
+        for (b in 1:3) {
+          s1 <- c1[band==paste0("band",b)]$sample
+          s2 <- c2[band==paste0("band",b)]$sample
+          jac[b] <- length(intersect(s1,s2)) / max(1, length(union(s1,s2)))
+        }
+        shared <- intersect(c1$sample, c2$sample)
+        pc1_cor <- if (length(shared)>10) {
+          cor(c1[match(shared,sample)]$mean_pc1,
+              c2[match(shared,sample)]$mean_pc1, use="complete.obs")
+        } else NA_real_
+        all_comparisons[[length(all_comparisons)+1]] <- data.table(
+          chrom=chr, id_1=c1$interval_id[1], id_2=c2$interval_id[1],
+          type_1=c1$interval_type[1], type_2=c2$interval_type[1],
+          band1_jac=round(jac[1],3), band2_jac=round(jac[2],3),
+          band3_jac=round(jac[3],3), mean_jac=round(mean(jac),3),
+          pc1_cor=round(pc1_cor,3))
+      }
+    }
+  }
+  # Step 7: BRIDGE DETECTION -- local triangle adjacency graph
+  # For each pair of nearby intervals, measure:
+  #   (a) gap size (how far apart they are)
+  #   (b) gap quality (sim_mat similarity in the gap region)
+  #   (c) composition similarity (do they share the same samples in same bands?)
+  #   (d) off-diagonal linkage (are they connected by cross-stripe?)
+  # A bridge = two intervals that SHOULD be one but are split by a gap
+  all_bridges <- list()
+  if (length(diag_intervals) >= 2) {
+    # Sort intervals by position
+    iv_order <- order(vapply(diag_intervals, function(x) x$L, integer(1)))
+    sorted_iv <- diag_intervals[iv_order]
+
+    for (pi in seq_len(length(sorted_iv) - 1)) {
+      for (pj in (pi+1):min(length(sorted_iv), pi+5)) {
+        # Only look at nearby pairs (within 5 intervals)
+        iv_a <- sorted_iv[[pi]]; iv_b <- sorted_iv[[pj]]
+        gap_L <- iv_a$R + 1; gap_R <- iv_b$L - 1
+        gap_bins <- gap_R - gap_L + 1
+
+        if (gap_bins < 1 || gap_bins > 80) next  # skip overlapping or very distant
+
+        # Gap quality: mean similarity in the gap region to both intervals
+        gap_to_a <- if (gap_bins > 0 && gap_L <= nb && gap_R <= nb) {
+          mean(bmat[gap_L:gap_R, iv_a$L:iv_a$R], na.rm = TRUE)
+        } else bg_median
+        gap_to_b <- if (gap_bins > 0 && gap_L <= nb && gap_R <= nb) {
+          mean(bmat[gap_L:gap_R, iv_b$L:iv_b$R], na.rm = TRUE)
+        } else bg_median
+        gap_internal <- if (gap_bins >= 2 && gap_L <= nb && gap_R <= nb) {
+          mean(bmat[gap_L:gap_R, gap_L:gap_R], na.rm = TRUE)
+        } else bg_median
+
+        # Cross-interval similarity (direct)
+        cross_sim <- mean(bmat[iv_a$L:iv_a$R, iv_b$L:iv_b$R], na.rm = TRUE)
+
+        # Composition similarity (from comparisons table)
+        comp_a <- NULL; comp_b <- NULL
+        for (cc in chr_comps) {
+          if (cc$interval_id[1] == iv_a$interval_id) comp_a <- cc
+          if (cc$interval_id[1] == iv_b$interval_id) comp_b <- cc
+        }
+
+        comp_jac <- 0; comp_cor <- NA_real_
+        if (!is.null(comp_a) && !is.null(comp_b)) {
+          jac <- numeric(3)
+          for (b in 1:3) {
+            s1 <- comp_a[band == paste0("band", b)]$sample
+            s2 <- comp_b[band == paste0("band", b)]$sample
+            jac[b] <- length(intersect(s1, s2)) / max(1, length(union(s1, s2)))
+          }
+          comp_jac <- mean(jac)
+          shared <- intersect(comp_a$sample, comp_b$sample)
+          if (length(shared) > 10) {
+            comp_cor <- cor(comp_a[match(shared, sample)]$mean_pc1,
+                           comp_b[match(shared, sample)]$mean_pc1, use = "complete.obs")
+          }
+        }
+
+        # Bridge score: high = likely same system split by gap
+        # Components: composition match (strongest), cross-similarity, gap quality
+        bridge_score <- 0.5 * comp_jac +
+                        0.25 * max(0, (cross_sim - bg_median) / max(0.01, bg_median)) +
+                        0.15 * max(0, (gap_to_a - bg_median) / max(0.01, bg_median)) +
+                        0.10 * max(0, (gap_to_b - bg_median) / max(0.01, bg_median))
+
+        # Bridge type classification
+        bridge_type <- if (bridge_score > 0.6 && comp_jac > 0.5) {
+          "strong_bridge"  # almost certainly same system
+        } else if (bridge_score > 0.35 && comp_jac > 0.3) {
+          "moderate_bridge"  # likely same, merge with flag
+        } else if (cross_sim > bg_median + 0.03) {
+          "weak_bridge"  # some connection, needs investigation
+        } else {
+          "no_bridge"  # different systems
+        }
+
+        if (bridge_type != "no_bridge") {
+          gap_mb <- if (gap_bins > 0) {
+            round((bin_pos[min(gap_R, nb)] - bin_pos[max(gap_L, 1)]), 3)
+          } else 0
+
+          all_bridges[[length(all_bridges)+1]] <- data.table(
+            chrom = chr,
+            id_a = iv_a$interval_id, id_b = iv_b$interval_id,
+            gap_bins = gap_bins, gap_mb = gap_mb,
+            gap_to_a = round(gap_to_a, 4), gap_to_b = round(gap_to_b, 4),
+            gap_internal = round(gap_internal, 4),
+            cross_sim = round(cross_sim, 4),
+            comp_jaccard = round(comp_jac, 3),
+            comp_pc1_cor = round(comp_cor, 3),
+            bridge_score = round(bridge_score, 3),
+            bridge_type = bridge_type,
+            merge_recommendation = fifelse(
+              bridge_type == "strong_bridge", "merge_freely",
+              fifelse(bridge_type == "moderate_bridge", "merge_with_flag",
+                      "investigate"))
+          )
+        }
+      }
+    }
+    if (length(all_bridges) > 0) {
+      n_bridges <- length(all_bridges)
+      n_strong <- sum(vapply(all_bridges, function(x) x$bridge_type == "strong_bridge", logical(1)))
+      message("  Bridges: ", n_bridges, " (strong: ", n_strong, ")")
+    }
+  }
+}  # END for (chr in chroms) — main detection loop
+
+
+# =============================================================================
+# TRIANGLE ROARY-STYLE WINDOW PA MATRIX
+# =============================================================================
+# For every window on each chromosome: which triangle interval contains it?
+# What type? What sub-regime? What bridge connects to it?
+
+# Build the data.tables FIRST so the PA loop can reference them
+iv_dt <- if (length(all_intervals) > 0) rbindlist(all_intervals) else data.table()
+subreg_dt <- if (length(all_subregimes) > 0) rbindlist(all_subregimes, fill = TRUE) else data.table()
+bridge_dt <- if (length(all_bridges) > 0) rbindlist(all_bridges) else data.table()
+
+message("[C01c] Building PA matrix: ", nrow(iv_dt), " intervals, ",
+        nrow(subreg_dt), " sub-regimes, ", nrow(bridge_dt), " bridges")
+
+all_tri_pa <- list()
+
+for (chr in chroms) {
+  pc <- precomp_list[[chr]]
+  if (is.null(pc)) next
+  dt <- pc$dt; n <- nrow(dt)
+
+  chr_iv <- if (nrow(iv_dt) > 0) iv_dt[chrom == chr] else data.table()
+  chr_sub <- if (nrow(subreg_dt) > 0) subreg_dt[chrom == chr] else data.table()
+  chr_br <- if (nrow(bridge_dt) > 0) bridge_dt[chrom == chr] else data.table()
+
+  pa_rows <- list()
+  for (wi in seq_len(n)) {
+    w_mb <- (dt$start_bp[wi] + dt$end_bp[wi]) / 2e6
+
+    # Which interval(s) contain this window?
+    in_intervals <- character(0); interval_types <- character(0); interval_ids <- integer(0)
+    if (nrow(chr_iv) > 0) {
+      for (ii in seq_len(nrow(chr_iv))) {
+        iv <- chr_iv[ii]
+        if (w_mb >= iv$start_mb && w_mb <= iv$end_mb) {
+          in_intervals <- c(in_intervals, paste0("I", iv$interval_id))
+          interval_types <- c(interval_types, iv$interval_type)
+          interval_ids <- c(interval_ids, iv$interval_id)
+        }
+      }
+    }
+
+    # Sub-regime at this window
+    sub_level <- NA_character_
+    if (nrow(chr_sub) > 0 && length(interval_ids) > 0) {
+      for (iid in interval_ids) {
+        sr <- chr_sub[interval_id == iid]
+        if (nrow(sr) > 0) {
+          # Convert bin coordinates to Mb (approximate)
+          for (si in seq_len(nrow(sr))) {
+            sr_start_mb <- sr$sub_L[si] * BIN_SIZE * mean(diff(dt$start_bp[1:min(10, n)])) / 1e6
+            sr_end_mb <- sr$sub_R[si] * BIN_SIZE * mean(diff(dt$start_bp[1:min(10, n)])) / 1e6
+            if (is.finite(sr_start_mb) && is.finite(sr_end_mb) &&
+                w_mb >= sr_start_mb && w_mb <= sr_end_mb) {
+              sub_level <- sr$sub_level[si]
+              break
+            }
+          }
+        }
+        if (!is.na(sub_level)) break
+      }
+    }
+
+    # Bridge involvement
+    in_bridge <- FALSE; bridge_type <- NA_character_
+    if (nrow(chr_br) > 0 && length(interval_ids) > 0) {
+      br_match <- chr_br[(id_a %in% interval_ids | id_b %in% interval_ids) &
+                          bridge_type != "no_bridge"]
+      if (nrow(br_match) > 0) { in_bridge <- TRUE; bridge_type <- br_match$bridge_type[1] }
+    }
+
+    n_intervals <- length(in_intervals)
+    tri_state <- if (n_intervals == 0) "outside"
+                 else if (length(interval_types) > 0 && any(interval_types == "strong_triangle")) "strong_triangle"
+                 else if (length(interval_types) > 0 && any(interval_types == "moderate_triangle")) "moderate_triangle"
+                 else if (length(interval_types) > 0) interval_types[1]
+                 else "outside"
+
+    pa_rows[[wi]] <- data.table(
+      chrom = chr,
+      global_window_id = dt$global_window_id[wi],
+      pos_mb = round(w_mb, 4),
+      n_intervals = n_intervals,
+      interval_ids = if (n_intervals > 0) paste(in_intervals, collapse = ";") else NA_character_,
+      interval_types = if (n_intervals > 0) paste(interval_types, collapse = ";") else NA_character_,
+      tri_state = tri_state,
+      sub_regime = sub_level,
+      in_bridge = in_bridge,
+      bridge_type = bridge_type
+    )
+  }
+  if (length(pa_rows) > 0) all_tri_pa[[length(all_tri_pa) + 1]] <- rbindlist(pa_rows)
+}
+
+tri_pa_dt <- if (length(all_tri_pa) > 0) rbindlist(all_tri_pa, fill = TRUE) else data.table()
+
+# =============================================================================
+# WRITE (per-chromosome prefixed filenames)
+# =============================================================================
+
+message("\n[C01c] Writing...")
+comp_dt <- if (length(all_composition) > 0) rbindlist(all_composition, fill = TRUE) else data.table()
+od_dt <- if (length(all_offdiag) > 0) rbindlist(all_offdiag, fill = TRUE) else data.table()
+sub_dt <- if (length(all_subtriangles) > 0) rbindlist(all_subtriangles) else data.table()
+cmp_dt <- if (length(all_comparisons) > 0) rbindlist(all_comparisons) else data.table()
+
+# Build prefix from chromosomes processed
+chr_prefix <- if (!is.null(chrom_filter) && length(chrom_filter) == 1) {
+  paste0(chrom_filter, "_")
+} else if (nrow(iv_dt) > 0) {
+  chrs_out <- sort(unique(iv_dt$chrom))
+  if (length(chrs_out) == 1) paste0(chrs_out, "_") else ""
+} else ""
+
+fwrite(iv_dt, file.path(outdir, paste0(chr_prefix, "triangle_intervals.tsv.gz")), sep = "\t")
+fwrite(comp_dt, file.path(outdir, paste0(chr_prefix, "triangle_sample_composition.tsv.gz")), sep = "\t")
+fwrite(od_dt, file.path(outdir, paste0(chr_prefix, "triangle_offdiag_linkage.tsv.gz")), sep = "\t")
+fwrite(sub_dt, file.path(outdir, paste0(chr_prefix, "triangle_subtriangles.tsv.gz")), sep = "\t")
+fwrite(subreg_dt, file.path(outdir, paste0(chr_prefix, "triangle_subregimes.tsv.gz")), sep = "\t")
+fwrite(bridge_dt, file.path(outdir, paste0(chr_prefix, "triangle_bridges.tsv.gz")), sep = "\t")
+fwrite(cmp_dt, file.path(outdir, paste0(chr_prefix, "triangle_interval_comparison.tsv.gz")), sep = "\t")
+fwrite(tri_pa_dt, file.path(outdir, paste0(chr_prefix, "triangle_window_pa.tsv.gz")), sep = "\t")
+
+message("[C01c] Prefix: '", chr_prefix, "'")
+message("[C01c] Intervals: ", nrow(iv_dt), " | Sub-regimes: ", nrow(subreg_dt),
+        " | Bridges: ", nrow(bridge_dt), " | Off-diag: ", nrow(od_dt),
+        " | PA rows: ", nrow(tri_pa_dt))
+message("[DONE] -> ", outdir)

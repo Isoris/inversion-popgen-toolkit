@@ -1,0 +1,133 @@
+#!/usr/bin/env bash
+#SBATCH -p compute
+#SBATCH -N 1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=28
+#SBATCH --mem=237G
+#SBATCH -t 6:00:00
+#SBATCH -J inv_S3v3
+#SBATCH -o logs/inv_S3v3_%j.out
+#SBATCH -e logs/inv_S3v3_%j.err
+
+# =============================================================================
+# LAUNCH_C04_snake3_ghsl_v3.slurm
+#
+# Snake 3 v3: GHSL haplotype contrast pipeline.
+#
+# Steps:
+#   --step prep      Merge per-sample TSVs into per-chr files (one-time)
+#   --step run       Run Snake 3 v3 engine (contrast scoring)
+#   --step figures   Generate diagnostic figures G1-G8
+#   --step all       prep → run → figures (default)
+#
+# Usage:
+#   sbatch LAUNCH_C04_snake3_ghsl_v3.slurm                    # full pipeline
+#   sbatch LAUNCH_C04_snake3_ghsl_v3.slurm --step prep        # prep only
+#   sbatch LAUNCH_C04_snake3_ghsl_v3.slurm --step run         # engine only
+#   sbatch LAUNCH_C04_snake3_ghsl_v3.slurm --step figures     # figures only
+#   sbatch LAUNCH_C04_snake3_ghsl_v3.slurm --chrom C_gar_LG28 # single chr
+# =============================================================================
+
+set -euo pipefail
+source ~/.bashrc
+mamba activate assembly
+
+CONFIG="/scratch/lt200308-agbsci/Quentin_project_KEEP_2026-02-04/inversion_codebase_v8.5/00_inversion_config.sh"
+[[ -f "${CONFIG}" ]] || { echo "Missing config: ${CONFIG}" >&2; exit 1; }
+
+set -a
+source "${CONFIG}"
+set +a
+
+inv_init_dirs
+
+A2_SNAKES="${DISCOVERY2DIR}/snakes"
+A2_UTILS="${CODEBASE}/utils"
+PRECOMP_DIR="${MDS_DIR}/snake_regions_multiscale/precomp"
+PP_DIR="${BASE}/MODULE_4A_SNP_INDEL50_Clair3/postprocess_results"
+GHSL_PREP_DIR="${MDS_DIR}/snake_regions_multiscale/ghsl_prep"
+SNAKE3_OUTDIR="${MDS_DIR}/snake3_ghsl_v3"
+SNAKE3_FIGS="${SNAKE3_OUTDIR}/figures"
+
+STEP="all"
+CHROM_ARG=""
+CHROM_OPTS=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --step)  STEP="$2"; shift 2 ;;
+    --chrom) CHROM_ARG="$2"; CHROM_OPTS="--chrom $2"; shift 2 ;;
+    *)       shift ;;
+  esac
+done
+
+mkdir -p "${GHSL_PREP_DIR}" "${SNAKE3_OUTDIR}" "${SNAKE3_FIGS}"
+
+echo "================================================================"
+echo "  Snake 3 v3: GHSL Haplotype Contrast"
+echo "  Step: ${STEP}"
+echo "  Chrom: ${CHROM_ARG:-all}"
+echo "  Precomp: ${PRECOMP_DIR}"
+echo "  Clair3 PP: ${PP_DIR}"
+echo "  GHSL prep: ${GHSL_PREP_DIR}"
+echo "  Output: ${SNAKE3_OUTDIR}"
+echo "  JobID: ${SLURM_JOB_ID}"
+echo "  Started: $(date)"
+echo "================================================================"
+
+run_prep() {
+  echo ""
+  echo "[LAUNCH] ── Phase: PREP (merge per-sample TSVs) ──"
+  if [[ -n "${CHROM_ARG}" ]]; then
+    bash "${A2_UTILS}/prepare_ghsl_v3_merged.sh" "${PP_DIR}" "${GHSL_PREP_DIR}" "${CHROM_ARG}"
+  else
+    bash "${A2_UTILS}/prepare_ghsl_v3_merged.sh" "${PP_DIR}" "${GHSL_PREP_DIR}"
+  fi
+}
+
+run_engine() {
+  echo ""
+  echo "[LAUNCH] ── Phase: RUN (Snake 3 v3 engine) ──"
+  "${RSCRIPT_BIN}" "${A2_SNAKES}/STEP_C04_snake3_ghsl_v3.R" \
+    "${PRECOMP_DIR}" "${GHSL_PREP_DIR}" "${SNAKE3_OUTDIR}" \
+    ${CHROM_OPTS} --store_matrices --ncores ${SLURM_CPUS_PER_TASK}
+}
+
+run_figures() {
+  echo ""
+  echo "[LAUNCH] ── Phase: FIGURES (G1-G8) ──"
+  local CAND_OPTS=""
+  local CAND_FILE="${MDS_DIR}/snake_regions_multiscale/snake_candidate_regions.tsv.gz"
+  if [[ -f "${CAND_FILE}" ]]; then
+    CAND_OPTS="--candidates ${CAND_FILE}"
+  fi
+
+  "${RSCRIPT_BIN}" "${A2_SNAKES}/STEP_C04b_snake3_ghsl_figures.R" \
+    "${SNAKE3_OUTDIR}" "${PRECOMP_DIR}" "${SNAKE3_FIGS}" \
+    ${CHROM_OPTS} ${CAND_OPTS}
+}
+
+# Dispatch
+if [[ "${STEP}" == "all" ]]; then
+  STEP="prep,run,figures"
+fi
+
+IFS=',' read -ra STEPS <<< "${STEP}"
+for s in "${STEPS[@]}"; do
+  case "${s}" in
+    prep)    run_prep ;;
+    run)     run_engine ;;
+    figures) run_figures ;;
+    *)
+      echo "[ERROR] Unknown step '${s}'. Use: prep, run, figures, all"
+      exit 1
+      ;;
+  esac
+done
+
+echo ""
+echo "================================================================"
+echo "  Snake 3 v3 '${STEP}' complete — $(date)"
+echo "  Output: ${SNAKE3_OUTDIR}/"
+echo "  Figures: ${SNAKE3_FIGS}/"
+echo "================================================================"
