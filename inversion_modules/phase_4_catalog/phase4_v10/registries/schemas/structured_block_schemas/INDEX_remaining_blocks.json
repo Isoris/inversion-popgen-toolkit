@@ -1,0 +1,147 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "block_index.schema.json",
+  "description": "Index of all 18 Tier-2 structured block schemas. Written as a single overview because the remaining 14 schemas follow the same pattern as existence_layer_d, internal_dynamics, hypothesis_verdict, boundary. Each gets its own file when the library is implemented.",
+  "blocks": [
+    {
+      "block_type": "existence_layer_a",
+      "question": "Q1, Q7",
+      "group_validation_required": "NONE",
+      "source_script": "C01a + C01b + C01d",
+      "description": "Local PCA sim_mat evidence: 12 D-dimensions, composite_score, tier, shape_class, landscape_category. The primary Layer A evidence for any candidate.",
+      "status": "skeleton — extract from existing register_C01d_keys helper"
+    },
+    {
+      "block_type": "existence_layer_b",
+      "question": "Q7",
+      "group_validation_required": "NONE",
+      "source_script": "C00 + MODULE_4*",
+      "description": "SV caller concordance: DELLY/Manta INV calls overlapping this candidate. Lists breakpoints, split/discordant read counts per sample. Physical evidence (real DNA).",
+      "status": "skeleton — adapt from flashlight RDS structure"
+    },
+    {
+      "block_type": "existence_layer_c",
+      "question": "Q7",
+      "group_validation_required": "NONE",
+      "source_script": "C04 GHSL",
+      "description": "GHSL haplotype contrast: Clair3 phased genotype patterns that cluster the same samples as PCA (or not). Independent of PCA signal.",
+      "status": "skeleton — adapt from GHSL v5 output"
+    },
+    {
+      "block_type": "existence_layer_d",
+      "question": "Q7",
+      "group_validation_required": "NONE",
+      "source_script": "STEP03_statistical_tests.py",
+      "status": "written — existence_layer_d.schema.json"
+    },
+    {
+      "block_type": "boundary_left",
+      "question": "Q3",
+      "group_validation_required": "NONE",
+      "source_script": "C01g",
+      "status": "written — boundary.schema.json (templated, side=left)"
+    },
+    {
+      "block_type": "boundary_right",
+      "question": "Q3",
+      "group_validation_required": "NONE",
+      "source_script": "C01g",
+      "status": "written — boundary.schema.json (templated, side=right)"
+    },
+    {
+      "block_type": "carrier_reconciliation",
+      "question": "Q3, Q6, Q7",
+      "group_validation_required": "N/A (this block IS the reconciliation)",
+      "source_script": "audit_cores_vs_sv",
+      "description": "Audits disagreement between per-sample carrier assignments from different evidence types (PCA, SV, GHSL, Clair3). Counts how many samples are concordant across all four layers and lists the disagreers."
+    },
+    {
+      "block_type": "internal_dynamics",
+      "question": "Q2",
+      "group_validation_required": "UNCERTAIN",
+      "source_script": "C01i + decomp_stats + cheat24",
+      "status": "written — internal_dynamics.schema.json"
+    },
+    {
+      "block_type": "mechanism",
+      "question": "Q4",
+      "group_validation_required": "NONE",
+      "source_script": "cheat14 + cheat27 + cheat29",
+      "description": "Junction sequence forensics: microhomology length, flanking SDs, TE context, NAHR/NHEJ/MMEJ call."
+    },
+    {
+      "block_type": "age_evidence",
+      "question": "Q5",
+      "group_validation_required": "NONE (GDS sub-block) / SUPPORTED (Fst sub-block)",
+      "source_script": "cheat30 + popstats",
+      "description": "GDS by genotype (dosage-based, no groups needed), Fst/dXY between HOM_REF and HOM_INV (needs validated groups). Dual sub-blocks in one file."
+    },
+    {
+      "block_type": "frequency",
+      "question": "Q6",
+      "group_validation_required": "SUPPORTED",
+      "source_script": "C01i + C01f",
+      "description": "freq_inv, HWE test, family_linkage status, class-balance metrics."
+    },
+    {
+      "block_type": "hypothesis_verdict",
+      "question": "Q7",
+      "group_validation_required": "UNCERTAIN",
+      "source_script": "C01f",
+      "status": "written — hypothesis_verdict.schema.json"
+    },
+    {
+      "block_type": "morphology",
+      "question": "Q1",
+      "group_validation_required": "NONE",
+      "source_script": "C01a",
+      "description": "Shape metrics: span_kb, n_children, aspect ratio, interior homogeneity."
+    },
+    {
+      "block_type": "band_composition",
+      "question": "Q1",
+      "group_validation_required": "UNCERTAIN",
+      "source_script": "C01i + instant_q",
+      "description": "Per-class ancestry composition: for each of HOM_REF/HET/HOM_INV, the mean Q vector from instant_q at this locus."
+    },
+    {
+      "block_type": "burden",
+      "question": "Q6",
+      "group_validation_required": "VALIDATED",
+      "source_script": "burden_regression",
+      "description": "Per-carrier trait burden regression. Only makes sense for VALIDATED groups (group labels must be trustworthy to regress on)."
+    },
+    {
+      "block_type": "block_detect",
+      "question": "Q1, Q3",
+      "group_validation_required": "NONE",
+      "source_script": "PHASE_01C block detection",
+      "description": "Block detection outputs: inner boundary (blue cross), block candidate windows, confidence score."
+    },
+    {
+      "block_type": "inv_detect_blocks",
+      "question": "Q1, Q3",
+      "group_validation_required": "NONE",
+      "source_script": "inv_detect_v9.3",
+      "description": "Staircase-block output from the inv_detect heatmap traversal. The primary Phase-2 signal that produced this candidate."
+    },
+    {
+      "block_type": "peel_diagnostic",
+      "question": "Q7",
+      "group_validation_required": "NONE",
+      "source_script": "C01n / inv_detect Phase 9",
+      "description": "Peel analysis: does the candidate signal survive successive peeling of high-relatedness samples? Feeds D8."
+    },
+    {
+      "block_type": "synteny_dollo",
+      "question": "Q5",
+      "group_validation_required": "NONE",
+      "source_script": "synteny_inversion_detection.sh + dollo_parsimony_inversions.py",
+      "description": "Cross-species synteny: is this inversion present in sister species? If present in C. macrocephalus and absent in outgroups → shared ancestral; if only in hatchery line → derived. Dollo parsimony call."
+    }
+  ],
+  "total": 18,
+  "written_so_far": ["existence_layer_d", "internal_dynamics", "hypothesis_verdict", "boundary_left", "boundary_right"],
+  "remaining": 14,
+  "note": "Remaining 14 schemas follow same pattern: required fields list, properties with descriptions and types, keys_extracted mapping block fields to flat key names. Each takes ~15 minutes to write from the corresponding script's output."
+}

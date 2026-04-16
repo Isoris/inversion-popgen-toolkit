@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "existence_layer_d.schema.json",
+  "block_type": "existence_layer_d",
+  "description": "Fisher OR association test between breakpoint read evidence and PCA-based genotype classes. This is the statistical test that links Layers A+B+C into one convergent proof. A passing Layer D (OR>5, p<0.05) is what promotes a candidate's group validation to VALIDATED.",
+  "question": "Q7",
+  "group_validation_required": "NONE",
+  "group_validation_sets": "VALIDATED (when Fisher p<0.05 and OR>5)",
+  "source_script": "STEP03_statistical_tests.py",
+  "required": ["fisher_or", "fisher_p", "contingency_table", "n_inv_with_support", "n_inv_total"],
+  "properties": {
+    "fisher_or": {
+      "type": "number",
+      "description": "Odds ratio from Fisher's exact test on 2x2 contingency of {HOM_INV, HOM_REF} x {has_BP_support, no_BP_support}"
+    },
+    "fisher_p": {
+      "type": "number",
+      "description": "p-value from Fisher's exact test (two-sided)"
+    },
+    "fisher_ci_lower": { "type": "number" },
+    "fisher_ci_upper": { "type": "number" },
+    "contingency_table": {
+      "type": "array",
+      "description": "2x2 table: rows = {HOM_INV, HOM_REF}, cols = {support, no_support}"
+    },
+    "armitage_z": { "type": "number", "description": "Cochran-Armitage trend test z-score" },
+    "armitage_p": { "type": "number" },
+    "n_inv_with_support": { "type": "integer" },
+    "n_inv_total": { "type": "integer" },
+    "n_ref_with_support": { "type": "integer" },
+    "n_ref_total": { "type": "integer" },
+    "samples_inv_with_support": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "List of sample IDs in HOM_INV class that show breakpoint support"
+    }
+  },
+  "keys_extracted": [
+    { "key": "q7_layer_d_fisher_or", "from": "fisher_or" },
+    { "key": "q7_layer_d_fisher_p", "from": "fisher_p" },
+    { "key": "q7_layer_d_fisher_ci_lower", "from": "fisher_ci_lower" },
+    { "key": "q7_layer_d_fisher_ci_upper", "from": "fisher_ci_upper" },
+    { "key": "q7_layer_d_armitage_z", "from": "armitage_z" },
+    { "key": "q7_layer_d_armitage_p", "from": "armitage_p" },
+    { "key": "q7_layer_d_n_inv_with_support", "from": "n_inv_with_support" },
+    { "key": "q7_layer_d_n_inv_total", "from": "n_inv_total" }
+  ]
+}

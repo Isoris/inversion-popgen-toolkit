@@ -1,0 +1,69 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "age_evidence.schema.json",
+  "block_type": "age_evidence",
+  "description": "Age / origin inference. Contains TWO sub-blocks with different validation requirements: GDS sub-block (cheat30, dosage-based, group-independent, validation=NONE) and Fst/dXY sub-block (Engine B between HOM_REF and HOM_INV groups, validation=SUPPORTED). If groups are UNCERTAIN or worse, the Fst sub-block stays empty but the GDS sub-block still runs.",
+  "question": "Q5",
+  "group_validation_required": "NONE for GDS sub-block, SUPPORTED for Fst sub-block",
+  "source_script": "cheat30_gds_by_genotype + unified_ancestry/region_popstats",
+  "required": ["gds_sub_block"],
+  "properties": {
+    "gds_sub_block": {
+      "type": "object",
+      "description": "Genotype Dissimilarity Score by genotype class. Works on dosage, no groups needed. GDS gap between HOM_REF and HOM_INV correlates with time since inversion origin.",
+      "required": ["gds_matrix_path", "dip_test_p"],
+      "properties": {
+        "gds_matrix_path": { "type": "string", "description": "Path to TSV matrix in raw/" },
+        "gds_gap":         { "type": "number" },
+        "dip_test_statistic": { "type": "number" },
+        "dip_test_p":      { "type": "number", "description": "Hartigan's dip test for bimodality" },
+        "origin_class":    { "type": "string", "enum": ["single_origin", "recurrent", "unclassified"] },
+        "origin_confidence": { "type": "string", "enum": ["high", "medium", "low"] },
+        "gds_percentile_global": {
+          "type": "number",
+          "description": "percentile of this candidate's gds_gap across all candidates — older inversions accumulate more GDS"
+        }
+      }
+    },
+    "fst_sub_block": {
+      "type": "object",
+      "description": "Hudson Fst and dXY between HOM_REF and HOM_INV groups inside the inversion. Requires SUPPORTED validation — if groups are not reliable, these numbers will be noise. When validation is UNCERTAIN, fields stay null and validation_skip_reason is populated.",
+      "properties": {
+        "fst_inside":         { "type": "number" },
+        "fst_flanking_left":  { "type": "number" },
+        "fst_flanking_right": { "type": "number" },
+        "dxy_inside":         { "type": "number" },
+        "dxy_flanking_left":  { "type": "number" },
+        "dxy_flanking_right": { "type": "number" },
+        "theta_pi_hom_ref":   { "type": "number" },
+        "theta_pi_hom_inv":   { "type": "number" },
+        "theta_w_hom_ref":    { "type": "number" },
+        "theta_w_hom_inv":    { "type": "number" },
+        "tajima_d_hom_ref":   { "type": "number" },
+        "tajima_d_hom_inv":   { "type": "number" },
+        "fst_decay_rate":     { "type": "number", "description": "exponential decay of Fst moving away from boundary (bp^-1)" },
+        "validation_skip_reason": { "type": "string", "description": "populated if group_validation was too low to run this sub-block" }
+      }
+    },
+    "age_class": {
+      "type": "string",
+      "enum": ["young", "intermediate", "old", "ancient_fixed"],
+      "description": "Derived jointly from GDS + Fst: young = low GDS gap + low Fst; old = high GDS gap + high Fst; ancient_fixed = high GDS + Fst approaching theta_pi ratio"
+    },
+    "age_confidence": { "type": "string", "enum": ["high", "medium", "low"] }
+  },
+  "keys_extracted": [
+    { "key": "q5_gds_gap",              "from": "gds_sub_block.gds_gap" },
+    { "key": "q5_gds_dip_p",            "from": "gds_sub_block.dip_test_p" },
+    { "key": "q5_origin_class",         "from": "gds_sub_block.origin_class" },
+    { "key": "q5_gds_percentile_global", "from": "gds_sub_block.gds_percentile_global" },
+    { "key": "q5_fst_inside",           "from": "fst_sub_block.fst_inside" },
+    { "key": "q5_dxy_inside",           "from": "fst_sub_block.dxy_inside" },
+    { "key": "q5_theta_pi_hom_ref",     "from": "fst_sub_block.theta_pi_hom_ref" },
+    { "key": "q5_theta_pi_hom_inv",     "from": "fst_sub_block.theta_pi_hom_inv" },
+    { "key": "q5_fst_decay_rate",       "from": "fst_sub_block.fst_decay_rate" },
+    { "key": "q5_age_class",            "from": "age_class" },
+    { "key": "q5_age_confidence",       "from": "age_confidence" }
+  ],
+  "keys_extracted_note": "The 'from' paths use dot notation for sub-block access. The library's key-extractor must follow dotted paths; this is a small extension over the flat from semantics used by other schemas. Handle by splitting on '.' and walking the data list."
+}

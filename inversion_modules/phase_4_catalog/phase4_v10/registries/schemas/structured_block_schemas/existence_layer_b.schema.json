@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "existence_layer_b.schema.json",
+  "block_type": "existence_layer_b",
+  "description": "SV caller concordance evidence. DELLY + Manta INV calls overlapping the candidate, with per-sample split-read and discordant-pair counts. This is PHYSICAL evidence (real DNA rearrangement signatures) as opposed to Layer A's statistical sim_mat evidence. At 9× coverage, SV callers miss many true inversions — absence of Layer B does NOT falsify a Layer A candidate.",
+  "question": "Q7",
+  "group_validation_required": "NONE",
+  "source_script": "C00 build_flashlight + MODULE_4H_ALL_Manta + MODULE_4_DELLY_INV",
+  "required": ["n_sv_calls"],
+  "properties": {
+    "n_sv_calls":                { "type": "integer", "description": "Total SV calls overlapping candidate region" },
+    "n_delly_inv_calls":         { "type": "integer" },
+    "n_manta_inv_calls":         { "type": "integer" },
+    "n_both_caller_concordant":  { "type": "integer", "description": "count of INV calls where DELLY and Manta agree on position ±1kb" },
+    "best_delly_call": {
+      "type": "object",
+      "properties": {
+        "chrom":    { "type": "string" },
+        "bp1":      { "type": "integer" },
+        "bp2":      { "type": "integer" },
+        "filter":   { "type": "string" },
+        "quality":  { "type": "number" },
+        "n_samples_passing": { "type": "integer" }
+      }
+    },
+    "best_manta_call": {
+      "type": "object",
+      "properties": {
+        "chrom": { "type": "string" },
+        "bp1":   { "type": "integer" },
+        "bp2":   { "type": "integer" },
+        "filter":   { "type": "string" },
+        "quality":  { "type": "number" },
+        "n_samples_passing": { "type": "integer" }
+      }
+    },
+    "bp1_concordance_kb": { "type": "number", "description": "distance between DELLY and Manta bp1 calls in kb" },
+    "bp2_concordance_kb": { "type": "number" },
+    "samples_with_sv_support": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Samples with at least one SV call (either caller) passing filters"
+    },
+    "sv_concordance_class": {
+      "type": "string",
+      "enum": ["full", "partial", "none"],
+      "description": "full = both callers agree at both boundaries; partial = one caller only OR boundary disagreement; none = no SV calls"
+    }
+  },
+  "keys_extracted": [
+    { "key": "q7_n_sv_calls",               "from": "n_sv_calls" },
+    { "key": "q7_n_delly_calls",            "from": "n_delly_inv_calls" },
+    { "key": "q7_n_manta_calls",            "from": "n_manta_inv_calls" },
+    { "key": "q7_sv_concordance_class",     "from": "sv_concordance_class" },
+    { "key": "q7_bp1_concordance_kb",       "from": "bp1_concordance_kb" },
+    { "key": "q7_bp2_concordance_kb",       "from": "bp2_concordance_kb" }
+  ]
+}

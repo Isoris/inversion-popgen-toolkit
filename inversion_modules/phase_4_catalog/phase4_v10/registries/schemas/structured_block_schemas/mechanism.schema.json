@@ -1,0 +1,79 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "mechanism.schema.json",
+  "block_type": "mechanism",
+  "description": "Formation mechanism inference from junction forensics (cheat29), SD substrate analysis (cheat14 + cheat27), and TE enrichment (cheat21 + cheat28). Outputs: mechanism class (NAHR/NHEJ/MMEJ), microhomology length at junction, flanking SD characteristics, TE content. Group-independent — junction sequence doesn't need carrier labels.",
+  "question": "Q4",
+  "group_validation_required": "NONE",
+  "source_script": "cheat14 + cheat21 + cheat27 + cheat28 + cheat29",
+  "required": ["mechanism_class"],
+  "properties": {
+    "mechanism_class": {
+      "type": "string",
+      "enum": ["NAHR", "NHEJ", "MMEJ", "TE_mediated", "unclassified"],
+      "description": "NAHR = flanking SDs >1kb at >95% identity; NHEJ = no microhomology; MMEJ = 2-25bp microhomology at junction; TE_mediated = flanking TEs of same family in inverted orientation"
+    },
+    "microhomology_length_bp": {
+      "type": "integer",
+      "description": "Length of sequence identity at the junction. 0 = blunt, 1-4 = NHEJ with noise, 2-25 = MMEJ signature, >25 = NAHR"
+    },
+    "microhomology_sequence": { "type": "string" },
+    "junction_orientation": {
+      "type": "string",
+      "enum": ["head_to_head", "tail_to_tail", "mixed", "unclear"]
+    },
+    "sd_present_left": { "type": "boolean" },
+    "sd_present_right": { "type": "boolean" },
+    "sd_identity_left": { "type": "number", "description": "% sequence identity of left flanking SD" },
+    "sd_identity_right": { "type": "number" },
+    "sd_length_left_bp": { "type": "integer" },
+    "sd_length_right_bp": { "type": "integer" },
+    "sd_concordance": {
+      "type": "string",
+      "enum": ["agree_nahr", "disagree", "unresolved"],
+      "description": "cheat27 output: do minimap2 and RepeatMasker agree that flanking SDs support NAHR?"
+    },
+    "te_enrichment": {
+      "type": "string",
+      "enum": ["ENRICHED", "DEPLETED", "NEUTRAL"]
+    },
+    "te_families": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "TE families found at both breakpoints (suggests TE-mediated if concordant)"
+    },
+    "tandem_repeat_context": {
+      "type": "object",
+      "description": "cheat28 output: tandem repeat density ±5kb of each junction",
+      "properties": {
+        "density_left_per_kb": { "type": "number" },
+        "density_right_per_kb": { "type": "number" }
+      }
+    },
+    "mechanism_confidence": {
+      "type": "string",
+      "enum": ["high", "medium", "low"],
+      "description": "high = both junctions agree + independent SD/TE evidence; medium = one junction resolved; low = ambiguous"
+    },
+    "junction_sequences": {
+      "type": "object",
+      "description": "±50bp breakpoint sequences for publication supplementary",
+      "properties": {
+        "left_bp_context":  { "type": "string" },
+        "right_bp_context": { "type": "string" }
+      }
+    }
+  },
+  "keys_extracted": [
+    { "key": "q4_mechanism_class",         "from": "mechanism_class" },
+    { "key": "q4_microhomology_length_bp", "from": "microhomology_length_bp" },
+    { "key": "q4_junction_orientation",    "from": "junction_orientation" },
+    { "key": "q4_sd_identity_left",        "from": "sd_identity_left" },
+    { "key": "q4_sd_identity_right",       "from": "sd_identity_right" },
+    { "key": "q4_sd_length_left_bp",       "from": "sd_length_left_bp" },
+    { "key": "q4_sd_length_right_bp",      "from": "sd_length_right_bp" },
+    { "key": "q4_sd_concordance",          "from": "sd_concordance" },
+    { "key": "q4_te_enrichment",           "from": "te_enrichment" },
+    { "key": "q4_mechanism_confidence",    "from": "mechanism_confidence" }
+  ]
+}

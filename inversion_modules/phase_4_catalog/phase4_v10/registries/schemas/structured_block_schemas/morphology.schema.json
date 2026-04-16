@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "morphology.schema.json",
+  "block_type": "morphology",
+  "description": "Shape metrics for the sim_mat block: span, aspect ratio, interior homogeneity, nested child count, architectural class. Produced during C01a precomputation. Group-independent, sim_mat-only.",
+  "question": "Q1",
+  "group_validation_required": "NONE",
+  "source_script": "C01a precompute + C01d scoring",
+  "required": ["span_kb", "aspect_ratio", "interior_homogeneity", "architecture"],
+  "properties": {
+    "span_kb":              { "type": "number" },
+    "span_bp":              { "type": "integer" },
+    "aspect_ratio":         { "type": "number", "description": "block height / block width in sim_mat units — close to 1.0 is square, >> 1 is tall, << 1 is wide" },
+    "interior_homogeneity": { "type": "number", "description": "mean pairwise sim within block / max pairwise sim — close to 1 is homogeneous, close to 0 is patchy" },
+    "patchiness_score":     { "type": "number" },
+    "stripe_count":         { "type": "integer", "description": "count of horizontal stripes detectable inside the block (should be 3 for classical inversion)" },
+    "n_children":           { "type": "integer", "description": "count of nested sub-blocks" },
+    "architecture": {
+      "type": "string",
+      "enum": ["single_block", "nested_blocks", "multi_system", "complex"]
+    },
+    "size_class": {
+      "type": "string",
+      "enum": ["small", "medium", "large"],
+      "description": "small <1Mb, medium 1-5Mb, large >5Mb"
+    },
+    "sample_grouping": {
+      "type": "string",
+      "enum": ["simple_polymorphic", "nested", "overlapping", "complex"],
+      "description": "high-level architectural class for classification"
+    },
+    "spatial_consistency": {
+      "type": "string",
+      "enum": ["uniform", "gradient", "patchy"]
+    }
+  },
+  "keys_extracted": [
+    { "key": "q1_span_kb",               "from": "span_kb" },
+    { "key": "q1_aspect_ratio",          "from": "aspect_ratio" },
+    { "key": "q1_interior_homogeneity",  "from": "interior_homogeneity" },
+    { "key": "q1_patchiness_score",      "from": "patchiness_score" },
+    { "key": "q1_stripe_count",          "from": "stripe_count" },
+    { "key": "q1_n_children",            "from": "n_children" },
+    { "key": "q1_architecture",          "from": "architecture" },
+    { "key": "q1_size_class",            "from": "size_class" },
+    { "key": "q1_sample_grouping",       "from": "sample_grouping" },
+    { "key": "q1_spatial_consistency",   "from": "spatial_consistency" }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "existence_layer_c.schema.json",
+  "block_type": "existence_layer_c",
+  "description": "GHSL (Genotype-aware Haplotype Structure Landscape) haplotype contrast evidence. Derived from Clair3 phased genotypes, detects within-sample allelic divergence that clusters samples by karyotype independently of PCA. Validates Layer A by an orthogonal route: if PCA says 'these 89 samples are HOM_REF' and GHSL agrees on the same 89 samples, that's independent confirmation.",
+  "question": "Q7",
+  "group_validation_required": "NONE",
+  "source_script": "C04 GHSL v5 (within-sample haplotype divergence) + STEP_C01c triangle insulation",
+  "required": ["ghsl_contrast_score", "n_samples_tested"],
+  "properties": {
+    "ghsl_contrast_score": { "type": "number", "description": "Normalized GHSL v5 contrast statistic for the candidate region" },
+    "ghsl_contrast_p":     { "type": "number", "description": "Permutation p-value" },
+    "n_samples_tested":    { "type": "integer" },
+    "triangle_insulation_score": { "type": "number", "description": "STEP_C01c triangle insulation score at the left boundary" },
+    "triangle_insulation_right": { "type": "number" },
+    "ghsl_vs_pca_rand_index": {
+      "type": "number",
+      "description": "Adjusted Rand Index between GHSL sample clusters and PCA sample clusters. High = independent confirmation."
+    },
+    "ghsl_concordance_class": {
+      "type": "string",
+      "enum": ["strong_concordant", "concordant", "weak_concordant", "discordant", "underpowered"],
+      "description": "strong: Rand > 0.7; concordant: > 0.4; weak: > 0.2; discordant: > 0; underpowered: insufficient Clair3 calls"
+    },
+    "n_clair3_snps_in_region": { "type": "integer", "description": "Number of Clair3-called variants inside the candidate region" }
+  },
+  "keys_extracted": [
+    { "key": "q7_ghsl_contrast_score",     "from": "ghsl_contrast_score" },
+    { "key": "q7_ghsl_contrast_p",         "from": "ghsl_contrast_p" },
+    { "key": "q7_ghsl_vs_pca_rand",        "from": "ghsl_vs_pca_rand_index" },
+    { "key": "q7_ghsl_concordance_class",  "from": "ghsl_concordance_class" },
+    { "key": "q7_n_clair3_snps",           "from": "n_clair3_snps_in_region" },
+    { "key": "q7_triangle_insulation_left",  "from": "triangle_insulation_score" },
+    { "key": "q7_triangle_insulation_right", "from": "triangle_insulation_right" }
+  ]
+}

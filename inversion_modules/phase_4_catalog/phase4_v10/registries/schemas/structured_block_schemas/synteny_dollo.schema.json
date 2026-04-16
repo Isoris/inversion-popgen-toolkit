@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "synteny_dollo.schema.json",
+  "block_type": "synteny_dollo",
+  "description": "Cross-species synteny + Dollo parsimony call for evolutionary conservation. Compares inversion presence/absence across Clarias gariepinus, C. macrocephalus, and available outgroup Siluriformes. Dollo parsimony (derived-state only loss) places the inversion on the species tree.",
+  "question": "Q5",
+  "group_validation_required": "NONE",
+  "source_script": "synteny_inversion_detection.sh + dollo_parsimony_inversions.py + mashmap",
+  "required": ["conservation_class"],
+  "properties": {
+    "conservation_class": {
+      "type": "string",
+      "enum": ["species_specific", "shared_ancestral", "ASEAN_diagnostic", "unclassified", "untested"],
+      "description": "species_specific = only in hatchery C. gariepinus-like samples; shared_ancestral = present in both parent species + outgroup; ASEAN_diagnostic = fixed difference between ASEAN species"
+    },
+    "present_in_c_gariepinus":    { "type": "boolean" },
+    "present_in_c_macrocephalus": { "type": "boolean" },
+    "outgroup_state": {
+      "type": "string",
+      "enum": ["reference_orientation", "inverted", "ambiguous", "untested"]
+    },
+    "outgroup_species_tested": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "dollo_inferred_state": {
+      "type": "string",
+      "description": "Dollo parsimony inferred ancestral state at the Clarias MRCA",
+      "enum": ["reference", "inverted", "polymorphic", "unresolved"]
+    },
+    "mashmap_identity":      { "type": "number" },
+    "mashmap_coverage":      { "type": "number" },
+    "synteny_block_length_bp": { "type": "integer" }
+  },
+  "keys_extracted": [
+    { "key": "q5_conservation_class",        "from": "conservation_class" },
+    { "key": "q5_present_c_gariepinus",      "from": "present_in_c_gariepinus" },
+    { "key": "q5_present_c_macrocephalus",   "from": "present_in_c_macrocephalus" },
+    { "key": "q5_outgroup_state",            "from": "outgroup_state" },
+    { "key": "q5_dollo_state",               "from": "dollo_inferred_state" }
+  ]
+}

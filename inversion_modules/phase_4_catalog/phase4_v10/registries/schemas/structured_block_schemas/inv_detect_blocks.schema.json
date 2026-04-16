@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "inv_detect_blocks.schema.json",
+  "block_type": "inv_detect_blocks",
+  "description": "Output from inv_detect v9.3 heatmap traversal (staircase detector). This is the primary Phase-2 signal that proposes candidates. Each candidate block has its own scoring_table entry with staircase scores, regime change detection, and candidate interval.",
+  "question": "Q1, Q3",
+  "group_validation_required": "NONE",
+  "source_script": "inv_detect_v9.3 + 12_bridge_to_codebase.R",
+  "required": ["interval_id", "staircase_score"],
+  "properties": {
+    "interval_id":            { "type": "string" },
+    "staircase_score":        { "type": "number" },
+    "staircase_rank":         { "type": "integer", "description": "rank within chromosome" },
+    "regime_change_left_bp":  { "type": "integer" },
+    "regime_change_right_bp": { "type": "integer" },
+    "n_scales_detected":      { "type": "integer", "description": "number of scales (20-step grid) the block was detected at" },
+    "matrix_variants_detected": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "which sim_mat variants (raw, nn40, nn80, etc.) produced a block here"
+    },
+    "consensus_strength":     { "type": "number", "description": "agreement across variants, 0-1" },
+    "scoring_table_path":     { "type": "string", "description": "path to scoring_table_<chr>.tsv in raw/" }
+  },
+  "keys_extracted": [
+    { "key": "q1_staircase_score",      "from": "staircase_score" },
+    { "key": "q1_staircase_rank",       "from": "staircase_rank" },
+    { "key": "q1_n_scales_detected",    "from": "n_scales_detected" },
+    { "key": "q1_consensus_strength",   "from": "consensus_strength" },
+    { "key": "q3_regime_change_left",   "from": "regime_change_left_bp" },
+    { "key": "q3_regime_change_right",  "from": "regime_change_right_bp" }
+  ]
+}

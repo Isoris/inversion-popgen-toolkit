@@ -1,0 +1,77 @@
+# =============================================================================
+# MODULE_CONSERVATION — Scoring Weights Configuration (CORE-ONLY)
+# =============================================================================
+# Tab-separated: CATEGORY	COMPONENT	CONDITION	POINTS	NOTES
+# Lines starting with # are comments.
+# Read by STEP_14_score_variants.sh
+#
+# CORE scoring: csq + SIFT4G + VESM + splice + hatchery risk
+# No GERP, phastCons, phyloP, orthology tiers, CAFE, DupGen.
+# =============================================================================
+
+# --- A. INTRINSIC DELETERIOUS EVIDENCE (max 22 pts) ---
+
+# A1. Consequence severity (from SnpEff / bcftools csq) [max 8]
+consequence	stop_gained	any	8	protein truncation
+consequence	frameshift	any	8	reading frame destroyed
+consequence	splice_acceptor	any	7	essential splice site
+consequence	splice_donor	any	7	essential splice site
+consequence	start_lost	any	6	translation initiation lost
+consequence	stop_lost	any	5	protein extension
+consequence	missense	any	4	amino acid change
+consequence	inframe_insertion	any	2	in-frame indel
+consequence	inframe_deletion	any	2	in-frame indel
+consequence	splice_region	any	1	near-splice modifier
+consequence	synonymous	any	0	silent
+consequence	intron	any	0	intronic
+consequence	intergenic	any	0	intergenic
+
+# A2. SIFT4G prediction [max 4]
+sift	deleterious	score<0.05	4	SIFT4G damaging
+sift	borderline	0.05<=score<0.1	2	borderline
+sift	tolerated	score>=0.1	0	tolerated
+
+# A3. VESM protein language model (Dinh et al. 2026 Nat Methods) [max 5]
+vesm	likely_damaging	LLR<-7	5	VESM co-distilled ESM, strong signal
+vesm	possibly_damaging	-7<=LLR<-3	2	VESM moderate signal
+vesm	benign	LLR>=-3	0	VESM benign
+
+# A4. Splice module (per-sample splice-specific classification) [max 5, capped]
+splice	class_A	donor/acceptor+HIGH+good_evidence	4	Canonical splice site disruption
+splice	class_B	splice_region+MODERATE+good_evidence	2	Splice region hit with quality support
+splice	class_C	exon_boundary_near_splice	1	Coding near splice junction
+splice	donor_5th_base	splice_donor_5th_base_variant	3	5th base — generic SnpEff gives 1
+splice	branch_point	splice_branch_variant	3	Branch point disruption
+splice	polypyrimidine	splice_polypyrimidine_tract_variant	2	Polypyrimidine tract
+
+# --- B. HATCHERY RISK SCORE (max 9 pts) ---
+
+# B1. Allele frequency [max 3]
+hatchery_freq	rare	MAF<0.01	3	rare = strong purifying selection or drift
+hatchery_freq	low	0.01<=MAF<0.05	2	low frequency
+hatchery_freq	common	0.05<=MAF<0.20	1	moderate frequency
+hatchery_freq	high	MAF>=0.20	0	common allele
+
+# B2. Homozygosity exposure [max 3]
+hatchery_hom	high_hom	n_hom>=10	3	many fish homozygous
+hatchery_hom	mod_hom	3<=n_hom<10	2	several homozygous
+hatchery_hom	low_hom	1<=n_hom<3	1	few homozygous
+hatchery_hom	no_hom	n_hom==0	0	never homozygous
+
+# B3. ROH overlap [max 3]
+hatchery_roh	in_long_roh	hom_in_ROH>1Mb	3	exposed in long ROH (recent inbreeding)
+hatchery_roh	in_roh	any_sample_hom_in_ROH	2	exposed in autozygous segment
+hatchery_roh	not_in_roh	no_ROH_overlap	0	not in ROH context
+
+# --- C. FINAL PRIORITY CLASSES ---
+# final_priority = deleterious_evidence + hatchery_risk
+# Thresholds from 00_config/pipeline.config.sh (configurable via env)
+# Defaults:
+#   Class A: final >= 16  (severe + damaging + high exposure)
+#   Class B: 10 <= final < 16  (protein-changing + some predictor + some exposure)
+#   Class C: 5 <= final < 10  (some evidence, possibly ambiguous)
+#   Class D: final < 5  (low priority)
+priority_class	A	score>=THRESHOLD_A	strongest	severe + damaging predictor(s) + exposed
+priority_class	B	THRESHOLD_B<=score<THRESHOLD_A	strong	protein-changing + some exposure
+priority_class	C	THRESHOLD_C<=score<THRESHOLD_B	ambiguous	some evidence but limited
+priority_class	D	score<THRESHOLD_C	low	little support

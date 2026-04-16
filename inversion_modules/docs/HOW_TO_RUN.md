@@ -42,9 +42,6 @@ sbatch launchers/LAUNCH_C01b_snake1.slurm --step cores
 # Step 6: Fuzzy merge (uses landscape data from step 3 automatically)
 sbatch launchers/LAUNCH_C01b_snake1.slurm --step merge
 
-# Step 7: Triangle regimes (insulation + squareness)
-sbatch launchers/LAUNCH_C01c_triangles.slurm
-
 #
 # ── PHASE_03: SCORING ───────────────────────────────────────────────
 #

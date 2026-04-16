@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "burden.schema.json",
+  "block_type": "burden",
+  "description": "Deleterious variant burden per carrier class. Regresses per-sample deleterious variant counts (from MODULE_CONSERVATION VESM/SIFT scoring) on inversion carrier status. Requires VALIDATED groups — a burden regression on UNCERTAIN or SUSPECT groups would be uninterpretable.",
+  "question": "Q6",
+  "group_validation_required": "VALIDATED",
+  "source_script": "burden_regression + STEP_C01f_c_burden_regression.R",
+  "required": ["beta_hom_inv_vs_hom_ref", "p_value"],
+  "properties": {
+    "beta_hom_inv_vs_hom_ref": { "type": "number", "description": "Regression coefficient: excess deleterious variants in HOM_INV relative to HOM_REF" },
+    "se_beta":   { "type": "number" },
+    "p_value":   { "type": "number" },
+    "ci_lower":  { "type": "number" },
+    "ci_upper":  { "type": "number" },
+    "mean_deleterious_count_hom_ref": { "type": "number" },
+    "mean_deleterious_count_het":     { "type": "number" },
+    "mean_deleterious_count_hom_inv": { "type": "number" },
+    "vesm_score_class": {
+      "type": "string",
+      "description": "which scoring layer provided the deleterious calls",
+      "enum": ["VESM", "SIFT", "both", "none"]
+    },
+    "n_genes_in_region":  { "type": "integer" },
+    "n_del_sites_tested": { "type": "integer" },
+    "selection_signal": {
+      "type": "string",
+      "enum": ["neutral", "selected", "undetermined"],
+      "description": "selected = beta significant and in the direction consistent with relaxed selection inside the inversion"
+    }
+  },
+  "keys_extracted": [
+    { "key": "q6_burden_beta",      "from": "beta_hom_inv_vs_hom_ref" },
+    { "key": "q6_burden_p",         "from": "p_value" },
+    { "key": "q6_burden_ci_lower",  "from": "ci_lower" },
+    { "key": "q6_burden_ci_upper",  "from": "ci_upper" },
+    { "key": "q6_n_del_sites",      "from": "n_del_sites_tested" },
+    { "key": "q6_selection_signal", "from": "selection_signal" }
+  ]
+}

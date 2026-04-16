@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "block_detect.schema.json",
+  "block_type": "block_detect",
+  "description": "PHASE_01C block detection output. Inner boundary (blue cross), block candidate windows, sim_mat block confidence. Feeds both Q1 architecture and Q3 boundaries.",
+  "question": "Q1, Q3",
+  "group_validation_required": "NONE",
+  "source_script": "PHASE_01C block_detect",
+  "required": ["block_id", "confidence_score"],
+  "properties": {
+    "block_id":               { "type": "string" },
+    "confidence_score":       { "type": "number" },
+    "outer_boundary_left_bp":  { "type": "integer" },
+    "outer_boundary_right_bp": { "type": "integer" },
+    "inner_boundary_left_bp":  { "type": "integer", "description": "blue-cross inner boundary — often the real inversion edge, inside the outer staircase" },
+    "inner_boundary_right_bp": { "type": "integer" },
+    "n_windows_in_block":     { "type": "integer" },
+    "mean_inside_similarity":  { "type": "number" },
+    "mean_outside_similarity": { "type": "number" },
+    "contrast_ratio":         { "type": "number" }
+  },
+  "keys_extracted": [
+    { "key": "q1_block_confidence",        "from": "confidence_score" },
+    { "key": "q3_outer_left_bp",           "from": "outer_boundary_left_bp" },
+    { "key": "q3_outer_right_bp",          "from": "outer_boundary_right_bp" },
+    { "key": "q3_inner_left_bp",           "from": "inner_boundary_left_bp" },
+    { "key": "q3_inner_right_bp",          "from": "inner_boundary_right_bp" },
+    { "key": "q1_contrast_ratio",          "from": "contrast_ratio" }
+  ]
+}

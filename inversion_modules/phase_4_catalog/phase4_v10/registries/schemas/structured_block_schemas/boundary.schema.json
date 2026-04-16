@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "boundary.schema.json",
+  "block_type_template": "boundary_{left|right}",
+  "description": "Per-boundary evidence: position, hardness, sharpness, boundary type, supporting cheats, and verdict. Written twice per candidate (boundary_left, boundary_right). Sharpness is real Hudson Fst/Hobs step from Cheat 4 when Engine B is available, otherwise sim_mat proxy.",
+  "question": "Q3",
+  "group_validation_required": "NONE",
+  "source_script": "STEP_C01g_boundary_catalog_wired_4_8_10_11_17_21_v934_registry.R",
+  "required": ["boundary_bp", "side", "hardness", "sharpness", "boundary_verdict"],
+  "properties": {
+    "side": { "type": "string", "enum": ["left", "right"] },
+    "boundary_bp": { "type": "integer" },
+    "hardness": {
+      "type": "number",
+      "description": "0-1: how consistent the boundary location is across matrix variants"
+    },
+    "sharpness": {
+      "type": "number",
+      "description": "Fst/Hobs contrast between ±flank of boundary"
+    },
+    "boundary_type": {
+      "type": "string",
+      "enum": ["sharp_hard", "sharp_soft", "diffuse_hard", "diffuse_soft", "system_junction"]
+    },
+    "boundary_verdict": {
+      "type": "string",
+      "enum": ["confirmed_structural", "likely_structural", "probable_structural",
+               "single_evidence_structural", "internal_feature",
+               "system_junction", "unresolved"]
+    },
+    "n_cheats_supporting": { "type": "integer" },
+    "cheat_4_passed": { "type": "boolean" },
+    "cheat_8_passed": { "type": "boolean" },
+    "cheat_10_passed": { "type": "boolean" },
+    "cheat_11_passed": { "type": "boolean" },
+    "cheat_17_passed": { "type": "boolean" },
+    "cheat_21_passed": { "type": "boolean" },
+    "clip_count": { "type": "integer" },
+    "depth_anomaly": { "type": "number" },
+    "is_fossil": { "type": "boolean" },
+    "sv_breakpoint_support": { "type": "object" },
+    "blue_cross_inner": { "type": "boolean", "description": "derived from PHASE_01C block_detect inner boundary" }
+  },
+  "keys_extracted": [
+    { "key": "q3_{side}_bp", "from": "boundary_bp" },
+    { "key": "q3_{side}_hardness", "from": "hardness" },
+    { "key": "q3_{side}_sharpness", "from": "sharpness" },
+    { "key": "q3_{side}_type", "from": "boundary_type" },
+    { "key": "q3_{side}_verdict", "from": "boundary_verdict" },
+    { "key": "q3_{side}_n_cheats", "from": "n_cheats_supporting" },
+    { "key": "q3_{side}_clip_count", "from": "clip_count" },
+    { "key": "q3_{side}_depth_anomaly", "from": "depth_anomaly" },
+    { "key": "q3_{side}_is_fossil", "from": "is_fossil" }
+  ],
+  "note_on_side_templating": "The library substitutes {side} with 'left' or 'right' at key extraction time based on block_type. So boundary_left.json writes q3_left_bp, q3_left_hardness, etc., and boundary_right.json writes q3_right_*."
+}

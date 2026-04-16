@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "peel_diagnostic.schema.json",
+  "block_type": "peel_diagnostic",
+  "description": "Peel diagnostic from C01n / inv_detect Phase 9. Tests whether the candidate signal survives successive peeling of high-relatedness samples (L1b) and of whole jackknife groups (L2). If peeling destroys the signal, it's family-driven. Feeds D8 in C01d scoring.",
+  "question": "Q7",
+  "group_validation_required": "NONE",
+  "source_script": "C01n peel / inv_detect Phase 9",
+  "required": ["l1b_score", "l2_score"],
+  "properties": {
+    "l1b_score":           { "type": "number", "description": "fraction of signal retained after L1b peel (high-relatedness sample removal)" },
+    "l2_score":            { "type": "number", "description": "fraction retained after L2 peel (jackknife over Q-ancestry groups)" },
+    "peel_combined_score": { "type": "number", "description": "0.55*l1b + 0.45*l2" },
+    "peel_survives":       { "type": "boolean", "description": "combined > 0.6" },
+    "n_l1b_iterations":    { "type": "integer" },
+    "n_l2_iterations":     { "type": "integer" }
+  },
+  "keys_extracted": [
+    { "key": "q7_peel_l1b_score",     "from": "l1b_score" },
+    { "key": "q7_peel_l2_score",      "from": "l2_score" },
+    { "key": "q7_peel_combined",      "from": "peel_combined_score" },
+    { "key": "q7_peel_survives",      "from": "peel_survives" }
+  ]
+}

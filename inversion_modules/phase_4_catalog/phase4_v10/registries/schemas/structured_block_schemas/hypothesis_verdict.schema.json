@@ -1,0 +1,66 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "hypothesis_verdict.schema.json",
+  "block_type": "hypothesis_verdict",
+  "description": "Output of C01f hypothesis tests (T1-T11). Captures the per-candidate verdict (H1-H5) and the individual test results that fed into it. Also records the validation promotion outcome (q6_group_validation after C01f).",
+  "question": "Q7",
+  "group_validation_required": "UNCERTAIN",
+  "group_validation_sets": "SUPPORTED or SUSPECT",
+  "source_script": "STEP_C01f_hypothesis_tests_wired_6_9_12_23_v934_registry.R",
+  "required": ["verdict", "verdict_confidence"],
+  "properties": {
+    "verdict": {
+      "type": "string",
+      "enum": ["H1_family_artifact", "H2_or_H3_real_inversion", "H2_simple_real",
+               "H3_complex_real", "H4_within_carrier_substructure",
+               "H5_informativeness_issue", "unresolved"]
+    },
+    "verdict_confidence": { "type": "string", "enum": ["high", "medium", "low"] },
+    "t1_ratio": { "type": "number", "description": "within/between band relatedness ratio" },
+    "t1_evidence": { "type": "string" },
+    "t2_eff_k": { "type": "number", "description": "min eff_K across bands" },
+    "t2_evidence": { "type": "string" },
+    "t3_retention": { "type": "number" },
+    "t3_evidence": { "type": "string" },
+    "t4_jaccard_mean": { "type": "number" },
+    "t5_anchor_retention": { "type": "number" },
+    "t6_boundary_shift": { "type": "number" },
+    "t7_substructure": { "type": "string" },
+    "t8_concordance": { "type": "number", "description": "Clair3 GT × PCA band Rand index" },
+    "t9_jackknife_status": { "type": "string", "enum": ["robust", "moderate", "fragile", "undetermined"] },
+    "t9_max_delta": { "type": "number" },
+    "t10_theta_concordance": { "type": "number" },
+    "t11_has_extended": { "type": "boolean" },
+    "t11_extent_kb": { "type": "number" },
+    "t11_fst_decay_rate": { "type": "number" },
+    "group_validation_before": {
+      "type": "string",
+      "enum": ["NONE", "UNCERTAIN", "SUPPORTED", "VALIDATED", "SUSPECT"]
+    },
+    "group_validation_after": {
+      "type": "string",
+      "enum": ["NONE", "UNCERTAIN", "SUPPORTED", "VALIDATED", "SUSPECT"]
+    },
+    "comp_source": {
+      "type": "string",
+      "description": "Where `comp` came from. 'C01i_registry' = used C01i groups; 'kmeans_fallback' = fell back to PC1 k-means because registry was empty.",
+      "enum": ["C01i_registry", "kmeans_fallback"]
+    }
+  },
+  "keys_extracted": [
+    { "key": "q7_verdict", "from": "verdict" },
+    { "key": "q7_verdict_confidence", "from": "verdict_confidence" },
+    { "key": "q7_t1_ratio", "from": "t1_ratio" },
+    { "key": "q7_t2_eff_k", "from": "t2_eff_k" },
+    { "key": "q7_t3_retention", "from": "t3_retention" },
+    { "key": "q7_t8_clair3_concordance", "from": "t8_concordance" },
+    { "key": "q7_t9_jackknife_status", "from": "t9_jackknife_status" },
+    { "key": "q7_t9_max_delta", "from": "t9_max_delta" },
+    { "key": "q7_t10_theta_concordance", "from": "t10_theta_concordance" },
+    { "key": "q3_extended_suppression", "from": "t11_has_extended" },
+    { "key": "q3_suppression_extent_kb", "from": "t11_extent_kb" },
+    { "key": "q3_fst_decay_rate", "from": "t11_fst_decay_rate" },
+    { "key": "q6_group_validation", "from": "group_validation_after" },
+    { "key": "q6_family_linkage", "from": "t9_jackknife_status" }
+  ]
+}

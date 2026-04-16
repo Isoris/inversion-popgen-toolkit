@@ -1,0 +1,57 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "carrier_reconciliation.schema.json",
+  "block_type": "carrier_reconciliation",
+  "description": "Audits per-sample class assignments across four independent evidence sources (PCA, SV calls, GHSL, Clair3). Records which samples agree across all four, which disagree, and the specific disagreement patterns. This is NOT a validation test (C01f does that) — it's a diagnostic that helps identify misgenotyped samples or interesting biological cases (e.g., a sample the SV caller says is HOM_INV but PCA says HOM_REF might be carrying a different independent inversion).",
+  "question": "Q3, Q6, Q7",
+  "group_validation_required": "N/A — this block IS the reconciliation",
+  "source_script": "audit_cores_vs_sv (new) + carrier_audit.R",
+  "required": ["n_agreeing", "n_total", "sources_used"],
+  "properties": {
+    "sources_used": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["PCA", "SV", "GHSL", "Clair3", "WhatsHap"] },
+      "description": "Which evidence sources were available for this candidate. Minimum 2 needed for any reconciliation."
+    },
+    "n_total": { "type": "integer", "description": "Total samples with class call from ≥1 source" },
+    "n_agreeing": { "type": "integer", "description": "Samples where ALL available sources agree" },
+    "n_disagreeing": { "type": "integer" },
+    "agreement_fraction": { "type": "number" },
+    "disagreeing_samples": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "sample_id": { "type": "string" },
+          "calls": {
+            "type": "object",
+            "description": "class assigned by each source",
+            "properties": {
+              "PCA":     { "type": "string" },
+              "SV":      { "type": "string" },
+              "GHSL":    { "type": "string" },
+              "Clair3":  { "type": "string" }
+            }
+          },
+          "disagreement_type": {
+            "type": "string",
+            "enum": ["PCA_vs_SV", "PCA_vs_Clair3", "GHSL_vs_Clair3", "multi_way", "other"]
+          },
+          "flag": {
+            "type": "string",
+            "enum": ["likely_misgenotyped", "possibly_recombinant", "possibly_nested_inversion", "low_coverage", "unresolved"]
+          }
+        }
+      }
+    },
+    "agreement_by_source_pair": {
+      "type": "object",
+      "description": "Pairwise agreement fractions (PCA vs SV, PCA vs GHSL, etc.)"
+    }
+  },
+  "keys_extracted": [
+    { "key": "q7_n_reconciliation_sources",  "from": "sources_used" },
+    { "key": "q7_reconciliation_agreement",  "from": "agreement_fraction" },
+    { "key": "q7_n_disagreeing_samples",     "from": "n_disagreeing" }
+  ]
+}
