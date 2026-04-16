@@ -12,14 +12,17 @@
 #      Also: blue_cross_verdicts (assembly errors, internal transitions)
 #      Also: block_concordance (which blocks share sample grouping)
 #
-#   2. inv_detect v9.3 staircase → scoring_table_<chr>.tsv
+#   2. phase_2/2d staircase → scoring_table_<chr>.tsv
 #      (block start/end from staircase vote peaks)
 #
-#   3. C01b snake cores → snake1_core_regions_<chr>.tsv.gz
-#      (core start/end = where snake grew to)
+#   3. phase_2/2c C01b_1 seeded regions → seeded_regions_summary_<chr>.tsv.gz
+#      (region start/end = where the seed grew to)
+#      Legacy filename snake1_core_regions_<chr>.tsv.gz is accepted as
+#      fallback for pre-rename output dirs.
 #
-#   4. C00 flashlight → sv_flashlight_<chr>.rds
+#   4. phase_2/2c C00 SV prior → sv_prior_<chr>.rds
 #      (DELLY/Manta INV bp1/bp2 at base-pair precision)
+#      Legacy filename sv_flashlight_<chr>.rds is accepted as fallback.
 #
 #   5. Blue-cross inner boundaries from 01C (already in source 1)
 #      (assembly errors, recombination zones, nested breakpoints)
@@ -77,8 +80,16 @@ precomp_dir <- NULL; landscape_dir <- NULL; staircase_dir <- NULL
 cores_dir <- NULL; flashlight_dir <- NULL; outdir <- "boundary_catalog"
 chrom_filter <- NULL; samples_file <- NULL
 bam_manifest <- NULL; mosdepth_dir <- NULL
-ref_fasta <- NULL; repeatmasker_file <- NULL; scores_file <- NULL
+repeatmasker_file <- NULL
 
+# BUGFIX 2026-04-17: --ref_fasta was parsed but never read anywhere.
+# ARCHIVED 2026-04-17: --scores (Cheat 17 fossil detection) removed.
+# Fossil detection created a circular dependency with C01d (C01g reads
+# C01d's candidate_scores.tsv.gz, C01d reads C01g's boundary_catalog),
+# requiring a two-pass run. The fossil-vs-active distinction was a
+# diagnostic annotation not in the manuscript main path, so removing it
+# is simpler than orchestrating the two passes. Both flags are accepted
+# (silently ignored) for back-compat with existing launchers.
 i <- 1L
 while (i <= length(args)) {
   a <- args[i]
@@ -92,9 +103,9 @@ while (i <= length(args)) {
   else if (a == "--samples" && i < length(args))    { samples_file <- args[i+1]; i <- i+2 }
   else if (a == "--bam_manifest" && i < length(args)) { bam_manifest <- args[i+1]; i <- i+2 }
   else if (a == "--mosdepth_dir" && i < length(args)) { mosdepth_dir <- args[i+1]; i <- i+2 }
-  else if (a == "--ref_fasta" && i < length(args))    { ref_fasta <- args[i+1]; i <- i+2 }
+  else if (a == "--ref_fasta" && i < length(args))    { i <- i+2 }  # accepted but unused
   else if (a == "--repeatmasker" && i < length(args)) { repeatmasker_file <- args[i+1]; i <- i+2 }
-  else if (a == "--scores" && i < length(args))       { scores_file <- args[i+1]; i <- i+2 }
+  else if (a == "--scores" && i < length(args))       { i <- i+2 }  # accepted but unused (fossil detection archived)
   else { i <- i+1 }
 }
 
@@ -314,22 +325,31 @@ for (chr in chroms) {
     message("  Staircase: ", n_stair, " boundaries")
   }
 
-  # ── SOURCE 3: Snake core edges ─────────────────────────────────────
+  # ── SOURCE 3: Seeded-region edges (formerly snake cores) ───────────
   n_snake <- 0L
   if (!is.null(cores_dir)) {
-    f <- file.path(cores_dir, paste0("snake1_core_regions_", chr, ".tsv.gz"))
+    # New filename from STEP_C01b_1_seeded_regions.R
+    f <- file.path(cores_dir, paste0("seeded_regions_summary_", chr, ".tsv.gz"))
+    if (!file.exists(f)) {
+      # Fallback for pre-rename output directories
+      f <- file.path(cores_dir, paste0("snake1_core_regions_", chr, ".tsv.gz"))
+    }
     if (file.exists(f)) {
       cores <- fread(f)
+      # Normalise column names (new input uses region_id; legacy used snake_id)
+      if ("region_id" %in% names(cores) && !"snake_id" %in% names(cores)) {
+        cores[, snake_id := region_id]
+      }
       for (ci in seq_len(nrow(cores))) {
         cr <- cores[ci]
-        cid <- cr$snake_id %||% paste0("core_", ci)
+        cid <- cr$snake_id %||% paste0("region_", ci)
 
         # Left edge
         bid <- bid + 1L
         all_bounds[[bid]] <- data.table(
           boundary_id = bid, chrom = chr, boundary_bp = as.integer(cr$start_bp),
-          boundary_type = "OUTER_SOFT",  # snake edges are softer than staircase
-          source = "snake_core", side = "left",
+          boundary_type = "OUTER_SOFT",  # seeded-region edges are softer than staircase
+          source = "seeded_region", side = "left",
           drop_magnitude = NA_real_, transition_width = NA_integer_,
           block_left = "background", block_right = as.character(cid),
           candidate_id = as.character(cid)
@@ -340,7 +360,7 @@ for (chr in chroms) {
         all_bounds[[bid]] <- data.table(
           boundary_id = bid, chrom = chr, boundary_bp = as.integer(cr$end_bp),
           boundary_type = "OUTER_SOFT",
-          source = "snake_core", side = "right",
+          source = "seeded_region", side = "right",
           drop_magnitude = NA_real_, transition_width = NA_integer_,
           block_left = as.character(cid), block_right = "background",
           candidate_id = as.character(cid)
@@ -348,13 +368,20 @@ for (chr in chroms) {
         n_snake <- n_snake + 2L
       }
     }
-    message("  Snake cores: ", n_snake, " boundaries")
+    message("  Seeded regions: ", n_snake, " boundaries")
   }
 
-  # ── SOURCE 4: Flashlight SV breakpoints ────────────────────────────
+  # ── SOURCE 4: SV prior breakpoints (formerly flashlight) ───────────
+  # The CLI flag is still --flashlight for back-compat with launchers;
+  # the underlying dir is what STEP_C00_build_sv_prior.R writes.
   n_sv <- 0L
   if (!is.null(flashlight_dir)) {
-    fl_file <- file.path(flashlight_dir, paste0("sv_flashlight_", chr, ".rds"))
+    # New filename from STEP_C00_build_sv_prior.R
+    fl_file <- file.path(flashlight_dir, paste0("sv_prior_", chr, ".rds"))
+    if (!file.exists(fl_file)) {
+      # Fallback for pre-rename output directories
+      fl_file <- file.path(flashlight_dir, paste0("sv_flashlight_", chr, ".rds"))
+    }
     if (file.exists(fl_file)) {
       fl <- tryCatch(readRDS(fl_file), error = function(e) NULL)
       if (!is.null(fl) && "inv_calls" %in% names(fl) && nrow(fl$inv_calls) > 0) {
@@ -1147,98 +1174,29 @@ for (chr in unique(deduped$chrom)) {
 }
 
 # =============================================================================
-# CHEAT 17: FOSSIL BREAKPOINT CLASSIFICATION
+# CHEAT 17: ARCHIVED 2026-04-17
 # =============================================================================
-# Boundaries that look structural in sim_mat but have NO active inversion:
-#   - no trimodal PCA (no 3-class grouping)
-#   - no SV calls at the position
-#   - inv_likeness may be elevated (residual signal from old event)
-# These are relics of inversions that broke apart. Diagnostic annotation.
-
-message("\n[C01g] Running Cheat 17 (fossil breakpoints)...")
-
-# Load candidate regions if available (to identify orphaned boundaries)
-cand_regions <- NULL
-if (!is.null(scores_file) && file.exists(scores_file)) {
-  cand_regions <- tryCatch(fread(scores_file), error = function(e) NULL)
-  if (!is.null(cand_regions)) {
-    # Standardize column names
-    if ("start_mb" %in% names(cand_regions) && !"start_bp" %in% names(cand_regions))
-      cand_regions[, start_bp := start_mb * 1e6]
-    if ("end_mb" %in% names(cand_regions) && !"end_bp" %in% names(cand_regions))
-      cand_regions[, end_bp := end_mb * 1e6]
-    if (!"chr" %in% names(cand_regions) && "chrom" %in% names(cand_regions))
-      cand_regions[, chr := chrom]
-    message("[C01g] Loaded ", nrow(cand_regions), " candidate regions for fossil check")
-  }
-}
-
+# The fossil-breakpoint classification block used to live here. It created
+# a circular dependency: Cheat 17 reads C01d's candidate_scores.tsv.gz via
+# --scores to find boundaries OUTSIDE any candidate, while C01d reads this
+# script's boundary_catalog_unified.tsv.gz for D11. Getting both fully
+# populated required a two-pass run (C01g → C01d → C01g), which the
+# orchestrator didn't wire up. In single-pass runs the block did nothing.
+#
+# The fossil-vs-active distinction was not used in the manuscript main
+# path — it was a diagnostic annotation. Downstream code no longer
+# references cheat17_class; boundary_activity is now computed
+# unconditionally as "active" (all kept boundaries are treated as
+# currently-segregating). If the fossil distinction becomes needed
+# again, the archived code is preserved in
+# _archive_superseded/cheat17_fossil_detection/ and can be brought back
+# as a post-hoc annotation step reading the already-written
+# boundary_catalog_unified.tsv.gz.
+#
+# Initialize cheat17 columns as NA for schema-stability with any
+# downstream readers that still expect them.
 deduped[, cheat17_class := NA_character_]
 deduped[, cheat17_inv_likeness := NA_real_]
-
-if (!is.null(cand_regions) && nrow(cand_regions) > 0) {
-  for (chr in unique(deduped$chrom)) {
-    pc <- precomp_list[[chr]]
-    if (is.null(pc)) next
-    dt_chr <- pc$dt
-    chr_idx <- which(deduped$chrom == chr)
-    chr_cands <- cand_regions[chr == (..chr) | chrom == (..chr)]
-    if (length(chr_idx) == 0) next
-
-    for (bi in chr_idx) {
-      bp <- deduped$boundary_bp[bi]
-
-      # Is this boundary inside any candidate?
-      inside_candidate <- FALSE
-      if (nrow(chr_cands) > 0) {
-        inside_candidate <- any(chr_cands$start_bp <= bp & chr_cands$end_bp >= bp)
-      }
-      if (inside_candidate) next  # not orphaned
-
-      # Orphaned: check for fossil signal
-      mid_bps <- (dt_chr$start_bp + dt_chr$end_bp) / 2
-      near_w <- which(abs(mid_bps - bp) < 100000)
-      if (length(near_w) < 3) next
-
-      near_dt <- dt_chr[near_w]
-
-      # 1. inv_likeness elevated?
-      il <- if ("inv_likeness" %in% names(near_dt))
-        mean(near_dt$inv_likeness, na.rm = TRUE) else NA_real_
-      il_elevated <- !is.na(il) && il > 0.3
-
-      # 2. Trimodality check (dip_p from precomp if available)
-      trimodal <- FALSE
-      if ("inv_dip_p" %in% names(near_dt)) {
-        trimodal <- any(near_dt$inv_dip_p < 0.05, na.rm = TRUE)
-      }
-
-      # 3. SV overlap from flashlight columns
-      sv_overlap <- FALSE
-      if ("sv_inv_overlap" %in% names(near_dt)) {
-        sv_overlap <- any(near_dt$sv_inv_overlap > 0, na.rm = TRUE)
-      }
-
-      # Classify
-      classification <- if (il_elevated && trimodal && sv_overlap) "MISSED_INVERSION"
-        else if (il_elevated && !trimodal && !sv_overlap) "FOSSIL_CANDIDATE"
-        else if (!il_elevated) "FALSE_BOUNDARY"
-        else "AMBIGUOUS"
-
-      deduped[bi, cheat17_class := classification]
-      deduped[bi, cheat17_inv_likeness := round(il, 4)]
-    }
-    n_fossil <- sum(deduped$cheat17_class[chr_idx] == "FOSSIL_CANDIDATE", na.rm = TRUE)
-    n_missed <- sum(deduped$cheat17_class[chr_idx] == "MISSED_INVERSION", na.rm = TRUE)
-    if (n_fossil > 0 || n_missed > 0)
-      message("  ", chr, ": ", n_fossil, " fossil, ", n_missed, " missed inversions")
-  }
-} else {
-  message("[C01g] No --scores file — Cheat 17 fossil detection skipped")
-}
-
-n_total_fossil <- sum(deduped$cheat17_class == "FOSSIL_CANDIDATE", na.rm = TRUE)
-message("[C01g] Cheat 17: ", n_total_fossil, " fossil breakpoints identified")
 
 # =============================================================================
 # CHEAT 21: TE ENRICHMENT/DEPLETION AT BREAKPOINTS
@@ -1300,8 +1258,16 @@ if (!is.null(repeatmasker_file) && file.exists(repeatmasker_file)) {
       if (length(chr_idx) == 0) next
       chr_te <- te_dt[chr == (..chr)]
       if (nrow(chr_te) == 0) {
-        # Try fuzzy match (C_gar_LG01 vs LG01)
-        chr_te <- te_dt[grepl(chr, chr, fixed = TRUE)]
+        # BUGFIX 2026-04-17: was `grepl(chr, chr, fixed = TRUE)` — pattern
+        # and target both the scalar `chr`, which is always TRUE and
+        # returned the entire genome's TE set. Now targets te_dt$chr
+        # against a simplified chr name AND against the full chr name
+        # so naming mismatches like LG01 vs C_gar_LG01 are tolerated.
+        short_chr <- sub("^[Cc]_?[A-Za-z]+_", "", chr)  # C_gar_LG01 → LG01
+        chr_te <- te_dt[
+          grepl(short_chr, te_dt$chr, fixed = TRUE) |
+          grepl(chr, te_dt$chr, fixed = TRUE)
+        ]
       }
       if (nrow(chr_te) == 0) next
 
@@ -1360,23 +1326,12 @@ deduped[, n_cheats_supporting := {
   n
 }, by = boundary_id]
 
-# ── BOUNDARY ACTIVITY (separate: is there an active inversion behind it?) ──
-# Combines fossil classification + inv_likeness + trimodality + SV overlap.
-# A boundary can be structurally confirmed (high concordance) but inactive
-# (fossil). That's biologically interesting — worth reporting.
-deduped[, boundary_activity := {
-  activity <- "unknown"
-  if (!is.na(cheat17_class)) {
-    if (cheat17_class == "FOSSIL_CANDIDATE") activity <- "fossil"
-    else if (cheat17_class == "MISSED_INVERSION") activity <- "active_missed"
-    else if (cheat17_class == "FALSE_BOUNDARY") activity <- "inactive"
-    else if (cheat17_class == "AMBIGUOUS") activity <- "ambiguous"
-  } else {
-    # Not tested for fossil (inside a candidate) → assume active
-    activity <- "active"
-  }
-  activity
-}, by = boundary_id]
+# ── BOUNDARY ACTIVITY ──
+# ARCHIVED 2026-04-17: Fossil vs active distinction is no longer computed
+# (see Cheat 17 archive note above). All kept boundaries are treated as
+# currently-segregating. The column is still emitted as "active" so
+# downstream readers/summary expecting it don't break.
+deduped[, boundary_activity := "active"]
 
 deduped[, boundary_verdict := fifelse(
   n_cheats_supporting >= 4, "confirmed_structural",

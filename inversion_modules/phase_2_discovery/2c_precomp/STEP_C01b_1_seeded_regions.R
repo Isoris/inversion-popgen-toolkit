@@ -5,17 +5,21 @@
 #
 # Phase 2 / 2c — seeded region-growing from MDS z-outlier seeds.
 # Performs seed selection + extension per chromosome, writes per-chr regions.
-# No merge step here — that belongs to STEP_C01b_2.
+# Consumed directly by phase_4/4a/STEP_C01d via --cores_dir.
 #
 # Codebase:    inversion_modules v8.5 / script v9.3.2
 # Upstream:    STEP_C01a output — <precomp_dir>/precomp/<chr>.precomp.rds
 #              <precomp_dir>/window_inv_likeness.tsv.gz
 #              (optional) <pruned_samples>.ind for test_26 kin-pruned retention
-# Downstream:  STEP_C01b_2 (merge script — consolidates across scale tiers)
+# Downstream:  phase_4/4a/STEP_C01d_candidate_scoring --cores_dir
+#              (seeded regions enter C01d's D2/D5 scoring dimensions at
+#              catalog-birth time — no intermediate merge step)
 # Formerly:    STEP_C01b_1_cores_wired_registry.R
 #              The pipeline's "snake" / "core" terminology has been retired
 #              in favour of "seeded region-growing" / "seeded region".
-#              See RENAMING.md for the full map.
+#              See RENAMING.md for the full map. The retired 1D fuzzy merge
+#              (STEP_C01b_2_merge.R) is at
+#              ../../_archive_superseded/fuzzy_merge_abandoned/.
 #
 # Algorithm
 # ---------

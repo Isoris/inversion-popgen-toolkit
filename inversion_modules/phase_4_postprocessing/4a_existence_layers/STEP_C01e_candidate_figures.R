@@ -22,12 +22,23 @@
 #   [optional] --sv_dir <dir>              -- DELLY/Manta SV catalogs
 #   [optional] --gff <annotation.gff3>     -- gene annotation
 #   [optional] --repeats <repeats.bed>     -- repeat annotation
-#   [optional] --het_dir <dir>             -- heterozygosity results
+#   [optional] --het_dir <dir>             -- ACCEPTED BUT IGNORED (2026-04-17)
+#   [optional] --repeats <file>             -- ACCEPTED BUT IGNORED (2026-04-17)
 #
 # Output per candidate:
-#   <outdir>/candidate_<chr>_<start>_<end>/figure_composite.png
-#   <outdir>/candidate_<chr>_<start>_<end>/panel_*.png (individual panels)
-#   <outdir>/candidate_<chr>_<start>_<end>/data/  (intermediate tables)
+#   <outdir>/candidate_<chr>_<start>_<end>/panel_A_ideogram.png
+#   <outdir>/candidate_<chr>_<start>_<end>/panel_B_pca.png
+#   <outdir>/candidate_<chr>_<start>_<end>/panel_I_systems.png   (multi-system only)
+#   <outdir>/candidate_<chr>_<start>_<end>/data/
+#     — sample_karyotypes.tsv, regional_pca.tsv, candidate_metadata.tsv
+#     — per-sample group lists (*_samples.txt)
+#     — executable extraction scripts (*_cmd.sh) for VCFtools / bcftools / ngsLD
+#
+# Note: panels C/D/E/F/G are emitted as shell-script extraction commands
+# (in data/) rather than inline PNGs — the PNGs are intended to be built
+# by those shell scripts in a follow-up step. Composite assembly
+# (figure_composite.png) is done externally with Inkscape / figrid and
+# is NOT produced by this script.
 #
 # Usage:
 #   Rscript STEP_C01e_candidate_figures.R \
@@ -50,10 +61,13 @@ suppressPackageStartupMessages({
 args <- commandArgs(trailingOnly = TRUE)
 scores_file <- NULL; triangle_dir <- NULL; precomp_dir <- NULL
 samples_file <- NULL; outdir <- "candidate_figures"
-vcf_dir <- NULL; sv_dir <- NULL; gff_file <- NULL; repeats_file <- NULL
-het_dir <- NULL; coseg_dir <- NULL; regime_dir <- NULL
+vcf_dir <- NULL; sv_dir <- NULL; gff_file <- NULL
+coseg_dir <- NULL; regime_dir <- NULL
 tier_max <- 2L; target_id <- NULL
 
+# BUGFIX 2026-04-17: --repeats and --het_dir were parsed but never read
+# anywhere in this script. They're accepted (silently ignored) for
+# backward compatibility with existing launchers.
 i <- 1L
 while (i <= length(args)) {
   a <- args[i]
@@ -65,8 +79,8 @@ while (i <= length(args)) {
   else if (a == "--vcf_dir" && i < length(args))   { vcf_dir <- args[i+1]; i <- i+2 }
   else if (a == "--sv_dir" && i < length(args))    { sv_dir <- args[i+1]; i <- i+2 }
   else if (a == "--gff" && i < length(args))       { gff_file <- args[i+1]; i <- i+2 }
-  else if (a == "--repeats" && i < length(args))   { repeats_file <- args[i+1]; i <- i+2 }
-  else if (a == "--het_dir" && i < length(args))   { het_dir <- args[i+1]; i <- i+2 }
+  else if (a == "--repeats" && i < length(args))   { i <- i+2 }  # accepted but unused
+  else if (a == "--het_dir" && i < length(args))   { i <- i+2 }  # accepted but unused
   else if (a == "--coseg_dir" && i < length(args)) { coseg_dir <- args[i+1]; i <- i+2 }
   else if (a == "--regime_dir" && i < length(args)) { regime_dir <- args[i+1]; i <- i+2 }
   else if (a == "--tier_max" && i < length(args))  { tier_max <- as.integer(args[i+1]); i <- i+2 }
@@ -100,10 +114,74 @@ cand_dt <- cand_dt[order(tier, -final_score)]
 message("[C01e] Candidates to plot: ", nrow(cand_dt))
 
 # Composition
+# BUGFIX 2026-04-17: The --triangles flag used to read
+# triangle_sample_composition.tsv.gz, which was a pre-v9.3 C01c artifact.
+# That script was retired when the v9.3 pipeline replaced the C01c
+# triangle flow with the inv_detect v9.3 scoring_table track. The file
+# doesn't exist on current runs, so comp_dt was always empty and
+# Panel B fell through to "everyone is HET" (all samples grey).
+#
+# Fix: compute bands on demand from precomp$dt PC_1_<sample> columns
+# using the same k-means(3) logic C01d uses at L651-680. The triangle
+# file is still read if provided (legacy override) but is no longer
+# required. compute_bands_for_candidate() returns a data.table with
+# columns: sample, band, karyotype, pc1_avg.
+compute_bands_for_candidate <- function(pc, start_mb, end_mb,
+                                        real_names = NULL, min_samples = 20L) {
+  if (is.null(pc) || is.null(pc$dt)) return(data.table())
+  dt_chr <- pc$dt
+  s_bp <- start_mb * 1e6; e_bp <- end_mb * 1e6
+
+  # Windows fully inside the candidate
+  inner_w <- which(dt_chr$start_bp >= s_bp & dt_chr$end_bp <= e_bp)
+  if (length(inner_w) < 3) return(data.table())
+
+  pc1_cols <- grep("^PC_1_", names(dt_chr), value = TRUE)
+  if (length(pc1_cols) < min_samples) return(data.table())
+
+  avg_pc1 <- colMeans(as.matrix(dt_chr[inner_w, ..pc1_cols]), na.rm = TRUE)
+  valid <- is.finite(avg_pc1)
+  if (sum(valid) < min_samples) return(data.table())
+
+  vals <- avg_pc1[valid]
+  km <- tryCatch(kmeans(vals, centers = 3, nstart = 10),
+                 error = function(e) NULL)
+  if (is.null(km)) return(data.table())
+
+  co <- order(km$centers[, 1])  # low PC1 → band 1 (REF), high PC1 → band 3 (INV)
+  bands <- integer(length(vals))
+  for (b in 1:3) bands[km$cluster == co[b]] <- b
+
+  snames <- sub("^PC_1_", "", names(vals))
+
+  # Optional: map IndN → real names if samples_file was provided
+  if (!is.null(real_names) && length(real_names) > 0 &&
+      length(snames) >= 1 && grepl("^Ind[0-9]", snames[1])) {
+    ind_to_real <- setNames(real_names, paste0("Ind", seq_along(real_names) - 1))
+    mapped <- ind_to_real[snames]
+    snames[!is.na(mapped)] <- mapped[!is.na(mapped)]
+  }
+
+  data.table(
+    sample    = snames,
+    band      = paste0("band", bands),
+    karyotype = fifelse(bands == 1L, "REF",
+                fifelse(bands == 2L, "HET", "INV")),
+    pc1_avg   = round(as.numeric(vals), 4)
+  )
+}
+
+# Legacy composition file (still accepted if provided, not required)
 comp_dt <- data.table()
 if (!is.null(triangle_dir)) {
   f <- file.path(triangle_dir, "triangle_sample_composition.tsv.gz")
-  if (file.exists(f)) comp_dt <- fread(f)
+  if (file.exists(f)) {
+    comp_dt <- fread(f)
+    message("[C01e] Legacy composition file loaded (", nrow(comp_dt), " rows)")
+  } else {
+    message("[C01e] No legacy composition file at ", f,
+            " — will compute bands from precomp on the fly")
+  }
 }
 
 # Sample name mapping
@@ -144,11 +222,31 @@ for (ci in seq_len(nrow(cand_dt))) {
           cand_id, " (Tier ", cand$tier, ", ", cand$pattern, ") ===")
 
   # --- Get composition (band assignments) ---
-  iv_comp <- comp_dt[chrom == chr & interval_id == cand$interval_id]
+  # Prefer legacy file if it has this candidate; otherwise compute from precomp.
+  # BUGFIX 2026-04-17: previously only legacy file was consulted, so
+  # Panel B on current runs always fell through to "everyone HET" (grey).
+  iv_comp <- data.table()
+  if (nrow(comp_dt) > 0) {
+    iv_comp <- comp_dt[chrom == chr & interval_id == cand$interval_id]
+  }
+  if (nrow(iv_comp) == 0) {
+    pc_for_bands <- load_precomp(chr)
+    iv_comp <- compute_bands_for_candidate(pc_for_bands, start_mb, end_mb,
+                                           real_names = real_names)
+    if (nrow(iv_comp) > 0) {
+      iv_comp[, `:=`(chrom = chr, interval_id = cand$interval_id)]
+      message("  [bands] computed on the fly: ",
+              sum(iv_comp$karyotype == "REF"), " REF / ",
+              sum(iv_comp$karyotype == "HET"), " HET / ",
+              sum(iv_comp$karyotype == "INV"), " INV")
+    }
+  }
   if (nrow(iv_comp) > 0) {
-    # Rename bands to karyotype labels
-    iv_comp[, karyotype := fifelse(band == "band1", "REF",
-                           fifelse(band == "band2", "HET", "INV"))]
+    # Ensure karyotype column is present (legacy file uses `band` column)
+    if (!"karyotype" %in% names(iv_comp) && "band" %in% names(iv_comp)) {
+      iv_comp[, karyotype := fifelse(band == "band1", "REF",
+                             fifelse(band == "band2", "HET", "INV"))]
+    }
     fwrite(iv_comp, file.path(cand_dir, "data", "sample_karyotypes.tsv"), sep = "\t")
   }
 
@@ -336,16 +434,25 @@ for (ci in seq_len(nrow(cand_dt))) {
   # --- Panel F: LD confirmation (Arctic cod check) ---
   # LD in all samples should show a block. LD in HOMO_REF only should NOT.
   if (!is.null(vcf_dir) && !is.null(coseg_samples)) {
+    # BUGFIX 2026-04-17: gt_data was never constructed anywhere in this
+    # script (`%||%` only saves NULLs, not missing bindings). Safe default
+    # is the total sample count from coseg_samples (includes all groups).
+    n_total_ind <- if (!is.null(coseg_samples) && "sample" %in% names(coseg_samples))
+                     length(unique(coseg_samples$sample)) else 226L
+    # ref_list may not have been defined if the Panel D branch above
+    # didn't enter its HOMO_REF-populating sub-branch. Guard it.
+    n_ref_ind <- if (exists("ref_list")) length(ref_list) else 0L
+
     # ngsLD commands for all-sample vs ref-only
     cmd_ld_all <- paste0(
       "# LD in ALL samples (should show inversion block)\n",
-      "ngsLD --geno <beagle_file> --pos <pos_file> --probs --n_ind ", ncol(gt_data$gt %||% 226),
+      "ngsLD --geno <beagle_file> --pos <pos_file> --probs --n_ind ", n_total_ind,
       " --max_kb_dist ", round((end_mb - start_mb) * 1000 + 500),
       " --out ", file.path(cand_dir, "data", "ld_all.tsv"))
     cmd_ld_ref <- paste0(
       "# LD in HOMO_REF only (block should disappear)\n",
       "# Subset beagle to ref_samples.txt first\n",
-      "ngsLD --geno <beagle_ref_only> --pos <pos_file> --probs --n_ind ", length(ref_list %||% 0),
+      "ngsLD --geno <beagle_ref_only> --pos <pos_file> --probs --n_ind ", n_ref_ind,
       " --max_kb_dist ", round((end_mb - start_mb) * 1000 + 500),
       " --out ", file.path(cand_dir, "data", "ld_ref_only.tsv"))
     writeLines(c(cmd_ld_all, "", cmd_ld_ref),
@@ -541,13 +648,43 @@ for (ci in seq_len(nrow(cand_dt))) {
     }
   }
 
-  # --- Save candidate metadata (updated with new fields) ---
-  meta_cols <- intersect(names(cand), c("chrom", "interval_id", "start_mb", "end_mb",
-    "span_mb", "final_score", "tier", "pattern", "interval_type",
-    "d1_triangle", "d2_bands", "d3_ancestry", "d4_offdiag",
-    "d5_subregime", "d6_bridge", "d7_nesting", "d8_hypothesis",
-    "d9_tube", "d10_ghsl", "hyp_verdict", "tube_stage_d", "tube_stage_e",
-    "band1_n", "band2_n", "band3_n", "band_symmetry"))
+  # --- Save candidate metadata ---
+  # BUGFIX 2026-04-17: column name set aligned with current v9.3 C01d output.
+  # The old list (d1_triangle..d10_ghsl, tube_stage_d/e, band1_n..band3_n,
+  # band_symmetry, interval_type) was from the pre-v9.3 C01c triangle
+  # pipeline — none of those columns exist in current candidate_scores.tsv.gz.
+  # intersect() silently discarded all of them, leaving candidate_metadata.tsv
+  # with only the basic fields (chrom, interval_id, start_mb, end_mb,
+  # span_mb, final_score, tier, pattern, hyp_verdict).
+  meta_cols <- intersect(names(cand), c(
+    # Identity + position (unchanged from v8.4)
+    "chrom", "interval_id", "start_mb", "end_mb", "span_mb",
+    # Summary scores
+    "final_score", "dim_positive", "tier", "pattern",
+    # v9.3 scoring dimensions (12)
+    "d1_block_strength", "d2_block_shape", "d3_nn_persistence",
+    "d4_decay_flatness", "d5_interior_quality", "d6_consensus",
+    "d7_sv_breakpoint", "d8_peel_or_hyp", "d9_pca_clusters",
+    "d10_partition", "d11_boundary_concordance", "d12_snake_concordance",
+    # Source evidence + classifications
+    "shape_class", "landscape_category", "hyp_verdict",
+    "l1b_peel", "l2_peel", "survives_nn40", "nn_birth",
+    "n_variants", "n_sv_hits",
+    # v9.3.2 Cheat 25 viability
+    "cheat25_status",
+    # v9.3.2 boundary / snake concordance annotations
+    "snake_overlap", "boundary_verdict_left", "boundary_verdict_right",
+    "n_boundary_cheats",
+    # v9.3.4 popgen annotations (Engine B)
+    "popgen_fst_b1b3", "popgen_theta_pi", "popgen_theta_W",
+    "popgen_Tajima_D", "popgen_method",
+    # v9.3.4 family Fst ratio (test_05)
+    "cheat5_family_fst_ratio",
+    # v9 morphology PA summary
+    "pa_flat_inv_mean", "pa_spiky_inv_mean", "pa_frag_mean",
+    "pa_family_like_mean", "pa_jaggedness_mean",
+    "pa_block_compactness_mean"
+  ))
   fwrite(cand[, ..meta_cols], file.path(cand_dir, "data", "candidate_metadata.tsv"), sep = "\t")
 
   message("  Output: ", cand_dir)

@@ -23,7 +23,7 @@ as valid R when integrated.
 | Patch file | Target script | Integration status |
 |---|---|---|
 | `patch_C01a_precompute_flashlight.R` | `STEP_C01a_precompute.R` | **ALREADY INTEGRATED** — no action needed. Current `STEP_C01a_precompute.R` (lines ~1216–1345) contains the SV-prior annotation block, now rewritten with clean terminology (`sv_prior` / `test_01/02/03/08`). |
-| `patch_C01b2_merge_flashlight.R` | `STEP_C01b_2_merge.R` | **PENDING** — adds the merge blocker (don't merge two regions if a HIGH-confidence SV breakpoint falls in the gap) and boundary snapping (snap fuzzy PCA boundaries to precise SV breakpoints within 50 kb). Needs integration when C01b_2 is renamed. |
+| `patch_C01b2_merge_flashlight.R` | `STEP_C01b_2_merge.R` | **NO LONGER APPLICABLE** — the target script was retired (1D fuzzy merge dropped after overmerge testing; see `_archive_superseded/fuzzy_merge_abandoned/`). The merge-blocker idea (don't merge across HIGH-confidence SV breakpoints) is now implicitly handled: the staircase detector in `2d_candidate_detection/` respects boundaries directly from the sim_mat, and C01g merges SV breakpoints into `boundary_catalog_unified.tsv.gz` which C01d reads at catalog birth. |
 | `patch_C01d_scoring_flashlight.R` | `STEP_C01d_candidate_scoring.R` | **PENDING** — adds SV-overlap score contribution to candidate scoring. |
 | `patch_C01f_hypothesis_flashlight.R` | `STEP_C01f_hypothesis_tests.R` | **PENDING** — adds anchor-sample group-validation check. |
 | `patch_C01i_decomposition_flashlight.R` | `STEP_C01i_decompose.R` | **PENDING** — uses SV anchors as seeds for k-means genotype decomposition. |

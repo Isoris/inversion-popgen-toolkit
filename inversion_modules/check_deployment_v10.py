@@ -101,10 +101,11 @@ def check_r_brackets(root: Path) -> list:
     known_false_positive_suffixes = (
         "phase_2_discovery/2c_precomp/STEP_C01b_1_seeded_regions.R",
         "phase_2_discovery/2c_precomp/STEP_C00_build_sv_prior.R",
-        "phase_2_discovery/2d_detect/STEP_D17_plot_marginal_tracks.R",
-        "phase_2_discovery/2d_detect/STEP_D15_plot_zoomed_regions.R",
-        "phase_2_discovery/2d_detect/STEP_D13_plot_annotated_simmat.R",
-        "phase_2_discovery/2d_detect/STEP_D10_variant_consensus.R",
+        "phase_2_discovery/2d_candidate_detection/STEP_C01b_2_region_merge.R",
+        "phase_2_discovery/2d_candidate_detection/STEP_D17_plot_marginal_tracks.R",
+        "phase_2_discovery/2d_candidate_detection/STEP_D15_plot_zoomed_regions.R",
+        "phase_2_discovery/2d_candidate_detection/STEP_D13_plot_annotated_simmat.R",
+        "phase_2_discovery/2d_candidate_detection/STEP_D10_variant_consensus.R",
         "phase_4_postprocessing/4c_group_validation/STEP_C01f_hypothesis_tests.R",
         "phase_4_postprocessing/4c_group_validation/_PRISTINE_v9.3.4.R",
     )

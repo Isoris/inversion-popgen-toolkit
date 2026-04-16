@@ -347,8 +347,15 @@ for (chr in chroms) {
       if (is.null(bg_left) || is.null(bg_right)) next
 
       cc <- band_concordance(bg_left$bands, bg_right$bands)
-      pc1_cor <- cor(bg_left$pc1[intersect(names(bg_left$pc1), names(bg_right$pc1))],
-                     bg_right$pc1[intersect(names(bg_left$pc1), names(bg_right$pc1))])
+      # BUGFIX 2026-04-17: cor() throws a warning and returns NA when the
+      # input length is 0 or 1, and NaN when all values are identical.
+      # Compute the intersect once, guard on length >= 3.
+      shared_s <- intersect(names(bg_left$pc1), names(bg_right$pc1))
+      pc1_cor <- if (length(shared_s) >= 3) {
+        tryCatch(cor(bg_left$pc1[shared_s], bg_right$pc1[shared_s]),
+                 warning = function(w) NA_real_,
+                 error = function(e) NA_real_)
+      } else NA_real_
 
       # Gap / contig boundary check
       in_gap <- FALSE; at_ctg <- FALSE

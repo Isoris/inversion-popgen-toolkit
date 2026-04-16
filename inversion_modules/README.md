@@ -1,29 +1,8 @@
 # `inversion_modules/` — pipeline deployment root
 
-Consolidated deployment tree for the catfish F₁ hybrid inversion pipeline.
-Combines phase 2 discovery work (this session stream) with the v10 phase 4
-catalog infrastructure (the `2026-04-16` bundle). All paths below are
-relative to this directory.
-
-## Status
-
-**`✓ ALL GREEN`** from `python3 check_deployment_v10.py`:
-
-- 26 expected files present
-- All JSON schemas parse (22 in `registries/schemas/` + 4 in
-  `phase_4_catalog/phase4b_rewrite/schemas/`)
-- All R files bracket-balanced (12 native + 6 allowlisted, where the
-  naive counter false-positives on valid R containing complex string
-  literals)
-- All Python files compile cleanly
-- All schema block_types cross-reference correctly
-- Registry tree creation works in tempdir
-- All 5 automated test suites pass:
-  - `test_compute_group_validation` (v10 — 22 unit tests)
-  - `test_registry_sanity` (v10 — end-to-end plumbing)
-  - `test_c01i_d_seal_resolution` (v10.1 — 21 resolution rules)
-  - `test_jackknife_semantics` (v10.1.1 — 15 four-way jackknife tests)
-  - `test_phase4b_integration` (v10.1 — 18 end-to-end phase 4b tests)
+Consolidated deployment tree for the catfish F₁ hybrid inversion
+pipeline (226 samples, *C. gariepinus × C. macrocephalus*). All paths
+below are relative to this directory.
 
 ## Top-level layout
 
@@ -32,256 +11,254 @@ inversion_modules/
 ├── README.md                           ← you are here
 ├── CONFIG_ARCHITECTURE.md              how module configs source the master
 ├── PATH_WIRING.md                      canonical DELLY/Manta paths
-├── check_deployment_v10.py             self-test (~10 s)
+├── check_deployment_v10.py             self-test (~5 s)
 │
-├── registries/                         v10 registry infrastructure (shared)
-│   ├── api/
-│   │   ├── R/registry_loader.R         unified R library
-│   │   ├── python/registry_loader.py   Python mirror
-│   │   └── bash/registry_loader.sh     shell helpers
-│   └── schemas/structured_block_schemas/
-│                                       18 Tier-2 block schemas
+├── utils/                              shared helpers
+│   ├── ancestry_bridge.R               phase 1 prep + local_Q cache
+│   ├── local_q_projector.R             Engine B local-Q computer
+│   ├── sample_map.R, sample_registry.R sample bookkeeping
+│   └── theme_systems_plate.R           ggplot theming
+│
+├── phase_1_inputs/                     mask + ANGSD SAF/SFS + BEAGLE
+│   ├── steps/   STEP01_mask_regions, STEP02_callable_mask, STEP03_mask_stats
+│   ├── launchers/ LAUNCH_STEP04..07   ANGSD SAF, merge, SFS, SNP + BEAGLE
+│   └── runners/  run_5A1_discovery_inputs.sh
 │
 ├── phase_2_discovery/                  genome scan for inversion-like regions
-│   ├── 2c_precomp/                     C00 sv_prior + C01a precompute +
-│   │                                   C01b_1 seeded regions + patches
+│   ├── 2a_local_pca/                   dosage + per-chr local PCA windows
+│   ├── 2b_mds/                         MDS (stage1 + stage2)
+│   ├── 2c_precomp/                     SV prior + precompute + seeded regions + PHASE_01C
 │   │   ├── STEP_C00_build_sv_prior.R
 │   │   ├── STEP_C01a_precompute.R
 │   │   ├── STEP_C01b_1_seeded_regions.R
-│   │   ├── patches/                    legacy integration patches (reference)
-│   │   ├── README.md
-│   │   └── RENAMING.md                 terminology migration tracker
-│   │
-│   └── 2d_detect/                      inv_detect v9.3 — matrix-based track
-│       ├── run_all.R                   9-phase orchestrator
-│       ├── STEP_D01…D17                (22 scripts, new naming)
-│       ├── LAUNCH_*.slurm              (3 launchers)
-│       ├── _archive_old_names/         original v9.3 docs (authoritative
-│       │                               for label semantics)
-│       └── README.md
+│   │   ├── PHASE_01C_block_detect.R
+│   │   ├── diags/, patches/
+│   │   └── README.md + RENAMING.md
+│   ├── 2d_candidate_detection/         staircase detector (primary boundary track)
+│   │   ├── STEP_D01..D17 + run_all.R
+│   │   ├── LAUNCH_*.slurm
+│   │   ├── tests/test_staircase.R
+│   │   └── README.md
+│   └── 2e_ghsl/                        GHSL haplotype contrast (Layer C)
 │
-├── phase_3_refine/                     breakpoint validation
+├── phase_3_refine/                     bp-resolution breakpoint validation
 │   └── MODULE_5A2_breakpoint_validation/
-│                                       DELLY/Manta concordance, BND signal,
-│                                       refined breakpoint coordinates
+│                                       DELLY/Manta concordance, BND signal
 │
-└── phase_4_catalog/                    per-candidate postprocessing
-    ├── phase4_v10/                     base patches + 18 schemas + tests
-    │   ├── docs/PHASE4_ARCHITECTURE_v10.md
-    │   ├── patches/C01d /C01f /C01i/   registry-aware patches
-    │   ├── orchestrator/run_phase4.sh  SLURM dependency chain
-    │   └── tests/                      2 test suites, both passing
-    │
-    └── phase4b_rewrite/                v10.1.1 — four-script subsystem
-                                        replacing old C01i
-        ├── R/
-        │   ├── STEP_C01i_decompose.R          4b.1 PCA + kmeans
-        │   ├── STEP_C01i_b_multi_recomb.R     4b.2 recombinant detection
-        │   ├── STEP_C01i_d_seal.R             4b.4 synthesis
-        │   ├── engine_b_smoke_test.R          5-s self-test
-        │   └── lib_decompose_helpers.R        shared utilities
-        ├── python/
-        │   ├── STEP_C01i_c_nested_composition.py  4b.3 composite detection
-        │   └── nested_composition_core.py     (vendored)
-        ├── schemas/                    4 schemas (v2 internal_dynamics +
-        │                               recombinant_map + composition +
-        │                               frequency.v2)
-        ├── patches/                    C01f promotion_cap + jackknife
-        ├── orchestrator/run_phase4b.sh SLURM DAG for the 4-script flow
-        ├── tests/                      3 test suites, all passing
-        ├── README.md
-        ├── ADDITIONS_v10_1_1.md        what changed in v10.1.1
-        └── docs/                       architecture + design notes
+├── phase_4_postprocessing/             per-candidate postprocessing — the spine
+│   ├── 4a_existence_layers/            ← catalog birth (C01d/C01e/C01g)
+│   ├── 4b_group_proposal/              C01i decompose / multi_recomb / nested_comp / seal
+│   ├── 4c_group_validation/            C01f hypothesis tests + gate
+│   ├── 4d_group_dependent/             Q5 age + Q6 burden + cheat28/29/30
+│   ├── 4e_final_classification/        characterize_candidate + compute_candidate_status
+│   ├── docs/                           PHASE4 + PHASE4B architecture + design notes
+│   ├── orchestrator/                   SLURM DAG (run_phase4b.sh)
+│   ├── patches/                        C01f registry-aware patches
+│   ├── schemas/                        4 Tier-2 block schemas
+│   ├── specs/                          evidence registry specs
+│   └── tests/                          5 test suites (all pass)
+│
+├── phase_5_followup/                   per-candidate deep analysis
+├── phase_6_secondary/                  LD / Fst / HOBS secondary analyses
+│   └── MODULE_5C_Inversion_LD/, MODULE_5D_Inversion_FST/, MODULE_5E_Inversion_HOBS/
+│
+└── _archive/                           legacy v8.5 HPC tree (kept for reference)
+```
+
+There is also `_archive_superseded/` at the deployment root for things
+that were dropped from the pipeline (not legacy — dead):
+
+```
+_archive_superseded/
+└── fuzzy_merge_abandoned/              STEP_C01b_2 + README explaining why
+                                        it was dropped (overmerge problem)
 ```
 
 ## The pipeline in one page
 
-This follows the canonical phase layout from `SESSION_AUDIT_2026-04-16.md`.
-
 ```
-phase_1_inputs/       (not in this deployment — lives elsewhere in the project)
-  mask, ANGSD, BEAGLE, NGSadmix K=8, ancestry_bridge --prepare
-
+phase_1_inputs/       mask + ANGSD SAF/SFS + BEAGLE + NGSadmix K=8
+                      ancestry_bridge --prepare (produces local_Q cache)
+                           │
+                           ▼
 phase_2_discovery/    scan genome for inversion-like regions
-  2a_local_pca/       (legacy lives in MODULE_2A — not renamed yet)
-  2b_mds/             (legacy lives in MODULE_2B — not renamed yet)
-  2c_precomp/         ✓ HERE — C00 sv_prior, C01a precompute, C01b seeded regions
-  2d_detect/          ✓ HERE — inv_detect v9.3 (matrix-based detection)
-  2e_ghsl/            (not yet renamed — lives as MODULE-* in the legacy tree)
-
+  2a_local_pca/       lostruct per-window PCA on dosage
+  2b_mds/             MDS on lostruct distance matrices
+  2c_precomp/         SV prior (C00) + heavy precompute (C01a)
+                      + seeded regions (C01b_1) + PHASE_01C landscape
+  2d_candidate_detection/  ★ staircase detector — primary boundary track
+  2e_ghsl/            Clair3 phased-genotype haplotype contrast (Layer C)
+                           │
+                           ▼
 phase_3_refine/       breakpoint validation (bp resolution)
-  ✓ HERE — MODULE_5A2_breakpoint_validation
-
-phase_4_catalog/      per-candidate postprocessing — the main pipeline
-  ✓ HERE — phase4_v10/ + phase4b_rewrite/
-  Sub-phases are runtime states, not folders:
-    4a  C01d scoring, C01e figures, C01g boundaries       (group_validation: NONE)
-    4b  C01i decompose/multi_recomb/nested_comp/seal      (writes: UNCERTAIN)
-    4c  C01f hypothesis tests                             (→ SUPPORTED/VALIDATED or SUSPECT)
-    4d  cheat6/20/24, Q5 age, Q6 burden                   (reads: ≥ SUPPORTED)
-    4e  classify_inversions, characterize_candidate       (reads: everything)
-
-phase_5_followup/     (not in this deployment)
-phase_6_secondary/    (not in this deployment)
+                      DELLY/Manta concordance + BND signal
+                           │
+                           ▼
+phase_4_postprocessing/  per-candidate postprocessing — the main pipeline
+  4a  C01d scoring (★ CATALOG BIRTH), C01e figures, C01g boundaries
+      group_validation: NONE
+  4b  C01i decompose + multi_recomb + nested_comp + seal
+      writes: UNCERTAIN
+  4c  C01f hypothesis tests + gate
+      → SUPPORTED / VALIDATED / SUSPECT
+  4d  Q5 age + Q6 burden + cheat28/29/30
+      reads: ≥ SUPPORTED
+  4e  classify_inversions + characterize_candidate
+      reads: everything
+                           │
+                           ▼
+phase_5_followup/     per-candidate deep analysis (MODULE_5B successor)
+phase_6_secondary/    LD / Fst / HOBS secondary analyses
 ```
 
-## The two detection tracks in phase 2
+## Catalog birth — where candidates become first-class objects
 
-Both tracks detect candidate inversion blocks. Both feed C01d (phase 4a)
-via the legacy `triangle_intervals.tsv.gz` format.
+`phase_4/4a/STEP_C01d_candidate_scoring` is the pipeline's pivot. At
+the moment it runs:
 
-| Track | Folder | Signal | Seed / start |
+1. Reads the primary boundary track (staircase blocks from
+   `phase_2/2d_candidate_detection/`, bridge-converted to
+   `triangle_intervals.tsv.gz`)
+2. Reads evidence from whichever of these are available, as scoring
+   dimensions (not gates):
+   - `--cores_dir` → seeded regions from `phase_2/2c_precomp/STEP_C01b_1`
+   - `--boundary_dir` → `boundary_catalog_unified.tsv.gz` from C01g
+     (built from 5 boundary sources)
+   - `--hyp_dir` → hypothesis verdicts from C01f (when available — a
+     second C01d pass after 4c)
+3. Computes 12 scoring dimensions D1–D12, assigns Tier 1/2/3/4
+4. Writes `candidate_scores.tsv.gz` — **the catalog**
+
+Still owed: a `create_candidate_folders.sh` that materialises
+per-candidate folder structure (`01_detection/`, `02_genotypes/`,
+`04_breakpoints/`, `05_mechanism/`, `06_evolution/`) from the catalog.
+Previous chats describe this running right after C01d; it is not in
+the current deployment. Downstream (`phase_4/4b`..`4e`) still works
+without it — the scripts read the flat catalog directly — but the
+per-candidate folder layout that older launchers expect is absent.
+
+## The two tracks in phase 2
+
+Both tracks produce candidate blocks. They are designed to fail on
+different kinds of noise — a candidate visible to both is higher
+confidence than one visible to only one.
+
+| Track | Primary signal | Seed / start | Folder |
 |---|---|---|---|
-| Seed-based | `2c_precomp/STEP_C01b_1_seeded_regions.R` | per-window `max_abs_z` + `inv_likeness` + adaptive β-threshold | **MDS z-score outliers** |
-| Matrix-based | `2d_detect/run_all.R` (9 phases) | similarity matrix structure + 6 image-processing transforms + NN persistence | step-down votes across row profiles |
+| Matrix-based (staircase) | vote-based boundaries across row profiles of sim_mat | step-down votes across row profiles | `2d_candidate_detection/` |
+| Seed-based (seeded regions) | MDS z-outlier extension under damage budget | MDS z-score outliers | `2c_precomp/STEP_C01b_1_seeded_regions.R` |
 
-They are designed to fail independently on different kinds of noise.
-Candidates visible to both tracks are higher confidence than those
-visible to one.
+The matrix track is **primary** — it runs `run_all.R` (9 phases) per
+chromosome and converts its output to the legacy
+`triangle_intervals.tsv.gz` format that C01d reads. The seed track is
+internal evidence — C01d consumes its output via `--cores_dir` as one
+of its scoring dimensions.
 
-## Group validation — the phase 4 spine
+### Historical note — no merge step in phase 2
 
-Phase 4 is organized around **validation levels that gate downstream
-cheats**. Groups (HOM_REF, HET, HOM_INV, RECOMBINANT) are proposed by
+An earlier design had a `2d_seeded_merge/` folder with
+`STEP_C01b_2_merge.R` that used 1D fuzzy max-min composition to
+consolidate seeded regions before scoring. It was dropped because it
+overmerged across real boundaries visible in the 2D sim_mat (LG19, LG28
+during testing). The replacement is: two parallel boundary detectors
+(staircase in `2d_candidate_detection/`, PHASE_01C in `2c_precomp/`)
+feeding phase 4 directly. The retired script is at
+`_archive_superseded/fuzzy_merge_abandoned/` with its own README.
+
+## Phase 4 — validation levels
+
+Phase 4 is organised around validation levels that gate downstream
+tests. Groups (HOM_REF, HET, HOM_INV, RECOMBINANT) are proposed by
 C01i (phase 4b), validated by C01f (phase 4c), and consumed by
-group-dependent cheats (phase 4d):
+group-dependent tests (phase 4d):
 
 ```
 NONE        phase 4a — scoring / figures / boundaries; no groups required
-UNCERTAIN   phase 4b — groups proposed from PCA; composite intervals capped here
-SUPPORTED   phase 4c — family-restricted + multi-family-contributing + few-family
-VALIDATED   phase 4c — robust multi-family verdicts only
-SUSPECT     phase 4c — only for pca_family_confounded
+UNCERTAIN   phase 4b — groups proposed from PCA; composite intervals cap here
+SUPPORTED   phase 4c — family-restricted or few-family verdicts
+VALIDATED   phase 4c — robust multi-family verdicts
+SUSPECT     phase 4c — pca_family_confounded only
 ```
 
-The four-way jackknife semantics in v10.1.1 replaces the old "demote
-everything that isn't robust_multi_family" rule with a principled
-five-way classification where **single-family-fragile = REAL
-(family-restricted polymorphism)**, not SUSPECT. See
-`phase_4_catalog/phase4b_rewrite/docs/DESIGN_NOTE_K_and_local_Q_and_jackknife.md`
-for the rationale.
+The four-way jackknife semantics (v10.1.1) treats
+`single_family_fragile` as REAL (family-restricted polymorphism), not
+SUSPECT. See `phase_4_postprocessing/docs/DESIGN_NOTE_K_and_local_Q_and_jackknife.md`.
 
-## The four key axes written by phase 4b
+## The 4-layer independence framework
 
-Phase 4b writes four things into each candidate's evidence registry:
+| Layer | Source | Algorithm | Produced by |
+|---|---|---|---|
+| A | dosage (genotype likelihoods) | lostruct local PCA → MDS | `phase_2/2a` + `2b` |
+| B | SV caller output | DELLY2 + Manta catalogs | `phase_2/2c/STEP_C00` |
+| C | Clair3 phased genotypes | GHSL haplotype contrast | `phase_2/2e_ghsl` |
+| D | genotype–breakpoint association | Fisher odds ratio linking A, B, C | `phase_4` |
 
-```
-internal_dynamics.json             per-window class track, silhouette,
-                                   BIC, cluster quality
-recombinant_map.json               three-signal recombinant detection
-                                   + GC/DCO/suspicious classification
-internal_ancestry_composition.json composite_flag ∈ {clean, maybe_composite,
-                                                     likely_composite,
-                                                     unknown_no_engine_b}
-frequency.v2.json                  q6_group_validation
-                                   q6_validation_promotion_cap
-                                   q6_family_linkage        ← see "Still owed" §1
-                                   q6_polymorphism_class     ← see "Still owed" §1
-```
+Layers are designed to fail independently. Tier 1 = multi-layer
+convergence; Tier 3–4 = single-layer evidence or layer-specific
+artefact.
 
-## Still owed (from the audit's blocking-items list)
-
-1. **10-line edit to `STEP_C01i_d_seal.R`** to write the new
-   `family_linkage` + `polymorphism_class` fields into the frequency
-   block. The `compute_group_validation()` function (patched in v10.1.1)
-   returns them but seal doesn't currently persist them. See
-   `ADDITIONS_v10_1_1.md` section "Stage 2" for the exact location.
-2. **C01f call-site updates**. `compute_group_validation()` now returns
-   a list (`$level`, `$quality_flags`, `$family_linkage`) instead of a
-   string. Call sites need the 3-line update.
-3. **`ancestry_bridge.R --prepare`** for all 28 chromosomes before the
-   first C01a run. This produces the `local_Q/<chr>.local_Q_samples.tsv.gz`
-   cache that `nested_composition` reads.
-4. **Full `Rscript --vanilla -e "parse(file='...')"`** on LANTA for
-   every R file. The deployment check does bracket balance only; 6 of
-   our files are allowlisted as "naive counter false-positives". Those
-   need a real parse before SLURM submit.
-5. **C01f comp-call-site patch** from `phase4_v10/patches/C01f/` —
-   only at the main-loop k-means (not T4/T5/T6 internal calls).
-
-## Still owed (from our phase 2 work)
-
-See `phase_2_discovery/2c_precomp/RENAMING.md` section 10 for the full
-list of scripts that still contain legacy `flashlight` / `snake` /
-`cheatN` / `core_family` terminology. The v10 phase 4 code intentionally
-still uses `cheatNN` and `event_class`-style naming — those stay until a
-cross-module rename pass (post-manuscript).
-
-Specific pending items:
-
-1. **Five remaining patch files** at
-   `phase_2_discovery/2c_precomp/patches/` have the autogen R parse bug
-   (statements inside `c(...)`). Need rewriting using the clean pattern
-   from integrated C01a.
-2. **`PATH_WIRING.md` diff** to centralise DELLY/Manta paths in the
-   master `00_inversion_config.sh`. Needs `readlink -f` verification on
-   LANTA first to confirm which directory names are real vs symlinks.
-3. **`snake_regions_multiscale/` directory rename** on LANTA — touches
-   9 config variables + MODULE_5B/5C/5D/5E + existing output dirs.
-   Coordinated via symlinks.
-4. **Folder conflict**: `phase_2_discovery/2d_cores/` (the seed-based
-   track's merge/community/consensus scripts from the legacy tree)
-   still needs renaming. `RENAMING.md` section 13 proposes
-   `2d_seeded_extension/` + this folder staying `2d_detect/`, OR
-   `2d_cores/` → keep and this folder becomes `2e_matrix_detect/`.
-   Your call.
-
-## Scope note — what this deployment does NOT do
-
-- **Does not replace `00_inversion_config.sh`** (the master config
-  lives in the inversion codebase, not here). This tree is the module
-  deployment; the master config is referenced via `INV_CONFIG` env
-  var. See `CONFIG_ARCHITECTURE.md`.
-- **Does not rebuild phase 1**. That's `ancestry_bridge.R --prepare`
-  and the ANGSD/BEAGLE/NGSadmix pipeline, which live outside this tree.
-- **Does not replace C01d or C01g**. Phase 4 uses patches (diff-apply
-  style) against the existing scripts, not replacements. See each
-  patch file's comment block.
-- **Does not split composite intervals**. `likely_composite` stays as
-  one catalog entry capped at UNCERTAIN. Multi-system catalog is
-  v10.2 (post-manuscript).
-
-## How to deploy
+## Deployment check
 
 ```bash
-# 1. Drop into your toolkit
-cd inversion-popgen-toolkit/inversion_modules/
-tar xzf phase_2_plus_v10_bundle.tar.gz --strip-components=1
-
-# 2. Verify
 python3 check_deployment_v10.py
-# Should print "✓ ALL GREEN"
-
-# 3. Run R parse on LANTA (the 6 allowlisted files especially)
-for f in phase_2_discovery/*/STEP_*.R phase_2_discovery/*/run_all.R \
-         phase_4_catalog/**/*.R; do
-  Rscript --vanilla -e "invisible(parse(file='$f'))" \
-    || { echo "PARSE FAIL: $f"; break; }
-done
-
-# 4. Run ancestry_bridge --prepare for each chromosome (phase 1 prep)
-for chr in C_gar_LG{01..28}; do
-  Rscript utils/ancestry_bridge.R --prepare --K 8 --chr $chr
-done
-
-# 5. Phase 4 smoke test
-bash phase_4_catalog/phase4b_rewrite/orchestrator/run_phase4b.sh \
-  --dry-run --chroms LG12
 ```
 
-## Referenced external docs
+Reports on files present, JSON schemas parsing, R bracket balance,
+Python syntax, schema cross-references, registry loader smoke, and
+runs the 5 test suites in `phase_4_postprocessing/tests/`.
 
-- `SESSION_AUDIT_2026-04-16.md` — uploaded earlier, contains the
-  phase-structure decisions this deployment implements
-- `phase_2_discovery/2c_precomp/RENAMING.md` — every rename already
-  applied + full audit commands for remaining work
-- `phase_2_discovery/2c_precomp/README.md` — precompute workflow
-- `phase_2_discovery/2d_detect/README.md` — matrix-based detection
-- `phase_4_catalog/phase4_v10/docs/PHASE4_ARCHITECTURE_v10.md` — the
-  authoritative phase 4 design (~350 lines, 8 sections)
-- `phase_4_catalog/phase4b_rewrite/docs/PHASE4B_REWRITE_ARCHITECTURE.md` —
-  the four-script subsystem design
-- `phase_4_catalog/phase4b_rewrite/docs/DESIGN_NOTE_K_and_local_Q_and_jackknife.md` —
-  why K=8, what local_Q is, why single_family_fragile is not SUSPECT
-- `CONFIG_ARCHITECTURE.md` — how module configs source the master
-- `PATH_WIRING.md` — the DELLY/Manta canonical paths proposal
+The `registries/` API + schema directory lives at the repo root
+(`inversion-popgen-toolkit/registries/`), not inside this tree — the
+deployment-check errors about missing registry files are expected in
+this configuration. The 5 tests all pass.
+
+## Still owed
+
+1. Real `Rscript --vanilla -e 'parse(file=...)'` on LANTA for every R
+   file, especially the allowlisted ones (naive bracket counter false-
+   positives on ggplot dict-arg + complex string literals).
+2. Bump `hypothesis_verdict.schema.json` to v2 (add `family_linkage`
+   enum + `quality_flags` field) to match v10.1.1 semantics.
+3. One-chromosome smoke test through 2c → 2d → phase_3 → 4a → 4b → 4c
+   (suggested target: LG12 with the Tier-1 candidate at 52.4–54.6 Mb
+   from earlier manuscript drafts).
+4. `ancestry_bridge.R --prepare` for all 28 chromosomes before the
+   first C01a run (produces `local_Q/<chr>.local_Q_samples.tsv.gz`
+   cache read by `nested_composition`).
+5. Wire C01f call sites to the new `compute_group_validation()` list
+   return (`$level`, `$quality_flags`, `$family_linkage`) instead of
+   the pre-v10.1.1 string return.
+6. `create_candidate_folders.sh` — the script that materialises
+   per-candidate folder structure (`01_detection/`, `02_genotypes/`,
+   `04_breakpoints/`, `05_mechanism/`, `06_evolution/`) from
+   `candidate_scores.tsv.gz`. Described in past chats, not present in
+   this deployment. Low priority — phase 4b–4e consume the flat catalog
+   directly.
+7. Cross-module rename pass (post-manuscript) to retire remaining
+   `cheatNN`/`snake`/`core` terminology in phase_4 and MODULE_5B–E
+   consumers. See `2c_precomp/RENAMING.md` section 13 for the
+   up-to-date remaining list. Note: C01d's output column names
+   `d12_snake_concordance` and `snake_overlap` are consumed by
+   `4e/compute_candidate_status.R` and `test_registry_sanity.py` —
+   renaming them is a coordinated change across those three files.
+
+## Referenced docs
+
+- `CONFIG_ARCHITECTURE.md` — module configs source the master
+- `PATH_WIRING.md` — DELLY/Manta canonical paths
+- `phase_2_discovery/2c_precomp/README.md` — precompute + PHASE_01C
+  workflow + "why no merge step"
+- `phase_2_discovery/2c_precomp/RENAMING.md` — terminology migration
+  tracker
+- `phase_2_discovery/2d_candidate_detection/README.md` — staircase
+  detector
+- `phase_4_postprocessing/docs/PHASE4_ARCHITECTURE.md` — the phase 4
+  design (sections + flow)
+- `phase_4_postprocessing/docs/PHASE4B_REWRITE_ARCHITECTURE.md` — the
+  four-script 4b subsystem
+- `phase_4_postprocessing/docs/DESIGN_NOTE_K_and_local_Q_and_jackknife.md`
+  — why K=8, what local_Q is, four-way jackknife semantics
+- `phase_4_postprocessing/4a_existence_layers/README.md` — catalog
+  birth (C01d/C01e/C01g contract)
+- `_archive_superseded/fuzzy_merge_abandoned/README.md` — what the
+  retired merge was, why it was dropped

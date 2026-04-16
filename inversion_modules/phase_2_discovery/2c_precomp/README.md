@@ -1,4 +1,4 @@
-# `2c_precomp/` — SV evidence prior and window-level precomputation
+# `2c_precomp/` — SV evidence prior, window-level precomputation, landscape detector
 
 Third block of phase 2. Takes the MDS output from `2b_mds/` plus the SV
 catalogs from `MODULE_4D` (DELLY INV), `MODULE_4F` (DELLY BND), and
@@ -8,9 +8,15 @@ catalogs from `MODULE_4D` (DELLY INV), `MODULE_4F` (DELLY BND), and
 - Per-window annotations: robust z-scores, similarity matrices, seed
   eligibility, inversion-likeness, dosage heterozygosity, Q-stamps,
   SV-overlap stamps
-- Seeded regions grown from MDS z-outlier seeds (before the merge step)
+- Seeded regions grown from MDS z-outlier seeds — consumed directly by
+  `phase_4/4a/STEP_C01d` as one of its scoring-dimension inputs via
+  `--cores_dir`
+- A chromosome-level landscape detector (blocks, classified boundaries,
+  blue-cross diagnosis, block concordance) consumed by
+  `phase_4/4a/STEP_C01g` which builds `boundary_catalog_unified.tsv.gz`
 
-Codebase: `inversion_modules` v8.5. Scripts `STEP_C00` through `STEP_C01b_1`.
+Codebase: `inversion_modules` v8.5. Scripts `STEP_C00`, `STEP_C01a`,
+`STEP_C01b_1`, `PHASE_01C_block_detect`.
 
 ## Layout
 
@@ -19,6 +25,8 @@ Codebase: `inversion_modules` v8.5. Scripts `STEP_C00` through `STEP_C01b_1`.
 ├── STEP_C00_build_sv_prior.R            # SV catalogs → per-chr sv_prior RDS
 ├── STEP_C01a_precompute.R               # MDS + sv_prior → per-chr annotations
 ├── STEP_C01b_1_seeded_regions.R         # seeded region-growing from z-outliers
+├── PHASE_01C_block_detect.R             # block + boundary + blue-cross landscape
+├── diags/                               # C01a / C01b diagnostic helpers
 ├── patches/                             # legacy patch files (terminology stale)
 ├── RENAMING.md                          # terminology migration tracker
 └── README.md
@@ -26,8 +34,10 @@ Codebase: `inversion_modules` v8.5. Scripts `STEP_C00` through `STEP_C01b_1`.
 
 ## Workflow
 
-The three scripts run in order and are independent jobs. Each is
-idempotent (safe to re-run):
+The scripts form a small DAG. C00 and C01a are the heavy steps; C01b_1
+and PHASE_01C are independent readers of C01a's precompute cache, and
+all four feed phase_4 directly (no merge step in phase_2 — see
+"Architectural note" below):
 
 ```
 DELLY INV / BND / Manta INV / DEL VCFs
@@ -44,17 +54,51 @@ STEP_C00_build_sv_prior.R
         ▼   ▼   ▼
 STEP_C01a_precompute.R
         │
-        ▼  $PRECOMP_DIR/<chr>.precomp.rds
-        │  $PRECOMP_DIR/window_inv_likeness.tsv.gz
+        ▼  $PRECOMP_DIR/precomp/<chr>.precomp.rds
+           $PRECOMP_DIR/window_inv_likeness.tsv.gz
         │
-        ▼
-STEP_C01b_1_seeded_regions.R
-        │
-        ▼  seeded_regions_<chr>.rds         ← consumed by C01b_2 merge
-           seeded_regions_windows_<chr>.tsv.gz
-           seeded_regions_summary_<chr>.tsv.gz
-           seeded_regions_decision_log_<chr>.tsv.gz
+        ├──────────────────────────────┐
+        ▼                              ▼
+STEP_C01b_1_seeded_regions.R    PHASE_01C_block_detect.R
+(seed selection + extension)    (blocks + boundary + blue-cross)
+        │                              │
+        ▼                              ▼
+seeded_regions_<chr>.rds        landscape/
+                                  block_registry_<chr>.tsv.gz
+                                  boundary_catalog_<chr>.tsv.gz
+                                  blue_cross_verdicts_<chr>.tsv.gz
+                                  block_concordance_<chr>.tsv.gz
+                                  01C_window_pa.tsv.gz
+
+Downstream consumption (all at phase_4 catalog-birth time):
+  seeded_regions_*.rds   ──►  phase_4/4a/STEP_C01d --cores_dir
+                              (D2/D5 scoring dimensions consume them)
+  landscape/*.tsv.gz     ──►  phase_4/4a/STEP_C01g
+                              (merged into boundary_catalog_unified.tsv.gz)
+                         ──►  phase_4/4a/STEP_C01d --boundary_dir
+                              (D11 boundary concordance dimension)
+  sv_prior_<chr>.rds     ──►  phase_4/4b/STEP_C01i_decompose
+                              (seeds k-means for genotype classes)
+                         ──►  phase_4/4a/STEP_C01g (SV-breakpoint layer)
 ```
+
+### Architectural note — why no `2d_seeded_merge`
+
+An earlier design had a merge step between C01b_1 and phase_4
+(`STEP_C01b_2_merge.R`, fuzzy max-min composition of membership and
+geometric relations). It was retired: on test chromosomes the 1D
+tail-to-head fuzzy merge overmerged across real boundaries visible in
+the 2D sim_mat (LG19 ~8–15 Mb, LG28 ~7–15 Mb). The replacement design
+is two parallel boundary detectors — the staircase in
+`2d_candidate_detection/` and PHASE_01C here — with the seeded regions
+serving as independent internal evidence consumed directly at
+catalog-birth by `phase_4/4a/STEP_C01d`. C01d already accepts
+`--cores_dir`, and the cores contribute to its D2 (bands) / D5
+(sub-regime) scoring dimensions.
+
+The retired merge script is at
+`_archive_superseded/fuzzy_merge_abandoned/` with a README documenting
+why it was dropped.
 
 ## What each script does
 
@@ -128,6 +172,54 @@ test each one's sim_mat block contrast on a kin-pruned sample subset.
 Regions whose signal collapses under pruning are flagged, not dropped
 (collapse under pruning is informative in a hatchery-founder context).
 
+### PHASE_01C — `PHASE_01C_block_detect.R`
+
+A **landscape detector**, independent of the seed-based track. Reads
+the same `precomp/<chr>.precomp.rds` produced by C01a and answers three
+related questions at the chromosome scale:
+
+1. **Where are the blocks?** Elevated-similarity regions on the
+   sim_mat, detected via row-profile clustering — not from seeds,
+   not from staircase votes. Written to `block_registry_<chr>.tsv.gz`.
+2. **What kind of boundary sits at each transition?** Classified
+   into `clear_hard` / `soft` / `inner_hard` / `inner_soft` /
+   `diffuse` based on the shape of the local sim decay. Written to
+   `boundary_catalog_<chr>.tsv.gz`.
+3. **Are suspected boundaries real or assembly artefacts?**
+   "Blue-cross" diagnosis: does the drop occur at an assembly gap or
+   AGP-scaffold edge? Written to `blue_cross_verdicts_<chr>.tsv.gz`.
+
+It also produces `block_concordance_<chr>.tsv.gz` (which blocks share
+the same sample-partitioning pattern) and `01C_window_pa.tsv.gz`
+(per-window block-membership in a P/A matrix).
+
+Mode-dependent thresholds — `hatchery` mode uses slightly lower
+`BLOCK_THRESH_ABOVE` and `MIN_BLOCK_SIM` than `wild`, reflecting the
+weaker genome-wide background contrast in hybrid hatchery populations.
+
+PHASE_01C's outputs are consumed at phase_4 catalog-birth time by:
+
+- `phase_4/4a/STEP_C01g_boundary_catalog` — one of five boundary
+  sources (PHASE_01C, staircase from 2d, seeded regions from C01b_1,
+  SV breakpoints from C00, blue-cross inner boundaries from PHASE_01C
+  itself) that get merged by proximity into
+  `boundary_catalog_unified.tsv.gz`
+- `phase_4/4a/STEP_C01d_candidate_scoring` — the unified boundary
+  catalog feeds C01d's D11 dimension (boundary concordance), and the
+  block_concordance layer can inform sub-regime scoring
+
+Usage:
+
+```bash
+Rscript PHASE_01C_block_detect.R <precomp_dir> <landscape_outdir> \
+  [--mode hatchery|wild] [--gaps gaps.bed] [--agp scaffold.agp] \
+  [--chrom C_gar_LG28] [--local_range 80]
+```
+
+The `--gaps` / `--agp` files are optional but enable higher-quality
+blue-cross diagnosis — without them, a "blue cross" (abrupt local
+similarity drop) cannot be distinguished from a small assembly gap.
+
 ## Two scripts, same VCFs, different questions
 
 This needs to be stated because it is confusing and it is not a bug.
@@ -164,7 +256,7 @@ sources. The SV prior built here is Layer B.
 |---|---|---|---|
 | A | dosage (genotype likelihoods) | lostruct local PCA → MDS | phase_2/2a + 2b |
 | **B** | **SV caller output** | **DELLY2 + Manta catalogs** | **STEP_C00 (this folder)** |
-| C | Clair3 phased genotypes | GHSL haplotype contrast | phase_2/2e |
+| C | Clair3 phased genotypes | GHSL haplotype contrast | phase_2/2e_ghsl |
 | D | genotype–breakpoint association | Fisher odds ratio linking A, B, C | phase_4 |
 
 Layers are designed to fail independently. A candidate that converges
@@ -210,6 +302,36 @@ Key replacements relevant here:
 - `cheat N` → `test_NN` (biological evidence tests, 01 through 26)
 
 Grep recipes to audit other scripts are in `RENAMING.md` section 8.
+
+**Caveat for the `test_05` rename specifically (2026-04-17 cleanup):**
+C01a writes columns named `test05_fst_pc1`, `test05_fst_q_best`,
+`test05_fst_q_best_k`, `test05_family_fst_ratio`. The downstream reader
+in `phase_4/4a/STEP_C01d` still names its output column
+`cheat5_family_fst_ratio` (to avoid forcing a rename across 4b/4c/4e
+registry keys and test suites), but accepts either name on read. Don't
+rename the C01d output until a follow-up sweep aligns it across the
+downstream consumers (`compute_candidate_status.R`,
+`test_registry_sanity.py`, manuscript tables).
+
+## CLI flag notes (2026-04-17 cleanup)
+
+Several flags in `phase_4/4a/` scripts were parsed but never read. On
+2026-04-17 they were silenced — still accepted for back-compat with
+existing launchers, but no longer have any effect:
+
+- `STEP_C01d_candidate_scoring.R --flashlight_dir` — D7's SV info
+  already comes from the staircase scoring table's `sv_overlap_pct` /
+  `n_sv_hits` columns (populated by `phase_2/2d/STEP_D06_sv_overlap.R`).
+  The sv_prior RDS built by `STEP_C00` here is consumed by C01a (which
+  stamps SV columns onto windows), not by C01d directly.
+- `STEP_C01e_candidate_figures.R --repeats` and `--het_dir` — never
+  referenced in the script body.
+- `STEP_C01g_boundary_catalog.R --ref_fasta` — never referenced.
+- `STEP_C01g_boundary_catalog.R --scores` — archived with the Cheat 17
+  fossil-detection block (see
+  `_archive_superseded/cheat17_fossil_detection/README.md`). Fossil
+  detection required a two-pass run of C01g → C01d → C01g that was
+  never wired; removing the flag simplifies the DAG.
 
 ## Paths and config
 

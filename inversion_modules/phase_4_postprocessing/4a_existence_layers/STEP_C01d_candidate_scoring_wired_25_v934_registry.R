@@ -94,8 +94,13 @@ if (length(args) < 2) stop("Usage: Rscript STEP_C01d_candidate_scoring.R <detect
 
 detector_dir <- args[1]; outdir <- args[2]
 precomp_dir <- NULL; hyp_dir <- NULL
-cores_dir <- NULL; boundary_dir <- NULL; flashlight_dir <- NULL
+cores_dir <- NULL; boundary_dir <- NULL
 
+# BUGFIX 2026-04-17: --flashlight_dir was parsed but never read in this
+# script. D7 (sv_breakpoint) already gets its SV info from the staircase
+# scoring table's sv_overlap_pct / n_sv_hits columns (populated by
+# phase_2/2d/STEP_D06_sv_overlap.R). The flag is accepted for backward
+# compatibility with existing launchers but is silently ignored.
 i <- 3L
 while (i <= length(args)) {
   a <- args[i]
@@ -103,7 +108,10 @@ while (i <= length(args)) {
   else if (a == "--hyp_dir" && i < length(args))    { hyp_dir <- args[i+1]; i <- i+2L }
   else if (a == "--cores_dir" && i < length(args))  { cores_dir <- args[i+1]; i <- i+2L }
   else if (a == "--boundary_dir" && i < length(args)) { boundary_dir <- args[i+1]; i <- i+2L }
-  else if (a == "--flashlight_dir" && i < length(args)) { flashlight_dir <- args[i+1]; i <- i+2L }
+  else if (a == "--flashlight_dir" && i < length(args)) {
+    # accepted but ignored — D7 uses scoring_table SV columns instead
+    i <- i+2L
+  }
   else { i <- i+1L }
 }
 
@@ -406,18 +414,36 @@ message("[C01d] Initial scoring: ", nrow(cand_dt), " candidates")
 # No overlap → D12 = 0, cap at Tier 4.
 
 if (!is.null(cores_dir) && dir.exists(cores_dir)) {
-  message("[C01d] ── D12: Snake-staircase concordance ──")
-  core_files <- list.files(cores_dir, pattern = "^snake1_core_regions_.*\\.tsv\\.gz$",
+  message("[C01d] ── D12: Seeded-region / staircase concordance ──")
+  # C01b_1 (phase_2/2c) writes seeded_regions_summary_<chr>.tsv.gz.
+  # Legacy snake1_core_regions_<chr>.tsv.gz pattern kept as fallback for
+  # pre-rename output directories.
+  core_files <- list.files(cores_dir,
+                            pattern = "^seeded_regions_summary_.*\\.tsv\\.gz$",
                             full.names = TRUE)
+  if (length(core_files) == 0) {
+    core_files <- list.files(cores_dir,
+                              pattern = "^snake1_core_regions_.*\\.tsv\\.gz$",
+                              full.names = TRUE)
+    if (length(core_files) > 0) {
+      message("[C01d] Reading legacy snake1_core_regions_*.tsv.gz (pre-rename)")
+    }
+  }
   if (length(core_files) > 0) {
     all_cores <- rbindlist(lapply(core_files, fread), fill = TRUE)
-    message("[C01d] Loaded ", nrow(all_cores), " snake cores from ", length(core_files), " chromosomes")
+    # Back-compat: legacy input had core_family/snake_id/cheat26_status; new
+    # input has scale_tier/region_id/test26_status. Normalise on read so the
+    # overlap logic below doesn't need to know which it got.
+    if ("scale_tier"   %in% names(all_cores) && !"core_family"    %in% names(all_cores)) all_cores[, core_family   := scale_tier]
+    if ("region_id"    %in% names(all_cores) && !"snake_id"       %in% names(all_cores)) all_cores[, snake_id      := region_id]
+    if ("test26_status"%in% names(all_cores) && !"cheat26_status" %in% names(all_cores)) all_cores[, cheat26_status := test26_status]
+    message("[C01d] Loaded ", nrow(all_cores), " seeded regions from ", length(core_files), " chromosomes")
 
     for (ci in seq_len(nrow(cand_dt))) {
       cd <- cand_dt[ci]
       s_bp <- cd$start_mb * 1e6; e_bp <- cd$end_mb * 1e6
 
-      # Find cores that overlap this candidate (≥50% reciprocal overlap)
+      # Find seeded regions that overlap this candidate (≥30% reciprocal overlap)
       chr_cores <- all_cores[chrom == cd$chrom]
       if (nrow(chr_cores) == 0) next
 
@@ -434,11 +460,11 @@ if (!is.null(cores_dir) && dir.exists(cores_dir)) {
           recip_core <- overlap_len / core_len
 
           if (recip_cand > 0.3 || recip_core > 0.3) {
-            # Snake core overlaps this staircase block
+            # Seeded region overlaps this staircase block
             overlap_frac <- max(recip_cand, recip_core)
             d12_val <- pmin(1, overlap_frac * 1.2)  # slight boost for strong overlap
 
-            # Check Cheat 26 status if available
+            # Check test_26 kin-pruned retention status if available
             c26 <- cr$cheat26_status %||% "untested"
             if (c26 == "persists") d12_val <- pmin(1, d12_val + 0.2)
             else if (c26 == "collapsed") d12_val <- d12_val * 0.5
@@ -446,27 +472,27 @@ if (!is.null(cores_dir) && dir.exists(cores_dir)) {
             if (d12_val > cand_dt$d12_snake_concordance[ci]) {
               set(cand_dt, ci, "d12_snake_concordance", round(d12_val, 3))
               set(cand_dt, ci, "snake_overlap", paste0(
-                cr$core_family, "_snake", cr$snake_id,
+                cr$core_family, "_region", cr$snake_id,
                 "_", round(overlap_frac * 100), "pct",
-                if (c26 != "untested") paste0("_c26=", c26) else ""))
+                if (c26 != "untested") paste0("_t26=", c26) else ""))
             }
           }
         }
       }
     }
 
-    # Tier cap: staircase blocks without snake core overlap → Tier 4
+    # Tier cap: staircase blocks without any seeded-region overlap → Tier 4
     no_snake <- cand_dt$d12_snake_concordance == 0 & cand_dt$snake_overlap == "no_data"
     n_capped <- sum(no_snake & cand_dt$tier <= 3)
     cand_dt[no_snake & tier <= 3, tier := 4L]
-    message("[C01d] Snake concordance: ",
+    message("[C01d] Seeded-region concordance: ",
             sum(cand_dt$d12_snake_concordance > 0), " with overlap, ",
-            n_capped, " capped to Tier 4 (no snake core)")
+            n_capped, " capped to Tier 4 (no seeded region)")
   } else {
-    message("[C01d] No core_regions files found in ", cores_dir)
+    message("[C01d] No seeded_regions_summary_*.tsv.gz files found in ", cores_dir)
   }
 } else {
-  message("[C01d] No --cores_dir — D12 snake concordance skipped")
+  message("[C01d] No --cores_dir — D12 seeded-region concordance skipped")
 }
 
 # =============================================================================
@@ -691,26 +717,46 @@ if (.bridge_available && exists("get_region_stats", mode = "function")) {
   }
   message("[C01d] Popgen annotation: ", n_annotated, "/", nrow(cand_dt), " candidates annotated")
 
-  # Also pull Cheat 5 family_fst_ratio from precomp if available
+  # Also pull test_05 family_fst_ratio from precomp if available.
+  # BUGFIX 2026-04-17: three issues fixed —
+  #   (1) column renamed cheat5_family_fst_ratio → test05_family_fst_ratio
+  #       in C01a during the cheat→test rename; this reader still looked
+  #       for the old name. Now reads the new name with legacy fallback.
+  #   (2) pc_obj does NOT have a top-level `inv_likeness` element — the
+  #       column lives at pc_obj$dt$<col>. Was always NULL, so the loop
+  #       silently did nothing. Now reads pc_obj$dt directly.
+  #   (3) pc_obj$dt has start_bp/end_bp, NOT mid_bp. Use window-overlap
+  #       against the candidate's bp range.
+  # Output column name in cand_dt kept as cheat5_family_fst_ratio so
+  # downstream readers (if any) don't need changing in this fix pass.
   if (!is.null(precomp_dir)) {
     cand_dt[, cheat5_family_fst_ratio := NA_real_]
     for (ci in seq_len(nrow(cand_dt))) {
       cd <- cand_dt[ci]; chr <- cd$chrom
       pf <- file.path(precomp_dir, paste0(chr, ".precomp.rds"))
       if (!file.exists(pf)) next
-      pc_obj <- readRDS(pf)
-      if (!"inv_likeness" %in% names(pc_obj) || is.null(pc_obj$inv_likeness)) next
-      il <- pc_obj$inv_likeness
-      if (!"cheat5_family_fst_ratio" %in% names(il)) next
+      pc_obj <- tryCatch(readRDS(pf), error = function(e) NULL)
+      if (is.null(pc_obj) || is.null(pc_obj$dt)) next
+      il <- pc_obj$dt
+      # Accept both new name (test05) and legacy (cheat5) for backward
+      # compatibility with pre-rename precomp caches.
+      fst_col <- if ("test05_family_fst_ratio" %in% names(il)) {
+        "test05_family_fst_ratio"
+      } else if ("cheat5_family_fst_ratio" %in% names(il)) {
+        "cheat5_family_fst_ratio"
+      } else NULL
+      if (is.null(fst_col)) next
       s_bp <- cd$start_mb * 1e6; e_bp <- cd$end_mb * 1e6
-      region <- il[mid_bp >= s_bp & mid_bp <= e_bp]
+      # Windows whose center lies inside the candidate region
+      mid_bp_vec <- (il$start_bp + il$end_bp) / 2
+      region <- il[mid_bp_vec >= s_bp & mid_bp_vec <= e_bp]
       if (nrow(region) > 0) {
         set(cand_dt, ci, "cheat5_family_fst_ratio",
-            round(mean(region$cheat5_family_fst_ratio, na.rm = TRUE), 4))
+            round(mean(region[[fst_col]], na.rm = TRUE), 4))
       }
     }
     n_ratio <- sum(is.finite(cand_dt$cheat5_family_fst_ratio))
-    if (n_ratio > 0) message("[C01d] Cheat 5 family_fst_ratio: ", n_ratio, " candidates annotated")
+    if (n_ratio > 0) message("[C01d] test_05 family_fst_ratio: ", n_ratio, " candidates annotated")
   }
 } else {
   message("[C01d] Popgen annotation skipped (no Engine B)")

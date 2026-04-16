@@ -490,7 +490,7 @@ sub-phases:
 phase_2_discovery/
 ├── 2c_precomp/                 (both tracks read from here)
 ├── 2d_seeded_regions/          (was 2d_cores — seed-based track)
-└── 2e_candidate_detection/     (bumped up from 2d to avoid collision)
+└── 2d_candidate_detection/     (bumped up from 2d to avoid collision)
 ```
 
 This is a folder-layout decision for you to make; I've used
