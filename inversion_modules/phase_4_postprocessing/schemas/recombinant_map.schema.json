@@ -1,0 +1,64 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "recombinant_map.schema.json",
+  "block_type": "recombinant_map",
+  "version": "v1_phase4b_rewrite",
+  "description": "Per-candidate map of recombinant samples. Each recombinant has a switchpoint, mosaic length, distance to nearest boundary, cheat24-derived event_class (gene_conversion / double_crossover / suspicious / ambiguous), posterior probability, and records which of three independent signals supported the call (per-window class switch, Clair3 phase switch, flashlight hemizygous). Consumed by STEP_C01i_d_seal during synthesis — recombinant samples are promoted from their PCA class to the dedicated RECOMBINANT group.",
+  "question": "Q2, Q4",
+  "group_validation_required": "NONE",
+  "source_script": "STEP_C01i_b_multi_recomb.R",
+  "required": ["candidate_id", "chrom", "start_bp", "end_bp", "n_recombinants"],
+  "properties": {
+    "candidate_id":       { "type": "string" },
+    "chrom":              { "type": "string" },
+    "start_bp":           { "type": "integer" },
+    "end_bp":             { "type": "integer" },
+    "n_recombinants":     { "type": "integer" },
+    "n_gene_conversion":  { "type": "integer" },
+    "n_double_crossover": { "type": "integer" },
+    "n_suspicious":       { "type": "integer", "description": "long mosaic near breakpoint; possible assembly error" },
+    "n_ambiguous":        { "type": "integer", "description": "classification could not distinguish GC from DCO" },
+    "mean_posterior":     { "type": "number", "description": "mean cheat24 posterior across recombinants; closer to 1 = higher confidence" },
+    "mean_dco_prior":     { "type": "number" },
+    "max_dco_prior":      { "type": "number" },
+    "cheat24_version":    { "type": "string" },
+    "recombinants": {
+      "type": "array",
+      "description": "one entry per recombinant sample",
+      "items": {
+        "type": "object",
+        "required": ["sample_id", "event_class", "recomb_status", "switchpoint_bp"],
+        "properties": {
+          "sample_id":       { "type": "string" },
+          "global_class":    { "type": "string", "enum": ["HOM_REF", "HET", "HOM_INV"] },
+          "switched_class":  { "type": "string", "description": "class on the other side of the switchpoint" },
+          "switchpoint_bp":  { "type": "integer" },
+          "mosaic_start_bp": { "type": "integer" },
+          "mosaic_end_bp":   { "type": "integer" },
+          "mosaic_length_bp":{ "type": "integer" },
+          "distance_to_nearest_boundary_bp": { "type": "integer" },
+          "dist_fraction":   { "type": "number" },
+          "event_class":     { "type": "string", "enum": ["gene_conversion", "double_crossover", "suspicious", "ambiguous"] },
+          "posterior":       { "type": "number" },
+          "near_breakpoint": { "type": "boolean" },
+          "recomb_status":   { "type": "string", "enum": ["recomb_GC", "recomb_DCO", "recomb_suspicious", "recomb_ambiguous"] },
+          "signal_1_class_switch":    { "type": "boolean" },
+          "signal_2_phase_switch":    { "type": "boolean" },
+          "signal_3_flashlight_hemi": { "type": "boolean" },
+          "n_phase_blocks":    { "type": "integer" },
+          "n_hemi_segments":   { "type": "integer" }
+        }
+      }
+    }
+  },
+  "keys_extracted": [
+    { "key": "q2_n_recombinants",       "from": "n_recombinants" },
+    { "key": "q2_n_gene_conversion",    "from": "n_gene_conversion" },
+    { "key": "q2_n_double_crossover",   "from": "n_double_crossover" },
+    { "key": "q2_n_suspicious_recomb",  "from": "n_suspicious" },
+    { "key": "q2_n_ambiguous_recomb",   "from": "n_ambiguous" },
+    { "key": "q2_recomb_mean_posterior","from": "mean_posterior" },
+    { "key": "q2_mean_dco_prior",       "from": "mean_dco_prior" },
+    { "key": "q2_max_dco_prior",        "from": "max_dco_prior" }
+  ]
+}

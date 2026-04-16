@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "internal_dynamics.schema.json",
+  "block_type": "internal_dynamics",
+  "version": "v2_phase4b_rewrite",
+  "description": "Per-candidate decomposition from STEP_C01i_decompose. Records the preliminary PCA-based class assignment (HOM_REF/HET/HOM_INV), per-window class consistency, silhouette + BIC quality metrics, flashlight seeding status, and per-window class track (stored separately as an RDS file alongside). The FINAL class assignment (including RECOMBINANT) is produced by STEP_C01i_d_seal and written to the sample_registry groups table; this block contains only the PCA preliminary.",
+  "question": "Q2, Q1",
+  "group_validation_required": "NONE (this block produces the initial grouping)",
+  "source_script": "STEP_C01i_decompose.R",
+  "required": ["candidate_id", "chrom", "start_bp", "end_bp", "n_samples",
+               "k_used", "silhouette_score", "per_sample"],
+  "properties": {
+    "candidate_id":       { "type": "string" },
+    "chrom":              { "type": "string" },
+    "start_bp":           { "type": "integer" },
+    "end_bp":             { "type": "integer" },
+    "n_samples":          { "type": "integer" },
+    "n_windows":          { "type": "integer" },
+    "k_used":             { "type": "integer", "enum": [2, 3] },
+    "n_HOM_REF_prelim":   { "type": "integer" },
+    "n_HET_prelim":       { "type": "integer" },
+    "n_HOM_INV_prelim":   { "type": "integer" },
+    "silhouette_score":   { "type": "number", "description": "mean silhouette [-1, 1]" },
+    "bic_gap_k3_vs_k2":   { "type": "number", "description": ">0 means k=3 fits better" },
+    "phase_concordance":  { "type": "number", "description": "fraction of HET samples with phased Clair3 support" },
+    "n_phase_supported":  { "type": "integer" },
+    "flashlight_mode":    { "type": "string", "enum": ["seeded", "unsupervised"] },
+    "n_seed_HOM_REF":     { "type": "integer" },
+    "n_seed_HET":         { "type": "integer" },
+    "n_seed_HOM_INV":     { "type": "integer" },
+    "n_discordant":       { "type": "integer", "description": "samples where SV anchor disagrees with clustering" },
+    "n_cheat2_reclassified": { "type": "integer", "description": "samples moved HOM_INV → HET by het-DEL at breakpoint constraint" },
+    "discordant_samples":       { "type": "array", "items": { "type": "string" } },
+    "cheat2_constrained_samples": { "type": "array", "items": { "type": "string" } },
+    "cluster_centers_pc1": { "type": "array", "items": { "type": "number" } },
+    "per_sample": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["sample_id", "pca_class", "mean_pc1"],
+        "properties": {
+          "sample_id":          { "type": "string" },
+          "pca_class":          { "type": "string", "enum": ["HOM_REF", "HET", "HOM_INV"] },
+          "mean_pc1":           { "type": "number" },
+          "mean_pc2":           { "type": "number" },
+          "window_consistency": { "type": "number", "description": "fraction of windows matching global class" },
+          "flashlight_seeded":  { "type": "boolean" },
+          "discordant":         { "type": "boolean" },
+          "cheat2_constrained": { "type": "boolean" }
+        }
+      }
+    },
+    "per_window_class_file": { "type": "string", "description": "RDS filename for per-window × per-sample class matrix (too big for JSON)" }
+  },
+  "keys_extracted": [
+    { "key": "q2_silhouette_score",    "from": "silhouette_score" },
+    { "key": "q2_bic_gap_k3_vs_k2",    "from": "bic_gap_k3_vs_k2" },
+    { "key": "q2_phase_concordance",   "from": "phase_concordance" },
+    { "key": "q2_flashlight_mode",     "from": "flashlight_mode" },
+    { "key": "q2_n_seed_HOM_REF",      "from": "n_seed_HOM_REF" },
+    { "key": "q2_n_seed_HOM_INV",      "from": "n_seed_HOM_INV" },
+    { "key": "q2_n_discordant",        "from": "n_discordant" },
+    { "key": "q2_n_cheat2_reclass",    "from": "n_cheat2_reclassified" },
+    { "key": "q6_n_HOM_REF_prelim",    "from": "n_HOM_REF_prelim" },
+    { "key": "q6_n_HET_prelim",        "from": "n_HET_prelim" },
+    { "key": "q6_n_HOM_INV_prelim",    "from": "n_HOM_INV_prelim" }
+  ]
+}
