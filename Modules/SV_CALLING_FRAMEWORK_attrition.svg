@@ -1,0 +1,245 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 820" font-family="Helvetica, Arial, sans-serif" font-size="11">
+<defs>
+  <style>
+    .title { font-weight: 700; font-size: 13px; }
+    .subtitle { font-size: 10px; fill: #666; }
+    .bar { fill: #2b5a7b; }
+    .bar-lost { fill: #d9e4ec; }
+    .dot-on { fill: #2b5a7b; }
+    .dot-off { fill: #cfd8dd; }
+    .link { stroke: #2b5a7b; stroke-width: 1.5; }
+    .count { font-size: 9px; fill: #2b5a7b; font-weight: 600; }
+    .lost-count { font-size: 9px; fill: #b34a3a; }
+    .label { font-size: 10px; fill: #333; }
+    .axis { stroke: #999; stroke-width: 0.5; }
+    .grid { stroke: #eee; stroke-width: 0.5; }
+  </style>
+</defs>
+<text x="600.0" y="30" text-anchor="middle" class="title" font-size="16">SV caller attrition across the MODULE_4 → MODULE_5A pipeline</text>
+<text x="600.0" y="48" text-anchor="middle" class="subtitle">Per-type survivor counts through seven filter layers. Numbers illustrative (order of magnitude), to be replaced with production values.</text>
+<text x="20.0" y="72.0" class="title">MODULE_4B — DEL</text>
+<text x="20.0" y="86.0" class="subtitle">Initial discovery: 18,000 calls</text>
+<line x1="20.0" y1="302.5" x2="380.0" y2="302.5" class="grid"/>
+<text x="17.0" y="305.5" text-anchor="end" font-size="8" fill="#999">4,500</text>
+<line x1="20.0" y1="235.0" x2="380.0" y2="235.0" class="grid"/>
+<text x="17.0" y="238.0" text-anchor="end" font-size="8" fill="#999">9,000</text>
+<line x1="20.0" y1="167.5" x2="380.0" y2="167.5" class="grid"/>
+<text x="17.0" y="170.5" text-anchor="end" font-size="8" fill="#999">13,500</text>
+<line x1="20.0" y1="100.0" x2="380.0" y2="100.0" class="grid"/>
+<text x="17.0" y="103.0" text-anchor="end" font-size="8" fill="#999">18,000</text>
+<rect x="23.0" y="100.0" width="45.42857142857143" height="270.0" class="bar"/>
+<text x="45.714285714285715" y="98.0" text-anchor="middle" class="count">18,000</text>
+<rect x="74.42857142857143" y="181.0" width="45.42857142857143" height="189.0" class="bar"/>
+<text x="97.14285714285714" y="179.0" text-anchor="middle" class="count">12,600</text>
+<text x="97.14285714285714" y="380.0" text-anchor="middle" class="lost-count">−5,400</text>
+<rect x="125.85714285714286" y="181.0" width="45.42857142857143" height="189.0" class="bar"/>
+<text x="148.57142857142858" y="179.0" text-anchor="middle" class="count">12,600</text>
+<rect x="177.28571428571428" y="221.5" width="45.42857142857143" height="148.5" class="bar"/>
+<text x="200.0" y="219.5" text-anchor="middle" class="count">9,900</text>
+<text x="200.0" y="380.0" text-anchor="middle" class="lost-count">−2,700</text>
+<rect x="228.71428571428572" y="310.6" width="45.42857142857143" height="59.4" class="bar"/>
+<text x="251.42857142857144" y="308.6" text-anchor="middle" class="count">3,960</text>
+<text x="251.42857142857144" y="380.0" text-anchor="middle" class="lost-count">−5,940</text>
+<rect x="280.14285714285717" y="316.0" width="45.42857142857143" height="54.0" class="bar"/>
+<text x="302.8571428571429" y="314.0" text-anchor="middle" class="count">3,600</text>
+<text x="302.8571428571429" y="380.0" text-anchor="middle" class="lost-count">−360</text>
+<rect x="331.57142857142856" y="343.0" width="45.42857142857143" height="27.0" class="bar"/>
+<text x="354.2857142857143" y="341.0" text-anchor="middle" class="count">1,800</text>
+<text x="354.2857142857143" y="380.0" text-anchor="middle" class="lost-count">−1,800</text>
+<text x="45.714285714285715" y="392.0" text-anchor="end" class="label" transform="rotate(-35 45.714285714285715 392.0)">discovery</text>
+<text x="97.14285714285714" y="392.0" text-anchor="end" class="label" transform="rotate(-35 97.14285714285714 392.0)">merged</text>
+<text x="148.57142857142858" y="392.0" text-anchor="end" class="label" transform="rotate(-35 148.57142857142858 392.0)">regenotyped</text>
+<text x="200.0" y="392.0" text-anchor="end" class="label" transform="rotate(-35 200.0 392.0)">germline</text>
+<text x="251.42857142857144" y="392.0" text-anchor="end" class="label" transform="rotate(-35 251.42857142857144 392.0)">strict</text>
+<text x="302.8571428571429" y="392.0" text-anchor="end" class="label" transform="rotate(-35 302.8571428571429 392.0)">concordance</text>
+<text x="354.2857142857143" y="392.0" text-anchor="end" class="label" transform="rotate(-35 354.2857142857143 392.0)">seed_qual</text>
+<line x1="20.0" y1="370.0" x2="380.0" y2="370.0" class="axis"/>
+<text x="420.0" y="72.0" class="title">MODULE_4C — DUP</text>
+<text x="420.0" y="86.0" class="subtitle">Initial discovery: 4,200 calls</text>
+<line x1="420.0" y1="302.5" x2="780.0" y2="302.5" class="grid"/>
+<text x="417.0" y="305.5" text-anchor="end" font-size="8" fill="#999">1,050</text>
+<line x1="420.0" y1="235.0" x2="780.0" y2="235.0" class="grid"/>
+<text x="417.0" y="238.0" text-anchor="end" font-size="8" fill="#999">2,100</text>
+<line x1="420.0" y1="167.5" x2="780.0" y2="167.5" class="grid"/>
+<text x="417.0" y="170.5" text-anchor="end" font-size="8" fill="#999">3,150</text>
+<line x1="420.0" y1="100.0" x2="780.0" y2="100.0" class="grid"/>
+<text x="417.0" y="103.0" text-anchor="end" font-size="8" fill="#999">4,200</text>
+<rect x="423.0" y="100.0" width="45.42857142857143" height="270.0" class="bar"/>
+<text x="445.7142857142857" y="98.0" text-anchor="middle" class="count">4,200</text>
+<rect x="474.42857142857144" y="181.0" width="45.42857142857143" height="189.0" class="bar"/>
+<text x="497.14285714285717" y="179.0" text-anchor="middle" class="count">2,940</text>
+<text x="497.14285714285717" y="380.0" text-anchor="middle" class="lost-count">−1,260</text>
+<rect x="525.8571428571429" y="181.0" width="45.42857142857143" height="189.0" class="bar"/>
+<text x="548.5714285714286" y="179.0" text-anchor="middle" class="count">2,940</text>
+<rect x="577.2857142857142" y="221.5" width="45.42857142857143" height="148.5" class="bar"/>
+<text x="599.9999999999999" y="219.5" text-anchor="middle" class="count">2,310</text>
+<text x="599.9999999999999" y="380.0" text-anchor="middle" class="lost-count">−630</text>
+<rect x="628.7142857142858" y="294.4" width="45.42857142857143" height="75.60000000000001" class="bar"/>
+<text x="651.4285714285714" y="292.4" text-anchor="middle" class="count">1,176</text>
+<text x="651.4285714285714" y="380.0" text-anchor="middle" class="lost-count">−1,134</text>
+<rect x="680.1428571428571" y="310.6" width="45.42857142857143" height="59.4" class="bar"/>
+<text x="702.8571428571428" y="308.6" text-anchor="middle" class="count">924</text>
+<text x="702.8571428571428" y="380.0" text-anchor="middle" class="lost-count">−252</text>
+<rect x="731.5714285714286" y="337.6" width="45.42857142857143" height="32.4" class="bar"/>
+<text x="754.2857142857142" y="335.6" text-anchor="middle" class="count">504</text>
+<text x="754.2857142857142" y="380.0" text-anchor="middle" class="lost-count">−420</text>
+<text x="445.7142857142857" y="392.0" text-anchor="end" class="label" transform="rotate(-35 445.7142857142857 392.0)">discovery</text>
+<text x="497.14285714285717" y="392.0" text-anchor="end" class="label" transform="rotate(-35 497.14285714285717 392.0)">merged</text>
+<text x="548.5714285714286" y="392.0" text-anchor="end" class="label" transform="rotate(-35 548.5714285714286 392.0)">regenotyped</text>
+<text x="599.9999999999999" y="392.0" text-anchor="end" class="label" transform="rotate(-35 599.9999999999999 392.0)">germline</text>
+<text x="651.4285714285714" y="392.0" text-anchor="end" class="label" transform="rotate(-35 651.4285714285714 392.0)">strict</text>
+<text x="702.8571428571428" y="392.0" text-anchor="end" class="label" transform="rotate(-35 702.8571428571428 392.0)">concordance</text>
+<text x="754.2857142857142" y="392.0" text-anchor="end" class="label" transform="rotate(-35 754.2857142857142 392.0)">seed_qual</text>
+<line x1="420.0" y1="370.0" x2="780.0" y2="370.0" class="axis"/>
+<text x="820.0" y="72.0" class="title">MODULE_4D — INV</text>
+<text x="820.0" y="86.0" class="subtitle">Initial discovery: 850 calls</text>
+<line x1="820.0" y1="302.5" x2="1180.0" y2="302.5" class="grid"/>
+<text x="817.0" y="305.5" text-anchor="end" font-size="8" fill="#999">212</text>
+<line x1="820.0" y1="235.0" x2="1180.0" y2="235.0" class="grid"/>
+<text x="817.0" y="238.0" text-anchor="end" font-size="8" fill="#999">425</text>
+<line x1="820.0" y1="167.5" x2="1180.0" y2="167.5" class="grid"/>
+<text x="817.0" y="170.5" text-anchor="end" font-size="8" fill="#999">637</text>
+<line x1="820.0" y1="100.0" x2="1180.0" y2="100.0" class="grid"/>
+<text x="817.0" y="103.0" text-anchor="end" font-size="8" fill="#999">850</text>
+<rect x="823.0" y="100.0" width="45.42857142857143" height="270.0" class="bar"/>
+<text x="845.7142857142857" y="98.0" text-anchor="middle" class="count">850</text>
+<rect x="874.4285714285714" y="186.39999999999998" width="45.42857142857143" height="183.60000000000002" class="bar"/>
+<text x="897.1428571428571" y="184.39999999999998" text-anchor="middle" class="count">578</text>
+<text x="897.1428571428571" y="380.0" text-anchor="middle" class="lost-count">−272</text>
+<rect x="925.8571428571429" y="186.39999999999998" width="45.42857142857143" height="183.60000000000002" class="bar"/>
+<text x="948.5714285714286" y="184.39999999999998" text-anchor="middle" class="count">578</text>
+<rect x="977.2857142857142" y="235.0" width="45.42857142857143" height="135.0" class="bar"/>
+<text x="999.9999999999999" y="233.0" text-anchor="middle" class="count">425</text>
+<text x="999.9999999999999" y="380.0" text-anchor="middle" class="lost-count">−153</text>
+<rect x="1028.7142857142858" y="329.65882352941173" width="45.42857142857143" height="40.34117647058824" class="bar"/>
+<text x="1051.4285714285716" y="327.65882352941173" text-anchor="middle" class="count">127</text>
+<text x="1051.4285714285716" y="380.0" text-anchor="middle" class="lost-count">−298</text>
+<rect x="1080.142857142857" y="343.0" width="45.42857142857143" height="27.0" class="bar"/>
+<text x="1102.857142857143" y="341.0" text-anchor="middle" class="count">85</text>
+<text x="1102.857142857143" y="380.0" text-anchor="middle" class="lost-count">−42</text>
+<rect x="1131.5714285714284" y="351.25882352941176" width="45.42857142857143" height="18.741176470588236" class="bar"/>
+<text x="1154.2857142857142" y="349.25882352941176" text-anchor="middle" class="count">59</text>
+<text x="1154.2857142857142" y="380.0" text-anchor="middle" class="lost-count">−26</text>
+<text x="845.7142857142857" y="392.0" text-anchor="end" class="label" transform="rotate(-35 845.7142857142857 392.0)">discovery</text>
+<text x="897.1428571428571" y="392.0" text-anchor="end" class="label" transform="rotate(-35 897.1428571428571 392.0)">merged</text>
+<text x="948.5714285714286" y="392.0" text-anchor="end" class="label" transform="rotate(-35 948.5714285714286 392.0)">regenotyped</text>
+<text x="999.9999999999999" y="392.0" text-anchor="end" class="label" transform="rotate(-35 999.9999999999999 392.0)">germline</text>
+<text x="1051.4285714285716" y="392.0" text-anchor="end" class="label" transform="rotate(-35 1051.4285714285716 392.0)">strict</text>
+<text x="1102.857142857143" y="392.0" text-anchor="end" class="label" transform="rotate(-35 1102.857142857143 392.0)">concordance</text>
+<text x="1154.2857142857142" y="392.0" text-anchor="end" class="label" transform="rotate(-35 1154.2857142857142 392.0)">seed_qual</text>
+<line x1="820.0" y1="370.0" x2="1180.0" y2="370.0" class="axis"/>
+<text x="20.0" y="482.0" class="title">MODULE_4E — BND</text>
+<text x="20.0" y="496.0" class="subtitle">Initial discovery: 2,400 calls</text>
+<line x1="20.0" y1="712.5" x2="380.0" y2="712.5" class="grid"/>
+<text x="17.0" y="715.5" text-anchor="end" font-size="8" fill="#999">600</text>
+<line x1="20.0" y1="645.0" x2="380.0" y2="645.0" class="grid"/>
+<text x="17.0" y="648.0" text-anchor="end" font-size="8" fill="#999">1,200</text>
+<line x1="20.0" y1="577.5" x2="380.0" y2="577.5" class="grid"/>
+<text x="17.0" y="580.5" text-anchor="end" font-size="8" fill="#999">1,800</text>
+<line x1="20.0" y1="510.0" x2="380.0" y2="510.0" class="grid"/>
+<text x="17.0" y="513.0" text-anchor="end" font-size="8" fill="#999">2,400</text>
+<rect x="23.0" y="510.0" width="45.42857142857143" height="270.0" class="bar"/>
+<text x="45.714285714285715" y="508.0" text-anchor="middle" class="count">2,400</text>
+<rect x="74.42857142857143" y="585.6" width="45.42857142857143" height="194.4" class="bar"/>
+<text x="97.14285714285714" y="583.6" text-anchor="middle" class="count">1,728</text>
+<text x="97.14285714285714" y="790.0" text-anchor="middle" class="lost-count">−672</text>
+<rect x="125.85714285714286" y="585.6" width="45.42857142857143" height="194.4" class="bar"/>
+<text x="148.57142857142858" y="583.6" text-anchor="middle" class="count">1,728</text>
+<rect x="177.28571428571428" y="623.4" width="45.42857142857143" height="156.6" class="bar"/>
+<text x="200.0" y="621.4" text-anchor="middle" class="count">1,392</text>
+<text x="200.0" y="790.0" text-anchor="middle" class="lost-count">−336</text>
+<rect x="228.71428571428572" y="731.4" width="45.42857142857143" height="48.6" class="bar"/>
+<text x="251.42857142857144" y="729.4" text-anchor="middle" class="count">432</text>
+<text x="251.42857142857144" y="790.0" text-anchor="middle" class="lost-count">−960</text>
+<rect x="280.14285714285717" y="747.6" width="45.42857142857143" height="32.4" class="bar"/>
+<text x="302.8571428571429" y="745.6" text-anchor="middle" class="count">288</text>
+<text x="302.8571428571429" y="790.0" text-anchor="middle" class="lost-count">−144</text>
+<rect x="331.57142857142856" y="755.7" width="45.42857142857143" height="24.3" class="bar"/>
+<text x="354.2857142857143" y="753.7" text-anchor="middle" class="count">216</text>
+<text x="354.2857142857143" y="790.0" text-anchor="middle" class="lost-count">−72</text>
+<text x="45.714285714285715" y="802.0" text-anchor="end" class="label" transform="rotate(-35 45.714285714285715 802.0)">discovery</text>
+<text x="97.14285714285714" y="802.0" text-anchor="end" class="label" transform="rotate(-35 97.14285714285714 802.0)">merged</text>
+<text x="148.57142857142858" y="802.0" text-anchor="end" class="label" transform="rotate(-35 148.57142857142858 802.0)">regenotyped</text>
+<text x="200.0" y="802.0" text-anchor="end" class="label" transform="rotate(-35 200.0 802.0)">germline</text>
+<text x="251.42857142857144" y="802.0" text-anchor="end" class="label" transform="rotate(-35 251.42857142857144 802.0)">strict</text>
+<text x="302.8571428571429" y="802.0" text-anchor="end" class="label" transform="rotate(-35 302.8571428571429 802.0)">concordance</text>
+<text x="354.2857142857143" y="802.0" text-anchor="end" class="label" transform="rotate(-35 354.2857142857143 802.0)">seed_qual</text>
+<line x1="20.0" y1="780.0" x2="380.0" y2="780.0" class="axis"/>
+<text x="420.0" y="482.0" class="title">MODULE_4F — TRA</text>
+<text x="420.0" y="496.0" class="subtitle">Initial discovery: 380 calls</text>
+<line x1="420.0" y1="712.5" x2="780.0" y2="712.5" class="grid"/>
+<text x="417.0" y="715.5" text-anchor="end" font-size="8" fill="#999">95</text>
+<line x1="420.0" y1="645.0" x2="780.0" y2="645.0" class="grid"/>
+<text x="417.0" y="648.0" text-anchor="end" font-size="8" fill="#999">190</text>
+<line x1="420.0" y1="577.5" x2="780.0" y2="577.5" class="grid"/>
+<text x="417.0" y="580.5" text-anchor="end" font-size="8" fill="#999">285</text>
+<line x1="420.0" y1="510.0" x2="780.0" y2="510.0" class="grid"/>
+<text x="417.0" y="513.0" text-anchor="end" font-size="8" fill="#999">380</text>
+<rect x="423.0" y="510.0" width="45.42857142857143" height="270.0" class="bar"/>
+<text x="445.7142857142857" y="508.0" text-anchor="middle" class="count">380</text>
+<rect x="474.42857142857144" y="604.5" width="45.42857142857143" height="175.5" class="bar"/>
+<text x="497.14285714285717" y="602.5" text-anchor="middle" class="count">247</text>
+<text x="497.14285714285717" y="790.0" text-anchor="middle" class="lost-count">−133</text>
+<rect x="525.8571428571429" y="604.5" width="45.42857142857143" height="175.5" class="bar"/>
+<text x="548.5714285714286" y="602.5" text-anchor="middle" class="count">247</text>
+<rect x="577.2857142857142" y="650.6842105263158" width="45.42857142857143" height="129.31578947368422" class="bar"/>
+<text x="599.9999999999999" y="648.6842105263158" text-anchor="middle" class="count">182</text>
+<text x="599.9999999999999" y="790.0" text-anchor="middle" class="lost-count">−65</text>
+<rect x="628.7142857142858" y="748.0263157894736" width="45.42857142857143" height="31.973684210526315" class="bar"/>
+<text x="651.4285714285714" y="746.0263157894736" text-anchor="middle" class="count">45</text>
+<text x="651.4285714285714" y="790.0" text-anchor="middle" class="lost-count">−137</text>
+<rect x="680.1428571428571" y="755.8421052631579" width="45.42857142857143" height="24.157894736842106" class="bar"/>
+<text x="702.8571428571428" y="753.8421052631579" text-anchor="middle" class="count">34</text>
+<text x="702.8571428571428" y="790.0" text-anchor="middle" class="lost-count">−11</text>
+<rect x="731.5714285714286" y="764.3684210526316" width="45.42857142857143" height="15.631578947368421" class="bar"/>
+<text x="754.2857142857142" y="762.3684210526316" text-anchor="middle" class="count">22</text>
+<text x="754.2857142857142" y="790.0" text-anchor="middle" class="lost-count">−12</text>
+<text x="445.7142857142857" y="802.0" text-anchor="end" class="label" transform="rotate(-35 445.7142857142857 802.0)">discovery</text>
+<text x="497.14285714285717" y="802.0" text-anchor="end" class="label" transform="rotate(-35 497.14285714285717 802.0)">merged</text>
+<text x="548.5714285714286" y="802.0" text-anchor="end" class="label" transform="rotate(-35 548.5714285714286 802.0)">regenotyped</text>
+<text x="599.9999999999999" y="802.0" text-anchor="end" class="label" transform="rotate(-35 599.9999999999999 802.0)">germline</text>
+<text x="651.4285714285714" y="802.0" text-anchor="end" class="label" transform="rotate(-35 651.4285714285714 802.0)">strict</text>
+<text x="702.8571428571428" y="802.0" text-anchor="end" class="label" transform="rotate(-35 702.8571428571428 802.0)">concordance</text>
+<text x="754.2857142857142" y="802.0" text-anchor="end" class="label" transform="rotate(-35 754.2857142857142 802.0)">seed_qual</text>
+<line x1="420.0" y1="780.0" x2="780.0" y2="780.0" class="axis"/>
+<text x="820.0" y="482.0" class="title">MODULE_4G — Manta</text>
+<text x="820.0" y="496.0" class="subtitle">Initial discovery: 22,000 calls</text>
+<line x1="820.0" y1="712.5" x2="1180.0" y2="712.5" class="grid"/>
+<text x="817.0" y="715.5" text-anchor="end" font-size="8" fill="#999">5,500</text>
+<line x1="820.0" y1="645.0" x2="1180.0" y2="645.0" class="grid"/>
+<text x="817.0" y="648.0" text-anchor="end" font-size="8" fill="#999">11,000</text>
+<line x1="820.0" y1="577.5" x2="1180.0" y2="577.5" class="grid"/>
+<text x="817.0" y="580.5" text-anchor="end" font-size="8" fill="#999">16,500</text>
+<line x1="820.0" y1="510.0" x2="1180.0" y2="510.0" class="grid"/>
+<text x="817.0" y="513.0" text-anchor="end" font-size="8" fill="#999">22,000</text>
+<rect x="823.0" y="510.0" width="45.42857142857143" height="270.0" class="bar"/>
+<text x="845.7142857142857" y="508.0" text-anchor="middle" class="count">22,000</text>
+<rect x="874.4285714285714" y="577.5" width="45.42857142857143" height="202.5" class="bar"/>
+<text x="897.1428571428571" y="575.5" text-anchor="middle" class="count">16,500</text>
+<text x="897.1428571428571" y="790.0" text-anchor="middle" class="lost-count">−5,500</text>
+<rect x="925.8571428571429" y="577.5" width="45.42857142857143" height="202.5" class="bar"/>
+<text x="948.5714285714286" y="575.5" text-anchor="middle" class="count">16,500</text>
+<rect x="977.2857142857142" y="577.5" width="45.42857142857143" height="202.5" class="bar"/>
+<text x="999.9999999999999" y="575.5" text-anchor="middle" class="count">16,500</text>
+<rect x="1028.7142857142858" y="631.5" width="45.42857142857143" height="148.5" class="bar"/>
+<text x="1051.4285714285716" y="629.5" text-anchor="middle" class="count">12,100</text>
+<text x="1051.4285714285716" y="790.0" text-anchor="middle" class="lost-count">−4,400</text>
+<rect x="1080.142857142857" y="658.5" width="45.42857142857143" height="121.5" class="bar"/>
+<text x="1102.857142857143" y="656.5" text-anchor="middle" class="count">9,900</text>
+<text x="1102.857142857143" y="790.0" text-anchor="middle" class="lost-count">−2,200</text>
+<rect x="1131.5714285714284" y="699.0" width="45.42857142857143" height="81.0" class="bar"/>
+<text x="1154.2857142857142" y="697.0" text-anchor="middle" class="count">6,600</text>
+<text x="1154.2857142857142" y="790.0" text-anchor="middle" class="lost-count">−3,300</text>
+<text x="845.7142857142857" y="802.0" text-anchor="end" class="label" transform="rotate(-35 845.7142857142857 802.0)">discovery</text>
+<text x="897.1428571428571" y="802.0" text-anchor="end" class="label" transform="rotate(-35 897.1428571428571 802.0)">merged</text>
+<text x="948.5714285714286" y="802.0" text-anchor="end" class="label" transform="rotate(-35 948.5714285714286 802.0)">regenotyped</text>
+<text x="999.9999999999999" y="802.0" text-anchor="end" class="label" transform="rotate(-35 999.9999999999999 802.0)">germline</text>
+<text x="1051.4285714285716" y="802.0" text-anchor="end" class="label" transform="rotate(-35 1051.4285714285716 802.0)">strict</text>
+<text x="1102.857142857143" y="802.0" text-anchor="end" class="label" transform="rotate(-35 1102.857142857143 802.0)">concordance</text>
+<text x="1154.2857142857142" y="802.0" text-anchor="end" class="label" transform="rotate(-35 1154.2857142857142 802.0)">seed_qual</text>
+<line x1="820.0" y1="780.0" x2="1180.0" y2="780.0" class="axis"/>
+<rect x="420.0" y="785" width="12" height="12" class="bar"/>
+<text x="438.0" y="795" class="label">surviving SVs</text>
+<text x="530.0" y="795" class="lost-count">−N  = lost at this stage</text>
+<text x="700.0" y="795" class="subtitle">Bars read left→right = pipeline order</text>
+</svg>
