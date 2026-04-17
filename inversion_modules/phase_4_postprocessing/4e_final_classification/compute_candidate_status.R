@@ -38,10 +38,24 @@ suppressPackageStartupMessages(library(data.table))
 # =============================================================================
 
 build_key_spec <- function() {
-  # Each key: name, question, can_be_NA (not_applicable in some contexts)
+  # FIX 42 (chat 9): full rewrite to match authoritative v2 spec (352 keys).
+  #
+  # Each question returns TWO lists:
+  #   <q>       = all keys per the v2 registry specification
+  #   <q>_apir  = subset that is "aspirational" — listed in the v2 spec but
+  #               no current codebase writer produces it yet (writer lives
+  #               upstream in phase 2/3 and hasn't been wired into the
+  #               registry API). Completion % is computed against
+  #               (spec - aspirational) so the number reflects "percentage
+  #               of keys you SHOULD have, not SHOULD-HAVE-EVENTUALLY".
+  #
+  # The aspirational list is maintained here so chat 10+ can tick items off
+  # as phase 2/3 writers get wired up. See SPEC_VS_REALITY.md for the
+  # canonical writer/reader audit trail.
   keys <- list()
 
   # ── Q1: WHAT IS IT? (49 keys) ──
+  # Produced primarily by: C01a precomp, C01b cores, C01d scoring, C01e figures
   q1 <- c(
     "q1_n_windows", "q1_span_kb", "q1_block_compactness", "q1_block_coherence",
     "q1_squareness", "q1_shape_class", "q1_n_children", "q1_landscape_category",
@@ -58,10 +72,19 @@ build_key_spec <- function() {
     "q1_d10_partition", "q1_d11_boundary_concordance", "q1_d12_snake_concordance",
     "q1_composite_score", "q1_dim_positive",
     "q1_band_std_qgroup_fracs", "q1_band_het_qgroup_fracs", "q1_band_inv_qgroup_fracs",
-    "q1_dominant_qgroup_std", "q1_dominant_qgroup_inv", "q1_q_group_overlap"
+    "q1_dominant_qgroup_std", "q1_dominant_qgroup_inv", "q1_q_group_overlap",
+    # v2 additions — written by 4b nested_composition via schema extraction:
+    "q1_ancestry_composite_flag",    # alias of q1_composite_flag (v10.1 rename)
+    "q1_composite_flag",              # FIX 40: canonical name post-rename
+    "q1_ancestry_dominant_pattern"
+  )
+  q1_aspir <- c(
+    # None currently — all Q1 keys have writers in the upstream phase 2 + phase 4a
+    # pipeline OR in phase 4b (nested_composition).
   )
 
   # ── Q2: WHAT'S HAPPENING INSIDE? (40 keys) ──
+  # Produced primarily by: 4b.1 decompose, 4b.2 multi_recomb, 4b.3 nested_comp, 4b.4 seal
   q2 <- c(
     "q2_n_recombinant", "q2_n_gene_conversion", "q2_n_double_crossover",
     "q2_recomb_sample_ids",
@@ -79,10 +102,71 @@ build_key_spec <- function() {
     "q2_n_indel_classes", "q2_indel_class_concordance", "q2_indel_ashman_D",
     "q2_chao1_hom_std", "q2_chao1_hom_inv",
     "q2_accum_saturated_std", "q2_accum_saturated_inv",
-    "q2_n_founder_haplotypes_std", "q2_n_founder_haplotypes_inv"
+    "q2_n_founder_haplotypes_std", "q2_n_founder_haplotypes_inv",
+    # v2 additions — written by 4b schema extractions (chat-15 BK
+    # reconciled the key names against the actual block_data written by
+    # STEP_C01i_decompose.R, STEP_C01i_b_multi_recomb.R, and
+    # STEP_C01i_c_nested_composition.py. The chat-13 listing contained
+    # names that matched pre-chat-12 draft schemas; five of those
+    # (q2_n_suspicious_recomb, q2_n_ambiguous_recomb, q2_mean_dco_prior,
+    # q2_max_dco_prior, q2_recomb_mean_posterior) do not exist in the
+    # current canonical schemas and have been removed. Chat-15 also
+    # renamed 31 BK keys from procedural labels (q2_decomp_status,
+    # q2_sv_prior_mode, q2_n_recombinants, etc.) to scientific names
+    # that identify what the key measures; see BK_KEYS_EXPLAINED.md
+    # for the full rename table + biological reasoning.)
+    # internal_dynamics (v2_chat12_decompose):
+    "q2_pca_decomp_status", "q2_pca_decomp_skip_reason", "q2_pca_seed_source",
+    "q2_n_seed_class_conflicts", "q2_pca_cluster_silhouette", "q2_pca_cluster_separation_flag",
+    "q2_bic_gap_k3_vs_k2", "q2_het_phase_support_fraction", "q2_n_het_phase_supported",
+    "q2_pca_seed_mode",
+    "q2_n_seed_HOM_REF", "q2_n_seed_HET", "q2_n_seed_HOM_INV",
+    "q2_n_samples_sv_pca_discordant", "q2_n_hetDEL_breakpoint_reclass", "q2_pca_k_used",
+    # Written directly by STEP_C01i_d_seal.R, NOT by the internal_dynamics
+    # schema extraction. Distinct from q2_pca_cluster_separation_flag
+    # (which is a single "clean"/"noisy" label derived from silhouette);
+    # this one is a comma-separated list of validation quality_flags
+    # aggregated across the synthesis step:
+    "q2_decomp_quality_flags",
+    # recombinant_map (v2_chat12_rewrite):
+    "q2_n_recombinant_samples", "q2_n_recombinant_gc_samples", "q2_n_recombinant_dco_samples",
+    "q2_n_regime_ghsl_disputed_samples", "q2_n_ghsl_split_only_samples",
+    "q2_recomb_posterior_source", "q2_recomb_gate_rule_version",
+    "q2_recomb_min_regime_dev_fraction", "q2_recomb_min_regime_dev_bp",
+    "q2_recomb_dco_threshold_bp",
+    # internal_ancestry_composition (v2_phase4b_rewrite):
+    "q2_pct_samples_homogeneous_ancestry", "q2_pct_samples_two_block_ancestry",
+    "q2_pct_samples_multi_block_ancestry", "q2_pct_samples_gradient_ancestry",
+    "q2_pct_samples_diffuse_ancestry",
+    "q2_mean_ancestry_fragmentation", "q2_mean_ancestry_entropy_within_sample", "q2_mean_ancestry_switches_per_sample",
+    "q2_ancestry_K_used", "q2_ancestry_n_samples_analyzed",
+    # chat-13 wiring (Finding BJ): register the 18 keys newly extracted
+    # from the four block schemas wired in chat-13 (regime_segments,
+    # local_structure_segments, distance_concordance, regime_sample_dag).
+    # Without this listing, completion accounting would under-report.
+    # Many of these use dotted-path extraction (Finding BG) so will only
+    # arrive in keys.tsv after the BG patch in registry_loader.R is in
+    # place — which chat-13 also applied.
+    "q2_regime_n_segments", "q2_regime_dominant_state",
+    "q2_regime_has_recomb", "q2_regime_n_samples_changed",
+    "q2_local_struct_core_delta12", "q2_local_struct_lflank_delta12",
+    "q2_local_struct_rflank_delta12",
+    "q2_boundary_sharpness_left", "q2_boundary_sharpness_right",
+    "q2_boundary_sharpness_overall",
+    "q2_distance_conc_inv_vs_fam_score",
+    "q2_distance_conc_n_persistent", "q2_distance_conc_n_decaying",
+    "q2_dag_fraction_samples_R_fired",
+    "q2_dag_fraction_samples_deviating",
+    "q2_dag_dominant_regime_cohort",
+    "q2_dag_dominant_regime_support",
+    "q2_dag_n_samples_R_fired"
+  )
+  q2_aspir <- c(
+    # Writers exist in 4b pipeline; contract-verified.
   )
 
-  # ── Q3: WHAT ARE THE BOUNDARIES DOING? (73 keys) ──
+  # ── Q3: WHAT ARE THE BOUNDARIES DOING? (81 keys = 73 v1 + 8 v2 carrier reconciliation) ──
+  # Produced primarily by: C01g boundary_catalog, phase 3 STEP02 carrier audit
   q3_left <- c(
     "q3_left_bp", "q3_left_sv_bp", "q3_left_delta12_bp", "q3_left_fst_bp",
     "q3_left_hardness", "q3_left_sharpness", "q3_left_type",
@@ -96,11 +180,11 @@ build_key_spec <- function() {
     "q3_extended_suppression", "q3_suppression_extent_kb", "q3_fst_decay_rate"
   )
   q3_fst_profile <- c(
-    paste0("q3_left_fst_", c("m200kb","m100kb","m50kb","0kb","p50kb","p100kb","p200kb","step")),
+    paste0("q3_left_fst_",  c("m200kb","m100kb","m50kb","0kb","p50kb","p100kb","p200kb","step")),
     paste0("q3_right_fst_", c("m200kb","m100kb","m50kb","0kb","p50kb","p100kb","p200kb","step"))
   )
   q3_hobs <- c(
-    paste0("q3_left_hobs_", c("m100kb","0kb","p100kb","step")),
+    paste0("q3_left_hobs_",  c("m100kb","0kb","p100kb","step")),
     paste0("q3_right_hobs_", c("m100kb","0kb","p100kb","step"))
   )
   q3_repeat <- c(
@@ -109,15 +193,27 @@ build_key_spec <- function() {
     "q3_genome_wide_repeat_density",
     "q3_repeat_enrichment_left", "q3_repeat_enrichment_right"
   )
-  # NEW v2: Carrier reconciliation (PCA vs SV)
+  # v2 Q3 additions: Carrier reconciliation (PCA vs SV)
   q3_carrier <- c(
     "q3_n_carriers_pca", "q3_n_carriers_sv", "q3_carrier_concordance",
     "q3_n_pca_carrier_sv_ref", "q3_n_sv_carrier_pca_ref",
     "q3_dropout_rate", "q3_population_prior_applied", "q3_n_rescued_by_prior"
   )
   q3 <- c(q3_left, q3_right, q3_concordance, q3_fst_profile, q3_hobs, q3_repeat, q3_carrier)
+  q3_aspir <- c(
+    # Most Q3 keys are produced by C01g + phase 3 STEP02/06 which exist but
+    # haven't been verified end-to-end through the registry API; mark the
+    # repeat annotation and extended-suppression keys as aspirational
+    # pending confirmation (repeat annotation requires RepeatMasker output
+    # that may not be run on all chromosomes).
+    "q3_left_repeat_density", "q3_left_repeat_class", "q3_left_gc_content",
+    "q3_right_repeat_density", "q3_right_repeat_class", "q3_right_gc_content",
+    "q3_genome_wide_repeat_density",
+    "q3_repeat_enrichment_left", "q3_repeat_enrichment_right"
+  )
 
   # ── Q4: HOW DID IT FORM? (47 keys) ──
+  # Produced primarily by: 4d cheat27/28/29, Q4 mechanism classifier
   q4 <- c(
     "q4_has_inverted_sd", "q4_sd_left_start", "q4_sd_left_end",
     "q4_sd_right_start", "q4_sd_right_end", "q4_sd_length",
@@ -134,10 +230,33 @@ build_key_spec <- function() {
     "q4_te_same_family", "q4_te_same_orientation",
     "q4_sd_alignment_length", "q4_sd_n_mismatches", "q4_sd_divergence_pct",
     "q4_n_genes_inside", "q4_n_genes_spanning_bp", "q4_gene_names_at_bp",
-    "q4_gene_density_inside", "q4_gene_density_genome", "q4_go_enrichment"
+    "q4_gene_density_inside", "q4_gene_density_genome", "q4_go_enrichment",
+    # v2 additions: tandem repeat / breakpoint audit context
+    "q4_n_tr_at_bp_left", "q4_n_tr_at_bp_right",
+    "q4_tr_density_ratio_left", "q4_tr_density_ratio_right",
+    "q4_dominant_tr_class_left", "q4_dominant_tr_class_right",
+    "q4_dominant_motif_left", "q4_dominant_motif_right",
+    "q4_mmbir_signal_left", "q4_mmbir_signal_right"
+  )
+  q4_aspir <- c(
+    # TE and GO enrichment require RepeatMasker + GO annotation — may not
+    # be run on the hybrid genome. Mark as aspirational.
+    "q4_te_family_left", "q4_te_family_right",
+    "q4_te_enrichment", "q4_te_enrichment_fold",
+    "q4_te_name_left", "q4_te_name_right",
+    "q4_te_same_family", "q4_te_same_orientation",
+    "q4_go_enrichment",
+    # Tandem-repeat keys require TRF + GMATA from cheat28 — pipeline exists
+    # (cheat28_tandem_repeat_context.R in 4d) but registry wiring pending.
+    "q4_n_tr_at_bp_left", "q4_n_tr_at_bp_right",
+    "q4_tr_density_ratio_left", "q4_tr_density_ratio_right",
+    "q4_dominant_tr_class_left", "q4_dominant_tr_class_right",
+    "q4_dominant_motif_left", "q4_dominant_motif_right",
+    "q4_mmbir_signal_left", "q4_mmbir_signal_right"
   )
 
   # ── Q5: HOW OLD IS IT? (39 keys) ──
+  # Produced primarily by: 4d cheat30 GDS, Q5 age_fst_subblock, phase 5 popstats
   q5 <- c(
     "q5_gds_gap", "q5_gds_gap_percentile", "q5_fst_b1b3",
     "q5_gds_fst_spearman_rho", "q5_gds_fst_spearman_p",
@@ -151,22 +270,75 @@ build_key_spec <- function() {
     "q5_segregating_sites_std", "q5_segregating_sites_inv",
     "q5_fixed_differences", "q5_shared_polymorphisms",
     "q5_origin_gds_dip_p", "q5_origin_class", "q5_origin_mechanism",
-    "q5_gds_within_std", "q5_gds_within_inv", "q5_gds_between", "q5_gds_het_pattern"
+    "q5_gds_within_std", "q5_gds_within_inv", "q5_gds_between", "q5_gds_het_pattern",
+    # v2 additions: age/origin diagnostic context
+    "q5_bimodality_dip_p", "q5_n_i_i_pairs", "q5_n_d_d_pairs", "q5_n_d_i_pairs"
+  )
+  q5_aspir <- c(
+    # Dollo reconstruction requires multi-species synteny — not available
+    # until macrosynteny table is wired through the registry.
+    "q5_dollo_node", "q5_dollo_mya", "q5_n_species_sharing",
+    # Tajima D and seg-sites require theta ladder output formatted for
+    # per-arrangement — pipeline exists (MODULE_3) but flat-key wiring
+    # pending.
+    "q5_tajima_D_std", "q5_tajima_D_inv", "q5_tajima_D_pooled",
+    "q5_tajima_D_pooled_note",
+    "q5_segregating_sites_std", "q5_segregating_sites_inv",
+    "q5_fixed_differences", "q5_shared_polymorphisms"
   )
 
   # ── Q6: HOW COMMON IS IT? (28 keys) ──
+  # FIX 42 naming fixes:
+  #   - Schema writes q6_hwe_p (not q6_hwe_chisq_p)
+  #   - Post v10.1 canonical class name is HOM_REF; HOM_STD kept as v9 alias
+  #   - Schema also extracts q6_freq_class, q6_genotype_balance,
+  #     q6_polymorphism_class which the v1 spec never listed.
+  # Produced by: 4b seal + 4c C01f jackknife (via frequency.v2.schema.json keys_extracted)
   q6 <- c(
-    "q6_freq_inv", "q6_n_HOM_STD", "q6_n_HET", "q6_n_HOM_INV",
+    "q6_freq_inv", "q6_freq_class",
+    # Both HOM_REF (canonical post-v10) and HOM_STD (v9 alias) tracked:
+    "q6_n_HOM_REF", "q6_n_HOM_STD",
+    "q6_n_HET", "q6_n_HOM_INV",
     "q6_n_Recombinant", "q6_n_Unclassified", "q6_n_total",
     "q6_expected_het_hwe", "q6_observed_expected_ratio",
-    "q6_hwe_deviation", "q6_hwe_chisq_p",
+    "q6_hwe_deviation", "q6_hwe_p", "q6_hwe_chi2", "q6_hwe_verdict",
+    "q6_genotype_balance",
     "q6_freq_per_qgroup", "q6_freq_cv_across_qgroups",
-    "q6_family_linkage", "q6_jackknife_max_delta", "q6_jackknife_sensitive_qgroup",
+    "q6_family_linkage", "q6_polymorphism_class",
+    "q6_jackknife_max_delta", "q6_jackknife_sensitive_qgroup",
+    "q6_tajima_D_inside", "q6_tajima_D_flanking", "q6_tajima_D_note",
+    "q6_selection_pattern",
+    "q6_group_validation", "q6_validation_promotion_cap",
+    # chat-15 BK: preliminary PCA-based class counts from
+    # STEP_C01i_decompose.R's internal_dynamics block. Distinct from the
+    # FINAL counts above (those come from C01i_d_seal after synthesis and
+    # should include RECOMBINANT). Tracked separately so the decompose →
+    # seal pipeline stage is auditable per-candidate.
+    "q6_n_HOM_REF_prelim", "q6_n_HET_prelim", "q6_n_HOM_INV_prelim"
+  )
+  q6_aspir <- c(
+    # v9-era flat class counts — schema writes a nested class_counts object
+    # but doesn't extract them as flat keys. Needs frequency.v2.schema
+    # extension OR seal to write them explicitly. Pending.
+    "q6_n_HOM_REF", "q6_n_HOM_STD", "q6_n_HET", "q6_n_HOM_INV",
+    "q6_n_Recombinant", "q6_n_Unclassified",
+    # Expected-het / observed-expected ratio: pipeline exists for HWE
+    # computation (from counts) but registry wiring pending.
+    "q6_expected_het_hwe", "q6_observed_expected_ratio", "q6_hwe_deviation",
+    # q6_freq_cv_across_qgroups requires cross-Q-group frequency scan — not
+    # currently produced.
+    "q6_freq_per_qgroup", "q6_freq_cv_across_qgroups",
+    "q6_jackknife_sensitive_qgroup",
+    # Tajima D keys belong semantically to Q5 but listed here for v1 compat;
+    # writer is MODULE_3 which isn't wired to produce per-candidate keys.
     "q6_tajima_D_inside", "q6_tajima_D_flanking", "q6_tajima_D_note",
     "q6_selection_pattern"
   )
 
-  # ── Q7: IS IT REAL? (68 keys — updated for 4-layer framework) ──
+  # ── Q7: IS IT REAL? (68 keys — 4-layer framework + Q7B SV audit) ──
+  # Produced by: C01d (Layer A), C00 sv_prior (Layer B), C04 GHSL (Layer C),
+  #              phase 3 STEP03 (Layer D), C01f (T8/T9/T10 hypothesis),
+  #              C01d pass-2 (composite + tier), breakpoint_evidence_audit.py (Q7B)
   q7_layer_a <- c(
     "q7_layer_a_detected", "q7_layer_a_inv_likeness", "q7_layer_a_beta_pval",
     "q7_layer_a_beta_qval", "q7_layer_a_core_family", "q7_layer_a_pa_pattern"
@@ -177,14 +349,12 @@ build_key_spec <- function() {
     "q7_layer_b_pe_support", "q7_layer_b_sr_support",
     "q7_layer_b_cipos", "q7_layer_b_ciend"
   )
-  # NEW: Layer C = GHSL haplotype contrast (independent from PCA)
   q7_layer_c <- c(
     "q7_layer_c_ghsl_detected", "q7_layer_c_ghsl_contrast",
     "q7_layer_c_ghsl_n_pass", "q7_layer_c_ghsl_pct_pass",
     "q7_layer_c_ghsl_quality", "q7_layer_c_partition_stable",
     "q7_layer_c_ghsl_version"
   )
-  # RENAMED: Layer D = genotype-breakpoint association (was Layer C in v1)
   q7_layer_d <- c(
     "q7_layer_d_tested", "q7_layer_d_fisher_or", "q7_layer_d_fisher_p",
     "q7_layer_d_armitage_z", "q7_layer_d_armitage_p", "q7_layer_d_concordance"
@@ -192,19 +362,31 @@ build_key_spec <- function() {
   q7_independence <- c(
     "q7_n_layers_tested", "q7_n_layers_passed", "q7_independence_class"
   )
+  # FIX 42: add q7_t9_jackknife_verdict (canonical, matches C01f output);
+  # keep q7_t9_jackknife_status as v9 alias. Both refer to the same
+  # cheat6 verdict string. Consumers (gate.R, characterize_q7,
+  # assign_confidence_tier) now prefer q6_family_linkage first, fall back
+  # to either q7_t9 key.
   q7_hypothesis <- c(
-    "q7_t8_clair3_concordance", "q7_t9_jackknife_status", "q7_t9_max_delta",
+    "q7_t8_clair3_concordance",
+    "q7_t9_jackknife_verdict", "q7_t9_jackknife_status",  # verdict = canonical, status = v9 alias
+    "q7_t9_max_delta",
     "q7_t10_theta_concordance"
   )
   q7_overall <- c(
     "q7_composite_score", "q7_tier", "q7_dim_positive",
     "q7_fdr_qval", "q7_verdict", "q7_verdict_confidence"
   )
-  # NEW: SV caller audit keys (failure mode tracking)
+  # Q7B: SV caller audit keys (failure mode tracking)
   q7b_dropout <- c(
     "q7b_delly_raw_carriers", "q7b_delly_strict_carriers", "q7b_delly_carrier_loss",
     "q7b_manta_raw_carriers", "q7b_manta_pass_carriers", "q7b_manta_carrier_loss",
-    "q7b_expected_dropout_pct", "q7b_observed_dropout_pct"
+    "q7b_expected_dropout_pct", "q7b_observed_dropout_pct",
+    # v2 additions from breakpoint_evidence_audit.py:
+    "q7b_n_sv_sites_audited", "q7b_pca_carriers_strong_sv",
+    "q7b_pca_carriers_weak_sv", "q7b_pca_carriers_no_sv",
+    "q7b_pca_carrier_sv_support_pct",
+    "q7b_dropout_suspected_fraction", "q7b_true_absence_fraction"
   )
   q7b_fragmentation <- c(
     "q7b_delly_inv_present", "q7b_delly_bnd_3to3", "q7b_delly_bnd_5to5",
@@ -220,15 +402,66 @@ build_key_spec <- function() {
     "q7b_pop_prior_applied", "q7b_pop_prior_freq_est", "q7b_pop_prior_n_rescued"
   )
   q7 <- c(q7_layer_a, q7_layer_b, q7_layer_c, q7_layer_d,
-           q7_independence, q7_hypothesis, q7_overall,
-           q7b_dropout, q7b_fragmentation, q7b_filter, q7b_prior)
+          q7_independence, q7_hypothesis, q7_overall,
+          q7b_dropout, q7b_fragmentation, q7b_filter, q7b_prior)
+  q7_aspir <- c(
+    # Layer C GHSL keys exist on HPC but registry wiring pending.
+    "q7_layer_c_ghsl_detected", "q7_layer_c_ghsl_contrast",
+    "q7_layer_c_ghsl_n_pass", "q7_layer_c_ghsl_pct_pass",
+    "q7_layer_c_ghsl_quality", "q7_layer_c_partition_stable",
+    "q7_layer_c_ghsl_version",
+    # Layer D armitage keys written by STEP03 but no flat-key wiring
+    # confirmed — verify in chat 10.
+    "q7_layer_d_armitage_z", "q7_layer_d_armitage_p", "q7_layer_d_concordance",
+    # jackknife_status/verdict — no writer produces these as flat keys;
+    # the semantic info is in q6_family_linkage. Kept here for v9
+    # back-compat but aspirational.
+    "q7_t9_jackknife_verdict", "q7_t9_jackknife_status", "q7_t9_max_delta",
+    "q7_t8_clair3_concordance", "q7_t10_theta_concordance",
+    "q7_fdr_qval",
+    # Q7B audit keys: pipeline partially exists (breakpoint_evidence_audit.py)
+    # but flat-key registry wiring only partial.
+    "q7b_delly_raw_carriers", "q7b_delly_strict_carriers", "q7b_delly_carrier_loss",
+    "q7b_manta_raw_carriers", "q7b_manta_pass_carriers", "q7b_manta_carrier_loss",
+    "q7b_expected_dropout_pct",
+    "q7b_delly_inv_present", "q7b_delly_bnd_3to3", "q7b_delly_bnd_5to5",
+    "q7b_manta_inv_present", "q7b_manta_bnd_inv3", "q7b_manta_bnd_inv5",
+    "q7b_bnd_rescued", "q7b_bnd_rescue_concordance",
+    "q7b_delly_site_in_raw", "q7b_delly_site_passes_strict",
+    "q7b_delly_site_qual", "q7b_delly_site_pe",
+    "q7b_manta_site_in_raw", "q7b_manta_site_passes_pass", "q7b_manta_site_qual",
+    "q7b_pop_prior_applied", "q7b_pop_prior_freq_est", "q7b_pop_prior_n_rescued"
+  )
+
+  all_keys  <- c(q1, q2, q3, q4, q5, q6, q7)
+  all_aspir <- c(q1_aspir, q2_aspir, q3_aspir, q4_aspir, q5_aspir, q6_aspir, q7_aspir)
+  # De-dup aspirational (a key may appear in multiple lists if miscategorised;
+  # we take the safer "aspirational if listed anywhere as aspirational").
+  all_aspir <- intersect(unique(all_aspir), all_keys)
 
   list(
     Q1 = q1, Q2 = q2, Q3 = q3, Q4 = q4, Q5 = q5, Q6 = q6, Q7 = q7,
-    all_keys = c(q1, q2, q3, q4, q5, q6, q7),
+    Q1_aspir = intersect(q1_aspir, q1),
+    Q2_aspir = intersect(q2_aspir, q2),
+    Q3_aspir = intersect(q3_aspir, q3),
+    Q4_aspir = intersect(q4_aspir, q4),
+    Q5_aspir = intersect(q5_aspir, q5),
+    Q6_aspir = intersect(q6_aspir, q6),
+    Q7_aspir = intersect(q7_aspir, q7),
+    all_keys = all_keys,
+    all_aspir = all_aspir,
     counts = c(Q1 = length(q1), Q2 = length(q2), Q3 = length(q3),
                Q4 = length(q4), Q5 = length(q5), Q6 = length(q6),
-               Q7 = length(q7))
+               Q7 = length(q7)),
+    counts_wired = c(
+      Q1 = length(q1) - length(intersect(q1_aspir, q1)),
+      Q2 = length(q2) - length(intersect(q2_aspir, q2)),
+      Q3 = length(q3) - length(intersect(q3_aspir, q3)),
+      Q4 = length(q4) - length(intersect(q4_aspir, q4)),
+      Q5 = length(q5) - length(intersect(q5_aspir, q5)),
+      Q6 = length(q6) - length(intersect(q6_aspir, q6)),
+      Q7 = length(q7) - length(intersect(q7_aspir, q7))
+    )
   )
 }
 
@@ -270,6 +503,14 @@ assign_confidence_tier <- function(keys) {
   layer_c <- as.logical(keys[["q7_layer_c_ghsl_detected"]] %||% FALSE)
   layer_d <- as.logical(keys[["q7_layer_d_tested"]] %||% FALSE)
   fisher_p <- as.numeric(keys[["q7_layer_d_fisher_p"]] %||% 1)
+  # BUGFIX 2026-04-17 (chat 7, FIX 32): add fisher_or to the Pathway A
+  # gate. The Layer D schema description requires "OR>5, p<0.05" and
+  # C01f's compute_group_validation() gate (L525–526) tests both. Prior
+  # 4e gates only tested fisher_p < 0.05, so a significant-but-low-OR
+  # candidate (e.g. p=0.04, OR=1.2) passed Pathway A here but failed
+  # C01f's VALIDATED promotion — the two axes disagreed. Default to 0
+  # means a missing OR blocks Pathway A, which matches "untested" semantics.
+  fisher_or <- as.numeric(keys[["q7_layer_d_fisher_or"]] %||% 0)
   n_layers <- as.integer(keys[["q7_n_layers_passed"]] %||% 0)
   ghsl_quality <- keys[["q7_layer_c_ghsl_quality"]] %||% "ABSENT"
   layer_c_strong <- layer_c && ghsl_quality %in% c("HIGH", "MODERATE")
@@ -295,7 +536,9 @@ assign_confidence_tier <- function(keys) {
 
   # ── Pathway A: Full convergence (PCA + SV + GHSL + association) ──
   # 4/4 layers: the gold standard
-  if (layer_a && layer_b && layer_c_strong && layer_d && fisher_p < 0.05) {
+  # Layer D gate: p < 0.05 AND OR > 5 (matches schema description and C01f)
+  if (layer_a && layer_b && layer_c_strong && layer_d &&
+      fisher_p < 0.05 && fisher_or > 5) {
     if (family == "multi_family" || jackknife == "robust_multi_family") {
       return(list(tier = 1L, pathway = "A_full_4layer_convergence",
                   reason = "4/4 layers (PCA+SV+GHSL+Fisher) + multi-family"))
@@ -306,7 +549,7 @@ assign_confidence_tier <- function(keys) {
   }
 
   # 3/3 tested layers all pass (GHSL not available or not tested)
-  if (layer_a && layer_b && layer_d && fisher_p < 0.05 && !layer_c) {
+  if (layer_a && layer_b && layer_d && fisher_p < 0.05 && fisher_or > 5 && !layer_c) {
     n_tested <- 3L  # A, B, D tested; C not available
     if (family == "multi_family" || jackknife == "robust_multi_family") {
       return(list(tier = 1L, pathway = "A_strong_3layer_convergence",
@@ -370,22 +613,43 @@ assign_confidence_tier <- function(keys) {
 
 
 # =============================================================================
-# AXIS 2: COMPLETION (per-question % of 317 keys resolved)
+# AXIS 2: COMPLETION (per-question % of keys resolved)
 # =============================================================================
+# FIX 42 (chat 9): completion now respects the aspirational-key marking.
+# A key that's in the v2 spec but has no current writer is NOT counted in
+# the completion denominator — so "70% Q6 complete" means "70% of keys
+# that CAN currently be written are written", not "70% of keys that we
+# eventually hope to write". This keeps the % meaningful while the
+# aspirational set shrinks over time as phase 2/3 writers get wired up.
+#
+# Per-question results include:
+#   resolved      = keys with a non-NA, non-"not_assessed" value
+#   applicable    = keys that are currently writable (total - aspirational - not_assessed)
+#   total         = full v2 spec (includes aspirational)
+#   total_wired   = total - aspirational (the realistic target)
+#   pct           = resolved / applicable * 100
+#   pct_of_spec   = resolved / total * 100 (lower but shows true gap to v2)
 
 compute_completion <- function(keys, spec) {
   result <- list()
   total_resolved <- 0L
   total_applicable <- 0L
+  total_keys <- 0L
 
   for (q in paste0("Q", 1:7)) {
-    q_keys <- spec[[q]]
+    q_keys  <- spec[[q]]
+    q_aspir <- spec[[paste0(q, "_aspir")]] %||% character()
     n_total <- length(q_keys)
+    n_aspir <- length(q_aspir)
     n_resolved <- 0L
     n_na <- 0L
     missing <- character()
 
     for (k in q_keys) {
+      # Aspirational keys are silently skipped from both denominator and
+      # missing-list; they're in the spec but don't count yet.
+      if (k %in% q_aspir) next
+
       val <- keys[[k]]
       if (is.null(val) || (length(val) == 1 && is.na(val))) {
         missing <- c(missing, k)
@@ -396,26 +660,34 @@ compute_completion <- function(keys, spec) {
       }
     }
 
-    applicable <- n_total - n_na
-    pct <- if (applicable > 0) round(n_resolved / applicable * 100, 1) else 0
+    applicable <- n_total - n_aspir - n_na
+    pct         <- if (applicable > 0) round(n_resolved / applicable * 100, 1) else 0
+    pct_of_spec <- if (n_total > 0)    round(n_resolved / n_total * 100, 1) else 0
     result[[q]] <- list(
       resolved = n_resolved,
       applicable = applicable,
       total = n_total,
+      total_wired = n_total - n_aspir,
+      n_aspirational = n_aspir,
       pct = pct,
+      pct_of_spec = pct_of_spec,
       n_missing = length(missing),
       top_missing = head(missing, 5)
     )
-    total_resolved <- total_resolved + n_resolved
+    total_resolved   <- total_resolved + n_resolved
     total_applicable <- total_applicable + applicable
+    total_keys       <- total_keys + n_total
   }
 
-  overall_pct <- if (total_applicable > 0) round(total_resolved / total_applicable * 100, 1) else 0
+  overall_pct         <- if (total_applicable > 0) round(total_resolved / total_applicable * 100, 1) else 0
+  overall_pct_of_spec <- if (total_keys > 0)       round(total_resolved / total_keys * 100, 1) else 0
 
   list(
     overall = overall_pct,
+    overall_of_spec = overall_pct_of_spec,
     total_resolved = total_resolved,
     total_applicable = total_applicable,
+    total_keys = total_keys,
     per_question = result
   )
 }

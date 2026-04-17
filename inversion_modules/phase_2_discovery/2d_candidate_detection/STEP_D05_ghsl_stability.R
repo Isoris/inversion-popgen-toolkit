@@ -11,8 +11,17 @@
 # design phase; it was never completed because the sim_mat fallback
 # turned out to produce sufficient signal for D10 and the direct
 # GHSL-file reader was not needed. Kept here for potential future use
-# if per-window band assignments from phase_2/2e_ghsl/STEP_C04_snake3_ghsl_v5.R
+# if per-window band assignments from phase_2/2e_ghsl/STEP_C04b_snake3_ghsl_classify.R
 # become worth reading directly.
+#
+# Chat 14 (2026-04-18): reference updated from v5 to v6. The v6 replacement
+# for the old STEP_C04_snake3_ghsl_v5.R writer is the two-script split
+# STEP_C04_snake3_ghsl_v6.R (heavy engine) + STEP_C04b_snake3_ghsl_classify.R
+# (classifier that emits per-chromosome annot/karyotype/per-sample panel RDS).
+# If this stub is ever revived, the annot RDS it should parse is now
+# <ghsl_dir>/annot/<chr>.ghsl_v6.annot.rds with columns ghsl_v6_score,
+# ghsl_v6_status, rank_stability, div_contrast_z, div_bimodal, plus
+# global_window_id, start_bp, end_bp, pos_mb.
 #
 # compute_ghsl_from_simmat() returns a data.frame with columns:
 #   candidate_id, partition_stability, n_consistent_windows,
@@ -27,7 +36,8 @@
 # (compute_ghsl_from_simmat below) turned out to be sufficient. Do not
 # wire this into run_all.R as-is — the band-file format-parsing is a
 # placeholder and returns all-NA rows. If you revive it, the format
-# should match what STEP_C04_snake3_ghsl_v5.R writes.
+# should match what STEP_C04b_snake3_ghsl_classify.R writes (chat 14 v6;
+# annot RDS at <ghsl_dir>/annot/<chr>.ghsl_v6.annot.rds).
 compute_ghsl_stability <- function(candidates, ghsl_dir, chr) {
   # Look for GHSL band assignment files
   band_file <- file.path(ghsl_dir, sprintf("%s_band_assignments.tsv", chr))
@@ -50,7 +60,7 @@ compute_ghsl_stability <- function(candidates, ghsl_dir, chr) {
   # Expected format: rows = samples, columns = windows (or vice versa)
   # Adapt to actual format...
   # For now, return placeholder — actual GHSL format parsing depends on
-  # the exact output of STEP_C04_snake3_ghsl_v5.R
+  # the exact output of STEP_C04b_snake3_ghsl_classify.R (chat 14 v6).
 
   results <- list()
   for (i in seq_len(nrow(candidates))) {

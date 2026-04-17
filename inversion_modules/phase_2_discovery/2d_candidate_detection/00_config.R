@@ -17,7 +17,7 @@ CFG$SIM_MATS    <- file.path(CFG$PRECOMP, "sim_mats")
 CFG$TRIANGLES   <- file.path(CFG$SNAKES, "triangles_v3")
 CFG$OUTDIR      <- file.path(CFG$CODEBASE, "MODULE_5A2_Discovery_Core/inv_detect_out_v9.3")
 CFG$SV_FILE     <- file.path(CFG$BASE, "delly_sv/merged_sv_calls.tsv")
-CFG$GHSL_DIR    <- file.path(CFG$SNAKES, "ghsl_v5")
+CFG$GHSL_DIR    <- file.path(CFG$SNAKES, "ghsl_v6")   # chat 14: v5 → v6
 
 # ---- General ----
 CFG$WINDOW_SIZE_BP <- 50000L   # bin-to-bp conversion factor
@@ -50,9 +50,13 @@ CFG$BLOCK_FAR_FRAC   <- 0.2   # fraction of block width for "far" zone
 CFG$BLOCK_EDGE_DEPTH <- 3L    # bins inside/outside boundary for edge contrast
 
 # ---- NN sweep / interval tree (09) ----
-CFG$NN_SCALES_DEFAULT  <- c(0L, 20L, 40L, 80L)
-CFG$NN_SCALES_EXTENDED <- seq(20L, 320L, by=20L)  # for full sweep
-CFG$NN_SWEEP_COARSE    <- seq(100L, 4000L, by=100L)  # coarse range
+# 2026-04-17 FIX 21: scales expanded so D09's persistence-barcode tree
+# can reach its INVERSION classifier threshold (nn_birth >= 200). Was
+# c(0, 20, 40, 80) — silently broken because precomp didn't produce the
+# nn-smoothed sim_mats anyway. See STEP_C01a_precompute.R FIX 21 header.
+CFG$NN_SCALES_DEFAULT  <- c(0L, 20L, 40L, 80L, 120L, 160L, 200L, 240L, 320L)
+CFG$NN_SCALES_EXTENDED <- seq(20L, 320L, by=20L)  # full sweep for diagnostics
+CFG$NN_SWEEP_COARSE    <- seq(100L, 4000L, by=100L)  # research-only
 CFG$NN_SWEEP_FINE      <- seq(20L, 100L, by=20L)     # fine range
 CFG$NN_OVERLAP_THRESH  <- 0.70   # reciprocal overlap for block matching
 

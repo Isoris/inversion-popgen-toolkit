@@ -5,19 +5,83 @@
 #
 # THREE SYSTEMS (independent):
 #   System 1: DISCOVERY    → confidence tier (from compute_candidate_status.R)
-#   System 2: COLLECTION   → key fill percentage (352 keys)
+#   System 2: COLLECTION   → key fill percentage (352 keys per v2 spec)
 #   System 3: CHARACTER.   → THIS SCRIPT: question-level convergence
 #
 # For each of 7 questions, evaluates whether the collected keys CONVERGE
 # on a biological conclusion. Returns ANSWERED / PARTIAL / MEASURED /
 # CONTRADICTED / EMPTY per question.
 #
+# FIX 44 (chat 9): this script is a FUNCTION LIBRARY — it defines the
+# characterize_q1..q7 functions and the master characterize_candidate()
+# but has no driver. The companion driver `run_characterize.R` sources
+# this file + group_validation_gate.R, reads per-candidate keys, and
+# writes outputs. This file is also safe to source() standalone from an
+# interactive R session for inspecting individual candidates.
+#
 # =============================================================================
 
+# Helpers — MUST be defined before the gate-locator block below uses %||%.
+# (FIX 46, chat 10: FIX 44's gate-locator used %||% before it was defined.
+# Every caller hit "could not find function %||%" before any characterize_qN
+# function could run. Also simplified sys.frame(1)$ofile path — that form
+# only works when the script is sourced via source(file, chdir=TRUE) and
+# crashes when sourced the normal way. The driver run_characterize.R now
+# sources the gate file explicitly, so the locator is defensive-only.)
 `%||%` <- function(a, b) if (is.null(a) || length(a) == 0 || (length(a) == 1 && is.na(a[1]))) b else a
-safe_num <- function(x, d = NA_real_) { x <- suppressWarnings(as.numeric(x)); if (is.finite(x)) x else d }
-safe_bool <- function(x) { if (is.null(x)) FALSE else if (is.logical(x)) x[1] else identical(toupper(as.character(x)), "TRUE") }
-has_key <- function(keys, k) !is.null(keys[[k]]) && !is.na(keys[[k]][1]) && keys[[k]][1] != ""
+# FIX 47 (chat 10): safe_num() previously did `if (is.finite(x)) x else d`
+# without guarding length. For a missing key, keys[[k]] -> NULL,
+# as.numeric(NULL) -> numeric(0), is.finite(numeric(0)) -> logical(0),
+# and `if (logical(0))` throws "argument is of length zero". Every
+# characterize_qN function hit this on its first safe_num call for an
+# absent key. Guard length + NULL first, then scalarize before the
+# is.finite branch.
+safe_num <- function(x, d = NA_real_) {
+  if (is.null(x) || length(x) == 0) return(d)
+  x <- suppressWarnings(as.numeric(x[1]))
+  if (length(x) == 1 && is.finite(x)) x else d
+}
+safe_bool <- function(x) {
+  if (is.null(x) || length(x) == 0) return(FALSE)
+  if (is.logical(x)) return(isTRUE(x[1]))
+  identical(toupper(as.character(x[1])), "TRUE")
+}
+has_key <- function(keys, k) {
+  v <- keys[[k]]
+  !is.null(v) && length(v) > 0 && !is.na(v[1]) && v[1] != ""
+}
+
+# Locate and source group_validation_gate.R (defines assess_group_validation
+# and check_group_gate used below). Support both "characterize_candidate.R
+# sourced directly" and "sourced via run_characterize.R" cases.
+# ofile is only available when this file was sourced via source(); guard
+# with tryCatch so a direct Rscript invocation doesn't blow up.
+.char_ofile <- tryCatch(sys.frame(1)$ofile, error = function(e) NULL)
+.char_ofile <- if (is.null(.char_ofile) || !is.character(.char_ofile) ||
+                   !nzchar(.char_ofile)) "" else .char_ofile
+.gate_file_candidates <- c(
+  if (nzchar(.char_ofile))
+    file.path(dirname(.char_ofile), "..", "4c_group_validation", "group_validation_gate.R")
+  else character(),
+  "../4c_group_validation/group_validation_gate.R",
+  "4c_group_validation/group_validation_gate.R",
+  Sys.getenv("GROUP_VALIDATION_GATE", "")
+)
+.gate_sourced <- FALSE
+for (.gf in .gate_file_candidates) {
+  if (nzchar(.gf) && file.exists(.gf)) {
+    tryCatch({ source(.gf); .gate_sourced <- TRUE; break },
+             error = function(e) NULL)
+  }
+}
+if (!.gate_sourced &&
+    (!exists("assess_group_validation", mode = "function") ||
+     !exists("check_group_gate", mode = "function"))) {
+  warning("[characterize_candidate] could not locate group_validation_gate.R - ",
+          "set GROUP_VALIDATION_GATE env var or source the gate file before ",
+          "calling characterize_candidate(). assess_group_validation + ",
+          "check_group_gate must be in scope at call time.")
+}
 
 # =============================================================================
 # Q1: WHAT IS IT?
@@ -112,7 +176,69 @@ characterize_q2 <- function(keys) {
   phase_ratio <- safe_num(keys[["q2_phase_block_ratio"]], NA)
   indel_conc <- safe_num(keys[["q2_indel_class_concordance"]], NA)
 
+  # ── chat-13 wiring: pull keys from the four new structured blocks ──
+  # These are ANNOTATION-ONLY for the first wiring pass; the audit at
+  # §6 and the handoff §"Not in scope" note that gate promotion (the
+  # new keys actually changing status/label) comes after chat-14 HPC
+  # calibration. Present them as evidence_for / evidence_against lines
+  # so they show up in the characterization report without altering
+  # the existing decision flow.
+  #
+  # From regime_segments (C01j):
+  q2_regime_n_segments      <- safe_num(keys[["q2_regime_n_segments"]], NA)
+  q2_regime_dominant        <- keys[["q2_regime_dominant_state"]] %||% NA_character_
+  q2_regime_has_recomb      <- keys[["q2_regime_has_recomb"]] %||% NA
+  q2_regime_n_samples_chg   <- safe_num(keys[["q2_regime_n_samples_changed"]], NA)
+  # From local_structure_segments (C01l):
+  q2_bound_left             <- keys[["q2_boundary_sharpness_left"]]    %||% NA_character_
+  q2_bound_right            <- keys[["q2_boundary_sharpness_right"]]   %||% NA_character_
+  q2_bound_overall          <- keys[["q2_boundary_sharpness_overall"]] %||% NA_character_
+  q2_core_delta12           <- safe_num(keys[["q2_local_struct_core_delta12"]],   NA)
+  q2_lflk_delta12           <- safe_num(keys[["q2_local_struct_lflank_delta12"]], NA)
+  q2_rflk_delta12           <- safe_num(keys[["q2_local_struct_rflank_delta12"]], NA)
+  # From distance_concordance (C01m):
+  q2_inv_vs_fam             <- safe_num(keys[["q2_distance_conc_inv_vs_fam_score"]], NA)
+  q2_n_persistent           <- safe_num(keys[["q2_distance_conc_n_persistent"]],    NA)
+  q2_n_decaying             <- safe_num(keys[["q2_distance_conc_n_decaying"]],      NA)
+  # From regime_sample_dag (C01i_b):
+  q2_dag_frac_r_fired       <- safe_num(keys[["q2_dag_fraction_samples_R_fired"]],   NA)
+  q2_dag_frac_dev           <- safe_num(keys[["q2_dag_fraction_samples_deviating"]], NA)
+  q2_dag_dominant_cohort    <- keys[["q2_dag_dominant_regime_cohort"]] %||% NA_character_
+  q2_dag_dominant_support   <- safe_num(keys[["q2_dag_dominant_regime_support"]],     NA)
+  q2_dag_n_r_fired          <- safe_num(keys[["q2_dag_n_samples_R_fired"]],           NA)
+
   ev_for <- character(); ev_against <- character()
+
+  # Annotation-only evidence collection from the four new blocks.
+  if (!is.na(q2_regime_dominant))
+    ev_for <- c(ev_for, paste0("regime_dominant=", q2_regime_dominant))
+  if (!is.na(q2_regime_n_segments))
+    ev_for <- c(ev_for, paste0("regime_n_segments=", as.integer(q2_regime_n_segments)))
+  if (isTRUE(q2_regime_has_recomb) ||
+      (is.character(q2_regime_has_recomb) && q2_regime_has_recomb == "TRUE")) {
+    ev_for <- c(ev_for, "regime_track_has_recomb_signal")
+  }
+  if (!is.na(q2_bound_overall))
+    ev_for <- c(ev_for, paste0("boundary_sharpness=", q2_bound_overall))
+  if (!is.na(q2_inv_vs_fam))
+    ev_for <- c(ev_for, paste0("inv_vs_family_score=", signif(q2_inv_vs_fam, 3)))
+  if (!is.na(q2_dag_frac_r_fired))
+    ev_for <- c(ev_for, paste0("dag_frac_R_fired=", signif(q2_dag_frac_r_fired, 3)))
+  if (!is.na(q2_dag_dominant_cohort))
+    ev_for <- c(ev_for, paste0("dag_dominant_regime=", q2_dag_dominant_cohort,
+                               if (!is.na(q2_dag_dominant_support))
+                                 paste0("(support=", signif(q2_dag_dominant_support, 3), ")")
+                               else ""))
+
+  # Soft contradictions (annotation-only; don't drive CONTRADICTED yet)
+  if (!is.na(q2_inv_vs_fam) && q2_inv_vs_fam < 0.2) {
+    ev_against <- c(ev_against,
+                    paste0("inv_vs_family_score=", signif(q2_inv_vs_fam, 3),
+                           " (low — family LD signal dominates)"))
+  }
+  if (!is.na(q2_bound_overall) && q2_bound_overall == "diffuse") {
+    ev_against <- c(ev_against, "boundary_sharpness=diffuse (no crisp edge)")
+  }
 
   # Contradictions
   if (n_rec == 0 && !is.na(stab_pct) && stab_pct < 90) {
@@ -445,8 +571,12 @@ characterize_q7 <- function(keys) {
   fisher_p <- safe_num(keys[["q7_layer_d_fisher_p"]], 1)
   fisher_or <- safe_num(keys[["q7_layer_d_fisher_or"]], 1)
   ghsl_qual <- keys[["q7_layer_c_ghsl_quality"]] %||% "ABSENT"
-  jackknife <- keys[["q7_t9_jackknife_status"]] %||% "unknown"
+  # FIX 43 (chat 9): q7_t9_jackknife_status is aspirational (no writer).
+  # q6_family_linkage carries the same semantic info reliably (written by
+  # seal + overwritten by C01f jackknife), so prefer it.
   family <- keys[["q6_family_linkage"]] %||% "unknown"
+  jackknife <- keys[["q7_t9_jackknife_verdict"]] %||%
+               keys[["q7_t9_jackknife_status"]] %||% "unknown"
   dropout <- safe_num(keys[["q7b_observed_dropout_pct"]], NA)
 
   if (!layer_a && !layer_b && !layer_c)

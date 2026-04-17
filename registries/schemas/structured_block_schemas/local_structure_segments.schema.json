@@ -1,0 +1,77 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "local_structure_segments.schema.json",
+  "title": "local_structure_segments",
+  "description": "Per-candidate local structure metrics from C01l. Five segments (left_flank, inv_left_half, inv_core, inv_right_half, right_flank) each characterized by per-sample delta12, entropy, ENA computed from local k-means membership proportions. The contrast between core and flanks is the boundary-sharpness signal: sharp boundary = core.delta12 >> flank.delta12.",
+  "type": "object",
+  "required": [
+    "candidate_id",
+    "segment_summary",
+    "boundary_sharpness"
+  ],
+  "properties": {
+    "candidate_id": { "type": "string" },
+    "segment_summary": {
+      "type": "array",
+      "description": "Per-segment aggregated metrics (all samples pooled).",
+      "items": {
+        "type": "object",
+        "required": ["segment", "mean_delta12", "mean_entropy", "mean_ena"],
+        "properties": {
+          "segment":      { "type": "string",
+                            "enum": ["left_flank", "inv_left_half", "inv_core",
+                                     "inv_right_half", "right_flank"] },
+          "n_windows":    { "type": "integer", "minimum": 0 },
+          "n_samples":    { "type": "integer", "minimum": 0 },
+          "mean_delta12": { "type": "number" },
+          "mean_entropy": { "type": "number" },
+          "mean_ena":     { "type": "number" },
+          "sd_delta12":   { "type": ["number", "null"] }
+        }
+      }
+    },
+    "by_inversion_class": {
+      "type": "array",
+      "description": "Per-segment metrics stratified by HOM_REF / HET / HOM_INV (from C01i decompose). Optional — omitted if decompose hasn't run yet.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "segment":       { "type": "string" },
+          "inv_genotype":  { "type": "string",
+                              "enum": ["HOM_REF", "HET", "HOM_INV", "HOMO_REF",
+                                       "HOMO_INV", "UNKNOWN"] },
+          "n_samples":     { "type": "integer" },
+          "mean_delta12":  { "type": "number" },
+          "mean_entropy":  { "type": "number" },
+          "mean_ena":      { "type": "number" }
+        }
+      }
+    },
+    "boundary_sharpness": {
+      "type": "object",
+      "required": ["overall"],
+      "properties": {
+        "left":     { "type": ["string", "null"],
+                       "enum": ["sharp", "moderate", "diffuse", null] },
+        "right":    { "type": ["string", "null"],
+                       "enum": ["sharp", "moderate", "diffuse", null] },
+        "overall":  { "type": ["string", "null"],
+                       "enum": ["sharp", "moderate", "diffuse",
+                                "asymmetric", null] },
+        "core_delta12":        { "type": ["number", "null"] },
+        "left_flank_delta12":  { "type": ["number", "null"] },
+        "right_flank_delta12": { "type": ["number", "null"] },
+        "left_half_delta12":   { "type": ["number", "null"] },
+        "right_half_delta12":  { "type": ["number", "null"] }
+      }
+    }
+  },
+  "keys_extracted": [
+    { "key": "q2_local_struct_core_delta12",      "from": "boundary_sharpness.core_delta12" },
+    { "key": "q2_local_struct_lflank_delta12",    "from": "boundary_sharpness.left_flank_delta12" },
+    { "key": "q2_local_struct_rflank_delta12",    "from": "boundary_sharpness.right_flank_delta12" },
+    { "key": "q2_boundary_sharpness_left",        "from": "boundary_sharpness.left" },
+    { "key": "q2_boundary_sharpness_right",       "from": "boundary_sharpness.right" },
+    { "key": "q2_boundary_sharpness_overall",     "from": "boundary_sharpness.overall" }
+  ]
+}

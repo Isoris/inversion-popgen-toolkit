@@ -298,15 +298,15 @@ role_comparison <- data.table()
 
 if (n_subs >= 2 && !is.null(s1_cand) && nrow(s1_cand) > 0) {
   # For each sub-candidate, find which Snake 1 cores overlap
-  # and compare their core_family membership
+  # and compare their scale_tier membership
   for (si in seq_len(n_subs)) {
     sub <- result$sub_candidates[si]
     s1_sub <- s1_cand[start_bp >= sub$start_bp & end_bp <= sub$end_bp]
 
     # Count by core family
-    n_1S <- sum(s1_sub$core_family == "1S", na.rm = TRUE)
-    n_1M <- sum(s1_sub$core_family == "1M", na.rm = TRUE)
-    n_1L <- sum(s1_sub$core_family == "1L", na.rm = TRUE)
+    n_1S <- sum(s1_sub$scale_tier == "1S", na.rm = TRUE)
+    n_1M <- sum(s1_sub$scale_tier == "1M", na.rm = TRUE)
+    n_1L <- sum(s1_sub$scale_tier == "1L", na.rm = TRUE)
 
     # Count by Snake 2 status
     prof_sub <- profile_windows[start_bp >= sub$start_bp & end_bp <= sub$end_bp]

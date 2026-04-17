@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "candidate_interval.schema.json",
+  "title": "interval_registry candidate_intervals row",
+  "description": "Schema for one row of interval_registry/candidate_intervals.tsv. Each row declares one candidate inversion interval. The candidate_id is the primary key and is referenced as a foreign key by results_registry manifest rows (where.candidate_id) and by evidence_registry per_candidate/<cid>/ directories.",
+  "version": "v1_chat16",
+  "type": "object",
+  "required": ["candidate_id", "chrom", "start_bp", "end_bp"],
+  "properties": {
+    "candidate_id": {
+      "type": "string",
+      "description": "Primary key. Convention: <chrom>_<N> where N is a per-chromosome counter. Examples: 'LG12_17', 'LG25_3'.",
+      "pattern": "^[A-Za-z0-9_]+$",
+      "minLength": 1
+    },
+    "chrom":    { "type": "string", "minLength": 1 },
+    "start_bp": { "type": "integer", "minimum": 0 },
+    "end_bp":   { "type": "integer", "minimum": 0 },
+    "size_kb":  { "type": ["number", "null"], "minimum": 0 },
+    "scale":    { "type": ["string", "null"], "description": "Scale at which the candidate was detected, e.g. '100', '50'." },
+    "parent_id": {
+      "type": ["string", "null"],
+      "description": "If this candidate is nested inside another, the parent's candidate_id. Null or '.' for top-level candidates."
+    }
+  },
+  "additionalProperties": true
+}

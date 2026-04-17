@@ -151,11 +151,11 @@ load_diag_data <- function(precomp_dir, chrom_filter = NULL) {
   if (!is.null(chrom_filter)) chroms <- intersect(chroms, chrom_filter)
   message("[diag] ", length(chroms), " chromosomes")
 
-  inv_like_file <- file.path(dirname(precomp_dir), "snake_inv_likeness.tsv.gz")
-  inv_like_dt <- if (file.exists(inv_like_file)) fread(inv_like_file) else data.table()
-  if (nrow(inv_like_dt) > 0) message("[diag] Inv-likeness: ", nrow(inv_like_dt), " windows")
+  inv_like_file <- file.path(dirname(precomp_dir), "window_dt.tsv.gz")
+  window_dt <- if (file.exists(inv_like_file)) fread(inv_like_file) else data.table()
+  if (nrow(window_dt) > 0) message("[diag] Inv-likeness: ", nrow(window_dt), " windows")
 
-  list(precomp_list = precomp_list, chroms = chroms, inv_like_dt = inv_like_dt)
+  list(precomp_list = precomp_list, chroms = chroms, window_dt = window_dt)
 }
 
 # =============================================================================

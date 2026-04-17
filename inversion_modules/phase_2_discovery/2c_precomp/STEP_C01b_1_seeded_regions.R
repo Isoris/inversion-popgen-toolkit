@@ -9,7 +9,7 @@
 #
 # Codebase:    inversion_modules v8.5 / script v9.3.2
 # Upstream:    STEP_C01a output — <precomp_dir>/precomp/<chr>.precomp.rds
-#              <precomp_dir>/window_inv_likeness.tsv.gz
+#              <precomp_dir>/window_dt.tsv.gz
 #              (optional) <pruned_samples>.ind for test_26 kin-pruned retention
 # Downstream:  phase_4/4a/STEP_C01d_candidate_scoring --cores_dir
 #              (seeded regions enter C01d's D2/D5 scoring dimensions at
@@ -203,8 +203,8 @@ for (chr_tmp in chroms) {
 if (!is.null(sample_names_snake)) message("[seeded_regions] Samples: ", length(sample_names_snake))
 
 # Inv-likeness (for threshold modulation)
-inv_like_file <- file.path(dirname(precomp_dir), "window_inv_likeness.tsv.gz")
-inv_like_dt <- if (file.exists(inv_like_file)) fread(inv_like_file) else data.table()
+inv_like_file <- file.path(dirname(precomp_dir), "window_dt.tsv.gz")
+window_dt <- if (file.exists(inv_like_file)) fread(inv_like_file) else data.table()
 
 # =============================================================================
 # HELPER FUNCTIONS

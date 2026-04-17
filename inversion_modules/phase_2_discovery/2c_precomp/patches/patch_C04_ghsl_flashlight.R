@@ -17,13 +17,13 @@
 #   - GHSL band assignment error (phase noise)
 #   - Recombinant sample (true biological discordance)
 #
-# INSERT: After process_window() returns sample_scores, add flashlight
+# INSERT: After process_window() returns sample_scores, add sv_prior
 # cross-check as a post-processing step per chromosome.
 # =============================================================================
 
-# ─── Source flashlight ───────────────────────────────────────────────
+# ─── Source sv_prior ───────────────────────────────────────────────
 
-fl_loader <- Sys.getenv("FLASHLIGHT_LOADER", "")
+fl_loader <- Sys.getenv("SV_PRIOR_LOADER", "")
 if (!nzchar(fl_loader)) {
   for (p in c(
     file.path(dirname(outdir), "utils", "flashlight_loader_v2.R")
@@ -32,11 +32,11 @@ if (!nzchar(fl_loader)) {
     if (!file.exists(fl_loader_path)) fl_loader_path <- sub("_v2", "", fl_loader_path)
   )) if (file.exists(p)) { fl_loader <- p; break }
 }
-.ghsl_has_flashlight <- FALSE
+.ghsl_has_sv_prior <- FALSE
 if (nzchar(fl_loader) && file.exists(fl_loader)) {
   tryCatch({
     source(fl_loader)
-    .ghsl_has_flashlight <- TRUE
+    .ghsl_has_sv_prior <- TRUE
     message("[S3v3] Flashlight sourced — SV anchor cross-check available")
   }, error = function(e) message("[S3v3] Flashlight: ", e$message))
 }
@@ -45,7 +45,7 @@ if (nzchar(fl_loader) && file.exists(fl_loader)) {
 # Called once per chromosome, after all windows are processed.
 # Takes the aggregated sample_scores and cross-references with SV anchors.
 
-ghsl_flashlight_crosscheck <- function(chr_scores_dt, chr, bands) {
+ghsl_sv_prior_crosscheck <- function(chr_scores_dt, chr, bands) {
   # chr_scores_dt: data.table from all_scores for this chromosome
   #   columns: sample_id, pc1_band, within_mean, between_mean, sample_ghsl, ...
   # bands: named integer vector (sample → band) from chromosome-wide k=3
@@ -59,9 +59,9 @@ ghsl_flashlight_crosscheck <- function(chr_scores_dt, chr, bands) {
     )
   )
 
-  if (!.ghsl_has_flashlight || nrow(chr_scores_dt) == 0) return(empty_result)
+  if (!.ghsl_has_sv_prior || nrow(chr_scores_dt) == 0) return(empty_result)
 
-  fl <- load_flashlight(chr)
+  fl <- load_sv_prior(chr)
   if (is.null(fl) || nrow(fl$inv_calls) == 0) return(empty_result)
 
   # Get all SV anchors for this chromosome
@@ -162,13 +162,13 @@ ghsl_flashlight_crosscheck <- function(chr_scores_dt, chr, bands) {
   )
 
   if (agreement > 0.7 && !is.na(wt_p) && wt_p < 0.05) {
-    message("[S3v3] [flashlight] ", chr, ": GHSL confirms SV genotypes!",
+    message("[S3v3] [sv_prior] ", chr, ": GHSL confirms SV genotypes!",
             " agreement=", round(agreement, 2),
             " Wilcoxon p=", format(wt_p, digits = 3),
             " (HOM_INV GHSL=", round(mean_ghsl_inv, 3),
             " > HOM_REF GHSL=", round(mean_ghsl_ref, 3), ")")
   } else if (!is.na(agreement) && agreement < 0.4) {
-    message("[S3v3] [flashlight] ", chr, ": GHSL discordant with SV",
+    message("[S3v3] [sv_prior] ", chr, ": GHSL discordant with SV",
             " agreement=", round(agreement, 2))
   }
 
@@ -180,9 +180,9 @@ ghsl_flashlight_crosscheck <- function(chr_scores_dt, chr, bands) {
 # chr_scores, add:
 #
 #   # Flashlight cross-check
-#   if (.ghsl_has_flashlight && length(chr_scores) > 0) {
+#   if (.ghsl_has_sv_prior && length(chr_scores) > 0) {
 #     chr_scores_dt <- rbindlist(chr_scores, fill = TRUE)
-#     fl_check <- ghsl_flashlight_crosscheck(chr_scores_dt, chr, bands)
+#     fl_check <- ghsl_sv_prior_crosscheck(chr_scores_dt, chr, bands)
 #     if (nrow(fl_check$crosscheck) > 0) {
 #       fl_check$crosscheck[, chrom := chr]
 #       all_fl_crosscheck <- c(all_fl_crosscheck, list(fl_check$crosscheck))
@@ -190,9 +190,9 @@ ghsl_flashlight_crosscheck <- function(chr_scores_dt, chr, bands) {
 #     all_fl_summary <- c(all_fl_summary, list(fl_check$summary))
 #   }
 #
-# At script end, write flashlight cross-check outputs:
+# At script end, write sv_prior cross-check outputs:
 #
 #   fl_cross_dt <- if (length(all_fl_crosscheck) > 0) rbindlist(all_fl_crosscheck, fill = TRUE) else data.table()
 #   fl_summ_dt  <- if (length(all_fl_summary) > 0) rbindlist(all_fl_summary, fill = TRUE) else data.table()
-#   fwrite(fl_cross_dt, file.path(outdir, "snake3v3_flashlight_crosscheck.tsv.gz"), sep = "\t")
-#   fwrite(fl_summ_dt, file.path(outdir, "snake3v3_flashlight_summary.tsv"), sep = "\t")
+#   fwrite(fl_cross_dt, file.path(outdir, "snake3v3_sv_prior_crosscheck.tsv.gz"), sep = "\t")
+#   fwrite(fl_summ_dt, file.path(outdir, "snake3v3_sv_prior_summary.tsv"), sep = "\t")

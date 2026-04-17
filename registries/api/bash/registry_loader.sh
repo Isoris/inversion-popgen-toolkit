@@ -23,9 +23,78 @@ registry_resolve_paths() {
   : "${SAMPLE_REGISTRY:=${REGISTRIES}/data/sample_registry}"
   : "${EVIDENCE_REGISTRY:=${REGISTRIES}/data/evidence_registry}"
   : "${INTERVAL_REGISTRY:=${REGISTRIES}/data/interval_registry}"
+  : "${RESULTS_REGISTRY:=${REGISTRIES}/data/results_registry}"
   : "${SCHEMA_DIR:=${REGISTRIES}/schemas}"
 
-  export BASE REGISTRIES SAMPLE_REGISTRY EVIDENCE_REGISTRY INTERVAL_REGISTRY SCHEMA_DIR
+  export BASE REGISTRIES SAMPLE_REGISTRY EVIDENCE_REGISTRY INTERVAL_REGISTRY \
+         RESULTS_REGISTRY SCHEMA_DIR
+}
+
+# ── Chat-16 results_registry helpers ─────────────────────────────────────────
+# Path resolver for a results_registry artifact by (kind, ...).
+# Echoes the expected absolute path. Does NOT check whether it exists —
+# pair with registry_results_has for that.
+#
+# Usage:
+#   registry_results_path pairwise <stat> <chrom> <g1> <g2>
+#   registry_results_path candidate_q <cid> <K> <group>
+#   registry_results_path candidate_f <cid> <K>
+#   registry_results_path interval_summary <chrom> <start> <end> <group> <stat> [K]
+registry_results_path() {
+  local kind="$1"; shift
+  registry_resolve_paths
+  case "$kind" in
+    pairwise)
+      local stat="$1" chrom="$2" g1="$3" g2="$4"
+      # Canonicalise g1/g2 order so (a,b) and (b,a) map to same file
+      local pair
+      pair=$(printf "%s\n%s\n" "$g1" "$g2" | LC_ALL=C sort | paste -sd '__vs__')
+      # paste inserts "__vs__" between the two sorted lines as a single separator
+      echo "${RESULTS_REGISTRY}/pairwise/${stat}/${chrom}/${pair}.tsv.gz"
+      ;;
+    candidate_q)
+      local cid="$1" K="$2" group="$3"
+      echo "${RESULTS_REGISTRY}/candidate/${cid}/Q_K$(printf %02d "$K").${group}.tsv.gz"
+      ;;
+    candidate_f)
+      local cid="$1" K="$2"
+      echo "${RESULTS_REGISTRY}/candidate/${cid}/F_K$(printf %02d "$K").tsv.gz"
+      ;;
+    interval_summary)
+      local chrom="$1" s="$2" e="$3" group="$4" stat="$5" K="${6:-}"
+      local k_suffix=""
+      [[ -n "$K" ]] && k_suffix=".K$(printf %02d "$K")"
+      echo "${RESULTS_REGISTRY}/interval/${chrom}/${s}_${e}.${group}.${stat}${k_suffix}.tsv.gz"
+      ;;
+    *)
+      echo "[registry_results_path] unknown kind: $kind" >&2
+      return 1
+      ;;
+  esac
+}
+
+# Existence check for a results_registry artifact.
+# Returns 0 if the file exists, 1 if not.
+#
+# Usage: see registry_results_path (same args)
+registry_results_has() {
+  local path
+  path=$(registry_results_path "$@") || return 1
+  [[ -f "$path" ]]
+}
+
+# Count manifest rows matching a (kind, filter) — uses awk, not R.
+# Useful in launchers to gate "only run if not yet cached."
+#
+# Usage:
+#   registry_results_count_by_kind pairwise
+#   registry_results_count_by_kind candidate_q
+registry_results_count_by_kind() {
+  local kind="$1"
+  registry_resolve_paths
+  local m="${RESULTS_REGISTRY}/manifest.tsv"
+  [[ -f "$m" ]] || { echo 0; return; }
+  awk -F'\t' -v k="$kind" 'NR>1 && $2==k {n++} END{print n+0}' "$m"
 }
 
 # ── List candidates at a given tier ──────────────────────────────────────────

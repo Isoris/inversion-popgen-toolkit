@@ -7,7 +7,7 @@
 # Do DELLY/Manta per-sample genotypes predict PCA cluster membership?
 #
 # Method:
-#   1. Load flashlight anchors for the candidate region
+#   1. Load sv_prior anchors for the candidate region
 #   2. Get PCA band assignments from precomp (k=3 on PC1)
 #   3. Build 2×3 contingency table:
 #        rows = SV genotype (HOM_REF, HET, HOM_INV)
@@ -24,9 +24,9 @@
 # INSERT: After existing tests (T1-T8), before verdict computation.
 # =============================================================================
 
-# ─── Source flashlight ───────────────────────────────────────────────
+# ─── Source sv_prior ───────────────────────────────────────────────
 
-fl_loader <- Sys.getenv("FLASHLIGHT_LOADER", "")
+fl_loader <- Sys.getenv("SV_PRIOR_LOADER", "")
 if (!nzchar(fl_loader)) {
   for (p in c(
     file.path(dirname(outdir), "utils", "flashlight_loader_v2.R")
@@ -35,11 +35,11 @@ if (!nzchar(fl_loader)) {
     if (!file.exists(fl_loader_path)) fl_loader_path <- sub("_v2", "", fl_loader_path)
   )) if (file.exists(p)) { fl_loader <- p; break }
 }
-.hyptest_has_flashlight <- FALSE
+.hyptest_has_sv_prior <- FALSE
 if (nzchar(fl_loader) && file.exists(fl_loader)) {
   tryCatch({
     source(fl_loader)
-    .hyptest_has_flashlight <- TRUE
+    .hyptest_has_sv_prior <- TRUE
     message("[C01f] Flashlight sourced — T9 SV concordance test available")
   }, error = function(e) message("[C01f] Flashlight: ", e$message))
 }
@@ -58,13 +58,13 @@ test_sv_concordance <- function(chr, start_bp, end_bp, pc, sample_names,
     orientation = NA_character_,
     cheat2_p = NA_real_,
     cheat2_n_del = 0L,
-    evidence = "no_flashlight",
+    evidence = "no_sv_prior",
     supports = "neutral"
   )
 
-  if (!.hyptest_has_flashlight) return(result)
+  if (!.hyptest_has_sv_prior) return(result)
 
-  fl <- load_flashlight(chr)
+  fl <- load_sv_prior(chr)
   if (is.null(fl) || nrow(fl$inv_calls) == 0) {
     result$evidence <- "no_inv_calls"
     return(result)
@@ -228,7 +228,7 @@ test_sv_concordance <- function(chr, start_bp, end_bp, pc, sample_names,
 # ─── USAGE: Inside the main test loop ───────────────────────────────
 # After existing tests T1-T8:
 #
-#   # T9: SV genotype concordance (flashlight)
+#   # T9: SV genotype concordance (sv_prior)
 #   t9 <- test_sv_concordance(chr, start_bp, end_bp, pc, precomp_sample_names,
 #                              real_names)
 #   all_results[[length(all_results) + 1]] <- data.table(

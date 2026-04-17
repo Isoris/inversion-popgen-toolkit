@@ -54,8 +54,10 @@ if (exists(".LOAD_BRIDGE_DONE", envir = .GlobalEnv) &&
   .bridge_dir <- if (!is.null(.bridge_self) && file.exists(.bridge_self)) {
     dirname(.bridge_self)
   } else {
-    # Fallback: scan likely locations
+    # Fallback: scan likely locations. Flattened layout first, then legacy v8.5.
     cands <- c(
+      file.path(BASE, "utils"),
+      file.path(BASE, "inversion_modules", "utils"),
       file.path(BASE, "inversion_codebase_v8.5", "utils"),
       "utils",
       "."
@@ -92,10 +94,25 @@ if (exists(".LOAD_BRIDGE_DONE", envir = .GlobalEnv) &&
                         file.path(BASE, "unified_ancestry/wrappers/instant_q.R"),
     DISPATCHER_R      = Sys.getenv("DISPATCHER_R", "") %||%
                         file.path(BASE, "unified_ancestry/dispatchers/region_stats_dispatcher.R"),
+    # 2026-04-17: ancestry cache moved out of the code tree.
+    LOCAL_Q_DIR       = Sys.getenv("LOCAL_Q_DIR", "") %||%
+                        file.path(BASE, "ancestry_cache"),
+    CANONICAL_K       = Sys.getenv("CANONICAL_K", "") %||%
+                        Sys.getenv("DEFAULT_K", "") %||% "8",
+    # Stats cache — chat-15 new store for persisting FST / dxy / pairwise results
+    STATS_CACHE_DIR   = Sys.getenv("STATS_CACHE_DIR", "") %||%
+                        file.path(BASE, "registries", "data", "stats_cache"),
 
-    # Inversion pipeline
-    INVERSION_CONFIG  = Sys.getenv("INVERSION_CONFIG", "") %||%
-                        file.path(BASE, "inversion_codebase_v8.5/00_inversion_config.sh"),
+    # Inversion pipeline — search flattened layout first, legacy v8.5 fallback
+    INVERSION_CONFIG  = Sys.getenv("INVERSION_CONFIG", "") %||% {
+                          cands <- c(
+                            file.path(BASE, "00_inversion_config.sh"),
+                            file.path(BASE, "inversion_modules", "00_inversion_config.sh"),
+                            file.path(BASE, "inversion_codebase_v8.5", "00_inversion_config.sh")
+                          )
+                          hit <- cands[file.exists(cands)][1]
+                          hit %||% cands[1]
+                        },
 
     # MODULE_2B
     MODULE2B_CONFIG   = Sys.getenv("MODULE2B_CONFIG", "") %||%
@@ -122,6 +139,8 @@ if (exists(".LOAD_BRIDGE_DONE", envir = .GlobalEnv) &&
   .smap_file <- NULL
   for (p in c(
     file.path(.bridge_dir, "sample_map.R"),
+    file.path(BASE, "utils/sample_map.R"),
+    file.path(BASE, "inversion_modules/utils/sample_map.R"),
     file.path(BASE, "inversion_codebase_v8.5/utils/sample_map.R"),
     "utils/sample_map.R"
   )) {
@@ -143,6 +162,8 @@ if (exists(".LOAD_BRIDGE_DONE", envir = .GlobalEnv) &&
   .reg_file <- NULL
   for (p in c(
     file.path(.bridge_dir, "sample_registry.R"),
+    file.path(BASE, "utils/sample_registry.R"),
+    file.path(BASE, "inversion_modules/utils/sample_registry.R"),
     file.path(BASE, "inversion_codebase_v8.5/utils/sample_registry.R"),
     "utils/sample_registry.R"
   )) {
@@ -188,6 +209,107 @@ if (exists(".LOAD_BRIDGE_DONE", envir = .GlobalEnv) &&
       .disp_loaded <- TRUE
     }, error = function(e) {
       message("[load_bridge] WARNING: region_stats_dispatcher.R load failed: ", conditionMessage(e))
+    })
+  }
+
+  # =========================================================================
+  # STEP 6.5: Auto-register ancestry-derived groups (chat-15)
+  # =========================================================================
+  # The inversion sample_registry is the source of truth for "who is in which
+  # group." Historically the ancestry module referenced group names like
+  # `ancestry_K8_Q3` or `all_226` without registering them. This step closes
+  # that gap by registering:
+  #
+  #   all_226        — every sample in sample_master (full cohort)
+  #   unrelated_81   — NAToRA-pruned subset from PRUNED_LIST
+  #   ancestry_K<K>_Q1 .. Q<K>  — samples whose canonical-K assigned_pop == k
+  #                               (read from the canonical-K local_Q cache's
+  #                               per-sample summary; fallback to an empty
+  #                               group if the cache hasn't been populated yet)
+  #
+  # Idempotent: sample_registry's add_group() skips if the group already
+  # exists (overwrite=FALSE by default). Safe to source load_bridge.R
+  # multiple times.
+  .anc_groups_registered <- 0L
+  if (!is.null(reg)) {
+    tryCatch({
+      # all_226
+      if (!is.null(smap) && length(smap$real_names) > 0 &&
+          !reg$has_group("all_226")) {
+        reg$add_group("all_226", smap$real_names,
+                       description = "Full cohort (226 samples)")
+        .anc_groups_registered <- .anc_groups_registered + 1L
+      }
+
+      # unrelated_81
+      pf <- BRIDGE_PATHS$PRUNED_LIST
+      if (nzchar(pf) && file.exists(pf) && !reg$has_group("unrelated_81")) {
+        pruned_ids <- trimws(readLines(pf, warn = FALSE))
+        pruned_ids <- pruned_ids[nzchar(pruned_ids)]
+        if (length(pruned_ids) > 0) {
+          reg$add_group("unrelated_81", pruned_ids,
+                         description = "NAToRA-pruned unrelated subset")
+          .anc_groups_registered <- .anc_groups_registered + 1L
+        }
+      }
+
+      # ancestry_K<K>_Q<k> — read from canonical-K samples cache, any chrom.
+      # The assigned_pop column partitions samples into K clusters; we collapse
+      # over chromosomes by majority vote (most-frequent assigned_pop per
+      # sample). This yields a stable cohort-level ancestry-cluster membership
+      # even when per-window assignments wobble.
+      canon_K <- as.integer(BRIDGE_PATHS$CANONICAL_K %||% 8L)
+      lqd <- BRIDGE_PATHS$LOCAL_Q_DIR
+      k_shard <- file.path(lqd, sprintf("K%02d", canon_K))
+      # Look for a samples.tsv.gz in the K-sharded dir; fall back to legacy
+      # flat layout at the canonical K.
+      samples_files <- character(0)
+      if (dir.exists(k_shard)) {
+        samples_files <- list.files(k_shard,
+                                     pattern = "\\.local_Q_samples\\.tsv\\.gz$",
+                                     full.names = TRUE)
+      }
+      if (length(samples_files) == 0 && dir.exists(lqd)) {
+        # Legacy flat — treat as canonical K
+        samples_files <- list.files(lqd,
+                                     pattern = "\\.local_Q_samples\\.tsv\\.gz$",
+                                     full.names = TRUE)
+      }
+      if (length(samples_files) > 0) {
+        # Read up to a few files to stabilise assigned_pop; one file is usually
+        # enough but reading 2-3 makes the majority vote less brittle to any
+        # single chrom being weird.
+        sf_use <- head(samples_files, 3L)
+        parts <- lapply(sf_use, function(f) {
+          tryCatch(data.table::fread(f, select = c("sample_id", "assigned_pop")),
+                    error = function(e) NULL)
+        })
+        parts <- Filter(Negate(is.null), parts)
+        if (length(parts) > 0) {
+          all_rows <- data.table::rbindlist(parts, fill = TRUE)
+          if ("sample_id" %in% names(all_rows) &&
+              "assigned_pop" %in% names(all_rows) &&
+              nrow(all_rows) > 0) {
+            mode_pop <- all_rows[,
+              list(pop = names(sort(table(assigned_pop), decreasing = TRUE))[1]),
+              by = sample_id]
+            for (k_val in seq_len(canon_K)) {
+              gid <- sprintf("ancestry_K%d_Q%d", canon_K, k_val)
+              if (!reg$has_group(gid)) {
+                members <- mode_pop[as.integer(pop) == k_val, sample_id]
+                reg$add_group(gid, as.character(members),
+                               description = sprintf(
+                                 "Canonical-K=%d ancestry cluster %d (majority-vote assigned_pop)",
+                                 canon_K, k_val))
+                .anc_groups_registered <- .anc_groups_registered + 1L
+              }
+            }
+          }
+        }
+      }
+    }, error = function(e) {
+      message("[load_bridge] ancestry group registration failed: ",
+              conditionMessage(e), " — continuing")
     })
   }
 
@@ -253,9 +375,11 @@ if (exists(".LOAD_BRIDGE_DONE", envir = .GlobalEnv) &&
           if (!is.null(smap)) paste0("smap(", smap$n, ") ") else "NO_SMAP ",
           if (!is.null(reg)) paste0("registry(", nrow(reg$list_groups()), " groups) ") else "NO_REG ",
           if (.iq_loaded) "instant_q " else "",
-          if (.disp_loaded) "dispatcher " else "")
+          if (.disp_loaded) "dispatcher " else "",
+          if (.anc_groups_registered > 0L)
+            paste0("ancestry_groups_new=", .anc_groups_registered, " ") else "")
 
   # Clean up temporaries
-  rm(.smap_file, .reg_file, .iq_loaded, .disp_loaded,
+  rm(.smap_file, .reg_file, .iq_loaded, .disp_loaded, .anc_groups_registered,
      .bridge_self, .bridge_dir, envir = environment())
 }

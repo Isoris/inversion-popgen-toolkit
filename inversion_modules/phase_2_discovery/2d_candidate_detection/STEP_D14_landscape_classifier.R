@@ -3,6 +3,24 @@
 # STEP_D14_landscape_classifier.R — Full-chromosome block classification + confidence
 # ============================================================================
 #
+# STATUS 2026-04-17 (FINDING 18, DESIGN — documented, not fixed):
+#   This module is NOT wired into run_all.R. It is sourced by nothing in the
+#   live pipeline. C01d (phase 4a) reads `iv$category`, `iv$landscape_category`,
+#   and `iv$n_children` for its pattern-classification fallback at L333-355,
+#   but since D14 never runs, those columns are absent from the merged
+#   scoring table and C01d falls through to its shape_class-based fallback
+#   (strong_inversion / diffuse_inversion / diagonal_band / noise). That
+#   fallback is sensible, so this isn't a crash or a silent corruption —
+#   it's a dead contract. D13 plotting also has a stale import of the old
+#   name `14_landscape_classifier.R` at L150 which will silently no-op.
+#
+#   Wiring this in is not blocking for the manuscript. If restored, Phase 8
+#   of run_all.R needs to source this file and merge the output on block_id
+#   (and the `classify_gaps` output would need dropping or carrying an
+#   explicit flag to distinguish real blocks from inter-block gap rows).
+#
+# ============================================================================
+#
 # Not just "find blocks" — label EVERYTHING on the chromosome.
 # Every region gets a structural category, a confidence score,
 # and a descriptive label for the annotated plot.

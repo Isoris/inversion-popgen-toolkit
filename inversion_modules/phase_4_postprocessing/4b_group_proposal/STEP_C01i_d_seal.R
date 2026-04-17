@@ -127,12 +127,19 @@ resolve_final_classes <- function(blocks) {
     is_recomb <- !is.null(rec_info)
     recomb_source <- if (is_recomb) "signal_detection" else NA_character_
     event_class <- if (is_recomb) as.character(rec_info$event_class) else NA_character_
+    # chat-13: pass multi_recomb's canonical recomb_subgroup through to
+    # register_all_groups. The full split (RECOMBINANT / RECOMBINANT_GC /
+    # RECOMBINANT_DCO) lives on the multi_recomb per-sample record.
+    recomb_subgroup <- if (is_recomb) {
+      as.character(rec_info$recomb_subgroup %||% NA_character_)
+    } else NA_character_
 
     # Rule 2: structure type says fragmented but no recomb detected → flag as weak
     if (!is_recomb && !is.null(struct) && struct == "multi_block_fragmented") {
       is_recomb <- TRUE
       recomb_source <- "nested_comp_fragmented"
       event_class <- "ambiguous"
+      recomb_subgroup <- NA_character_
     }
 
     # Rule 3: two_block_composite flag (keep pca_class, mark sample)
@@ -144,21 +151,32 @@ resolve_final_classes <- function(blocks) {
       sample_id = sid,
       pca_class = pca_class,
       structure_type = struct %||% NA_character_,
+      # chat-13 Finding BI: C01i_b emits event_class values
+      # "gene_conversion_embedded", "double_crossover",
+      # "single_crossover_or_ambiguous". Accept both the current-canonical
+      # names and the short legacy names ("gene_conversion",
+      # "double_crossover", "suspicious"/"ambiguous"). Map to a stable
+      # recomb_status token.
       recomb_status = if (is_recomb) {
-        switch(event_class %||% "ambiguous",
-               gene_conversion = "recomb_GC",
-               double_crossover = "recomb_DCO",
-               suspicious = "recomb_suspicious",
-               ambiguous = "recomb_ambiguous",
-               "recomb_ambiguous")
+        ec_norm <- event_class %||% "ambiguous"
+        if      (ec_norm %in% c("gene_conversion_embedded", "gene_conversion"))
+          "recomb_GC"
+        else if (ec_norm == "double_crossover")
+          "recomb_DCO"
+        else if (ec_norm %in% c("single_crossover_or_ambiguous",
+                                  "suspicious", "ambiguous", NA_character_))
+          "recomb_ambiguous"
+        else
+          "recomb_ambiguous"
       } else "NOT_RECOMB",
       recomb_event_class = event_class %||% NA_character_,
+      recomb_subgroup = recomb_subgroup %||% NA_character_,
       recomb_source = recomb_source %||% NA_character_,
       in_composite_region = in_composite,
       final_class = final_class,
       # Diagnostics passed through
       window_consistency = s$window_consistency %||% NA_real_,
-      flashlight_seeded = s$flashlight_seeded %||% FALSE,
+      sv_prior_seeded = s$sv_prior_seeded %||% FALSE,
       discordant = s$discordant %||% FALSE,
       cheat2_constrained = s$cheat2_constrained %||% FALSE
     )
@@ -236,11 +254,23 @@ register_all_groups <- function(cid, chrom, final_records) {
     fc <- r$final_class
     class_groups[[fc]] <- c(class_groups[[fc]], r$sample_id)
     if (fc == "RECOMBINANT") {
+      # chat-13 wiring: prefer the explicit recomb_subgroup from
+      # multi_recomb's per-sample record if present. Fall back to
+      # deriving from event_class (Finding BI: accept both canonical
+      # "gene_conversion_embedded" and legacy "gene_conversion"; same
+      # for "double_crossover").
+      sg <- r$recomb_subgroup %||% NA_character_
       ec <- r$recomb_event_class %||% "ambiguous"
-      if (ec == "gene_conversion") {
-        class_groups$RECOMBINANT_GC <- c(class_groups$RECOMBINANT_GC, r$sample_id)
+      target <- if (!is.na(sg) && sg %in% c("RECOMBINANT_GC",
+                                              "RECOMBINANT_DCO")) {
+        sg
+      } else if (ec %in% c("gene_conversion_embedded", "gene_conversion")) {
+        "RECOMBINANT_GC"
       } else if (ec == "double_crossover") {
-        class_groups$RECOMBINANT_DCO <- c(class_groups$RECOMBINANT_DCO, r$sample_id)
+        "RECOMBINANT_DCO"
+      } else NA_character_
+      if (!is.na(target)) {
+        class_groups[[target]] <- c(class_groups[[target]], r$sample_id)
       }
     }
   }
@@ -356,10 +386,15 @@ for (ci in seq_len(nrow(cand_dt))) {
                                          value = valid$level,
                                          script = "STEP_C01i_d_seal.R"),
              error = function(e) NULL)
-    tryCatch(reg$evidence$add_evidence(cid, "q1_composite_flag",
-                                         value = valid$composite_flag,
-                                         script = "STEP_C01i_d_seal.R"),
-             error = function(e) NULL)
+    # FIX 40 (chat 9): q1_composite_flag is written exclusively by the
+    # internal_ancestry_composition.schema.json keys_extracted rule (from
+    # the Python nested_composition block's `composite_flag` field). The
+    # previous explicit add_evidence call here duplicated that write under
+    # a different key name (schema wrote q1_ancestry_composite_flag; seal
+    # wrote q1_composite_flag — two keys for the same value). Schema key
+    # renamed to q1_composite_flag in the same fix; seal's explicit write
+    # removed. One canonical key, one canonical writer.
+    # See AUDIT_LOG_chat9 Finding X.
     tryCatch(reg$evidence$add_evidence(cid, "q2_decomp_quality_flags",
                                          value = paste(valid$quality_flags, collapse = ","),
                                          script = "STEP_C01i_d_seal.R"),

@@ -146,7 +146,12 @@ load_registry <- function(registry_dir = NULL) {
                          subgroup = ".", description = "", overwrite = FALSE) {
 
     # Check duplicate
-    g <- fread(groups_file)
+    # FIX 2026-04-17 (Finding AK, chat 11): force `created` to character on
+    # read. fread auto-detects the "%Y-%m-%d %H:%M:%S" format and coerces to
+    # POSIXct, which then class-mismatches the character value from
+    # format(Sys.time()) on rbind — fatal after the first add_group in a
+    # session. Bulk-writer modules (chat 13 seeded regions) hit this hard.
+    g <- fread(groups_file, colClasses = c(created = "character"))
     if (group_id %in% g$group_id) {
       if (!overwrite) {
         message("[registry] Group already exists: ", group_id, " (", 
@@ -225,6 +230,55 @@ load_registry <- function(registry_dir = NULL) {
     invisible(TRUE)
   }
 
+  # Chat-16: get all groups associated with a candidate, labeled by karyotype
+  # and dimension. Helps classification scripts discover sub-clusters without
+  # string-parsing group names themselves. See DATABASE_DESIGN.md §
+  # "Sample group naming convention" for the suffix conventions.
+  #
+  # Returns a data.table: group_id / karyotype / dimension / parent_group / n
+  # where dimension is derived from the group name (or the stored `dimension`
+  # column if present).
+  get_subgroups <- function(cid) {
+    all_g <- fread(groups_file, colClasses = c(created = "character"))
+    prefix <- sprintf("^inv_%s_", cid)
+    hits <- all_g[grepl(prefix, all_g$group_id)]
+    if (!nrow(hits)) return(data.table(group_id = character(0),
+                                          karyotype = character(0),
+                                          dimension = character(0),
+                                          parent_group = character(0),
+                                          n = integer(0)))
+    # Parse karyotype + dimension from group_id. Conventions:
+    #   inv_<cid>_<KARYO>                    → top-level karyotype
+    #   inv_<cid>_<KARYO>__sub<N>            → karyotype_subcluster
+    #   inv_<cid>_<KARYO>__ancestry<K>_<k>   → ancestry
+    #   inv_<cid>_<KARYO>__ghsl_<band>       → ghsl
+    #   inv_<cid>_<KARYO>__family_<fid>      → family
+    body <- sub(sprintf("^inv_%s_", cid), "", hits$group_id)
+    has_suffix <- grepl("__", body)
+    karyo <- ifelse(has_suffix, sub("__.*", "", body), body)
+    suffix <- ifelse(has_suffix, sub(".*?__", "", body), "")
+    dim <- rep(".", nrow(hits))
+    dim[!has_suffix] <- "karyotype"
+    dim[has_suffix & grepl("^sub[0-9]+$",   suffix)] <- "karyotype_subcluster"
+    dim[has_suffix & grepl("^noise$",       suffix)] <- "karyotype_subcluster_noise"
+    dim[has_suffix & grepl("^ancestry",     suffix)] <- "ancestry"
+    dim[has_suffix & grepl("^ghsl_",        suffix)] <- "ghsl"
+    dim[has_suffix & grepl("^family_",      suffix)] <- "family"
+    # Override with stored dimension column if the groups_file has one
+    if ("dimension" %in% names(hits)) {
+      stored <- as.character(hits$dimension)
+      dim <- ifelse(!is.na(stored) & nzchar(stored) & stored != ".", stored, dim)
+    }
+    parent <- ifelse(has_suffix, sprintf("inv_%s_%s", cid, karyo), NA_character_)
+    data.table(
+      group_id     = hits$group_id,
+      karyotype    = karyo,
+      dimension    = dim,
+      parent_group = parent,
+      n            = hits$n
+    )
+  }
+
   list(
     dir = registry_dir,
     master_file = master_file,
@@ -234,6 +288,7 @@ load_registry <- function(registry_dir = NULL) {
     has_group = has_group,
     get_group = get_group,
     add_group = add_group,
+    get_subgroups = get_subgroups,
     sample_id_from_ind = sample_id_from_ind,
     ind_from_sample_id = ind_from_sample_id,
     add_master_column = add_master_column

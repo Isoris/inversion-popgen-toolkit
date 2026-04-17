@@ -20,7 +20,7 @@ MANTA_DEL_VCF  $BASE/MODULE_4H_ALL_Manta/05_final_catalogs/catalog_226.DEL.PASS.
 POP_CONF_DIR   $BASE/MODULE_4H_ALL_Manta/10_population_confidence
 ```
 
-### `MODULE_5A2_breakpoint_validation` config defaults (new MODULE_4* names)
+### `phase_3_refine` config defaults (new MODULE_4* names)
 
 ```
 DELLY_BASE      $BASE/MODULE_4B_DEL_Delly
@@ -80,7 +80,7 @@ Add this block near the "Stable external inputs" section, before the
 +export POP_CONF_DIR="${MANTA_BASE}/10_population_confidence"
 ```
 
-### 2. Update `MODULE_5A2_breakpoint_validation/00_breakpoint_validation_config.sh`
+### 2. Update `phase_3_refine/00_breakpoint_validation_config.sh`
 
 Remove the duplicated `DELLY_INV_VCF` etc. definitions; keep only the
 module-specific ones (like `DELLY_INV_BED`, `DELLY_INV_GT`,

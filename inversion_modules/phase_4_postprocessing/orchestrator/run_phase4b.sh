@@ -27,7 +27,7 @@
 set -euo pipefail
 
 BASE="${BASE:-/scratch/lt200308-agbsci/Quentin_project_KEEP_2026-02-04}"
-MODULE_DIR="${MODULE_DIR:-${BASE}/inversion-popgen-toolkit}"
+MODULE_DIR="${MODULE_DIR:-${BASE}/inversion_modules}"
 SLURM_ACCT="${SLURM_ACCT:-lt200308}"
 LOGDIR="${LOGDIR:-${MODULE_DIR}/logs/phase4b_$(date +%Y%m%d_%H%M%S)}"
 mkdir -p "${LOGDIR}"
@@ -97,14 +97,14 @@ submit_job() {
 }
 
 # ── Phase 4b.1: decompose ────────────────────────────────────────────────────
-CMD_DECOMP="Rscript ${MODULE_DIR}/phase4b_rewrite/R/STEP_C01i_decompose.R \
+CMD_DECOMP="Rscript ${MODULE_DIR}/phase_4_postprocessing/4b_group_proposal/STEP_C01i_decompose.R \
   --candidates ${CANDIDATES} \
   --outdir ${DECOMP_OUT} \
   --tier_max ${TIER_MAX}"
 JID_DECOMP=$(submit_job "4b1_decomp" "" "04:00:00" 4 16G "${CMD_DECOMP}")
 
 # ── Phase 4b.2: multi_recomb (depends on 4b.1) ───────────────────────────────
-CMD_RECOMB="Rscript ${MODULE_DIR}/phase4b_rewrite/R/STEP_C01i_b_multi_recomb.R \
+CMD_RECOMB="Rscript ${MODULE_DIR}/phase_4_postprocessing/4b_group_proposal/STEP_C01i_b_multi_recomb.R \
   --candidates ${CANDIDATES} \
   --decomp_dir ${DECOMP_OUT} \
   --outdir ${RECOMB_OUT} \
@@ -112,7 +112,7 @@ CMD_RECOMB="Rscript ${MODULE_DIR}/phase4b_rewrite/R/STEP_C01i_b_multi_recomb.R \
 JID_RECOMB=$(submit_job "4b2_recomb" "${JID_DECOMP}" "03:00:00" 2 8G "${CMD_RECOMB}")
 
 # ── Phase 4b.3: nested_composition (parallel with 4b.1) ──────────────────────
-CMD_NESTED="python3 ${MODULE_DIR}/phase4b_rewrite/python/STEP_C01i_c_nested_composition.py \
+CMD_NESTED="python3 ${MODULE_DIR}/phase_4_postprocessing/4b_group_proposal/STEP_C01i_c_nested_composition.py \
   --candidates ${CANDIDATES} \
   --q_cache_dir ${Q_CACHE_DIR} \
   --outdir ${NESTED_OUT} \
@@ -120,7 +120,7 @@ CMD_NESTED="python3 ${MODULE_DIR}/phase4b_rewrite/python/STEP_C01i_c_nested_comp
 JID_NESTED=$(submit_job "4b3_nested" "" "02:00:00" 2 8G "${CMD_NESTED}")
 
 # ── Phase 4b.4: seal (depends on 4b.1, 4b.2, 4b.3) ───────────────────────────
-CMD_SEAL="Rscript ${MODULE_DIR}/phase4b_rewrite/R/STEP_C01i_d_seal.R \
+CMD_SEAL="Rscript ${MODULE_DIR}/phase_4_postprocessing/4b_group_proposal/STEP_C01i_d_seal.R \
   --candidates ${CANDIDATES} \
   --decomp_dir ${DECOMP_OUT} \
   --recomb_dir ${RECOMB_OUT} \
@@ -144,3 +144,9 @@ echo "  squeue -u \$USER -j ${JID_DECOMP},${JID_RECOMB},${JID_NESTED},${JID_SEAL
 echo ""
 echo "[run_phase4b] logs at ${LOGDIR}"
 echo "[run_phase4b] outputs at ${MODULE_DIR}/phase4b_out/"
+# FIX 48 (chat 10): machine-readable "final job id" line for parent
+# orchestrators (run_phase4.sh). The seal job is the exit gate of 4b —
+# 4c must gate on it. Emitted as the LAST line of stdout with a fixed
+# prefix, so callers can `grep '^PHASE4B_SEAL_JID=' | cut -d= -f2`
+# deterministically without parsing anything else.
+echo "PHASE4B_SEAL_JID=${JID_SEAL}"

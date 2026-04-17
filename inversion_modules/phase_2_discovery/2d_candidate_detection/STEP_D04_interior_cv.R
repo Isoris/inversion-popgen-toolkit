@@ -10,8 +10,18 @@
 # Also computes stripe count: number of dark bands (local sim minima)
 # crossing the interior of the block.
 #
+# BUGFIX 2026-04-17 (FIX 17, SILENT): the "patchiness" column here was a
+# tail-fraction (fraction of cells < median/2) with semantics completely
+# different from D08's CV-based `patchiness`. Both landed on tab during
+# Phase 8 merges, producing `patchiness.x` (D04 tail fraction) and
+# `patchiness.y` (D08 CV), so C01d's `iv$patchiness` at line 222 was NULL
+# and D5_interior_quality silently skewed (`1 - 0*3 = 1` saturated
+# patch_score). Renaming to `below_median_frac` preserves both quantities
+# without collision. C01d reads D08's `patchiness` which is what the
+# scoring logic at L222 `1 - patchiness * 3` actually assumes (CV range).
+#
 # Returns data.frame with columns:
-#   candidate_id, interior_cv, homogeneity, stripe_count, patchiness
+#   candidate_id, interior_cv, homogeneity, stripe_count, below_median_frac
 # ============================================================================
 
 compute_interior_cv <- function(candidates, smat) {
@@ -29,7 +39,7 @@ compute_interior_cv <- function(candidates, smat) {
         interior_cv  = NA_real_,
         homogeneity  = NA_real_,
         stripe_count = NA_integer_,
-        patchiness   = NA_real_,
+        below_median_frac = NA_real_,  # BUGFIX 2026-04-17 (FIX 17)
         stringsAsFactors = FALSE
       )
       next
@@ -46,7 +56,7 @@ compute_interior_cv <- function(candidates, smat) {
         interior_cv  = NA_real_,
         homogeneity  = NA_real_,
         stripe_count = NA_integer_,
-        patchiness   = NA_real_,
+        below_median_frac = NA_real_,  # BUGFIX 2026-04-17 (FIX 17)
         stringsAsFactors = FALSE
       )
       next
@@ -75,7 +85,9 @@ compute_interior_cv <- function(candidates, smat) {
     stripe_threshold <- mu * 0.7  # minima below 70% of mean
     stripes <- count_local_minima(col_smoothed, stripe_threshold)
 
-    # Patchiness: fraction of within-block values below the block median
+    # Below-median fraction: fraction of within-block values below half the
+    # block median. Previously called `patchiness` but that name clashed
+    # with D08's CV-based patchiness on merge. See FIX 17 header comment.
     block_median <- median(ut_vals, na.rm=TRUE)
     below_median <- sum(ut_vals < block_median * 0.5) / length(ut_vals)
 
@@ -84,7 +96,7 @@ compute_interior_cv <- function(candidates, smat) {
       interior_cv  = round(cv, 4),
       homogeneity  = round(homogeneity, 4),
       stripe_count = stripes,
-      patchiness   = round(below_median, 4),
+      below_median_frac = round(below_median, 4),  # BUGFIX 2026-04-17 (FIX 17)
       stringsAsFactors = FALSE
     )
   }

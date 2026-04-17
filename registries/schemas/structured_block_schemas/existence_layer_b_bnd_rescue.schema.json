@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "existence_layer_b_bnd_rescue.schema.json",
+  "block_type": "existence_layer_b_bnd_rescue",
+  "description": "Supplementary Layer B evidence from phase_3/STEP06 BND rescue pathway. When DELLY's INV-typing fails on one of the two inversion junctions at low coverage (~5-9x), the surviving junction lands in the BND catalog with INFO/CT=3to3 (left bp) or CT=5to5 (right bp). Manta's equivalent is INV3/INV5 flags on BND records in the pre-conversion raw VCF. STEP06 greedily pairs unmatched CT=3to3/INV3 with CT=5to5/INV5 within a 5 Mb window and cross-references the resulting pairs against the INV catalog. Pairs with no catalog match are 'orphan rescue' candidates — inversions the strict INV callers missed. This block records the rescue evidence for a specific candidate so downstream 4a/4e scoring can account for it. Added 2026-04-17 (chat 5 FIX 29 v2). Co-exists with existence_layer_b (the primary Layer B block written by C00 in phase_2c).",
+  "question": "Q7",
+  "group_validation_required": "NONE",
+  "source_script": "phase_3_refine/06_bnd_inversion_signal.py",
+  "required": ["bnd_rescued", "rescue_source"],
+  "properties": {
+    "bnd_rescued": {
+      "type": "boolean",
+      "description": "True iff this candidate was reconstructed from paired BND junctions that were not present in either caller's INV catalog."
+    },
+    "rescue_source": {
+      "type": "string",
+      "enum": ["delly_only", "manta_raw_only", "cross_caller", "none"],
+      "description": "Provenance of the two paired BND junctions. 'cross_caller' = one from DELLY, one from Manta raw pre-conversion."
+    },
+    "bnd_pair_bp1": { "type": "integer", "description": "Left breakpoint position of the rescued pair (CT=3to3 / INV3 junction)." },
+    "bnd_pair_bp2": { "type": "integer", "description": "Right breakpoint position (CT=5to5 / INV5 junction)." },
+    "bnd_pair_size_bp": { "type": "integer" },
+    "left_junction_id":  { "type": "string", "description": "VCF ID of the left (3to3) BND record." },
+    "right_junction_id": { "type": "string", "description": "VCF ID of the right (5to5) BND record." },
+    "left_junction_source":  { "type": "string", "enum": ["delly", "manta_raw"] },
+    "right_junction_source": { "type": "string", "enum": ["delly", "manta_raw"] },
+    "left_pe":  { "type": "integer", "description": "Paired-end support at left junction (DELLY INFO/PE or Manta aggregated PR-alt)." },
+    "right_pe": { "type": "integer" },
+    "left_sr":  { "type": "integer", "description": "Split-read support at left junction." },
+    "right_sr": { "type": "integer" },
+    "matched_inv_id": { "type": "string", "description": "If the BND pair matches an existing INV catalog record, the ID of that record. Empty string for true orphan rescues." },
+    "match_type": {
+      "type": "string",
+      "enum": ["matches_BP1", "matches_BP2", "no_inv_match"],
+      "description": "Whether the pair aligns with an INV catalog entry's bp1, bp2, or neither (true orphan rescue)."
+    }
+  },
+  "keys_extracted": [
+    { "key": "q7b_bnd_rescued",         "from": "bnd_rescued" },
+    { "key": "q7b_bnd_rescue_source",   "from": "rescue_source" },
+    { "key": "q7b_bnd_pair_bp1",        "from": "bnd_pair_bp1" },
+    { "key": "q7b_bnd_pair_bp2",        "from": "bnd_pair_bp2" },
+    { "key": "q7b_bnd_pair_size_bp",    "from": "bnd_pair_size_bp" },
+    { "key": "q7b_bnd_match_type",      "from": "match_type" },
+    { "key": "q7b_bnd_matched_inv_id",  "from": "matched_inv_id" },
+    { "key": "q7b_bnd_left_pe",         "from": "left_pe" },
+    { "key": "q7b_bnd_right_pe",        "from": "right_pe" },
+    { "key": "q7b_bnd_left_sr",         "from": "left_sr" },
+    { "key": "q7b_bnd_right_sr",        "from": "right_sr" }
+  ]
+}

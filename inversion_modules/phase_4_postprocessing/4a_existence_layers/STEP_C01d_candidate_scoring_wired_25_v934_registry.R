@@ -21,15 +21,19 @@
 #     staircase blocks. Blocks without snake core → capped Tier 4.
 #   - Cheat 25 block viability: 4-test battery using SV + boundary + peel.
 #     DEAD candidates → forced Tier 4.
-#   - New args: --cores_dir, --boundary_dir, --flashlight_dir
+#   - New args: --cores_dir, --boundary_dir, --sv_prior_dir
 #
 # v9.3: Rebuilt to consume inv_detect_v9.3 scoring tables DIRECTLY.
 # The old C01c triangle/tube/GHSL pipeline is superseded.
 #
 # OLD (v8.4):  C01c triangles → bridge → C01d (10 dimensions from triangles)
-# NEW (v9.3):  inv_detect scoring_table_*.tsv → C01d (10 dimensions from detector)
+# NEW (v9.3):  inv_detect scoring_table_*.tsv → C01d (12 dimensions from detector)
+#                                                 [chat-13 Finding AO: was
+#                                                  documented as 10; actual
+#                                                  count is 12 per the mapping
+#                                                  below, D1–D12.]
 #
-# Dimension mapping:
+# Dimension mapping (12 dimensions after v9.3.2):
 #   D1  Block strength    — contrast × squareness × sharpness (from 08_bloc_scoring)
 #   D2  Block shape       — shape_class + occupancy + homogeneity (from 08 + 04)
 #   D3  NN persistence    — survives_nn40/nn80 + nn_birth (from 02 + 09)
@@ -40,15 +44,17 @@
 #   D8  Peel diagnostic   — L1b + L2 effect classes (from C01n peeling)
 #   D9  PCA/ICA clusters  — pc1_silhouette + ica_kurtosis (from 08_pca)
 #   D10 Partition (GHSL)  — partition_stability + entropy (from 05)
+#   D11 Boundary concord  — C01g boundary catalog (v9.3.2, filled after loop)
+#   D12 Snake concordance — C01b core_regions overlap (v9.3.2, filled after loop)
 #
 # D3 (ancestry diversity / eff_K) is GONE — replaced by D3 (NN persistence)
 # which is a genuinely independent structural test.
 #
 # Tier assignment: count-based matching manuscript.
-#   Tier 1: ≥7/10 dimensions positive
-#   Tier 2: 5-6 dimensions positive
-#   Tier 3: 3-4 dimensions positive
-#   Tier 4: <3 dimensions positive
+#   Tier 1: ≥8/12 dimensions positive
+#   Tier 2: 6–7 dimensions positive
+#   Tier 3: 4–5 dimensions positive
+#   Tier 4: <4 dimensions positive
 #
 # Usage:
 #   Rscript STEP_C01d_candidate_scoring.R <detector_dir> <outdir> \
@@ -96,11 +102,21 @@ detector_dir <- args[1]; outdir <- args[2]
 precomp_dir <- NULL; hyp_dir <- NULL
 cores_dir <- NULL; boundary_dir <- NULL
 
-# BUGFIX 2026-04-17: --flashlight_dir was parsed but never read in this
+# BUGFIX 2026-04-17: --sv_prior_dir was parsed but never read in this
 # script. D7 (sv_breakpoint) already gets its SV info from the staircase
 # scoring table's sv_overlap_pct / n_sv_hits columns (populated by
 # phase_2/2d/STEP_D06_sv_overlap.R). The flag is accepted for backward
 # compatibility with existing launchers but is silently ignored.
+#
+# 2026-04-17 (chat 5): an earlier attempt (FIX 29 first draft) added a
+# --phase3_dir flag + D13 scoring dimension to pull phase_3 OR-test
+# results into Layer A's composite. That was the wrong abstraction —
+# phase_3's OR test is Layer D of the 4-layer evidence model, not a
+# sub-dimension of Layer A. Layer D is written into the evidence
+# registry directly by phase_3/STEP03 via the `existence_layer_d`
+# block, and consumed by C01f's compute_group_validation() through
+# the `q7_layer_d_fisher_p` / `q7_layer_d_fisher_or` flat keys.
+# C01d stays Layer-A-only. The --phase3_dir flag was reverted.
 i <- 3L
 while (i <= length(args)) {
   a <- args[i]
@@ -108,7 +124,7 @@ while (i <= length(args)) {
   else if (a == "--hyp_dir" && i < length(args))    { hyp_dir <- args[i+1]; i <- i+2L }
   else if (a == "--cores_dir" && i < length(args))  { cores_dir <- args[i+1]; i <- i+2L }
   else if (a == "--boundary_dir" && i < length(args)) { boundary_dir <- args[i+1]; i <- i+2L }
-  else if (a == "--flashlight_dir" && i < length(args)) {
+  else if (a == "--sv_prior_dir" && i < length(args)) {
     # accepted but ignored — D7 uses scoring_table SV columns instead
     i <- i+2L
   }
@@ -280,11 +296,52 @@ score_candidates <- function(iv_dt, hyp_verd) {
     d9 <- pmin(1, pmax(0, 0.60 * sil + 0.40 * pmin(1, ica_k / 5)))
 
     # --- D10: Partition stability (GHSL-like) ---
+    # BUGFIX 2026-04-17 (FIX 22, DESIGN): D10 now consumes 2e/C04's
+    # GHSL v6 phased-Clair3 haplotype divergence when available, not
+    # just D05's sim_mat-based partition stability. The two measure
+    # different things and are complementary:
+    #   - D05 sim_mat partition_stability: "do sample-PC1 cluster
+    #     assignments stay consistent across the block's windows?"
+    #     Population-structure signal; always available.
+    #   - C04 ghsl_v6_score_max: "do within-sample haplotype
+    #     divergences form a stable bimodal pattern?" Direct
+    #     biological karyotype signal; available only where Clair3
+    #     phasing has finished.
+    # When both exist, blend with preference for the more direct
+    # biological signal (ghsl). When only sim_mat, use it alone
+    # (preserves pre-FIX-22 behaviour).
     part_stab <- safe_num(iv$partition_stability, 0)
     part_ent  <- safe_num(iv$partition_entropy, 0)
-    # Low entropy = crisp partition = good
     ent_score <- pmin(1, pmax(0, 1 - part_ent / 2))
-    d10 <- 0.60 * part_stab + 0.40 * ent_score
+    d10_simmat <- 0.60 * part_stab + 0.40 * ent_score
+
+    # GHSL v6 contribution (from C04b via chat-14 wiring in run_all.R).
+    # Column was `ghsl_v5_score_max` before chat 14 — see chat-14 rename
+    # pass. v5/v6 compat is handled in run_all.R; this column is always
+    # the canonical v6 score max regardless of which annot RDS was read.
+    ghsl_score_max    <- safe_num(iv$ghsl_v6_score_max, NA_real_)
+    ghsl_bimodal_frac <- safe_num(iv$ghsl_div_bimodal_frac, NA_real_)
+    ghsl_pass_frac    <- safe_num(iv$ghsl_pass_frac, NA_real_)
+    ghsl_n_scored     <- safe_num(iv$ghsl_n_scored_windows, 0)
+
+    if (ghsl_n_scored >= 3 && is.finite(ghsl_score_max)) {
+      # C04 has data for this block — build phased-Clair3 D10 component.
+      # ghsl_v6_score is already [0,1]-valued in the classifier's
+      # compute_rolling_metrics (see STEP_C04b). We take it as a direct
+      # partition-quality proxy.
+      d10_ghsl <- 0.50 * ghsl_score_max +
+                  0.25 * safe_num(ghsl_bimodal_frac, 0) +
+                  0.25 * safe_num(ghsl_pass_frac, 0)
+      d10_ghsl <- pmin(1, pmax(0, d10_ghsl))
+      # Blend: ghsl gets 0.6 weight when both are present (direct
+      # biological evidence preferred over structural proxy)
+      d10 <- 0.60 * d10_ghsl + 0.40 * d10_simmat
+      d10_source <- "ghsl_and_simmat"
+    } else {
+      # Fall back to sim_mat partition stability alone
+      d10 <- d10_simmat
+      d10_source <- "simmat_only"
+    }
 
     # --- D11: Boundary concordance (from C01g boundary catalog) ---
     # How well are this candidate's edges supported by independent evidence?
@@ -361,7 +418,7 @@ score_candidates <- function(iv_dt, hyp_verd) {
       start_mb = round(safe_num(iv$start_mb, 0), 3),
       end_mb = round(safe_num(iv$end_mb, 0), 3),
       span_mb = span_mb,
-      # 10 scoring dimensions
+      # 12 scoring dimensions (D11 + D12 filled after loop at L819+)
       d1_block_strength = round(d1, 3),
       d2_block_shape = round(d2, 3),
       d3_nn_persistence = round(d3, 3),
@@ -372,6 +429,7 @@ score_candidates <- function(iv_dt, hyp_verd) {
       d8_peel_or_hyp = round(d8, 3),
       d9_pca_clusters = round(d9, 3),
       d10_partition = round(d10, 3),
+      d10_source = d10_source,  # BUGFIX 2026-04-17 (FIX 22): simmat_only vs ghsl_and_simmat
       d11_boundary_concordance = round(d11, 3),
       d12_snake_concordance = round(d12, 3),
       # Summary
@@ -431,11 +489,11 @@ if (!is.null(cores_dir) && dir.exists(cores_dir)) {
   }
   if (length(core_files) > 0) {
     all_cores <- rbindlist(lapply(core_files, fread), fill = TRUE)
-    # Back-compat: legacy input had core_family/snake_id/cheat26_status; new
+    # Back-compat: legacy input had scale_tier/region_id/cheat26_status; new
     # input has scale_tier/region_id/test26_status. Normalise on read so the
     # overlap logic below doesn't need to know which it got.
-    if ("scale_tier"   %in% names(all_cores) && !"core_family"    %in% names(all_cores)) all_cores[, core_family   := scale_tier]
-    if ("region_id"    %in% names(all_cores) && !"snake_id"       %in% names(all_cores)) all_cores[, snake_id      := region_id]
+    if ("scale_tier"   %in% names(all_cores) && !"scale_tier"    %in% names(all_cores)) all_cores[, scale_tier   := scale_tier]
+    if ("region_id"    %in% names(all_cores) && !"region_id"       %in% names(all_cores)) all_cores[, region_id      := region_id]
     if ("test26_status"%in% names(all_cores) && !"cheat26_status" %in% names(all_cores)) all_cores[, cheat26_status := test26_status]
     message("[C01d] Loaded ", nrow(all_cores), " seeded regions from ", length(core_files), " chromosomes")
 
@@ -472,7 +530,7 @@ if (!is.null(cores_dir) && dir.exists(cores_dir)) {
             if (d12_val > cand_dt$d12_snake_concordance[ci]) {
               set(cand_dt, ci, "d12_snake_concordance", round(d12_val, 3))
               set(cand_dt, ci, "snake_overlap", paste0(
-                cr$core_family, "_region", cr$snake_id,
+                cr$scale_tier, "_region", cr$region_id,
                 "_", round(overlap_frac * 100), "pct",
                 if (c26 != "untested") paste0("_t26=", c26) else ""))
             }
@@ -781,6 +839,25 @@ cand_dt[, dim_positive := rowSums(cbind(
   d7_sv_breakpoint >= 0.20, d8_peel_or_hyp >= 0.60, d9_pca_clusters >= 0.30,
   d10_partition >= 0.30, d11_boundary_concordance >= 0.30, d12_snake_concordance >= 0.30
 ), na.rm = TRUE)]
+
+# BUGFIX 2026-04-17 (chat 7, FIX 33): recompute tier after dim_positive
+# recomputation. The tier assignment at L373–376 runs inside the
+# per-candidate loop BEFORE D11 and D12 are filled (both default to 0
+# in the loop). Since tier is count-based on dim_positive, every
+# candidate with non-zero D11/D12 was getting a tier computed on a
+# dim_positive that was up to 2 lower than the final value. Downstream
+# readers saw dim_positive = 8, tier = 2 — internally inconsistent.
+# Apply the same ≥8/≥6/≥4 ladder as L373–376 and re-apply the
+# peel-disappeared downgrade so tier matches the final dim_positive.
+cand_dt[, tier := fifelse(dim_positive >= 8L, 1L,
+                    fifelse(dim_positive >= 6L, 2L,
+                      fifelse(dim_positive >= 4L, 3L, 4L)))]
+# Peel-disappeared downgrade (matches L378): if both peel effects say
+# "disappeared", a candidate can't sit at Tier 1–2.
+if ("l1b_peel" %in% names(cand_dt) && "l2_peel" %in% names(cand_dt)) {
+  cand_dt[l1b_peel == "disappeared" & l2_peel == "disappeared" & tier <= 2L,
+          tier := 3L]
+}
 
 # Re-sort by final_score
 cand_dt <- cand_dt[order(-final_score)]

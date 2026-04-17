@@ -1,9 +1,15 @@
 # Unified Ancestry Module — Integration Guide
 
+> **Chat 15 update (2026-04-17).** Cache layout is now K-sharded and
+> sample-set-tagged. Cache directory moved out of the code tree. See
+> "What changed" below for the migration story. The prior rewiring
+> plan in `README_REWIRING_v9_need_rewrite.md` is now implemented and
+> that file can be deleted after one full pipeline rerun.
+
 ## Directory Layout
 
 ```
-unified_ancestry/
+unified_ancestry/                                        CODE (git)
 ├── 00_ancestry_config.sh          Central config (source this everywhere)
 ├── run_ancestry.sh                Unified dispatcher
 ├── instant_q                      Bash CLI for Engine B
@@ -15,9 +21,54 @@ unified_ancestry/
 │   ├── instant_q.R                R wrapper (source from any R script)
 │   └── instant_q.py               Python wrapper (import from any script)
 ├── launchers/
-│   └── LAUNCH_instant_q_precompute.slurm   SLURM array (28 chromosomes)
-└── local_Q/                       Cache directory (created by Engine B)
+│   └── LAUNCH_instant_q_precompute.slurm   SLURM array: 28 × K-sweep
+├── dispatchers/
+│   └── region_stats_dispatcher.R  Unified stats dispatcher
+├── engines/                       hobs_hwe, fst_dxy C engines
+└── registries/
+    └── build_registries.py        Interval + sample-subset + cov registry
+
+$BASE/ancestry_cache/                                    DATA (scratch, NOT in git)
+├── K02/
+│   ├── <chr>.<sample_set>.local_Q_summary.tsv.gz   cohort aggregates
+│   ├── <chr>.<sample_set>.local_Q_samples.tsv.gz   per-sample × per-window Q
+│   └── <chr>.<sample_set>.local_Q_meta.tsv
+├── K03/
+├── ...
+├── K08/                                              ← canonical K
+├── ...
+├── K20/
+└── manifest.tsv                   audit of every cached (chrom,K,sample_set)
 ```
+
+`<sample_set>` is a short tag `N<count>_<6char-sha1>` computed from
+the sorted `SAMPLE_LIST` at configure time. Running against a different
+sample subset produces a different tag and cannot collide with prior
+output.
+
+The cache directory lives OUT of `unified_ancestry/` (the code dir) so
+a git status never sees data files and a repo reclone doesn't nuke
+your cache. Default is `$BASE/ancestry_cache`; override by setting
+`LOCAL_Q_DIR` in the env or in `00_ancestry_config.sh`.
+
+## What changed (chat 15)
+
+Pre-2026-04-17:
+- One K only (K=8). Cache files named `<chr>.local_Q_summary.tsv.gz`.
+- Cache directory was `$BASE/unified_ancestry/local_Q/` — inside the code tree.
+- No way to tell which sample set a cache file came from.
+
+Now:
+- K=2..20 sweep. Per-K subdir under `$LOCAL_Q_DIR/K<NN>/`.
+- Sample-set tag in every filename.
+- Cache directory is `$BASE/ancestry_cache/` by default (set via `LOCAL_Q_DIR`).
+- Canonical K (default K=8) is flattened into the inversion precomp RDS as
+  `localQ_delta12_K08` / `localQ_entropy_K08` / `localQ_ena_K08` columns.
+
+Backward compat: legacy flat-layout cache files (no K subdir, no sample
+tag) are still readable — the wrapper's `resolve_cache_summary()` falls
+through to them at canonical K. Manifest files auto-upgrade on the next
+write.
 
 ## Step 1: Compile the C++ Engine
 
@@ -25,7 +76,6 @@ unified_ancestry/
 cd unified_ancestry/src
 make
 # Produces: instant_q
-# Optionally: make install  (copies to ~/.local/bin/)
 ```
 
 Requirements: `g++` with C++17, OpenMP, zlib (`-lz`).
@@ -33,16 +83,17 @@ On LANTA: `module load gcc zlib` or use the conda `assembly` env.
 
 ## Step 2: Configure
 
-Edit `00_ancestry_config.sh` to match your HPC paths.
-The critical variables:
+Edit `00_ancestry_config.sh` to match your HPC paths. Critical vars:
 
 ```bash
 BEAGLE_DIR      # Per-chr BEAGLE GL files from Step 1
-BEST_QOPT       # Best-seed Q matrix (n_samples × K)
-BEST_FOPT       # Best-seed F matrix (n_sites × K)
+BEST_QOPT       # Canonical-K Q matrix; other K's resolved by filename swap
+BEST_FOPT       # Canonical-K F matrix; other K's resolved by filename swap
 SAMPLE_LIST     # One sample ID per line
 INSTANT_Q_BIN   # Path to compiled binary
-LOCAL_Q_DIR     # Where cache files go
+LOCAL_Q_DIR     # Where the cache goes (default: $BASE/ancestry_cache)
+CANONICAL_K     # Which K gets flattened into precomp RDS (default: 8)
+K_SWEEP         # Space-sep list of K's to precompute (default: 2..20)
 ```
 
 ## Step 3: Validate
@@ -51,21 +102,23 @@ LOCAL_Q_DIR     # Where cache files go
 ./run_ancestry.sh validate
 ```
 
-## Step 4: Precompute All Chromosomes
+## Step 4: Precompute All (Chroms × K Values)
 
 ### Option A: SLURM array (recommended)
 ```bash
 mkdir -p logs
 sbatch launchers/LAUNCH_instant_q_precompute.slurm
-# Launches 28 jobs, one per chromosome. ~10 min total.
+# 28 chroms × 19 K values = 532 array tasks. Array-parallel runtime ~30-60 min
+# depending on queue and node concurrency.
 ```
 
-### Option B: Serial bash
+### Option B: Canonical K only (fast, one-time sanity)
 ```bash
-./instant_q --config 00_ancestry_config.sh --precompute --all --ncores 4
+K_SWEEP=8 sbatch launchers/LAUNCH_instant_q_precompute.slurm
+# 28 tasks, ~10 min total.
 ```
 
-### Option C: Single chromosome
+### Option C: Serial bash (single chrom, single K)
 ```bash
 ./instant_q --precompute --chr C_gar_LG01
 ```

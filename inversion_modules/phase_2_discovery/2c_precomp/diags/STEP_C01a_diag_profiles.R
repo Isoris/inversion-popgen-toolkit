@@ -25,7 +25,7 @@ cli <- parse_diag_args()
 data <- load_diag_data(cli$precomp_dir, cli$chrom_filter)
 precomp_list <- data$precomp_list
 chroms <- data$chroms
-inv_like_dt <- data$inv_like_dt
+window_dt <- data$window_dt
 dir.create(cli$outdir, recursive = TRUE, showWarnings = FALSE)
 
 # =============================================================================
@@ -81,8 +81,8 @@ build_eigen_profile <- function(chr) {
 
 # -- 02: Inv-likeness profile (PC14: SEED semantics, continuous color) -------
 build_inv_likeness_profile <- function(chr) {
-  if (nrow(inv_like_dt) == 0) return(NULL)
-  il_chr <- inv_like_dt[chrom == chr]
+  if (nrow(window_dt) == 0) return(NULL)
+  il_chr <- window_dt[chrom == chr]
   if (nrow(il_chr) == 0) return(NULL)
 
   if (!"start_bp" %in% names(il_chr)) {
@@ -277,9 +277,9 @@ build_combined_profile <- function(chr) {
     panels[["B_zscore"]] <- data.table(pos_mb = pos_mb, value = dt$max_abs_z, panel = "B: |z-score|")
   if ("inv_likeness" %in% names(dt)) {
     panels[["C_inv"]] <- data.table(pos_mb = pos_mb, value = dt$inv_likeness, panel = "C: Inv-likeness")
-  } else if (nrow(inv_like_dt) > 0) {
+  } else if (nrow(window_dt) > 0) {
     il_chr <- merge(data.table(global_window_id = dt$global_window_id, pos_mb = pos_mb),
-                     inv_like_dt[chrom == chr, .(global_window_id, inv_likeness)],
+                     window_dt[chrom == chr, .(global_window_id, inv_likeness)],
                      by = "global_window_id", all.x = TRUE)
     panels[["C_inv"]] <- data.table(pos_mb = il_chr$pos_mb, value = il_chr$inv_likeness, panel = "C: Inv-likeness")
   }
@@ -325,7 +325,7 @@ build_combined_profile <- function(chr) {
 
 # -- 24: Local entropy profile ------------------------------------------------
 build_entropy_profile <- function(chr) {
-  il_chr <- if (nrow(inv_like_dt) > 0) inv_like_dt[chrom == chr] else data.table()
+  il_chr <- if (nrow(window_dt) > 0) window_dt[chrom == chr] else data.table()
   if (nrow(il_chr) == 0 || !"local_entropy" %in% names(il_chr)) return(NULL)
   il_chr <- il_chr[is.finite(local_entropy) & is.finite(start_bp)]
   if (nrow(il_chr) < 20) return(NULL)
@@ -344,7 +344,7 @@ build_entropy_profile <- function(chr) {
 
 # -- 25: ENA profile -----------------------------------------------------------
 build_ena_profile <- function(chr) {
-  il_chr <- if (nrow(inv_like_dt) > 0) inv_like_dt[chrom == chr] else data.table()
+  il_chr <- if (nrow(window_dt) > 0) window_dt[chrom == chr] else data.table()
   if (nrow(il_chr) == 0 || !"local_ena" %in% names(il_chr)) return(NULL)
   il_chr <- il_chr[is.finite(local_ena) & is.finite(start_bp)]
   if (nrow(il_chr) < 20) return(NULL)
@@ -364,7 +364,7 @@ build_ena_profile <- function(chr) {
 
 # -- 27: Three-track decomposition -------------------------------------------
 build_three_track_profile <- function(chr) {
-  il_chr <- if (nrow(inv_like_dt) > 0) inv_like_dt[chrom == chr] else data.table()
+  il_chr <- if (nrow(window_dt) > 0) window_dt[chrom == chr] else data.table()
   if (nrow(il_chr) == 0) return(NULL)
   has_str <- "structure_likeness" %in% names(il_chr) && any(is.finite(il_chr$structure_likeness))
   if (!has_str) return(NULL)
@@ -398,7 +398,7 @@ build_three_track_profile <- function(chr) {
 
 # -- 28: Family-likeness profile -----------------------------------------------
 build_family_profile <- function(chr) {
-  il_chr <- if (nrow(inv_like_dt) > 0) inv_like_dt[chrom == chr] else data.table()
+  il_chr <- if (nrow(window_dt) > 0) window_dt[chrom == chr] else data.table()
   if (nrow(il_chr) == 0 || !"family_likeness" %in% names(il_chr)) return(NULL)
   il_chr <- il_chr[is.finite(family_likeness)]
   if (nrow(il_chr) < 20) return(NULL)
@@ -417,7 +417,7 @@ build_family_profile <- function(chr) {
 
 # -- 29: Dosage het rate profile ------------------------------------------------
 build_dosage_het_profile <- function(chr) {
-  il_chr <- if (nrow(inv_like_dt) > 0) inv_like_dt[chrom == chr] else data.table()
+  il_chr <- if (nrow(window_dt) > 0) window_dt[chrom == chr] else data.table()
   if (nrow(il_chr) == 0) return(NULL)
   has_mean <- "dosage_het_rate_median" %in% names(il_chr) && any(is.finite(il_chr$dosage_het_rate_median))
   has_cv <- "dosage_het_rate_cv" %in% names(il_chr) && any(is.finite(il_chr$dosage_het_rate_cv))
@@ -452,7 +452,7 @@ build_dosage_het_profile <- function(chr) {
 
 # -- 30: Band fraction profile -------------------------------------------------
 build_band_fraction_profile <- function(chr) {
-  il_chr <- if (nrow(inv_like_dt) > 0) inv_like_dt[chrom == chr] else data.table()
+  il_chr <- if (nrow(window_dt) > 0) window_dt[chrom == chr] else data.table()
   if (nrow(il_chr) == 0 || !"band1_frac" %in% names(il_chr)) return(NULL)
   il_chr <- il_chr[is.finite(band1_frac)]
   if (nrow(il_chr) < 20) return(NULL)
@@ -478,7 +478,7 @@ build_band_fraction_profile <- function(chr) {
 
 # -- 31: Local Q profile -------------------------------------------------------
 build_localQ_profile <- function(chr) {
-  il_chr <- if (nrow(inv_like_dt) > 0) inv_like_dt[chrom == chr] else data.table()
+  il_chr <- if (nrow(window_dt) > 0) window_dt[chrom == chr] else data.table()
   if (nrow(il_chr) == 0) return(NULL)
   has_lq <- "localQ_delta12" %in% names(il_chr) && any(is.finite(il_chr$localQ_delta12))
   if (!has_lq) return(NULL)
@@ -511,7 +511,7 @@ build_localQ_profile <- function(chr) {
 
 # -- 32: PC1 het metrics profile ------------------------------------------------
 build_het_metrics_profile <- function(chr) {
-  il_chr <- if (nrow(inv_like_dt) > 0) inv_like_dt[chrom == chr] else data.table()
+  il_chr <- if (nrow(window_dt) > 0) window_dt[chrom == chr] else data.table()
   if (nrow(il_chr) == 0) return(NULL)
   il_chr[, pos_mb := (start_bp + end_bp) / 2e6]
 
@@ -559,9 +559,9 @@ build_dashboard <- function(chr) {
   # Panel B: inv-likeness + smooth
   p_inv <- NULL
   inv_vals <- if ("inv_likeness" %in% names(dt)) dt$inv_likeness else {
-    if (nrow(inv_like_dt) > 0 && "global_window_id" %in% names(dt)) {
+    if (nrow(window_dt) > 0 && "global_window_id" %in% names(dt)) {
       m <- merge(data.table(global_window_id = dt$global_window_id),
-                 inv_like_dt[chrom == chr, .(global_window_id, inv_likeness)],
+                 window_dt[chrom == chr, .(global_window_id, inv_likeness)],
                  by = "global_window_id", all.x = TRUE)
       m$inv_likeness
     } else NULL

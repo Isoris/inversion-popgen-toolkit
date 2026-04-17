@@ -1,0 +1,198 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "result_row.schema.json",
+  "title": "results_registry manifest row",
+  "description": "Schema for one row of results_registry/manifest.tsv. Each row points at exactly one cached numerical artifact (a pairwise FST/dxy/theta table, a per-candidate Q matrix, a per-candidate F matrix, or a per-interval ancestry summary) and carries the provenance needed to reproduce it. Foreign keys into sample_registry (who) and interval_registry (where) are strings referencing the PKs of those tables; they must resolve at write time or the put_* method refuses to write. See registries/DATABASE_DESIGN.md for the full design rationale.",
+  "version": "v1_chat16",
+  "type": "object",
+  "required": [
+    "row_id",
+    "kind",
+    "where",
+    "what",
+    "file",
+    "provenance",
+    "timestamp"
+  ],
+  "properties": {
+    "row_id": {
+      "type": "string",
+      "description": "UUID-v4 uniquely identifying this result. Assigned at put time.",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "kind": {
+      "type": "string",
+      "description": "Which of the four result kinds this row represents. Determines which who_*/where fields are required.",
+      "enum": ["pairwise", "candidate_q", "candidate_f", "interval_summary"]
+    },
+    "where": {
+      "type": "object",
+      "description": "Genomic location. For pairwise/interval_summary, chrom is required; for candidate_q/candidate_f, candidate_id is required (FK into interval_registry). start_bp/end_bp are optional for chromosome-wide results.",
+      "properties": {
+        "chrom":        { "type": ["string", "null"] },
+        "start_bp":     { "type": ["integer", "null"], "minimum": 0 },
+        "end_bp":       { "type": ["integer", "null"], "minimum": 0 },
+        "candidate_id": { "type": ["string", "null"], "description": "FK into interval_registry.candidate_intervals.candidate_id" }
+      },
+      "additionalProperties": false
+    },
+    "who_1": {
+      "type": ["object", "null"],
+      "description": "Primary sample group. Required for pairwise, candidate_q, and interval_summary. Null for candidate_f (F matrix has no sample-group dimension).",
+      "required": ["group_id", "group_version"],
+      "properties": {
+        "group_id": {
+          "type": "string",
+          "description": "FK into sample_registry.sample_groups.group_id. Must exist at write time."
+        },
+        "group_version": {
+          "type": "string",
+          "description": "Copy of the group's 'created' timestamp at write time. Used to detect stale caches when group membership changes."
+        }
+      },
+      "additionalProperties": false
+    },
+    "who_2": {
+      "type": ["object", "null"],
+      "description": "Secondary sample group, only for pairwise kind. Otherwise null.",
+      "required": ["group_id", "group_version"],
+      "properties": {
+        "group_id":      { "type": "string" },
+        "group_version": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "what": {
+      "type": "object",
+      "description": "The statistic or metric this row represents.",
+      "required": ["stat"],
+      "properties": {
+        "stat": {
+          "type": "string",
+          "description": "Named metric. pairwise: fst/dxy/theta_pi/da. candidate_q: Q. candidate_f: F. interval_summary: delta12/entropy/ena/ancestry_q_mean.",
+          "enum": ["fst", "dxy", "theta_pi", "da", "Q", "F", "delta12", "entropy", "ena", "ancestry_q_mean"]
+        },
+        "K": {
+          "type": ["integer", "null"],
+          "description": "Number of ancestry clusters (for Q/F/ancestry stats). Null for pairwise FST/dxy etc.",
+          "minimum": 2,
+          "maximum": 50
+        }
+      },
+      "additionalProperties": false
+    },
+    "file": {
+      "type": "string",
+      "description": "Path to the data file, relative to results_registry root. Must exist at write time.",
+      "minLength": 1
+    },
+    "shape": {
+      "type": ["object", "null"],
+      "description": "Quick file shape info so audits don't need to re-open the file.",
+      "properties": {
+        "n_rows": { "type": "integer", "minimum": 0 },
+        "n_cols": { "type": "integer", "minimum": 0 },
+        "sha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$|^$" }
+      },
+      "additionalProperties": false
+    },
+    "provenance": {
+      "type": "object",
+      "description": "How this result was computed. Required so a reviewer can trace any number back to its source script, config, and input files.",
+      "required": ["source_script"],
+      "properties": {
+        "engine": {
+          "type": ["string", "null"],
+          "description": "Which numerical engine produced the raw result. e.g. instant_q_v13, angsd_v0.940, ngsAdmix_v33."
+        },
+        "engine_version": {
+          "type": ["string", "null"],
+          "description": "Specific build / commit / version string of the engine."
+        },
+        "source_script": {
+          "type": "string",
+          "description": "Path (relative to toolkit root) to the R/Python/shell script that made the put_* call."
+        },
+        "run_id": {
+          "type": ["string", "null"],
+          "description": "Identifier for the pipeline run. SLURM job id, ISO timestamp, or anything the submitter sets."
+        },
+        "config_hash": {
+          "type": ["string", "null"],
+          "description": "Short hash of the config file contents at write time. Lets you detect results computed under a different parameter set."
+        },
+        "upstream_files": {
+          "type": "array",
+          "description": "List of input file paths that went into this computation (BEAGLE, qopt, fopt, BAM, etc.). Enables DAG reconstruction.",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "timestamp": {
+      "type": "string",
+      "description": "ISO8601 timestamp of when this row was written.",
+      "format": "date-time"
+    }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "description": "kind=pairwise requires chrom, who_1 (non-null object), who_2 (non-null object), stat",
+      "if":   { "properties": { "kind": { "const": "pairwise" } }, "required": ["kind"] },
+      "then": {
+        "required": ["who_1", "who_2"],
+        "properties": {
+          "where": { "required": ["chrom"], "properties": { "chrom": { "type": "string" } } },
+          "who_1": { "type": "object" },
+          "who_2": { "type": "object" }
+        }
+      }
+    },
+    {
+      "description": "kind=candidate_q requires candidate_id, who_1, K, stat='Q'",
+      "if":   { "properties": { "kind": { "const": "candidate_q" } }, "required": ["kind"] },
+      "then": {
+        "required": ["who_1"],
+        "properties": {
+          "where": { "required": ["candidate_id"], "properties": { "candidate_id": { "type": "string" } } },
+          "who_1": { "type": "object" },
+          "what":  { "required": ["K"], "properties": { "stat": { "const": "Q" }, "K": { "type": "integer" } } }
+        }
+      }
+    },
+    {
+      "description": "kind=candidate_f requires candidate_id, K, stat='F'. No who (F has no sample-group dimension).",
+      "if":   { "properties": { "kind": { "const": "candidate_f" } }, "required": ["kind"] },
+      "then": {
+        "properties": {
+          "where": { "required": ["candidate_id"], "properties": { "candidate_id": { "type": "string" } } },
+          "what":  { "required": ["K"], "properties": { "stat": { "const": "F" }, "K": { "type": "integer" } } }
+        }
+      }
+    },
+    {
+      "description": "kind=interval_summary requires chrom, start_bp, end_bp, who_1, stat in {delta12, entropy, ena, ancestry_q_mean}",
+      "if":   { "properties": { "kind": { "const": "interval_summary" } }, "required": ["kind"] },
+      "then": {
+        "required": ["who_1"],
+        "properties": {
+          "where": {
+            "required": ["chrom", "start_bp", "end_bp"],
+            "properties": {
+              "chrom":    { "type": "string" },
+              "start_bp": { "type": "integer" },
+              "end_bp":   { "type": "integer" }
+            }
+          },
+          "who_1": { "type": "object" },
+          "what":  {
+            "properties": {
+              "stat": { "enum": ["delta12", "entropy", "ena", "ancestry_q_mean"] }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

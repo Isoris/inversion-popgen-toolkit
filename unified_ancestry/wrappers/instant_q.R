@@ -55,6 +55,11 @@ configure_instant_q <- function(
     sample_list     <- sample_list     %||% cfg$SAMPLE_LIST %||% cfg$STEP1_SAMPLE_LIST
     binary          <- binary          %||% cfg$INSTANT_Q_BIN
     sample_map_file <- sample_map_file %||% cfg$SAMPLE_MAP_R
+    # Canonical K — what the inversion precomp RDS flattens in. Resolved
+    # from config's CANONICAL_K (preferred) or DEFAULT_K (fallback).
+    .canon_from_cfg <- cfg$CANONICAL_K %||% cfg$DEFAULT_K
+  } else {
+    .canon_from_cfg <- NULL
   }
 
   .iq_env$binary      <- binary %||% find_instant_q_binary()
@@ -67,6 +72,21 @@ configure_instant_q <- function(
   .iq_env$window_step <- as.integer(window_step)
   .iq_env$em_iter     <- as.integer(em_iter)
   .iq_env$ncores      <- as.integer(ncores)
+  # Canonical K: resolved from config's CANONICAL_K (preferred) or the K arg
+  # passed to configure_instant_q, or a hard-coded 8 default.
+  .iq_env$canonical_K <- as.integer(K %||% .canon_from_cfg %||% 8L)
+  # 2026-04-17 chat-16: sample-set identity is now a registered group_id
+  # from sample_registry (typically "all_226"), not a content hash. The
+  # group name is read from the SAMPLE_GROUP env var set by the launcher
+  # or defaults to "all_226". See registries/DATABASE_DESIGN.md for the
+  # rationale — this replaces the chat-15 .compute_sample_set_tag() which
+  # produced R-vs-bash hash mismatches, silently no-op'ing every downstream
+  # merge.
+  .iq_env$sample_group <- Sys.getenv("SAMPLE_GROUP", "all_226")
+  if (!nzchar(.iq_env$sample_group)) .iq_env$sample_group <- "all_226"
+  # Back-compat: keep sample_set_tag field name so existing callers that
+  # pass it through still work. New code should use sample_group.
+  .iq_env$sample_set_tag <- .iq_env$sample_group
 
   # ── Load sample_map.R for robust name resolution ──
   .iq_env$smap <- NULL
@@ -190,29 +210,156 @@ resolve_beagle <- function(chr) {
 # CACHE MANAGEMENT
 # =============================================================================
 
-cache_path_summary <- function(chr) {
+# ── Sample-set fingerprint helpers ───────────────────────────────────────────
+# Cache files are tagged with a short sample-set identifier so that running
+# the same chrom/K against a different sample subset doesn't silently
+# overwrite the prior result. Tag format: "N<count>_<6-char-sha>", e.g.
+# "N226_a3f2c1". Computed once at configure time from the sorted sample list.
+#
+# If sample_list is missing or empty, the tag falls back to "unknown". Legacy
+# files (no tag in the filename) are read with an "N226_legacy" assumption —
+# the instant_q engine today always processes whichever samples are columns
+# in the BEAGLE file, and production has been 226-sample throughout, so this
+# is the safe assumption for pre-2026-04-17 caches.
+# 2026-04-17 chat-16: DEPRECATED. The chat-15 implementation of this function
+# hashed the sample list with digest::digest(ids, algo="sha1") which serializes
+# the R object before hashing — producing a hash that did NOT match the bash
+# launcher's `sort | sha1sum | cut -c1-6` over the same list. Result: every
+# cache read via this tag silently returned NA (no file found), every
+# merge_local_Q_into_invlikeness() silently no-op'd, every reg$compute$ancestry_*
+# method silently returned NULL.
+#
+# Replacement: sample-set identity is now a registered group_id from the
+# sample_registry (read from env SAMPLE_GROUP, default "all_226"). The group
+# name is a single source of truth — no hash to disagree on. See
+# registries/DATABASE_DESIGN.md for the design.
+#
+# This function is kept as a shim that returns the current sample_group so
+# old callers that reference it don't break mid-migration.
+.compute_sample_set_tag <- function(sample_list_path) {
+  sg <- Sys.getenv("SAMPLE_GROUP", "all_226")
+  if (!nzchar(sg)) sg <- "all_226"
+  sg
+}
+
+# Public accessor in case callers want to pass the tag into downstream file
+# naming (e.g. stats_cache files).
+get_sample_set_tag <- function() {
+  .iq_env$sample_set_tag %||% "unknown"
+}
+
+# Chat-16: preferred accessor — returns the registered group_id (e.g. "all_226")
+# that this cache was computed over. Used by results_registry put_* methods
+# when they need to stamp who_1.group_id on a new row.
+get_active_sample_group <- function() {
+  .iq_env$sample_group %||% Sys.getenv("SAMPLE_GROUP", "all_226")
+}
+# 2026-04-17 rewrite: the cache is sharded by K under <LOCAL_Q_DIR>/K<NN>/ so
+# a full K=2..20 sweep can coexist. The canonical K (flattened into the
+# inversion precomp RDS) defaults to .iq_env$canonical_K which configure_instant_q
+# reads from CANONICAL_K or DEFAULT_K in the ancestry config.
+#
+# Backward compatibility: if a caller passes K=NULL we still resolve to
+# canonical. On read, we also try the legacy flat layout <LOCAL_Q_DIR>/<chr>.*
+# if the K-sharded path is missing — this lets pre-2026-04-17 caches keep
+# working without a rerun. New writes always go to the sharded path.
+.resolve_K <- function(K) {
+  if (is.null(K)) {
+    k <- .iq_env$canonical_K %||% 8L
+    return(as.integer(k))
+  }
+  as.integer(K)
+}
+.k_subdir <- function(K) {
+  K <- .resolve_K(K)
+  file.path(.iq_env$cache_dir, sprintf("K%02d", K))
+}
+cache_path_summary <- function(chr, K = NULL, sample_set = NULL) {
+  set_tag <- sample_set %||% get_sample_set_tag()
+  file.path(.k_subdir(K),
+            paste0(chr, ".", set_tag, ".local_Q_summary.tsv.gz"))
+}
+cache_path_samples <- function(chr, K = NULL, sample_set = NULL) {
+  set_tag <- sample_set %||% get_sample_set_tag()
+  file.path(.k_subdir(K),
+            paste0(chr, ".", set_tag, ".local_Q_samples.tsv.gz"))
+}
+cache_path_meta <- function(chr, K = NULL, sample_set = NULL) {
+  set_tag <- sample_set %||% get_sample_set_tag()
+  file.path(.k_subdir(K),
+            paste0(chr, ".", set_tag, ".local_Q_meta.tsv"))
+}
+# Legacy flat-layout paths — canonical K + untagged sample set (pre-chat-15).
+# Only used for read fallback; new writes never land here.
+.legacy_path_summary <- function(chr) {
   file.path(.iq_env$cache_dir, paste0(chr, ".local_Q_summary.tsv.gz"))
 }
-cache_path_samples <- function(chr) {
+.legacy_path_samples <- function(chr) {
   file.path(.iq_env$cache_dir, paste0(chr, ".local_Q_samples.tsv.gz"))
 }
-cache_path_meta <- function(chr) {
-  file.path(.iq_env$cache_dir, paste0(chr, ".local_Q_meta.tsv"))
+# Pre-sample-set-tag path inside a K shard (post chat-15 K-aware rewrite,
+# pre chat-15 sample-set-tag addition). Also tolerated on read.
+.k_shard_untagged_summary <- function(chr, K = NULL) {
+  file.path(.k_subdir(K), paste0(chr, ".local_Q_summary.tsv.gz"))
 }
-cache_exists <- function(chr) {
-  file.exists(cache_path_summary(chr))
+.k_shard_untagged_samples <- function(chr, K = NULL) {
+  file.path(.k_subdir(K), paste0(chr, ".local_Q_samples.tsv.gz"))
 }
-update_manifest <- function(chr) {
+# Resolve to whichever layout has the file. Preference order:
+#   1. K-sharded + sample-set tag (current layout)
+#   2. K-sharded + untagged    (transient intermediate)
+#   3. Legacy flat (canonical K only)
+# Each step also tries the .tsv variant (no .gz).
+resolve_cache_summary <- function(chr, K = NULL, sample_set = NULL) {
+  for (p in c(cache_path_summary(chr, K, sample_set),
+              sub("\\.gz$", "", cache_path_summary(chr, K, sample_set)),
+              .k_shard_untagged_summary(chr, K),
+              sub("\\.gz$", "", .k_shard_untagged_summary(chr, K)))) {
+    if (file.exists(p)) return(p)
+  }
+  if (is.null(K) || .resolve_K(K) == (.iq_env$canonical_K %||% 8L)) {
+    for (p in c(.legacy_path_summary(chr),
+                sub("\\.gz$", "", .legacy_path_summary(chr)))) {
+      if (file.exists(p)) return(p)
+    }
+  }
+  NA_character_
+}
+resolve_cache_samples <- function(chr, K = NULL, sample_set = NULL) {
+  for (p in c(cache_path_samples(chr, K, sample_set),
+              sub("\\.gz$", "", cache_path_samples(chr, K, sample_set)),
+              .k_shard_untagged_samples(chr, K),
+              sub("\\.gz$", "", .k_shard_untagged_samples(chr, K)))) {
+    if (file.exists(p)) return(p)
+  }
+  if (is.null(K) || .resolve_K(K) == (.iq_env$canonical_K %||% 8L)) {
+    for (p in c(.legacy_path_samples(chr),
+                sub("\\.gz$", "", .legacy_path_samples(chr)))) {
+      if (file.exists(p)) return(p)
+    }
+  }
+  NA_character_
+}
+cache_exists <- function(chr, K = NULL, sample_set = NULL) {
+  !is.na(resolve_cache_summary(chr, K, sample_set))
+}
+update_manifest <- function(chr, K = NULL, sample_set = NULL) {
+  K <- .resolve_K(K)
+  set_tag <- sample_set %||% get_sample_set_tag()
   manifest_file <- file.path(.iq_env$cache_dir, "manifest.tsv")
   row <- data.table(
     chrom = chr,
-    summary_file = cache_path_summary(chr),
-    samples_file = cache_path_samples(chr),
+    K     = K,
+    sample_set = set_tag,
+    summary_file = cache_path_summary(chr, K, set_tag),
+    samples_file = cache_path_samples(chr, K, set_tag),
     timestamp = as.character(Sys.time())
   )
   if (file.exists(manifest_file)) {
     old <- fread(manifest_file)
-    old <- old[chrom != chr]
+    if (!"K" %in% names(old)) old[, K := .iq_env$canonical_K %||% 8L]
+    if (!"sample_set" %in% names(old)) old[, sample_set := "N226_legacy"]
+    old <- old[!(chrom == chr & K == row$K & sample_set == row$sample_set)]
     fwrite(rbind(old, row, fill = TRUE), manifest_file, sep = "\t")
   } else {
     fwrite(row, manifest_file, sep = "\t")
@@ -223,18 +370,30 @@ update_manifest <- function(chr) {
 # get_Q() — Single region query
 # =============================================================================
 
-get_Q <- function(chr, start, end, force = FALSE) {
+get_Q <- function(chr, start, end, K = NULL, force = FALSE) {
   bin <- .iq_env$binary
   if (is.null(bin) || !file.exists(bin)) {
     message("[instant_q.R] C++ binary not found, falling back to R implementation")
     return(get_Q_R(chr, start, end))
   }
 
+  K_eff <- .resolve_K(K)
+  # Resolve per-K qinit/fopt the same way get_Q_precompute does
+  canon <- .iq_env$canonical_K %||% 8L
+  qinit_use <- .iq_env$qinit_file
+  fopt_use  <- .iq_env$fopt_file
+  if (K_eff != canon) {
+    pad_canon <- sprintf("K%02d", canon)
+    pad_K     <- sprintf("K%02d", K_eff)
+    if (!is.null(qinit_use)) qinit_use <- sub(pad_canon, pad_K, qinit_use, fixed = TRUE)
+    if (!is.null(fopt_use))  fopt_use  <- sub(pad_canon, pad_K, fopt_use,  fixed = TRUE)
+  }
+
   beagle <- resolve_beagle(chr)
   cmd <- sprintf(
     "%s --beagle %s --fopt %s --qinit %s --chr %s --start %d --end %d --em_iter %d",
-    shQuote(bin), shQuote(beagle), shQuote(.iq_env$fopt_file),
-    shQuote(.iq_env$qinit_file), shQuote(chr),
+    shQuote(bin), shQuote(beagle), shQuote(fopt_use),
+    shQuote(qinit_use), shQuote(chr),
     as.integer(start), as.integer(end), .iq_env$em_iter
   )
 
@@ -260,17 +419,20 @@ get_Q <- function(chr, start, end, force = FALSE) {
 # get_Q_summary()
 # =============================================================================
 
-get_Q_summary <- function(chr, force = FALSE) {
-  cf <- cache_path_summary(chr)
-  if (file.exists(cf) && !force) {
+get_Q_summary <- function(chr, K = NULL, force = FALSE) {
+  cf <- resolve_cache_summary(chr, K)
+  if (!is.na(cf) && !force) {
     dt <- fread(cf)
-    message("[instant_q.R] Loaded cached summary for ", chr, ": ", nrow(dt), " windows")
+    message("[instant_q.R] Loaded cached summary for ", chr,
+            " K=", .resolve_K(K), ": ", nrow(dt), " windows (", cf, ")")
     return(dt)
   }
-  message("[instant_q.R] No cache for ", chr, " — triggering precompute")
-  get_Q_precompute(chr, force = force)
-  if (file.exists(cf)) return(fread(cf))
-  warning("[instant_q.R] Precompute failed for ", chr)
+  message("[instant_q.R] No cache for ", chr, " K=", .resolve_K(K),
+          " — triggering precompute")
+  get_Q_precompute(chr, K = K, force = force)
+  cf2 <- resolve_cache_summary(chr, K)
+  if (!is.na(cf2)) return(fread(cf2))
+  warning("[instant_q.R] Precompute failed for ", chr, " K=", .resolve_K(K))
   data.table()
 }
 
@@ -278,16 +440,38 @@ get_Q_summary <- function(chr, force = FALSE) {
 # get_Q_precompute()
 # =============================================================================
 
-get_Q_precompute <- function(chr = NULL, sample_output = FALSE, force = FALSE) {
+get_Q_precompute <- function(chr = NULL, K = NULL, sample_output = FALSE,
+                               force = FALSE,
+                               qinit_file = NULL, fopt_file = NULL) {
   bin <- .iq_env$binary
   if (is.null(bin) || !file.exists(bin)) {
     message("[instant_q.R] C++ binary not found, falling back to R precompute")
     return(get_Q_precompute_R(chr, force))
   }
 
-  if (!is.null(chr) && cache_exists(chr) && !force) {
-    message("[instant_q.R] Cache exists for ", chr, " (use force=TRUE to recompute)")
+  K_eff <- .resolve_K(K)
+  if (!is.null(chr) && cache_exists(chr, K_eff) && !force) {
+    message("[instant_q.R] Cache exists for ", chr, " K=", K_eff,
+            " (use force=TRUE to recompute)")
     return(invisible(NULL))
+  }
+
+  # Resolve per-K qinit/fopt. If the caller passed explicit paths, honour them.
+  # Otherwise derive from the configured canonical paths by swapping K<NN> in
+  # the filename (matches the BEST_QOPT / BEST_FOPT naming in 00_ancestry_config.sh).
+  .swap_K_in_filename <- function(path, K_eff) {
+    if (is.null(path) || !nzchar(path)) return(path)
+    canon <- .iq_env$canonical_K %||% 8L
+    if (K_eff == canon) return(path)
+    pad_canon <- sprintf("K%02d", canon)
+    pad_K     <- sprintf("K%02d", K_eff)
+    sub(pad_canon, pad_K, path, fixed = TRUE)
+  }
+  qinit_use <- qinit_file %||% .swap_K_in_filename(.iq_env$qinit_file, K_eff)
+  fopt_use  <- fopt_file  %||% .swap_K_in_filename(.iq_env$fopt_file,  K_eff)
+  if (!is.null(qinit_use) && !file.exists(qinit_use)) {
+    warning("[instant_q.R] qinit for K=", K_eff, " not found: ", qinit_use,
+            " — precompute will fail")
   }
 
   beagle <- resolve_beagle(chr %||% stop("chr required"))
@@ -296,8 +480,8 @@ get_Q_precompute <- function(chr = NULL, sample_output = FALSE, force = FALSE) {
 
   cmd <- sprintf(
     "%s --beagle %s --fopt %s --qinit %s --precompute --outdir %s --chr %s --window_size %d --window_step %d --em_iter %d --ncores %d%s",
-    shQuote(bin), shQuote(beagle), shQuote(.iq_env$fopt_file),
-    shQuote(.iq_env$qinit_file), shQuote(tmpdir), shQuote(chr),
+    shQuote(bin), shQuote(beagle), shQuote(fopt_use),
+    shQuote(qinit_use), shQuote(tmpdir), shQuote(chr),
     .iq_env$window_size, .iq_env$window_step, .iq_env$em_iter,
     .iq_env$ncores, if (sample_output) " --sample_output" else ""
   )
@@ -309,40 +493,40 @@ get_Q_precompute <- function(chr = NULL, sample_output = FALSE, force = FALSE) {
     return(invisible(NULL))
   }
 
-  dir.create(.iq_env$cache_dir, recursive = TRUE, showWarnings = FALSE)
+  # K-sharded output dir
+  out_shard <- .k_subdir(K_eff)
+  dir.create(out_shard, recursive = TRUE, showWarnings = FALSE)
 
   summary_raw <- file.path(tmpdir, paste0(chr, ".local_Q_summary.tsv"))
   if (file.exists(summary_raw)) {
     dt <- fread(summary_raw)
-    fwrite(dt, cache_path_summary(chr), sep = "\t")
-    message("[instant_q.R] Cached summary: ", nrow(dt), " windows")
+    fwrite(dt, cache_path_summary(chr, K_eff), sep = "\t")
+    message("[instant_q.R] Cached summary K=", K_eff, ": ", nrow(dt), " windows")
   }
 
   if (sample_output) {
     sample_raw <- file.path(tmpdir, paste0(chr, ".local_Q_samples.tsv"))
     if (file.exists(sample_raw)) {
       dt <- fread(sample_raw)
-      # v12.1: ensure CGA sample_id column
       samples <- get_sample_ids_iq()
       if ("sample_idx" %in% names(dt) && length(samples) > 0) {
         dt[, sample_id := samples[sample_idx + 1L]]
       } else if (!"sample_id" %in% names(dt) && length(samples) > 0) {
-        # Positional: rows cycle through samples per window
         n_samp <- length(samples)
         if (nrow(dt) %% n_samp == 0) {
           dt[, sample_id := rep(samples, nrow(dt) %/% n_samp)]
         }
       }
-      fwrite(dt, cache_path_samples(chr), sep = "\t")
+      fwrite(dt, cache_path_samples(chr, K_eff), sep = "\t")
     }
   }
 
   meta_raw <- file.path(tmpdir, paste0(chr, ".local_Q_meta.tsv"))
   if (file.exists(meta_raw)) {
-    file.copy(meta_raw, cache_path_meta(chr), overwrite = TRUE)
+    file.copy(meta_raw, cache_path_meta(chr, K_eff), overwrite = TRUE)
   }
 
-  update_manifest(chr)
+  update_manifest(chr, K_eff)
   unlink(tmpdir, recursive = TRUE)
   invisible(NULL)
 }
@@ -642,42 +826,99 @@ get_region_stats <- function(chr, start, end,
 # MERGE INTO INV_LIKENESS
 # =============================================================================
 
-merge_local_Q_into_invlikeness <- function(inv_like_dt, cache_dir = NULL) {
+merge_local_Q_into_invlikeness <- function(window_dt, K = NULL,
+                                              cache_dir = NULL) {
+  # 2026-04-17: K-aware merge. Reads the K-sharded cache (new layout) or the
+  # flat layout (legacy, canonical-K only). Output columns are suffixed with
+  # _K<NN> so multiple K levels can coexist in the same precomp RDS if a
+  # later caller wants to merge more than one.
+  #
+  # New columns added:
+  #   localQ_delta12_K<NN>  — mean |Q_max1 - Q_max2| per window
+  #   localQ_entropy_K<NN>  — mean Shannon entropy of Q vector per window
+  #   localQ_ena_K<NN>      — mean effective number of ancestries per window
   cache_dir <- cache_dir %||% .iq_env$cache_dir %||% "local_Q"
+  K_eff <- .resolve_K(K)
+  pad_K <- sprintf("K%02d", K_eff)
+
   manifest_file <- file.path(cache_dir, "manifest.tsv")
   if (!file.exists(manifest_file)) {
-    message("[instant_q.R] No manifest at ", manifest_file)
-    return(inv_like_dt)
+    # Not fatal: might still find summary files if the user seeded the cache
+    # manually. Warn then keep going.
+    message("[instant_q.R] No manifest at ", manifest_file,
+            " — will scan for per-chrom files")
+  } else {
+    manifest <- fread(manifest_file)
+    message("[instant_q.R] Merging K=", K_eff, " from ", nrow(manifest),
+            " manifest rows (cache=", cache_dir, ")")
   }
-  manifest <- fread(manifest_file)
-  message("[instant_q.R] Merging from ", nrow(manifest), " cached chromosomes")
-  for (chr in unique(inv_like_dt$chrom)) {
-    sf <- file.path(cache_dir, paste0(chr, ".local_Q_summary.tsv.gz"))
-    if (!file.exists(sf)) {
-      sf2 <- file.path(cache_dir, paste0(chr, ".local_Q_summary.tsv"))
-      if (file.exists(sf2)) sf <- sf2 else next
+
+  col_delta12 <- paste0("localQ_delta12_", pad_K)
+  col_entropy <- paste0("localQ_entropy_", pad_K)
+  col_ena     <- paste0("localQ_ena_",     pad_K)
+
+  # Save .iq_env$cache_dir for resolve_cache_summary() calls; temporarily
+  # point at the requested cache_dir.
+  saved_cache_dir <- .iq_env$cache_dir
+  .iq_env$cache_dir <- cache_dir
+  on.exit(.iq_env$cache_dir <- saved_cache_dir, add = TRUE)
+
+  n_merged <- 0L
+  for (chr in unique(window_dt$chrom)) {
+    sf <- resolve_cache_summary(chr, K_eff)
+    if (is.na(sf)) {
+      message("[instant_q.R]   ", chr, " K=", K_eff, ": no cache found, skipped")
+      next
     }
     q_summ <- fread(sf)
     if (nrow(q_summ) == 0) next
-    if ("window_id" %in% names(q_summ) && "global_window_id" %in% names(inv_like_dt)) {
+    if ("window_id" %in% names(q_summ) && "global_window_id" %in% names(window_dt)) {
       q_summ[, global_window_id := window_id]
-      q_sub <- q_summ[, .(global_window_id,
-                           localQ_delta12 = mean_delta12,
-                           localQ_entropy = mean_entropy,
-                           localQ_ena = mean_ena)]
-      inv_like_dt <- merge(inv_like_dt, q_sub, by = "global_window_id",
+      q_sub <- q_summ[, list(global_window_id,
+                               V_delta12 = mean_delta12,
+                               V_entropy = mean_entropy,
+                               V_ena     = mean_ena)]
+      setnames(q_sub, c("V_delta12", "V_entropy", "V_ena"),
+               c(col_delta12, col_entropy, col_ena))
+      window_dt <- merge(window_dt, q_sub, by = "global_window_id",
                             all.x = TRUE, suffixes = c("", ".q"))
+      n_merged <- n_merged + 1L
     }
   }
-  n_filled <- sum(is.finite(inv_like_dt$localQ_delta12), na.rm = TRUE)
-  message("[instant_q.R] Merged: ", n_filled, "/", nrow(inv_like_dt), " windows")
-  inv_like_dt
+  n_filled <- if (col_delta12 %in% names(window_dt)) {
+    sum(is.finite(window_dt[[col_delta12]]), na.rm = TRUE)
+  } else 0L
+  message("[instant_q.R] Merge K=", K_eff, ": ", n_merged, " chrom(s) merged, ",
+          n_filled, "/", nrow(window_dt), " windows filled")
+  window_dt
 }
 
-list_cached_Q <- function(cache_dir = NULL) {
+list_cached_Q <- function(cache_dir = NULL, K = NULL) {
   cache_dir <- cache_dir %||% .iq_env$cache_dir %||% "local_Q"
   mf <- file.path(cache_dir, "manifest.tsv")
-  if (file.exists(mf)) return(fread(mf))
-  files <- list.files(cache_dir, pattern = "\\.local_Q_summary\\.", full.names = FALSE)
-  data.table(chrom = sub("\\.local_Q_summary\\..*$", "", files))
+  if (file.exists(mf)) {
+    m <- fread(mf)
+    if (!"K" %in% names(m)) m[, K := .iq_env$canonical_K %||% 8L]
+    if (!is.null(K)) m <- m[K == .resolve_K(K)]
+    return(m)
+  }
+  # Fallback: scan. Look in both sharded (K<NN>/) and legacy (flat) layouts.
+  out <- list()
+  K_dirs <- list.files(cache_dir, pattern = "^K[0-9]{2}$", full.names = TRUE)
+  for (kd in K_dirs) {
+    k_int <- as.integer(sub("^K", "", basename(kd)))
+    files <- list.files(kd, pattern = "\\.local_Q_summary\\.", full.names = FALSE)
+    if (length(files)) out[[basename(kd)]] <- data.table(
+      chrom = sub("\\.local_Q_summary\\..*$", "", files), K = k_int
+    )
+  }
+  flat <- list.files(cache_dir, pattern = "\\.local_Q_summary\\.", full.names = FALSE)
+  if (length(flat)) out[["legacy"]] <- data.table(
+    chrom = sub("\\.local_Q_summary\\..*$", "", flat),
+    K = .iq_env$canonical_K %||% 8L
+  )
+  if (!length(out)) return(data.table(chrom = character(0), K = integer(0)))
+  r <- rbindlist(out, fill = TRUE)
+  if (!is.null(K)) r <- r[K == .resolve_K(K)]
+  r
 }

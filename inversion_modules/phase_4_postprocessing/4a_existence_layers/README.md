@@ -100,8 +100,20 @@ Phase 4a integrates evidence from:
 | Layer | Source | Produced by |
 |---|---|---|
 | **A** — genotype covariance | `phase_2_discovery/2c_precomp/` | local PCA → MDS → seeded region-growing |
-| **B** — SV concordance | `phase_3_refine/MODULE_5A2_breakpoint_validation/` | DELLY / Manta inversion calls |
+| **B** — SV concordance (primary) | `phase_2_discovery/2c_precomp/STEP_C00_build_sv_prior.R` → `sv_prior/` | DELLY / Manta INV calls parsed into per-chromosome sv_prior |
+| **B** — SV concordance (BND rescue) | `phase_3_refine/06_bnd_inversion_signal.py` → registry blocks | Paired CT=3to3/INV3 + CT=5to5/INV5 junctions; recovers inversions the strict INV callers missed |
 | **C** — GHSL haplotype contrast | `phase_2_discovery/2e_ghsl/` | Clair3 phased genotypes → per-window sample partitioning |
+| **D** — OR association | `phase_3_refine/03_statistical_tests_and_seeds.py` → registry blocks | Fisher + Armitage test linking PCA groups to physical breakpoint evidence |
+
+> **NOTE 2026-04-17 (chat 5 audit):** the Layer B/D attribution was
+> corrected in this session. An earlier revision of this README claimed
+> `phase_3_refine/` fed Layer B directly as `DELLY / Manta inversion
+> calls` — it doesn't; that's C00's job. Phase 3 contributes Layer B
+> **supplementary evidence** (BND rescue via STEP06) and owns Layer D
+> entirely (OR test via STEP03). Both phase 3 contributions reach phase
+> 4a/4e via registry blocks (`existence_layer_d`,
+> `existence_layer_b_bnd_rescue`) whose `keys_extracted` directives
+> auto-materialise `q7_layer_d_*` and `q7b_bnd_*` flat keys.
 
 If any layer is missing, its score is NA and the combined
 `existence_score` is computed from the layers that ARE available.

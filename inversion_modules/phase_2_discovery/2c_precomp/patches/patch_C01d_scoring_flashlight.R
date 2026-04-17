@@ -4,7 +4,7 @@
 #
 # Adds dimension D11: SV FLASHLIGHT SUPPORT
 #
-# For each candidate interval, queries the flashlight to determine:
+# For each candidate interval, queries the sv_prior to determine:
 #   sv_support_level         — STRONG / MODERATE / NONE
 #   sv_genotype_concordance  — do SV genotypes match PCA bands?
 #   sv_carrier_overlap       — fraction of SV carriers in band 3
@@ -21,10 +21,10 @@
 # Also update the composite score weights.
 # =============================================================================
 
-# ─── Source flashlight loader (add at script top) ────────────────────
+# ─── Source sv_prior loader (add at script top) ────────────────────
 # <<< INSERT after library() calls
 
-fl_loader <- Sys.getenv("FLASHLIGHT_LOADER", "")
+fl_loader <- Sys.getenv("SV_PRIOR_LOADER", "")
 if (!nzchar(fl_loader)) {
   for (p in c(
     file.path(dirname(outdir), "utils", "flashlight_loader_v2.R")
@@ -33,20 +33,20 @@ if (!nzchar(fl_loader)) {
     if (!file.exists(fl_loader_path)) fl_loader_path <- sub("_v2", "", fl_loader_path)
   )) if (file.exists(p)) { fl_loader <- p; break }
 }
-.scoring_has_flashlight <- FALSE
+.scoring_has_sv_prior <- FALSE
 if (nzchar(fl_loader) && file.exists(fl_loader)) {
   tryCatch({
     source(fl_loader)
-    .scoring_has_flashlight <- TRUE
+    .scoring_has_sv_prior <- TRUE
     message("[C01d] Flashlight loader sourced")
   }, error = function(e) message("[C01d] Flashlight: ", e$message))
 }
 
 # ─── D11: FLASHLIGHT SUPPORT ────────────────────────────────────────
 # This function is called for each candidate inside score_candidates().
-# It returns a named list of flashlight metrics.
+# It returns a named list of sv_prior metrics.
 
-compute_flashlight_score <- function(chr, start_mb, end_mb, band_sizes_vec) {
+compute_sv_prior_score <- function(chr, start_mb, end_mb, band_sizes_vec) {
   result <- list(
     d11 = 0, sv_support = "NONE",
     sv_concordance = NA_real_, sv_carrier_frac = NA_real_,
@@ -54,12 +54,12 @@ compute_flashlight_score <- function(chr, start_mb, end_mb, band_sizes_vec) {
     n_callers = 0L, best_confidence = NA_character_
   )
 
-  if (!.scoring_has_flashlight) return(result)
+  if (!.scoring_has_sv_prior) return(result)
 
   start_bp <- start_mb * 1e6
   end_bp   <- end_mb * 1e6
 
-  fl <- load_flashlight(chr)
+  fl <- load_sv_prior(chr)
   if (is.null(fl)) return(result)
 
   # ── Overlapping SV INV calls ──
@@ -138,7 +138,7 @@ compute_flashlight_score <- function(chr, start_mb, end_mb, band_sizes_vec) {
 # After computing D10 (GHSL), add:
 #
 #   # --- D11: Flashlight SV support ---
-#   fl_result <- compute_flashlight_score(chr, iv$start_mb, iv$end_mb, band_sizes)
+#   fl_result <- compute_sv_prior_score(chr, iv$start_mb, iv$end_mb, band_sizes)
 #   d11 <- fl_result$d11
 #   sv_support <- fl_result$sv_support
 #
@@ -151,20 +151,20 @@ compute_flashlight_score <- function(chr, start_mb, end_mb, band_sizes_vec) {
 #   final_score <- 0.16 * d1 + 0.13 * d2 + 0.09 * d3 +
 #                  0.06 * d4 + 0.04 * d5 + 0.04 * d6_bridge + 0.04 * d7 +
 #                  0.14 * d8 + 0.10 * d9 + 0.07 * d10 +
-#                  0.13 * d11  # <── flashlight gets 13% weight
+#                  0.13 * d11  # <── sv_prior gets 13% weight
 #
 # And update the tier assignment to consider D11:
 #
-#   # Tier upgrade: if flashlight strongly supports, allow tier 1
+#   # Tier upgrade: if sv_prior strongly supports, allow tier 1
 #   if (d11 >= 0.7 && sv_support == "STRONG" && tier >= 2) {
 #     tier <- tier - 1L  # upgrade by one tier
 #   }
-#   # Tier downgrade protection: don't downgrade if flashlight confirms
+#   # Tier downgrade protection: don't downgrade if sv_prior confirms
 #   # (family-like pattern but SV says it's a real inversion)
 #
 # And add columns to the output data.table:
 #
-#   d11_flashlight = round(d11, 3),
+#   d11_sv_prior = round(d11, 3),
 #   sv_support = sv_support,
 #   sv_concordance = fl_result$sv_concordance,
 #   het_del_bp_count = fl_result$het_del_bp_count,

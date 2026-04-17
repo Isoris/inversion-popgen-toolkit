@@ -46,7 +46,7 @@
 #
 # SV prior annotation (tests 01/02/03/08 from sv_prior)
 # -----------------------------------------------------
-# At the end of precompute, stamps SV columns onto inv_like_dt by reading
+# At the end of precompute, stamps SV columns onto window_dt by reading
 # the per-chromosome sv_prior RDS built by STEP_C00. These are pure
 # annotation — they do not alter inv_likeness or any upstream computation.
 # Downstream (merge, scoring, decomposition) consumes them.
@@ -63,7 +63,7 @@
 # Outputs (in <outdir>/)
 # ----------------------
 #   precomp/<chr>.precomp.rds       per-chr: dt, sim_mat, mds_mat, dmat
-#   window_inv_likeness.tsv.gz      per-window inv-likeness scores
+#   window_dt.tsv.gz      per-window inv-likeness scores
 #   precomp_summary.tsv             per-chr window counts + timing
 #
 # Usage
@@ -897,9 +897,9 @@ compute_inv_likeness_all <- function(per_chr, chroms) {
 
 message("[PRECOMP] Computing inversion-likeness scores...")
 t_il <- proc.time()
-inv_like_dt <- compute_inv_likeness_all(per_chr, chroms)
-message("[PRECOMP] Inv-likeness: ", nrow(inv_like_dt), " windows, ",
-        sum(inv_like_dt$inv_likeness >= 0.5, na.rm = TRUE), " with score >= 0.5 (",
+window_dt <- compute_inv_likeness_all(per_chr, chroms)
+message("[PRECOMP] Inv-likeness: ", nrow(window_dt), " windows, ",
+        sum(window_dt$inv_likeness >= 0.5, na.rm = TRUE), " with score >= 0.5 (",
         round((proc.time() - t_il)[3], 1), "s)")
 
 # ── Dosage-based het rate (independent from PCA) ──
@@ -911,25 +911,25 @@ if (!is.null(dosage_dir)) {
   message("[PRECOMP] Dosage het: ", nrow(dosage_het_dt), " windows (",
           round((proc.time() - t_dos)[3], 1), "s)")
 
-  # Merge into inv_like_dt using clean data.table join
+  # Merge into window_dt using clean data.table join
   if (nrow(dosage_het_dt) > 0) {
-    inv_like_dt[dosage_het_dt, on = c("chrom", "global_window_id"),
+    window_dt[dosage_het_dt, on = c("chrom", "global_window_id"),
       `:=`(dosage_het_rate_median = i.dosage_het_rate_median,
            dosage_het_rate_sd = i.dosage_het_rate_sd,
            dosage_het_rate_cv = i.dosage_het_rate_cv)]
 
-    n_filled <- sum(is.finite(inv_like_dt$dosage_het_rate_cv))
+    n_filled <- sum(is.finite(window_dt$dosage_het_rate_cv))
     message("[PRECOMP] Dosage merge: ", n_filled, " windows got dosage values")
 
     # SECOND PASS: recompute inv_likeness for windows that now have dosage CV
     # Dosage CV replaces het_contrast as the het component (45% weight)
     # v9.3: no PVE1, uses band_discreteness instead
-    n_with_dosage <- sum(is.finite(inv_like_dt$dosage_het_rate_cv) &
-                          inv_like_dt$dosage_het_rate_cv > 0)
+    n_with_dosage <- sum(is.finite(window_dt$dosage_het_rate_cv) &
+                          window_dt$dosage_het_rate_cv > 0)
     if (n_with_dosage > 0) {
       message("[PRECOMP] Upgrading inv_likeness for ", n_with_dosage,
               " windows with dosage het CV...")
-      inv_like_dt[is.finite(dosage_het_rate_cv) & dosage_het_rate_cv > 0,
+      window_dt[is.finite(dosage_het_rate_cv) & dosage_het_rate_cv > 0,
         inv_likeness := {
           s_h <- pmin(1, pmax(0, (dosage_het_rate_cv - 0.1) / 0.6))
           s_d <- pmin(1, pmax(0, (0.5 - inv_dip_p) / 0.45))
@@ -946,30 +946,30 @@ if (!is.null(dosage_dir)) {
 }
 
 # ── Track summary (v9.3) ──
-n_inv <- sum(inv_like_dt$inv_likeness >= 0.5, na.rm = TRUE)
-n_fam <- sum(inv_like_dt$family_likeness >= 0.5, na.rm = TRUE)
-n_dos <- sum(is.finite(inv_like_dt$dosage_het_rate_median))
-n_discrete <- sum(inv_like_dt$band_discreteness > 2, na.rm = TRUE)
-n_diffuse <- sum(inv_like_dt$diffuse_score > 0.5, na.rm = TRUE)
+n_inv <- sum(window_dt$inv_likeness >= 0.5, na.rm = TRUE)
+n_fam <- sum(window_dt$family_likeness >= 0.5, na.rm = TRUE)
+n_dos <- sum(is.finite(window_dt$dosage_het_rate_median))
+n_discrete <- sum(window_dt$band_discreteness > 2, na.rm = TRUE)
+n_diffuse <- sum(window_dt$diffuse_score > 0.5, na.rm = TRUE)
 message("[PRECOMP] ── TRACK SUMMARY (v9.3) ──")
-message("  Inv-like >= 0.5:       ", n_inv, " / ", nrow(inv_like_dt),
+message("  Inv-like >= 0.5:       ", n_inv, " / ", nrow(window_dt),
         "  (formula: 45% het + 30% trimodality + 25% band_discreteness)")
-message("  Band discrete (>2):    ", n_discrete, " / ", nrow(inv_like_dt))
-message("  Diffuse (>0.5):        ", n_diffuse, " / ", nrow(inv_like_dt))
-message("  Family >= 0.5:         ", n_fam, " / ", nrow(inv_like_dt),
+message("  Band discrete (>2):    ", n_discrete, " / ", nrow(window_dt))
+message("  Diffuse (>0.5):        ", n_diffuse, " / ", nrow(window_dt))
+message("  Family >= 0.5:         ", n_fam, " / ", nrow(window_dt),
         if (is.null(q_mat)) " (Q not loaded)" else " (diagnostic only)")
-message("  Dosage het computed:   ", n_dos, " / ", nrow(inv_like_dt))
+message("  Dosage het computed:   ", n_dos, " / ", nrow(window_dt))
 
 # Q-stamp summary (test_05)
-if ("band1_dom_Q" %in% names(inv_like_dt)) {
-  n_stamped <- sum(is.finite(inv_like_dt$band1_dom_Q))
-  n_same_q <- sum(inv_like_dt$bands_same_Q == TRUE, na.rm = TRUE)
-  message("  Q-stamps computed:     ", n_stamped, " / ", nrow(inv_like_dt),
+if ("band1_dom_Q" %in% names(window_dt)) {
+  n_stamped <- sum(is.finite(window_dt$band1_dom_Q))
+  n_same_q <- sum(window_dt$bands_same_Q == TRUE, na.rm = TRUE)
+  message("  Q-stamps computed:     ", n_stamped, " / ", nrow(window_dt),
           if (is.null(q_mat)) " (Q not loaded)" else "")
   if (n_stamped > 0) {
     message("  Bands same dominant Q: ", n_same_q, " / ", n_stamped,
             " (", round(100 * n_same_q / n_stamped, 1), "% — high = family structure)")
-    med_ent <- median(inv_like_dt$band_Q_entropy[is.finite(inv_like_dt$band_Q_entropy)])
+    med_ent <- median(window_dt$band_Q_entropy[is.finite(window_dt$band_Q_entropy)])
     message("  Band Q entropy median: ", round(med_ent, 3),
             " (low = family-like, high = mixed ancestry per band)")
   }
@@ -1022,14 +1022,14 @@ beta_adaptive_pvalues <- function(scores) {
 
 # Apply per chromosome
 message("[PRECOMP] ── TEST 07: Beta adaptive threshold ──")
-inv_like_dt[, c("beta_pval", "adaptive_seed", "beta_alpha", "beta_beta") :=
+window_dt[, c("beta_pval", "adaptive_seed", "beta_alpha", "beta_beta") :=
               list(NA_real_, FALSE, NA_real_, NA_real_)]
 
-for (chr_i in unique(inv_like_dt$chrom)) {
-  idx <- inv_like_dt$chrom == chr_i
-  scores_chr <- inv_like_dt$inv_likeness[idx]
+for (chr_i in unique(window_dt$chrom)) {
+  idx <- window_dt$chrom == chr_i
+  scores_chr <- window_dt$inv_likeness[idx]
   bt <- beta_adaptive_pvalues(scores_chr)
-  inv_like_dt[idx, `:=`(
+  window_dt[idx, `:=`(
     beta_pval = bt$beta_pval,
     adaptive_seed = bt$adaptive_seed,
     beta_alpha = bt$beta_alpha,
@@ -1040,34 +1040,51 @@ for (chr_i in unique(inv_like_dt$chrom)) {
           ") → ", n_seeds, " adaptive seeds (p<0.01)")
 }
 
-n_total_seeds <- sum(inv_like_dt$adaptive_seed, na.rm = TRUE)
-message("[PRECOMP] Total adaptive seeds: ", n_total_seeds, " / ", nrow(inv_like_dt))
+n_total_seeds <- sum(window_dt$adaptive_seed, na.rm = TRUE)
+message("[PRECOMP] Total adaptive seeds: ", n_total_seeds, " / ", nrow(window_dt))
 
-f_inv <- file.path(outdir, "window_inv_likeness.tsv.gz")
+f_inv <- file.path(outdir, "window_dt.tsv.gz")
 
-# ── Merge local Q from ancestry_bridge (if cached) ──
-# Local Q provides REAL per-window ancestry proportions (delta12, H, ENA)
-# computed via fixed-F EM on BEAGLE genotype likelihoods.
-# These replace the PC1-proxy metrics with genuine admixture estimates.
-# Run ancestry_bridge.R --prepare FIRST to generate the cache.
-local_q_dir <- file.path(outdir, "local_Q")
-ancestry_bridge_path <- file.path(dirname(dirname(f_inv)), "utils", "ancestry_bridge.R")
-if (!file.exists(ancestry_bridge_path)) {
-  ancestry_bridge_path <- Sys.glob(file.path(dirname(f_inv), "..", "inversion_codebase_*/utils/ancestry_bridge.R"))[1]
-}
-
-if (!is.null(ancestry_bridge_path) && file.exists(ancestry_bridge_path) &&
-    dir.exists(local_q_dir)) {
+# ── Merge canonical-K local Q from the unified ancestry cache ────────────────
+# 2026-04-17: load_bridge.R (sourced at the top of this script) has already
+# called configure_instant_q() against $ANCESTRY_CONFIG, so:
+#   - merge_local_Q_into_invlikeness() is in scope
+#   - .iq_env$cache_dir points at $LOCAL_Q_DIR (e.g. $BASE/ancestry_cache)
+#   - .iq_env$canonical_K holds CANONICAL_K (default 8)
+#
+# The merge reads the K-sharded cache <LOCAL_Q_DIR>/K<NN>/<chr>.local_Q_summary.tsv.gz
+# and stamps three columns onto every window:
+#   localQ_delta12_K<NN>   — mean |Q_max1 - Q_max2|
+#   localQ_entropy_K<NN>   — mean Shannon entropy of Q
+#   localQ_ena_K<NN>       — mean effective number of ancestries
+# Only canonical K is merged here; additional K levels stay in the cache and
+# are queryable on demand via reg$compute$ancestry_at_interval(..., K=).
+#
+# If the cache has not been populated (no manifest, no chrom files), the
+# merge emits a message and returns window_dt unchanged. Non-fatal.
+if (exists("merge_local_Q_into_invlikeness", mode = "function")) {
   tryCatch({
-    source(ancestry_bridge_path)
-    inv_like_dt <- merge_local_Q_into_invlikeness(inv_like_dt, cache_dir = local_q_dir)
-    message("[PRECOMP] Local Q columns added: localQ_delta12, localQ_entropy, localQ_ena")
+    window_dt <- merge_local_Q_into_invlikeness(window_dt)
+    # Count which canonical-K columns were actually added (merge may have
+    # skipped all chroms if the cache is empty).
+    canonK <- tryCatch(.iq_env$canonical_K %||% 8L, error = function(e) 8L)
+    ck <- sprintf("K%02d", canonK)
+    added <- grep(paste0("^localQ_.*_", ck, "$"), names(window_dt), value = TRUE)
+    if (length(added)) {
+      message("[PRECOMP] local Q columns added for ", ck, ": ",
+              paste(added, collapse = ", "))
+    } else {
+      message("[PRECOMP] local Q cache appears empty for ", ck,
+              " — run LAUNCH_instant_q_precompute.slurm to populate, ",
+              "then re-run precomp to stamp localQ columns")
+    }
   }, error = function(e) {
-    message("[PRECOMP] ancestry_bridge merge failed: ", e$message, " — continuing without")
+    message("[PRECOMP] local Q merge failed: ", conditionMessage(e),
+            " — continuing without")
   })
 } else {
-  message("[PRECOMP] No local Q cache found at ", local_q_dir,
-          " — run ancestry_bridge.R --prepare first to enable real Q metrics")
+  message("[PRECOMP] merge_local_Q_into_invlikeness() not in scope ",
+          "(load_bridge.R sourcing failed upstream) — localQ columns skipped")
 }
 
 # ═══════════════════════════════════════════════════════════════════
@@ -1098,7 +1115,7 @@ if (.bridge_available && exists("get_region_stats", mode = "function") &&
   }
 
   # Initialize columns
-  inv_like_dt[, `:=`(
+  window_dt[, `:=`(
     test05_fst_pc1 = NA_real_,
     test05_fst_q_best = NA_real_,
     test05_fst_q_best_k = NA_integer_,
@@ -1107,8 +1124,8 @@ if (.bridge_available && exists("get_region_stats", mode = "function") &&
 
   Q_SPLIT <- 0.30  # top/bottom 30% for Q-axis grouping
 
-  for (chr_i in unique(inv_like_dt$chrom)) {
-    chr_rows <- which(inv_like_dt$chrom == chr_i)
+  for (chr_i in unique(window_dt$chrom)) {
+    chr_rows <- which(window_dt$chrom == chr_i)
     if (length(chr_rows) < 10) next
 
     # Get per-window band assignments for this chr from precomp
@@ -1138,8 +1155,8 @@ if (.bridge_available && exists("get_region_stats", mode = "function") &&
 
     for (si in scan_idx) {
       wi <- chr_rows[si]
-      s_bp <- inv_like_dt$start_bp[wi]
-      e_bp <- inv_like_dt$end_bp[wi]
+      s_bp <- window_dt$start_bp[wi]
+      e_bp <- window_dt$end_bp[wi]
 
       # PC1 bands for this window
       pc1_vals <- as.numeric(dt_chr[si, ..pc1_cols_chr])
@@ -1200,7 +1217,7 @@ if (.bridge_available && exists("get_region_stats", mode = "function") &&
         pmin(2, pmax(0, fst_q_best / fst_pc1))
       } else NA_real_
 
-      inv_like_dt[wi, `:=`(
+      window_dt[wi, `:=`(
         test05_fst_pc1 = round(fst_pc1 %||% NA_real_, 4),
         test05_fst_q_best = round(fst_q_best %||% NA_real_, 4),
         test05_fst_q_best_k = as.integer(fst_q_best_k %||% NA_integer_),
@@ -1211,34 +1228,34 @@ if (.bridge_available && exists("get_region_stats", mode = "function") &&
 
     # Interpolate to non-scanned windows (nearest-neighbor fill)
     scanned <- chr_rows[scan_idx]
-    scanned_valid <- scanned[!is.na(inv_like_dt$test05_fst_pc1[scanned])]
+    scanned_valid <- scanned[!is.na(window_dt$test05_fst_pc1[scanned])]
     if (length(scanned_valid) > 0) {
       for (col in c("test05_fst_pc1", "test05_fst_q_best",
                      "test05_fst_q_best_k", "test05_family_fst_ratio")) {
-        vals <- inv_like_dt[[col]][scanned_valid]
-        mids_scanned <- (inv_like_dt$start_bp[scanned_valid] + inv_like_dt$end_bp[scanned_valid]) / 2
-        mids_all <- (inv_like_dt$start_bp[chr_rows] + inv_like_dt$end_bp[chr_rows]) / 2
+        vals <- window_dt[[col]][scanned_valid]
+        mids_scanned <- (window_dt$start_bp[scanned_valid] + window_dt$end_bp[scanned_valid]) / 2
+        mids_all <- (window_dt$start_bp[chr_rows] + window_dt$end_bp[chr_rows]) / 2
         nn_idx <- findInterval(mids_all, mids_scanned)
         nn_idx[nn_idx == 0] <- 1L
         nn_idx[nn_idx > length(mids_scanned)] <- length(mids_scanned)
-        set(inv_like_dt, i = chr_rows, j = col, value = vals[nn_idx])
+        set(window_dt, i = chr_rows, j = col, value = vals[nn_idx])
       }
     }
 
     message("  ", chr_i, ": ", n_done, " windows scanned (every 5th), interpolated to ", length(chr_rows))
   }
 
-  n_ratio <- sum(is.finite(inv_like_dt$test05_family_fst_ratio))
-  n_inversion_like <- sum(inv_like_dt$test05_family_fst_ratio < 0.3, na.rm = TRUE)
-  n_family_like <- sum(inv_like_dt$test05_family_fst_ratio > 0.7, na.rm = TRUE)
+  n_ratio <- sum(is.finite(window_dt$test05_family_fst_ratio))
+  n_inversion_like <- sum(window_dt$test05_family_fst_ratio < 0.3, na.rm = TRUE)
+  n_family_like <- sum(window_dt$test05_family_fst_ratio > 0.7, na.rm = TRUE)
   message("[PRECOMP] test_05 Fst scan: ", n_ratio, " windows with ratio, ",
           n_inversion_like, " inversion-like (ratio<0.3), ",
           n_family_like, " family-like (ratio>0.7)")
 } else {
   message("[PRECOMP] test_05 Fst scan skipped (need Engine B + Q matrix)")
   # Ensure columns exist even when skipped
-  if (!"test05_fst_pc1" %in% names(inv_like_dt)) {
-    inv_like_dt[, `:=`(
+  if (!"test05_fst_pc1" %in% names(window_dt)) {
+    window_dt[, `:=`(
       test05_fst_pc1 = NA_real_,
       test05_fst_q_best = NA_real_,
       test05_fst_q_best_k = NA_integer_,
@@ -1250,10 +1267,10 @@ if (.bridge_available && exists("get_region_stats", mode = "function") &&
 # ═══════════════════════════════════════════════════════════════════
 # SV PRIOR ANNOTATION — integrated v9.3.1
 # ═══════════════════════════════════════════════════════════════════
-# Last annotation step — stamps SV columns onto inv_like_dt.
+# Last annotation step — stamps SV columns onto window_dt.
 # Reads per-chromosome sv_prior RDS built by STEP_C00_build_sv_prior.R.
 # These are PURE ANNOTATION — they do not alter inv_likeness or any
-# upstream computation. Can be added/rerun anytime after inv_like_dt exists.
+# upstream computation. Can be added/rerun anytime after window_dt exists.
 # Downstream scripts (merge blocker, scoring, decomposition seeds) consume them.
 #
 # Evidence tests stamped here (see phase_4_catalog/ for the test catalogue):
@@ -1263,7 +1280,7 @@ if (.bridge_available && exists("get_region_stats", mode = "function") &&
 #   Test 08: BND-paired triangulation — rescues INVs misclassified as BND
 # ═══════════════════════════════════════════════════════════════════
 
-inv_like_dt[, `:=`(
+window_dt[, `:=`(
   sv_inv_overlap    = 0L,
   sv_inv_confidence = NA_character_,
   sv_inv_af         = NA_real_,
@@ -1275,7 +1292,7 @@ if (!is.null(sv_prior_dir) && dir.exists(sv_prior_dir)) {
   message("[PRECOMP] ── SV PRIOR annotation (tests 01/02/03/08) ──")
   n_annotated <- 0L
 
-  for (chr in unique(inv_like_dt$chrom)) {
+  for (chr in unique(window_dt$chrom)) {
     # Try current name, then legacy names for backward compatibility
     fl_file <- file.path(sv_prior_dir, paste0("sv_prior_", chr, ".rds"))
     if (!file.exists(fl_file)) {
@@ -1289,7 +1306,7 @@ if (!is.null(sv_prior_dir) && dir.exists(sv_prior_dir)) {
     fl <- tryCatch(readRDS(fl_file), error = function(e) NULL)
     if (is.null(fl)) next
 
-    chr_idx <- which(inv_like_dt$chrom == chr)
+    chr_idx <- which(window_dt$chrom == chr)
     if (length(chr_idx) == 0) next
 
     inv_calls <- if ("inv_calls" %in% names(fl)) fl$inv_calls else NULL
@@ -1330,8 +1347,8 @@ if (!is.null(sv_prior_dir) && dir.exists(sv_prior_dir)) {
     if (is.null(inv_calls) || nrow(inv_calls) == 0) next
 
     for (wi in chr_idx) {
-      w_start <- inv_like_dt$start_bp[wi]
-      w_end   <- inv_like_dt$end_bp[wi]
+      w_start <- window_dt$start_bp[wi]
+      w_end   <- window_dt$end_bp[wi]
 
       # Test 01: SV INV overlap
       overlapping <- inv_calls[bp1 <= w_end & bp2 >= w_start]
@@ -1343,10 +1360,10 @@ if (!is.null(sv_prior_dir) && dir.exists(sv_prior_dir)) {
           ranks[is.na(ranks)] <- length(conf_order)
           best_idx <- which.min(ranks)
         }
-        set(inv_like_dt, wi, "sv_inv_overlap", 1L)
-        set(inv_like_dt, wi, "sv_inv_confidence", overlapping$confidence_level[best_idx])
+        set(window_dt, wi, "sv_inv_overlap", 1L)
+        set(window_dt, wi, "sv_inv_confidence", overlapping$confidence_level[best_idx])
         if ("af" %in% names(overlapping)) {
-          set(inv_like_dt, wi, "sv_inv_af", overlapping$af[best_idx])
+          set(window_dt, wi, "sv_inv_af", overlapping$af[best_idx])
         }
         if (!is.null(samp_inv) && nrow(samp_inv) > 0) {
           anchors <- samp_inv[
@@ -1354,7 +1371,7 @@ if (!is.null(sv_prior_dir) && dir.exists(sv_prior_dir)) {
             sv_genotype != "MISSING" &
             sv_confidence %in% c("HIGH", "MEDIUM")
           ]
-          set(inv_like_dt, wi, "sv_n_anchors", nrow(anchors))
+          set(window_dt, wi, "sv_n_anchors", nrow(anchors))
         }
         n_annotated <- n_annotated + 1L
       }
@@ -1363,7 +1380,7 @@ if (!is.null(sv_prior_dir) && dir.exists(sv_prior_dir)) {
       if (!is.null(bp_dels) && nrow(bp_dels) > 0) {
         bp_dels_here <- bp_dels[bp_pos >= w_start & bp_pos <= w_end]
         if (nrow(bp_dels_here) > 0) {
-          set(inv_like_dt, wi, "sv_het_del_count", nrow(bp_dels_here))
+          set(window_dt, wi, "sv_het_del_count", nrow(bp_dels_here))
         }
       }
 
@@ -1371,26 +1388,26 @@ if (!is.null(sv_prior_dir) && dir.exists(sv_prior_dir)) {
       if (!is.null(int_dels) && nrow(int_dels) > 0) {
         int_dels_here <- int_dels[del_start >= w_start & del_end <= w_end]
         if (nrow(int_dels_here) > 0) {
-          old_count <- inv_like_dt$sv_het_del_count[wi]
-          set(inv_like_dt, wi, "sv_het_del_count", old_count + nrow(int_dels_here))
+          old_count <- window_dt$sv_het_del_count[wi]
+          set(window_dt, wi, "sv_het_del_count", old_count + nrow(int_dels_here))
         }
       }
     }
-    message("  ", chr, ": ", sum(inv_like_dt$sv_inv_overlap[chr_idx] == 1),
+    message("  ", chr, ": ", sum(window_dt$sv_inv_overlap[chr_idx] == 1),
             " windows with SV INV overlap")
   }
 
-  n_with_sv <- sum(inv_like_dt$sv_inv_overlap == 1, na.rm = TRUE)
-  n_with_del <- sum(inv_like_dt$sv_het_del_count > 0, na.rm = TRUE)
+  n_with_sv <- sum(window_dt$sv_inv_overlap == 1, na.rm = TRUE)
+  n_with_del <- sum(window_dt$sv_het_del_count > 0, na.rm = TRUE)
   message("[PRECOMP] SV prior annotation complete:")
-  message("  Windows with SV INV overlap: ", n_with_sv, " / ", nrow(inv_like_dt))
-  message("  Windows with het-DEL: ", n_with_del, " / ", nrow(inv_like_dt))
-  message("  Total anchor assignments: ", sum(inv_like_dt$sv_n_anchors, na.rm = TRUE))
+  message("  Windows with SV INV overlap: ", n_with_sv, " / ", nrow(window_dt))
+  message("  Windows with het-DEL: ", n_with_del, " / ", nrow(window_dt))
+  message("  Total anchor assignments: ", sum(window_dt$sv_n_anchors, na.rm = TRUE))
 } else {
   message("[PRECOMP] No --sv_prior_dir provided — SV annotation columns will be 0/NA")
 }
 
-fwrite(inv_like_dt, f_inv, sep = "\t")
+fwrite(window_dt, f_inv, sep = "\t")
 message("[PRECOMP] → ", f_inv)
 
 # =============================================================================
@@ -1415,11 +1432,11 @@ precompute_one_chr <- function(chr) {
 
   # Merge ALL inv_likeness + three-track + het metrics into precomp dt
   # This way the RDS has everything — downstream scripts don't need the TSV
-  if (nrow(inv_like_dt) > 0 && "global_window_id" %in% names(dt)) {
+  if (nrow(window_dt) > 0 && "global_window_id" %in% names(dt)) {
     # Avoid duplicate columns that already exist in dt
-    il_cols <- setdiff(names(inv_like_dt), c(names(dt), "chrom"))
+    il_cols <- setdiff(names(window_dt), c(names(dt), "chrom"))
     il_cols <- c("global_window_id", il_cols)
-    dt <- merge(dt, inv_like_dt[, ..il_cols, with = FALSE],
+    dt <- merge(dt, window_dt[, ..il_cols, with = FALSE],
                 by = "global_window_id", all.x = TRUE)
     dt <- dt[order(start_bp)]
     message("[PRECOMP] ", chr, ": merged ", length(il_cols) - 1, " inv_like columns into dt")
@@ -1822,6 +1839,109 @@ precompute_one_chr <- function(chr) {
   )
   rds_out <- file.path(precomp_dir, paste0(chr, ".precomp.rds"))
   saveRDS(precomp, rds_out)
+
+  # BUGFIX 2026-04-17 (FIX 21, CRASH/DESIGN): port NN-smoothed sim_mat
+  # production from archived snake1 precomp. Without this, the live
+  # precomp only wrote the raw sim_mat (nn=0) inside <chr>.precomp.rds
+  # and did NOT write per-scale sim_mat_nn<k>.rds files. Phase 2d
+  # (`load_sim_mat` in run_all.R) looks for sim_mat_nn20/40/80/... and
+  # was silently finding only nn=0, so:
+  #   - Phase 4 (D02 NN persistence, needs >= 2 scales) was skipped
+  #   - Phase 5 (D09 NN sweep tree, needs >= 3 scales) was skipped
+  #   - C01d's iv$survives_nn40/nn80 were always NA
+  #   - C01d's iv$nn_birth was always NA (tree never built)
+  #   - The entire NN-persistence track in the scoring was dead
+  # FIX 16 (tree merge into scoring table) was correct but couldn't
+  # fire because tree was always NULL upstream.
+  #
+  # Semantics: NN smoothing is NOT genomic-adjacent window averaging.
+  # It's MDS-space k-nearest-neighbor averaging: for each window, find
+  # its k most-similar (smallest dmat row) windows anywhere on the
+  # chromosome, average their MDS coordinates, recompute distances,
+  # build a new sim_mat. Windows inside the same structural block
+  # (inversion/family/background) have MDS-space neighbors sharing
+  # that block; smoothing preserves block-level structure while
+  # dissolving noise. Larger k = more smoothing = smaller blocks
+  # dissolve into the ambient structure.
+  #
+  # WHY THE TREE (D09) NEEDS MULTIPLE SCALES:
+  # The tree is a persistence-barcode over NN scale. At the coarsest
+  # NN, only the biggest-and-most-persistent blocks survive — those
+  # become roots. As NN decreases, blocks either stay stable (small
+  # boundary refinements), split into children (nested inversions
+  # resolving), disappear (oversmoothing artifact — block only looked
+  # real at one scale), or novel blocks pop in (scale-specific real
+  # small inversion, or noise).
+  #
+  # nn_birth = coarsest NN scale at which the block first appears as
+  # its own distinct unit. High nn_birth = block survives heavy
+  # smoothing = strong persistent structure = real large inversion.
+  # Low nn_birth = block is scale-specific = noise or small local
+  # signal. This is topological-data-analysis persistence for
+  # structural blocks along a chromosome.
+  #
+  # Scale ladder (expanded from 20,40,80 per Quentin 2026-04-17 for
+  # 226 samples / 50kb windows / median chr ~900 windows):
+  #   20, 40, 80   = fine (catches ~100kb-1Mb inversions, nn_birth=20-80)
+  #   120, 160     = middle (catches 1-5Mb inversions, nn_birth=120-160)
+  #   200, 240     = coarse (catches 5-10Mb inversions, nn_birth>=200
+  #                  which is C01d's D3 saturation threshold)
+  #   320          = ceiling (confirms largest blocks persist; anything
+  #                  nn_birth=320 is the strongest class)
+  # Top scales auto-clamp to (n_windows - 1) for small chromosomes
+  # via min(k, n_mds - 1L) at runtime, so nothing breaks.
+  #
+  # Going beyond 320 is not scientifically useful for this cohort
+  # (largest suspected inversion ~10Mb = NN~200; beyond that only
+  # chromosome-scale family-LD lingers, which isn't what D09 is
+  # classifying). Diagnostic scales (480/640/800) could be added if
+  # needed to confirm the noise floor, at the cost of ~2x precomp time.
+  sim_dir <- file.path(precomp_dir, "sim_mats")
+  dir.create(sim_dir, recursive = TRUE, showWarnings = FALSE)
+
+  # Always save nn0 as a separate file for phase 2d to load
+  saveRDS(sim_mat, file.path(sim_dir, paste0(chr, ".sim_mat_nn0.rds")))
+  message("[PRECOMP] ", chr, ": saved sim_mat_nn0")
+
+  # Scale list from env. Default: scientifically-calibrated ladder that
+  # reaches D09's classifier threshold (nn_birth>=200) without wasting
+  # precomp time on oversmoothed scales where nothing survives.
+  nn_sim_scales <- as.integer(strsplit(
+    Sys.getenv("NN_SIM_SCALES",
+               "20,40,80,120,160,200,240,320"), ",")[[1]])
+  nn_sim_scales <- nn_sim_scales[nn_sim_scales > 0 & is.finite(nn_sim_scales)]
+
+  mds_cols_nn <- grep("^MDS[0-9]+$", names(dt), value = TRUE)
+  if (length(mds_cols_nn) > 0 && length(nn_sim_scales) > 0) {
+    mds_mat_nn <- as.matrix(dt[, ..mds_cols_nn])
+    n_mds <- nrow(mds_mat_nn)
+    for (k in nn_sim_scales) {
+      k_use <- min(k, n_mds - 1L)
+      if (k_use < 2L) {
+        message("[PRECOMP] ", chr, ": skipping nn", k,
+                " (n_windows=", n_mds, " too small)")
+        next
+      }
+      t_nn <- proc.time()
+      smoothed <- matrix(0, nrow = n_mds, ncol = ncol(mds_mat_nn))
+      for (wi in seq_len(n_mds)) {
+        d <- dmat[wi, ]; d[wi] <- Inf
+        nn_idx <- order(d)[seq_len(k_use)]
+        smoothed[wi, ] <- colMeans(
+          mds_mat_nn[c(wi, nn_idx), , drop = FALSE], na.rm = TRUE)
+      }
+      nn_dmat <- as.matrix(dist(smoothed))
+      nn_sim <- make_sim_mat(nn_dmat)
+      saveRDS(nn_sim,
+              file.path(sim_dir, paste0(chr, ".sim_mat_nn", k, ".rds")))
+      elapsed_nn <- round((proc.time() - t_nn)[3], 1)
+      message("[PRECOMP] ", chr, ": saved sim_mat_nn", k,
+              " (k_use=", k_use, ", ", elapsed_nn, "s)")
+    }
+  } else {
+    message("[PRECOMP] ", chr,
+            ": skipping NN-smoothed sim_mats — no MDS columns or empty scale list")
+  }
 
   elapsed <- round((proc.time() - t_chr)[3], 1)
   message("[PRECOMP] ", chr, ": ", nrow(dt), " windows (", elapsed, "s)")

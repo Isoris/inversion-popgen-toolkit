@@ -1,0 +1,346 @@
+#!/usr/bin/env Rscript
+# =============================================================================
+# lib_decompose_helpers.R — shared utilities for Phase 4b scripts
+# =============================================================================
+# Functions shared by STEP_C01i_decompose.R, STEP_C01i_b_multi_recomb.R,
+# and STEP_C01i_d_seal.R. Source this at the top of each. No side effects,
+# no globals — just functions.
+# =============================================================================
+
+suppressPackageStartupMessages({
+  library(data.table)
+})
+
+`%||%` <- function(a, b) {
+  if (is.null(a) || length(a) == 0 || (length(a) == 1 && is.na(a[1]))) b else a
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Config / paths
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Centralized path resolution. Each caller can override via env or args.
+resolve_decomp_paths <- function(args = list()) {
+  base <- args$base %||% Sys.getenv("BASE",
+    "/scratch/lt200308-agbsci/Quentin_project_KEEP_2026-02-04")
+  registries <- args$registries %||% Sys.getenv("REGISTRIES",
+    file.path(base, "inversion-popgen-toolkit/registries"))
+
+  list(
+    base         = base,
+    registries   = registries,
+    sample_reg   = file.path(registries, "data", "sample_registry"),
+    evidence_reg = file.path(registries, "data", "evidence_registry"),
+    precomp_dir  = args$precomp_dir %||% Sys.getenv("PRECOMP_DIR",
+      file.path(base, "inversion_localpca_v7",
+                "06_mds_candidates/snake_regions_multiscale/precomp")),
+    clair3_dir   = args$clair3_dir %||% Sys.getenv("CLAIR3_DIR",
+      file.path(base, "MODULE_4A_SNP_INDEL50_Clair3/postprocess_results")),
+    sv_prior_dir = args$sv_prior_dir %||% Sys.getenv("FLASHLIGHT_DIR",
+      file.path(base, "flashlight_v2/cache")),
+    q_cache_dir = args$q_cache_dir %||% Sys.getenv("Q_CACHE_DIR",
+      file.path(base, "unified_ancestry/local_Q"))
+  )
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Precomp loading — PC loadings per sample per window
+# ─────────────────────────────────────────────────────────────────────────────
+
+load_precomp <- function(chr, precomp_dir) {
+  pf <- file.path(precomp_dir, paste0(chr, ".precomp.rds"))
+  if (!file.exists(pf)) {
+    message("[lib] no precomp for ", chr, " at ", pf)
+    return(NULL)
+  }
+  readRDS(pf)
+}
+
+# Extract PC loadings for a candidate interval. Returns NULL on failure.
+# Output: list(pc1_mat, pc2_mat, sample_names, n_windows)
+extract_pc_loadings <- function(pc, start_bp, end_bp, min_windows = 5L) {
+  if (is.null(pc) || is.null(pc$inv_likeness)) return(NULL)
+  il <- pc$inv_likeness
+  wins <- il[mid_bp >= start_bp & mid_bp <= end_bp]
+  if (nrow(wins) < min_windows) return(NULL)
+
+  pc1_cols <- grep("^PC_1_", names(wins), value = TRUE)
+  pc2_cols <- grep("^PC_2_", names(wins), value = TRUE)
+  if (length(pc1_cols) == 0) return(NULL)
+
+  sample_names <- sub("^PC_1_", "", pc1_cols)
+  pc1_mat <- as.matrix(wins[, ..pc1_cols])
+  colnames(pc1_mat) <- sample_names
+
+  pc2_mat <- if (length(pc2_cols) > 0) {
+    m <- as.matrix(wins[, ..pc2_cols])
+    colnames(m) <- sub("^PC_2_", "", pc2_cols)
+    m[, sample_names, drop = FALSE]
+  } else {
+    matrix(0, nrow = nrow(wins), ncol = length(sample_names),
+           dimnames = list(NULL, sample_names))
+  }
+
+  # FIX 38 (chat 8): previous code was
+  #   win_starts = wins$start_bp %||% wins$mid_bp - 50000L,
+  #   win_ends   = wins$end_bp   %||% wins$mid_bp + 50000L,
+  # which parses as (wins$start_bp %||% wins$mid_bp) - 50000L because
+  # %||% binds tighter than +/- in R. When wins$start_bp is present
+  # (the common case) this shifted every window start back 50 kb from
+  # its real value, inflating every window interval by 100 kb.
+  #
+  # The precomp (C01a STEP_C01a_precompute.R L849) ALWAYS writes
+  # start_bp and end_bp as real window boundaries inherited from the
+  # upstream per-window table `dt`. So the %||% fallback branch was
+  # never supposed to fire — and the 50000 magic number was an
+  # arbitrary guess (real window sizes come from C01a's multiscale
+  # ladder: 20/40/80/120/160/200/240/320, not a fixed ±50 kb).
+  #
+  # Using the real columns directly:
+  win_starts <- wins$start_bp
+  win_ends   <- wins$end_bp
+
+  list(
+    pc1_mat = pc1_mat, pc2_mat = pc2_mat,
+    sample_names = sample_names,
+    n_windows = nrow(wins),
+    win_starts = win_starts,
+    win_ends   = win_ends,
+    win_mids   = wins$mid_bp
+  )
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# k-means with quality metrics
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Run k-means and compute silhouette score. Returns NULL if k-means fails.
+kmeans_with_quality <- function(x, k = 3L, nstart = 25L, seed = 42L,
+                                  compute_silhouette = TRUE) {
+  set.seed(seed)
+  km <- tryCatch(
+    kmeans(x, centers = k, nstart = nstart, iter.max = 100),
+    error = function(e) NULL
+  )
+  if (is.null(km)) return(NULL)
+
+  result <- list(
+    cluster = km$cluster,
+    centers = km$centers,
+    size = km$size,
+    tot_withinss = km$tot.withinss,
+    betweenss = km$betweenss
+  )
+
+  if (compute_silhouette && k >= 2 && length(unique(km$cluster)) >= 2) {
+    result$silhouette_mean <- compute_silhouette_mean(x, km$cluster)
+  } else {
+    result$silhouette_mean <- NA_real_
+  }
+  result
+}
+
+# Simple silhouette mean without external cluster package dependency.
+# For each point i: a = mean distance to own cluster, b = min mean distance
+# to other clusters, s_i = (b-a)/max(a,b). Return mean over all points.
+compute_silhouette_mean <- function(x, cluster) {
+  x <- as.matrix(x)
+  n <- nrow(x)
+  if (n < 4) return(NA_real_)
+  cl <- as.integer(cluster)
+  unique_cl <- unique(cl)
+  if (length(unique_cl) < 2) return(NA_real_)
+
+  # Precompute distance matrix (may be slow for large n, but n is
+  # bounded by sample count ≤ 226)
+  dmat <- as.matrix(dist(x))
+
+  s <- numeric(n)
+  for (i in seq_len(n)) {
+    own <- cl[i]
+    own_idx <- which(cl == own & seq_len(n) != i)
+    if (length(own_idx) == 0) { s[i] <- 0; next }
+    a_i <- mean(dmat[i, own_idx])
+
+    others <- setdiff(unique_cl, own)
+    b_vals <- vapply(others, function(c2) {
+      idx <- which(cl == c2)
+      if (length(idx) == 0) return(Inf)
+      mean(dmat[i, idx])
+    }, numeric(1))
+    b_i <- min(b_vals)
+
+    s[i] <- if (max(a_i, b_i) > 0) (b_i - a_i) / max(a_i, b_i) else 0
+  }
+  mean(s)
+}
+
+# BIC-like gap between k=3 and k=2 (higher gap → k=3 is much better).
+# Simple: compare tot.withinss normalized by k penalty.
+compute_bic_gap <- function(x) {
+  x <- as.matrix(x)
+  km2 <- tryCatch(kmeans(x, centers = 2, nstart = 10), error = function(e) NULL)
+  km3 <- tryCatch(kmeans(x, centers = 3, nstart = 10), error = function(e) NULL)
+  if (is.null(km2) || is.null(km3)) return(NA_real_)
+  n <- nrow(x)
+  bic2 <- n * log(km2$tot.withinss / n) + 2 * log(n)
+  bic3 <- n * log(km3$tot.withinss / n) + 3 * log(n)
+  (bic2 - bic3) / abs(bic2)  # positive means k=3 fits better
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Class label assignment
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Given a k-means result on mean PC1 (or PC1+PC2), order clusters by mean
+# PC1 and assign canonical labels HOM_REF (lowest), HET (middle), HOM_INV
+# (highest). Returns a character vector aligned to names(x).
+assign_class_labels <- function(km, x, k_use = 3L) {
+  labels <- c("HOM_REF", "HET", "HOM_INV")[seq_len(k_use)]
+  if (is.matrix(km$centers)) {
+    # Sort by first column (PC1)
+    order_by <- km$centers[, 1]
+  } else {
+    order_by <- km$centers
+  }
+  cluster_order <- order(order_by)
+  cluster_to_class <- setNames(labels, as.character(cluster_order))
+  class <- cluster_to_class[as.character(km$cluster)]
+  names(class) <- names(x) %||% rownames(x) %||% seq_along(km$cluster)
+  class
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Loading optional data sources (fall back gracefully if absent)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Try to load sv_prior for a chromosome. Returns NULL if unavailable.
+try_load_flashlight <- function(chr, sv_prior_dir) {
+  fl_path <- file.path(sv_prior_dir, paste0(chr, ".rds"))
+  if (!file.exists(fl_path)) return(NULL)
+  tryCatch(readRDS(fl_path), error = function(e) {
+    message("[lib] sv_prior load failed for ", chr, ": ", conditionMessage(e))
+    NULL
+  })
+}
+
+# Load Clair3 phase info for a sample in a region. Returns data.table with
+# columns POS, IS_PHASED, or empty data.table.
+load_clair3_phase <- function(chr, sample_id, start_bp, end_bp, clair3_dir) {
+  pf <- file.path(clair3_dir, chr, sample_id, "all_variants_with_phase.tsv")
+  if (!file.exists(pf)) return(data.table())
+  dt <- tryCatch(
+    fread(pf, select = c(2, 41), header = FALSE),
+    error = function(e) NULL
+  )
+  if (is.null(dt) || nrow(dt) == 0) return(data.table())
+  setnames(dt, c("POS", "IS_PHASED"))
+  dt[POS >= start_bp & POS <= end_bp]
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Registry helpers (thin wrappers; heavy lifting in registry_loader.R)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Load reg if available — each script calls this at top. Returns NULL if
+# registry library is not sourceable.
+try_load_registry <- function() {
+  for (p in c(
+    "registries/api/R/registry_loader.R",
+    "../registries/api/R/registry_loader.R",
+    file.path(Sys.getenv("BASE", ""),
+              "inversion-popgen-toolkit/registries/api/R/registry_loader.R")
+  )) {
+    if (file.exists(p)) {
+      tryCatch({
+        source(p)
+        if (exists("load_registry", mode = "function")) {
+          return(load_registry())
+        }
+      }, error = function(e) {
+        message("[lib] registry source failed at ", p, ": ", conditionMessage(e))
+      })
+    }
+  }
+  # Also try the older v9 sample_registry.R directly for group ops
+  for (p in c("utils/sample_registry.R", "../utils/sample_registry.R",
+              file.path(Sys.getenv("BASE", ""),
+                        "inversion_codebase_v8.5/utils/sample_registry.R"))) {
+    if (file.exists(p)) {
+      tryCatch({
+        source(p)
+        if (exists("load_registry", mode = "function")) {
+          # v9-style returns a list with $add_group, $get_group, etc.
+          # Wrap it to match the v10 reg$samples$* / reg$evidence$* shape.
+          r <- load_registry()
+          return(list(
+            samples  = list(
+              add_group   = r$add_group,
+              get_group   = r$get_group,
+              has_group   = r$has_group,
+              list_groups = r$list_groups
+            ),
+            evidence = list(
+              add_evidence    = r$add_evidence,
+              get_evidence    = r$get_evidence,
+              has_evidence    = r$has_evidence,
+              write_block     = NULL  # v9 doesn't have this
+            ),
+            legacy_v9 = TRUE
+          ))
+        }
+      }, error = function(e) NULL)
+    }
+  }
+  NULL
+}
+
+# Write a Tier-2 block using either v10 or a legacy fallback (JSON dump).
+write_block_safe <- function(reg, candidate_id, block_type, data,
+                               source_script, outdir_fallback = NULL) {
+  # Try the v10 library path first
+  if (!is.null(reg) && !is.null(reg$evidence$write_block)) {
+    Sys.setenv(CURRENT_SCRIPT = source_script)
+    return(reg$evidence$write_block(
+      candidate_id = candidate_id,
+      block_type = block_type,
+      data = data
+    ))
+  }
+  # Legacy fallback: write to outdir
+  if (!is.null(outdir_fallback) && dir.exists(outdir_fallback)) {
+    json_path <- file.path(outdir_fallback, paste0(block_type, ".json"))
+    if (requireNamespace("jsonlite", quietly = TRUE)) {
+      jsonlite::write_json(
+        list(block_type = block_type, candidate_id = candidate_id,
+             source_script = source_script,
+             computed_at = format(Sys.time(), "%Y-%m-%dT%H:%M:%S"),
+             data = data),
+        json_path, auto_unbox = TRUE, pretty = TRUE, null = "null", na = "null"
+      )
+      message("[lib] block written (legacy fallback): ", json_path)
+      return(list(path = json_path, status = "legacy_fallback"))
+    }
+  }
+  message("[lib] WARNING: block ", block_type, " for ", candidate_id,
+          " not written (no registry, no fallback)")
+  NULL
+}
+
+# Read a previously-written block (v10 or legacy path)
+read_block_safe <- function(reg, candidate_id, block_type,
+                              outdir_fallback = NULL) {
+  if (!is.null(reg) && !is.null(reg$evidence$read_block)) {
+    b <- reg$evidence$read_block(candidate_id, block_type)
+    if (!is.null(b)) return(b)
+  }
+  if (!is.null(outdir_fallback) && dir.exists(outdir_fallback)) {
+    json_path <- file.path(outdir_fallback, paste0(block_type, ".json"))
+    if (file.exists(json_path) && requireNamespace("jsonlite", quietly = TRUE)) {
+      return(jsonlite::fromJSON(json_path, simplifyVector = FALSE))
+    }
+  }
+  NULL
+}
+
+message("[lib_decompose_helpers] loaded")

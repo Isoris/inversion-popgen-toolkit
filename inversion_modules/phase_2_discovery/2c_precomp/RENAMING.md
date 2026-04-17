@@ -265,7 +265,7 @@ REGIONS_PRIMARY_CAND_FILE                                        # was SNAKE_CAN
 SV_PRIOR_DIR="${REGIONS_DIR}/sv_prior"                           # pattern match
 ```
 
-This touches every downstream module (5B / 5C / 5D / 5E / MODULE_5A2_breakpoint_validation) plus any already-produced output directories on LANTA. Coordinate with a directory rename and a set of symlinks for backward compatibility.
+This touches every downstream module (5B / 5C / 5D / 5E / phase_3_refine breakpoint validation) plus any already-produced output directories on LANTA. Coordinate with a directory rename and a set of symlinks for backward compatibility.
 
 ### 5.2 The snake1 / snake2 / snake3 / snake4 algorithm variants
 
@@ -462,11 +462,11 @@ Original section 10 list, updated:
 - `phase_2_discovery/2d_cores/STEP_C06_consensus.R`
 - `phase_2_discovery/2d_cores/STEP_C07_hmm_regime.R`
 - `phase_2_discovery/2d_cores/STEP_C08_rescue_pass2.R`
-- `phase_2_discovery/2e_ghsl/STEP_C04_snake3_ghsl_v5.R`
+- `phase_2_discovery/2e_ghsl/STEP_C04_snake3_ghsl_v6.R` + `STEP_C04b_snake3_ghsl_classify.R`  <!-- chat 14: v5 split into v6 heavy + classifier -->
 - `phase_4_catalog/` — every script that writes `cheatN_*` columns
 - `phase_4_catalog/cheats/*` — all 23 cheat files (see section 3 for
   the rename map)
-- `MODULE_5A2_breakpoint_validation/` — minor references
+- `phase_3_refine/` (flattened from `MODULE_5A2_breakpoint_validation/`) — minor references
 - `MODULE_5B / 5C / 5D / 5E` — consume `SNAKE*_DIR` paths, need path
   rename
 

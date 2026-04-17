@@ -169,5 +169,13 @@ the scripts for the 4 other sub-phases.
 - `../registries/` — registry infrastructure (shared)
 - `../phase_2_discovery/2d_detect/STEP_D12_bridge_to_C01d.R` — the
   contract between phase 2 and phase 4a
-- `../phase_3_refine/MODULE_5A2_breakpoint_validation/` — the contract
-  between phase 3 and phase 4a
+- `../phase_3_refine/` — Breakpoint validation + BND rescue. This is the
+  **writer for Layer D** (`q7_layer_d_*` flat keys via the
+  `existence_layer_d` registry block) and for **supplementary Layer B**
+  (`q7b_bnd_*` keys via `existence_layer_b_bnd_rescue`). The Layer D
+  VALIDATED promotion gate (fisher_p<0.05 AND fisher_or>5) in 4c
+  `compute_group_validation()` and the Layer B BND-rescue consumer in
+  4a Layer B scoring both depend on phase 3 having run. Earlier
+  sessions believed the registry contract was inactive; the chat-5
+  audit wired STEP03 and STEP06 through the Python registry API to
+  make it real.

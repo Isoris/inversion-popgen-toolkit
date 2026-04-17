@@ -54,11 +54,11 @@ if (!is.null(chrom_filter)) core_dt <- core_dt[chrom == chrom_filter]
 message("[DEBUG] Loaded ", nrow(core_dt), " window records from ", basename(core_file))
 
 # Identify core/region ID column
-id_col <- intersect(c("core_id", "region_id", "merge_id", "snake_id"), names(core_dt))
+id_col <- intersect(c("core_id", "region_id", "merge_id", "region_id"), names(core_dt))
 if (length(id_col) == 0) {
   # Try to construct from available columns
-  if ("core_family" %in% names(core_dt) && "core_idx" %in% names(core_dt)) {
-    core_dt[, core_id := paste0(core_family, "_", core_idx)]
+  if ("scale_tier" %in% names(core_dt) && "core_idx" %in% names(core_dt)) {
+    core_dt[, core_id := paste0(scale_tier, "_", core_idx)]
     id_col <- "core_id"
   } else {
     stop("Cannot find core/region ID column")
@@ -117,7 +117,7 @@ for (chr in chroms) {
     start_mb <- round(min(c_wins$start_bp, na.rm = TRUE) / 1e6, 2)
     end_mb <- round(max(c_wins$end_bp, na.rm = TRUE) / 1e6, 2)
     n_win <- length(win_idx)
-    fam <- if ("core_family" %in% names(c_wins)) c_wins$core_family[1] else "?"
+    fam <- if ("scale_tier" %in% names(c_wins)) c_wins$scale_tier[1] else "?"
 
     # k=3 for coloring
     valid <- is.finite(avg_pc1) & is.finite(avg_pc2)

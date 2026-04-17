@@ -28,7 +28,7 @@
 #   trf_bed:      TRF output in BED format (chr, start, end, period, copies, ...)
 #   gmata_bed:    GMATA SSR output (chr, start, end, motif, motif_len, copies)
 #   boundary_catalog: from C01g
-#   inv_like_dt:  from C01a (for theta filter annotation)
+#   window_dt:  from C01a (for theta filter annotation)
 #
 # OUTPUT per breakpoint (USE 1):
 #   n_tr_at_bp:       count of tandem repeats within ±5 kb
@@ -45,7 +45,7 @@
 #
 # INTEGRATION:
 #   C01g: annotate boundaries with TR context → cheat28_* columns
-#   C01a: annotate inv_like_dt with ssr_density → theta_noise_flag
+#   C01a: annotate window_dt with ssr_density → theta_noise_flag
 #   Cheat 12: downweight windows where theta_noise_flag == TRUE
 #   Cheat 14: add MMBIR mechanism class from TR context
 #

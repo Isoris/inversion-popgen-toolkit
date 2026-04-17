@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "evidence_key.schema.json",
+  "title": "evidence_registry per_candidate keys.tsv row",
+  "description": "Schema for one row of evidence_registry/per_candidate/<candidate_id>/keys.tsv. Each row is a flat scalar key extracted from a Tier-2 structured block (validated against the block's schema in structured_block_schemas/) per the keys_extracted directive. Keys follow the qN_* convention (q1_* through q7_*) mapping to the seven characterization questions.",
+  "version": "v1_chat16",
+  "type": "object",
+  "required": ["candidate_id", "key", "value"],
+  "properties": {
+    "candidate_id": {
+      "type": "string",
+      "description": "FK into interval_registry.candidate_intervals.candidate_id."
+    },
+    "key": {
+      "type": "string",
+      "description": "Scalar key name. Convention: qN_<scientific_name> where N in 1..7 maps to characterization question.",
+      "pattern": "^q[1-7]_[a-zA-Z0-9_]+$"
+    },
+    "value": {
+      "description": "Scalar value. Type-coerced to string in the TSV; validators must parse per the originating block schema.",
+      "type": ["string", "number", "integer", "boolean", "null"]
+    },
+    "block_type": {
+      "type": ["string", "null"],
+      "description": "Originating Tier-2 block type. FK into structured_block_schemas/<block_type>.schema.json."
+    },
+    "written_by": {
+      "type": ["string", "null"],
+      "description": "Script that wrote this row (e.g. STEP_C01i_decompose.R)."
+    },
+    "timestamp": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    }
+  },
+  "additionalProperties": true
+}

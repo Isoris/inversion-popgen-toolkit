@@ -23,7 +23,7 @@ cli <- parse_diag_args()
 data <- load_diag_data(cli$precomp_dir, cli$chrom_filter)
 precomp_list <- data$precomp_list
 chroms <- data$chroms
-inv_like_dt <- data$inv_like_dt
+window_dt <- data$window_dt
 dir.create(cli$outdir, recursive = TRUE, showWarnings = FALSE)
 
 # =============================================================================
@@ -139,8 +139,8 @@ build_mds_inv <- function(chr) {
   mds_mat <- precomp_list[[chr]]$mds_mat
   if (is.null(mds_mat) || ncol(mds_mat) < 2) return(NULL)
   if (!"inv_likeness" %in% names(dt)) {
-    if (nrow(inv_like_dt) > 0 && "global_window_id" %in% names(dt))
-      dt <- merge(dt, inv_like_dt[chrom == chr, .(global_window_id, inv_likeness)],
+    if (nrow(window_dt) > 0 && "global_window_id" %in% names(dt))
+      dt <- merge(dt, window_dt[chrom == chr, .(global_window_id, inv_likeness)],
                    by = "global_window_id", all.x = TRUE)
     else return(NULL)
   }
@@ -427,9 +427,9 @@ build_mds_faceted_all <- function(chr) {
   )
 
   inv_vals <- if ("inv_likeness" %in% names(dt)) dt$inv_likeness
-              else if (nrow(inv_like_dt) > 0 && "global_window_id" %in% names(dt)) {
+              else if (nrow(window_dt) > 0 && "global_window_id" %in% names(dt)) {
                 m <- merge(data.table(global_window_id = dt$global_window_id),
-                           inv_like_dt[chrom == chr, .(global_window_id, inv_likeness)],
+                           window_dt[chrom == chr, .(global_window_id, inv_likeness)],
                            by = "global_window_id", all.x = TRUE)
                 m$inv_likeness
               } else NULL
@@ -501,7 +501,7 @@ build_mds_faceted_all <- function(chr) {
 
 # -- 26: Multi-source het assessment ------------------------------------------
 build_het_assessment <- function(chr) {
-  il_chr <- if (nrow(inv_like_dt) > 0) inv_like_dt[chrom == chr] else data.table()
+  il_chr <- if (nrow(window_dt) > 0) window_dt[chrom == chr] else data.table()
   if (nrow(il_chr) == 0) return(NULL)
   if (!any(c("pc1_bimodality", "het_pc1_gap", "het_mid_fraction",
              "local_delta12", "local_entropy") %in% names(il_chr))) return(NULL)

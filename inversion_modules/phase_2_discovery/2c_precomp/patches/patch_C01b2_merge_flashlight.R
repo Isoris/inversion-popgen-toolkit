@@ -16,19 +16,19 @@
 #    This upgrades "fuzzy PCA boundary" to "bp-resolution SV boundary".
 #
 # INSERT POINTS:
-#   - Source flashlight_loader.R at script top (after library() calls)
-#   - Add flashlight gate inside run_merge_fuzzy() while loop
+#   - Source sv_prior_loader.R at script top (after library() calls)
+#   - Add sv_prior gate inside run_merge_fuzzy() while loop
 #   - Add boundary refinement after each chromosome's merge loop
 #
 # Cheat 2 usage: het-DEL pileup at breakpoint positions provides
 # additional evidence that a boundary is real (not an artifact).
 # =============================================================================
 
-# ─── Source flashlight (add near top of script, after library calls) ──
+# ─── Source sv_prior (add near top of script, after library calls) ──
 
 # <<< INSERT after: `%||%` <- function(a, b) if (is.null(a)) b else a
 
-fl_loader <- Sys.getenv("FLASHLIGHT_LOADER", "")
+fl_loader <- Sys.getenv("SV_PRIOR_LOADER", "")
 if (!nzchar(fl_loader)) {
   for (p in c(
     file.path(dirname(dirname(outdir)), "utils", "flashlight_loader_v2.R")
@@ -37,15 +37,15 @@ if (!nzchar(fl_loader)) {
     if (!file.exists(fl_loader_path)) fl_loader_path <- sub("_v2", "", fl_loader_path)
   )) if (file.exists(p)) { fl_loader <- p; break }
 }
-.merge_has_flashlight <- FALSE
+.merge_has_sv_prior <- FALSE
 if (nzchar(fl_loader) && file.exists(fl_loader)) {
   tryCatch({
     source(fl_loader)
-    .merge_has_flashlight <- TRUE
+    .merge_has_sv_prior <- TRUE
     message("[merge] Flashlight loader sourced: ", fl_loader)
   }, error = function(e) message("[merge] Flashlight load failed: ", e$message))
 } else {
-  message("[merge] No flashlight — merge runs without SV breakpoint gates")
+  message("[merge] No sv_prior — merge runs without SV breakpoint gates")
 }
 
 # ─── GATE 4: SV BREAKPOINT BLOCKER ──────────────────────────────────
@@ -57,11 +57,11 @@ if (nzchar(fl_loader) && file.exists(fl_loader)) {
 # and before:
 #   la <- landscape_adjust(ms$score, ...)
 
-flashlight_merge_gate <- function(chr, core_a_end_bp, core_b_start_bp) {
+sv_prior_merge_gate <- function(chr, core_a_end_bp, core_b_start_bp) {
   # Returns: list(blocked = T/F, reason = "...")
-  if (!.merge_has_flashlight) return(list(blocked = FALSE, reason = "no_flashlight"))
+  if (!.merge_has_sv_prior) return(list(blocked = FALSE, reason = "no_sv_prior"))
 
-  fl <- load_flashlight(chr)
+  fl <- load_sv_prior(chr)
   if (is.null(fl) || nrow(fl$inv_calls) == 0) {
     return(list(blocked = FALSE, reason = "no_inv_calls"))
   }
@@ -116,7 +116,7 @@ flashlight_merge_gate <- function(chr, core_a_end_bp, core_b_start_bp) {
 # After computing merge score (ms) and BEFORE landscape adjustment:
 #
 #   # Gate 4: Flashlight SV breakpoint blocker
-#   sv_gate <- flashlight_merge_gate(chr, dt$end_bp[cur_end], dt$start_bp[nxt_start])
+#   sv_gate <- sv_prior_merge_gate(chr, dt$end_bp[cur_end], dt$start_bp[nxt_start])
 #   if (sv_gate$blocked) {
 #     score_log[[length(score_log) + 1]] <- data.table(
 #       chrom = chr, merge_family = params$name,
@@ -144,7 +144,7 @@ flashlight_merge_gate <- function(chr, core_a_end_bp, core_b_start_bp) {
 # INSERT after the merge QC loop, before writing output.
 
 snap_boundaries_to_sv <- function(region_rows, chroms_with_regions) {
-  if (!.merge_has_flashlight || length(region_rows) == 0) {
+  if (!.merge_has_sv_prior || length(region_rows) == 0) {
     return(list(region_rows = region_rows, n_snapped = 0L, snap_log = data.table()))
   }
 
@@ -157,7 +157,7 @@ snap_boundaries_to_sv <- function(region_rows, chroms_with_regions) {
     if (!is.data.table(r) || nrow(r) != 1) next
 
     chr <- r$chrom
-    fl <- load_flashlight(chr)
+    fl <- load_sv_prior(chr)
     if (is.null(fl) || nrow(fl$inv_calls) == 0) next
 
     orig_start <- r$start_bp
@@ -176,7 +176,7 @@ snap_boundaries_to_sv <- function(region_rows, chroms_with_regions) {
       if (dists_left[best_idx] <= SNAP_WINDOW) {
         new_start <- all_bps_left[best_idx]
         snap_log_rows[[length(snap_log_rows) + 1]] <- data.table(
-          chrom = chr, snake_id = r$snake_id,
+          chrom = chr, region_id = r$region_id,
           boundary = "left", orig_bp = orig_start, snapped_bp = new_start,
           snap_dist = new_start - orig_start,
           inv_id = near_left$inv_id[ceiling(best_idx / 2)]
@@ -198,7 +198,7 @@ snap_boundaries_to_sv <- function(region_rows, chroms_with_regions) {
       if (dists_right[best_idx] <= SNAP_WINDOW) {
         new_end <- all_bps_right[best_idx]
         snap_log_rows[[length(snap_log_rows) + 1]] <- data.table(
-          chrom = chr, snake_id = r$snake_id,
+          chrom = chr, region_id = r$region_id,
           boundary = "right", orig_bp = orig_end, snapped_bp = new_end,
           snap_dist = new_end - orig_end,
           inv_id = near_right$inv_id[ceiling(best_idx / 2)]
@@ -222,5 +222,5 @@ snap_boundaries_to_sv <- function(region_rows, chroms_with_regions) {
 # if (snap_result$n_snapped > 0) {
 #   message("[merge] SV boundary snap: ", snap_result$n_snapped, " boundaries refined")
 #   fwrite(snap_result$snap_log,
-#          file.path(outdir, "flashlight_boundary_snaps.tsv"), sep = "\t")
+#          file.path(outdir, "sv_prior_boundary_snaps.tsv"), sep = "\t")
 # }

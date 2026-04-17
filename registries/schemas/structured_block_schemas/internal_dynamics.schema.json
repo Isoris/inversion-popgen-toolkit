@@ -2,58 +2,363 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "internal_dynamics.schema.json",
   "block_type": "internal_dynamics",
-  "description": "Per-candidate record of recombinant samples, their switchpoints, event class (gene conversion vs double crossover), and posterior probability. This is the Tier-2 block that captures the position-dependent class information that cannot fit in the flat sample_groups table. Q2 internal dynamics.",
-  "question": "Q2",
-  "group_validation_required": "UNCERTAIN",
-  "source_script": "C01i + cheat24_recombinant_prior",
-  "required": ["n_HOM_REF", "n_HET", "n_HOM_INV", "n_RECOMBINANT", "n_total", "freq_inv"],
+  "title": "internal_dynamics",
+  "version": "v2_chat12_decompose",
+  "description": "Per-candidate PCA-based preliminary class assignment (HOM_REF / HET / HOM_INV) from STEP_C01i_decompose.R, with per-window class consistency, silhouette + BIC quality metrics, flashlight seeding status, and per-window class track (stored separately as an RDS file named by per_window_class_file). This block is chat-12's rewrite scope: the FINAL class assignment (including RECOMBINANT / RECOMBINANT_GC / RECOMBINANT_DCO) is produced by STEP_C01i_d_seal and written to the sample_registry groups table; this block holds only the PCA preliminary. The per-candidate recombinant map lives in the recombinant_map block, written by STEP_C01i_b_multi_recomb (pre-chat-12 the two were conflated in a single internal_dynamics block; that older flavor is archived at _archive_superseded/bk_schemas_pre_canonical/internal_dynamics.schema.json.pre_BK). Three emit variants: (a) full success with silhouette / BIC / per_sample; (b) no_seeding stub when seed_loader returns no seeds (decomp_status='no_seeding' + decomp_reason); (c) no_seeding stub when seeded_kmeans falls back to unsupervised (per chat-9 design we do NOT ship unsupervised). Downstream scripts must read decomp_status before dereferencing rich fields. See BK_KEYS_EXPLAINED.md in this directory for per-key documentation (biological meaning, provenance, downstream consumer).",
+  "question": "Q1, Q2",
+  "group_validation_required": "NONE (this block produces the initial grouping that seal then synthesises)",
+  "source_script": "STEP_C01i_decompose.R",
+  "type": "object",
+  "required": [
+    "candidate_id",
+    "chrom",
+    "start_bp",
+    "end_bp",
+    "n_samples",
+    "n_windows",
+    "decomp_status"
+  ],
   "properties": {
-    "n_HOM_REF": { "type": "integer" },
-    "n_HET": { "type": "integer" },
-    "n_HOM_INV": { "type": "integer" },
-    "n_RECOMBINANT": { "type": "integer" },
-    "n_total": { "type": "integer" },
-    "freq_inv": { "type": "number", "description": "(2*n_HOM_INV + n_HET) / (2*n_total), pre-recombinant correction" },
-    "recombinants": {
+    "candidate_id": {
+      "type": "string"
+    },
+    "chrom": {
+      "type": "string"
+    },
+    "start_bp": {
+      "type": "integer"
+    },
+    "end_bp": {
+      "type": "integer"
+    },
+    "n_samples": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "n_windows": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "decomp_status": {
+      "type": "string",
+      "enum": [
+        "seeded_ok",
+        "no_seeding"
+      ],
+      "description": "Chat-12: explicit status so downstream readers can distinguish 'succeeded with seeds' from 'skipped because seeds were insufficient'."
+    },
+    "decomp_reason": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Only populated when decomp_status == 'no_seeding'. Names the specific reason (seed_loader verdict, or 'seeded_kmeans fell back to unsupervised \u2014 not shipping')."
+    },
+    "seed_source": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Which seed loader branch produced the seeds: e.g. 'flashlight+step03', 'step03', 'flashlight', 'flashlight_legacy'."
+    },
+    "n_seed_agree": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "Number of samples where multiple seed sources agree."
+    },
+    "n_seed_conflict": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "Number of samples dropped because seed sources conflicted (Finding AY: implementation is drop-on-conflict, stricter than chat-9 design language of 'priority-pick')."
+    },
+    "k_used": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "enum": [
+        2,
+        3,
+        null
+      ]
+    },
+    "n_HOM_REF_prelim": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "n_HET_prelim": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "n_HOM_INV_prelim": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "silhouette_score": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": -1,
+      "maximum": 1,
+      "description": "Mean silhouette across samples."
+    },
+    "decomp_quality": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "clean",
+        "noisy",
+        null
+      ],
+      "description": "Chat-13 AV non-gating annotation derived from silhouette; 'clean' if silhouette >= 0.40 else 'noisy'. C01d / C01f must NOT promote on this field during the first wiring pass."
+    },
+    "bic_gap_k3_vs_k2": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": ">0 means k=3 fits better than k=2."
+    },
+    "phase_concordance": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Fraction of HET samples with phased Clair3 support."
+    },
+    "n_phase_supported": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "flashlight_mode": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "n_seed_HOM_REF": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "n_seed_HET": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "n_seed_HOM_INV": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "n_discordant": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "Samples where the SV anchor disagrees with the clustering call."
+    },
+    "n_cheat2_reclassified": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "Samples moved HOM_INV -> HET by the het-DEL at breakpoint constraint (cheat2)."
+    },
+    "discordant_samples": {
       "type": "array",
-      "description": "Per-recombinant-sample record",
+      "items": {
+        "type": "string"
+      }
+    },
+    "cheat2_constrained_samples": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "cluster_centers_pc1": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      }
+    },
+    "per_sample": {
+      "type": "array",
+      "description": "One entry per sample in the candidate (only in decomp_status='seeded_ok' blocks).",
       "items": {
         "type": "object",
-        "required": ["sample_id", "event_class"],
+        "required": [
+          "sample_id",
+          "pca_class",
+          "mean_pc1"
+        ],
         "properties": {
-          "sample_id":         { "type": "string" },
-          "event_class":       { "type": "string", "enum": ["gene_conversion", "double_crossover", "suspicious"] },
-          "switchpoint_bp":    { "type": "integer" },
-          "mosaic_length_bp":  { "type": "integer" },
-          "distance_to_nearest_boundary_bp": { "type": "integer" },
-          "prior_dco":         { "type": "number" },
-          "prior_gc":          { "type": "number" },
-          "posterior":         { "type": "number" },
-          "phase_support":     { "type": "integer", "description": "number of WhatsHap phase blocks supporting the call" },
-          "windows_HOM_REF":   { "type": "array", "items": { "type": "integer" }, "description": "window ids where this sample is HOM_REF" },
-          "windows_HOM_INV":   { "type": "array", "items": { "type": "integer" } },
-          "windows_HET":       { "type": "array", "items": { "type": "integer" } }
+          "sample_id": {
+            "type": "string"
+          },
+          "pca_class": {
+            "type": "string",
+            "enum": [
+              "HOM_REF",
+              "HET",
+              "HOM_INV"
+            ]
+          },
+          "mean_pc1": {
+            "type": "number"
+          },
+          "mean_pc2": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "window_consistency": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Fraction of windows whose local class matches the sample's global class."
+          },
+          "flashlight_seeded": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "discordant": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "cheat2_constrained": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
         }
       }
     },
-    "n_gene_conversion":  { "type": "integer" },
-    "n_double_crossover": { "type": "integer" },
-    "n_suspicious":       { "type": "integer" },
-    "mean_dco_prior":     { "type": "number" },
-    "max_dco_prior":      { "type": "number" }
+    "per_window_class_file": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "RDS filename (alongside the block JSON) carrying the per-window x per-sample class matrix. Too big for JSON. Example: 'per_window_class.rds'."
+    }
   },
   "keys_extracted": [
-    { "key": "q6_n_HOM_REF", "from": "n_HOM_REF" },
-    { "key": "q6_n_HET", "from": "n_HET" },
-    { "key": "q6_n_HOM_INV", "from": "n_HOM_INV" },
-    { "key": "q6_n_Recombinant", "from": "n_RECOMBINANT" },
-    { "key": "q6_n_total", "from": "n_total" },
-    { "key": "q6_freq_inv", "from": "freq_inv" },
-    { "key": "q2_n_gene_conversion", "from": "n_gene_conversion" },
-    { "key": "q2_n_double_crossover", "from": "n_double_crossover" },
-    { "key": "q2_n_suspicious", "from": "n_suspicious" },
-    { "key": "q2_mean_dco_prior", "from": "mean_dco_prior" },
-    { "key": "q2_max_dco_prior", "from": "max_dco_prior" },
-    { "key": "q2_decomposition_status", "from": "_status_done" }
+    {
+      "key": "q2_pca_decomp_status",
+      "from": "decomp_status"
+    },
+    {
+      "key": "q2_pca_decomp_skip_reason",
+      "from": "decomp_reason"
+    },
+    {
+      "key": "q2_pca_seed_source",
+      "from": "seed_source"
+    },
+    {
+      "key": "q2_n_seed_class_conflicts",
+      "from": "n_seed_conflict"
+    },
+    {
+      "key": "q2_pca_cluster_silhouette",
+      "from": "silhouette_score"
+    },
+    {
+      "key": "q2_pca_cluster_separation_flag",
+      "from": "decomp_quality"
+    },
+    {
+      "key": "q2_bic_gap_k3_vs_k2",
+      "from": "bic_gap_k3_vs_k2"
+    },
+    {
+      "key": "q2_het_phase_support_fraction",
+      "from": "phase_concordance"
+    },
+    {
+      "key": "q2_n_het_phase_supported",
+      "from": "n_phase_supported"
+    },
+    {
+      "key": "q2_pca_seed_mode",
+      "from": "flashlight_mode"
+    },
+    {
+      "key": "q2_n_seed_HOM_REF",
+      "from": "n_seed_HOM_REF"
+    },
+    {
+      "key": "q2_n_seed_HET",
+      "from": "n_seed_HET"
+    },
+    {
+      "key": "q2_n_seed_HOM_INV",
+      "from": "n_seed_HOM_INV"
+    },
+    {
+      "key": "q2_n_samples_sv_pca_discordant",
+      "from": "n_discordant"
+    },
+    {
+      "key": "q2_n_hetDEL_breakpoint_reclass",
+      "from": "n_cheat2_reclassified"
+    },
+    {
+      "key": "q2_pca_k_used",
+      "from": "k_used"
+    },
+    {
+      "key": "q6_n_HOM_REF_prelim",
+      "from": "n_HOM_REF_prelim"
+    },
+    {
+      "key": "q6_n_HET_prelim",
+      "from": "n_HET_prelim"
+    },
+    {
+      "key": "q6_n_HOM_INV_prelim",
+      "from": "n_HOM_INV_prelim"
+    }
   ]
 }

@@ -1,0 +1,59 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "internal_dynamics.schema.json",
+  "block_type": "internal_dynamics",
+  "description": "Per-candidate record of recombinant samples, their switchpoints, event class (gene conversion vs double crossover), and posterior probability. This is the Tier-2 block that captures the position-dependent class information that cannot fit in the flat sample_groups table. Q2 internal dynamics.",
+  "question": "Q2",
+  "group_validation_required": "UNCERTAIN",
+  "source_script": "C01i + cheat24_recombinant_prior",
+  "required": ["n_HOM_REF", "n_HET", "n_HOM_INV", "n_RECOMBINANT", "n_total", "freq_inv"],
+  "properties": {
+    "n_HOM_REF": { "type": "integer" },
+    "n_HET": { "type": "integer" },
+    "n_HOM_INV": { "type": "integer" },
+    "n_RECOMBINANT": { "type": "integer" },
+    "n_total": { "type": "integer" },
+    "freq_inv": { "type": "number", "description": "(2*n_HOM_INV + n_HET) / (2*n_total), pre-recombinant correction" },
+    "recombinants": {
+      "type": "array",
+      "description": "Per-recombinant-sample record",
+      "items": {
+        "type": "object",
+        "required": ["sample_id", "event_class"],
+        "properties": {
+          "sample_id":         { "type": "string" },
+          "event_class":       { "type": "string", "enum": ["gene_conversion", "double_crossover", "suspicious"] },
+          "switchpoint_bp":    { "type": "integer" },
+          "mosaic_length_bp":  { "type": "integer" },
+          "distance_to_nearest_boundary_bp": { "type": "integer" },
+          "prior_dco":         { "type": "number" },
+          "prior_gc":          { "type": "number" },
+          "posterior":         { "type": "number" },
+          "phase_support":     { "type": "integer", "description": "number of WhatsHap phase blocks supporting the call" },
+          "windows_HOM_REF":   { "type": "array", "items": { "type": "integer" }, "description": "window ids where this sample is HOM_REF" },
+          "windows_HOM_INV":   { "type": "array", "items": { "type": "integer" } },
+          "windows_HET":       { "type": "array", "items": { "type": "integer" } }
+        }
+      }
+    },
+    "n_gene_conversion":  { "type": "integer" },
+    "n_double_crossover": { "type": "integer" },
+    "n_suspicious":       { "type": "integer" },
+    "mean_dco_prior":     { "type": "number" },
+    "max_dco_prior":      { "type": "number" }
+  },
+  "keys_extracted": [
+    { "key": "q6_n_HOM_REF", "from": "n_HOM_REF" },
+    { "key": "q6_n_HET", "from": "n_HET" },
+    { "key": "q6_n_HOM_INV", "from": "n_HOM_INV" },
+    { "key": "q6_n_Recombinant", "from": "n_RECOMBINANT" },
+    { "key": "q6_n_total", "from": "n_total" },
+    { "key": "q6_freq_inv", "from": "freq_inv" },
+    { "key": "q2_n_gene_conversion", "from": "n_gene_conversion" },
+    { "key": "q2_n_double_crossover", "from": "n_double_crossover" },
+    { "key": "q2_n_suspicious", "from": "n_suspicious" },
+    { "key": "q2_mean_dco_prior", "from": "mean_dco_prior" },
+    { "key": "q2_max_dco_prior", "from": "max_dco_prior" },
+    { "key": "q2_decomposition_status", "from": "_status_done" }
+  ]
+}

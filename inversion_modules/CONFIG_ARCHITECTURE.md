@@ -16,8 +16,9 @@ The codebase already has a clean two-tier pattern:
 inversion_codebase_v8.5/
 ├── 00_inversion_config.sh                         # MASTER for anything inversion
 │
-├── MODULE_5A2_breakpoint_validation/
+├── phase_3_refine/
 │   └── 00_breakpoint_validation_config.sh         # sources master, adds module-specific
+│                                                  # (flat layout — was MODULE_5A2_breakpoint_validation/)
 │
 ├── utils/
 │   ├── load_bridge.R
@@ -176,7 +177,7 @@ requires updating every reference.
 Already compliant with this pattern:
 
 - `00_inversion_config.sh` — master
-- `MODULE_5A2_breakpoint_validation/00_breakpoint_validation_config.sh` —
+- `phase_3_refine/00_breakpoint_validation_config.sh` —
   module config, sources master
 
 Suggested next modules to add a config for:
@@ -194,7 +195,7 @@ filter thresholds.
 ## See also
 
 - `00_inversion_config.sh` — master project config
-- `MODULE_5A2_breakpoint_validation/00_breakpoint_validation_config.sh` —
+- `phase_3_refine/00_breakpoint_validation_config.sh` —
   reference implementation of a module config
 - `phase_2_discovery/*/README.md` — per-phase documentation
 - `phase_2_discovery/2c_precomp/RENAMING.md` — terminology migration

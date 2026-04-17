@@ -15,8 +15,8 @@
 #   - per-sample class assignment (HOM_REF/HET/HOM_INV)
 #   - per-window dosage track
 #   - silhouette_score, bic_gap_k3_vs_k2, phase_support
-#   - seeded_by_flashlight flag (if applicable)
-#   - discordant_samples (where flashlight seeds disagree with clustering)
+#   - seeded_by_sv_prior flag (if applicable)
+#   - discordant_samples (where sv_prior seeds disagree with clustering)
 #   - samples_constrained_cheat2 (het-DEL at breakpoint → not HOM_INV)
 #
 # DOES NOT register groups yet. STEP_C01i_d_seal does that after all three
@@ -24,7 +24,7 @@
 #
 # Sources:
 #   - lib_decompose_helpers.R for shared utilities
-#   - flashlight_v2/patches/patch_C01i_decomposition_flashlight.R for cheats 1/2/3
+#   - flashlight_v2/patches/patch_C01i_decomposition_sv_prior.R for cheats 1/2/3
 #   - inspired by superseded/STEP_C01i_multi_inversion_decomposition.R structure
 # =============================================================================
 
@@ -42,7 +42,19 @@ option_list <- list(
   make_option("--tier_max", type = "integer", default = 3L,
               help = "Only process candidates with tier <= this"),
   make_option("--k_decomp", type = "integer", default = 3L,
-              help = "Number of classes (default 3)")
+              help = "Number of classes (default 3)"),
+  make_option("--step03_seeds_dir", type = "character", default = NA_character_,
+              help = paste0("Directory containing STEP03 per-candidate seed ",
+                            "TSVs (04_deconvolution_seeds/<cid>_seeds.tsv). ",
+                            "If set, combined with sv_prior seeds via ",
+                            "lib_step03_seed_loader.R::combine_tier1_seeds(). ",
+                            "If unset AND sv_prior seeds are unavailable, ",
+                            "the candidate is skipped with decomp_status=",
+                            "'no_seeding'. The unsupervised k-means fallback ",
+                            "has been removed (chat-12, per chat-9 design).")),
+  make_option("--min_seeds_per_class", type = "integer", default = 2L,
+              help = paste0("Minimum samples per (HOM_REF/HET/HOM_INV) class ",
+                            "in the combined seed set (default 2)."))
 )
 opt <- parse_args(OptionParser(option_list = option_list))
 
@@ -64,6 +76,27 @@ if (!helper_found) {
   stop("[C01i_decompose] cannot find lib_decompose_helpers.R")
 }
 
+# Chat-12: load the Tier-1 seed combiner (sv_prior ∪ STEP03, conflict drop,
+# no unsupervised fallback). If missing, seed combination falls back to the
+# sv_prior-only path inside the main loop.
+seed_loader_paths <- c(
+  "lib_step03_seed_loader.R",
+  "R/lib_step03_seed_loader.R",
+  file.path(dirname(sys.frame(1)$ofile %||% "."), "lib_step03_seed_loader.R")
+)
+.has_seed_loader <- FALSE
+for (p in seed_loader_paths) {
+  if (file.exists(p)) {
+    tryCatch({ source(p); .has_seed_loader <- TRUE; break },
+             error = function(e) message("[C01i_decompose] seed loader source failed: ",
+                                          conditionMessage(e)))
+  }
+}
+if (!.has_seed_loader) {
+  message("[C01i_decompose] lib_step03_seed_loader.R not found — ",
+          "STEP03 seed path disabled, sv_prior-only seeding.")
+}
+
 paths <- resolve_decomp_paths(list(outdir = opt$outdir))
 reg <- try_load_registry()
 if (is.null(reg)) {
@@ -71,17 +104,17 @@ if (is.null(reg)) {
 }
 dir.create(opt$outdir, recursive = TRUE, showWarnings = FALSE)
 
-# ── Optional flashlight loader (for seeded k-means cheats) ──────────────────
-.has_flashlight <- FALSE
-flashlight_path <- file.path(paths$base, "flashlight_v2", "utils",
+# ── Optional sv_prior loader (for seeded k-means cheats) ──────────────────
+.has_sv_prior <- FALSE
+sv_prior_path <- file.path(paths$base, "flashlight_v2", "utils",
                               "flashlight_loader_v2.R")
-if (file.exists(flashlight_path)) {
+if (file.exists(sv_prior_path)) {
   tryCatch({
-    source(flashlight_path)
-    .has_flashlight <- TRUE
-    message("[C01i_decompose] flashlight loader sourced")
+    source(sv_prior_path)
+    .has_sv_prior <- TRUE
+    message("[C01i_decompose] sv_prior loader sourced")
   }, error = function(e) {
-    message("[C01i_decompose] flashlight source failed: ", conditionMessage(e))
+    message("[C01i_decompose] sv_prior source failed: ", conditionMessage(e))
   })
 }
 
@@ -90,7 +123,7 @@ if (file.exists(flashlight_path)) {
 # =============================================================================
 #
 # If the candidate has ≥10 SV-genotyped anchor samples (from DELLY/Manta
-# flashlight), use their genotypes as k-means seeds instead of random init.
+# sv_prior), use their genotypes as k-means seeds instead of random init.
 # This is much more reliable than unsupervised clustering at 9x coverage.
 seeded_kmeans <- function(x, seeds, k = 3L, nstart_fallback = 25L) {
   seed_ref <- intersect(seeds$HOM_REF, names(x))
@@ -259,12 +292,20 @@ for (ci in seq_len(nrow(cand_dt))) {
   # PC1 is where the arrangement signal lives. PC2 mostly captures ancestry.
 
   # ── Cheat 1: Flashlight seeded init ──
-  seeds <- list(HOM_REF = character(0), HET = character(0), HOM_INV = character(0))
+  # The sv_prior_seeds list is gathered first; then combine_tier1_seeds()
+  # (chat-12) unions sv_prior ∪ STEP03 seeds, drops samples where the two
+  # sources disagree on class, and emits status="no_seeding" if the result
+  # can't meet min_seeds_per_class on all three classes. The unsupervised
+  # k-means fallback has been REMOVED (chat-12, per chat-9 design): if
+  # Tier-1 has no seeding, the candidate is skipped with
+  # decomp_status="no_seeding" and no groups are proposed.
+  sv_prior_seeds <- list(HOM_REF = character(0), HET = character(0),
+                            HOM_INV = character(0))
   cheat2_constrained <- character(0)
-  flashlight_mode <- "unsupervised"
+  sv_prior_available <- FALSE
 
-  if (.has_flashlight && exists("load_flashlight", mode = "function")) {
-    fl <- tryCatch(load_flashlight(chr), error = function(e) NULL)
+  if (.has_sv_prior && exists("load_sv_prior", mode = "function")) {
+    fl <- tryCatch(load_sv_prior(chr), error = function(e) NULL)
     if (!is.null(fl)) {
       if (exists("get_sv_anchors", mode = "function")) {
         anchors <- tryCatch(
@@ -272,13 +313,14 @@ for (ci in seq_len(nrow(cand_dt))) {
           error = function(e) NULL
         )
         if (!is.null(anchors) && nrow(anchors) >= 10) {
-          seeds$HOM_REF <- unique(anchors[sv_genotype == "HOM_REF"]$sample_id)
-          seeds$HET     <- unique(anchors[sv_genotype == "HET"]$sample_id)
-          seeds$HOM_INV <- unique(anchors[sv_genotype == "HOM_INV"]$sample_id)
-          flashlight_mode <- "seeded"
-          cat("[C01i_decompose]   seeded: REF=", length(seeds$HOM_REF),
-              " HET=", length(seeds$HET),
-              " INV=", length(seeds$HOM_INV), "\n", sep = "")
+          sv_prior_seeds$HOM_REF <- unique(anchors[sv_genotype == "HOM_REF"]$sample_id)
+          sv_prior_seeds$HET     <- unique(anchors[sv_genotype == "HET"]$sample_id)
+          sv_prior_seeds$HOM_INV <- unique(anchors[sv_genotype == "HOM_INV"]$sample_id)
+          sv_prior_available <- TRUE
+          cat("[C01i_decompose]   sv_prior seeds: REF=",
+              length(sv_prior_seeds$HOM_REF),
+              " HET=", length(sv_prior_seeds$HET),
+              " INV=", length(sv_prior_seeds$HOM_INV), "\n", sep = "")
         }
       }
       # Cheat 2: Het-DEL at breakpoint → not HOM_INV
@@ -300,14 +342,94 @@ for (ci in seq_len(nrow(cand_dt))) {
     }
   }
 
-  # ── K-means clustering ──
-  km <- if (flashlight_mode == "seeded") {
-    seeded_kmeans(mean_pc1, seeds, k = opt$k_decomp)
+  # ── Combined Tier-1 seeding (chat-12) ──
+  step03_dir <- if (!is.na(opt$step03_seeds_dir) && nzchar(opt$step03_seeds_dir))
+                    opt$step03_seeds_dir else NULL
+
+  seed_result <- if (.has_seed_loader) {
+    combine_tier1_seeds(
+      chr = chr, cid = cid, start_bp = s, end_bp = e,
+      sv_prior_seeds    = if (sv_prior_available) sv_prior_seeds else NULL,
+      step03_seeds_dir    = step03_dir,
+      min_seeds_per_class = opt$min_seeds_per_class
+    )
+  } else if (sv_prior_available) {
+    # Seed loader missing — degrade gracefully to sv_prior-only
+    list(status = "sv_prior_only", reason = NA_character_,
+         seeds = sv_prior_seeds, n_agree = 0L, n_conflict = 0L,
+         source = "sv_prior_legacy")
   } else {
-    kmeans_with_quality(mean_pc1, k = opt$k_decomp, nstart = 25)
+    list(status = "no_seeding",
+         reason = "neither sv_prior nor STEP03 seeds available",
+         seeds = NULL, n_agree = 0L, n_conflict = 0L, source = "none")
   }
+
+  if (identical(seed_result$status, "no_seeding")) {
+    cat("[C01i_decompose]   SKIP (decomp_status=no_seeding): ",
+        seed_result$reason, "\n", sep = "")
+    # Emit a minimal Tier-2 block so downstream scripts don't silently
+    # miss the candidate — they can read decomp_status and skip accordingly.
+    block_data <- list(
+      candidate_id   = cid,
+      chrom          = chr,
+      start_bp       = as.integer(s),
+      end_bp         = as.integer(e),
+      n_samples      = as.integer(n_samples),
+      n_windows      = as.integer(n_windows),
+      decomp_status  = "no_seeding",
+      decomp_reason  = seed_result$reason,
+      seed_source    = seed_result$source,
+      n_seed_conflict= as.integer(seed_result$n_conflict %||% 0L)
+    )
+    write_block_safe(
+      reg = reg,
+      candidate_id = cid,
+      block_type   = "internal_dynamics",
+      data         = block_data,
+      source_script= "STEP_C01i_decompose.R",
+      outdir_fallback = cand_outdirs[ci]
+    )
+    next
+  }
+
+  seeds <- seed_result$seeds
+  sv_prior_mode <- seed_result$source  # e.g. "sv_prior+step03", "step03",
+                                          # "sv_prior", "sv_prior_legacy"
+
+  # ── K-means clustering (seeded only; unsupervised fallback removed) ──
+  km <- seeded_kmeans(mean_pc1, seeds, k = opt$k_decomp)
   if (is.null(km)) {
-    cat("[C01i_decompose]   SKIP: k-means failed\n")
+    cat("[C01i_decompose]   SKIP: seeded_kmeans failed\n")
+    next
+  }
+  if (!isTRUE(km$seeded)) {
+    # seeded_kmeans returned the unsupervised fallback (n_seeds<10 or
+    # under-represented classes). Per chat-9 design we do NOT ship this —
+    # emit no_seeding and continue.
+    cat("[C01i_decompose]   SKIP (decomp_status=no_seeding): ",
+        "seeds too sparse for seeded_kmeans (n_ref=", length(seeds$HOM_REF),
+        " n_het=", length(seeds$HET),
+        " n_inv=", length(seeds$HOM_INV), ")\n", sep = "")
+    block_data <- list(
+      candidate_id   = cid,
+      chrom          = chr,
+      start_bp       = as.integer(s),
+      end_bp         = as.integer(e),
+      n_samples      = as.integer(n_samples),
+      n_windows      = as.integer(n_windows),
+      decomp_status  = "no_seeding",
+      decomp_reason  = "seeded_kmeans fell back to unsupervised — not shipping",
+      seed_source    = seed_result$source,
+      n_seed_conflict= as.integer(seed_result$n_conflict %||% 0L)
+    )
+    write_block_safe(
+      reg = reg,
+      candidate_id = cid,
+      block_type   = "internal_dynamics",
+      data         = block_data,
+      source_script= "STEP_C01i_decompose.R",
+      outdir_fallback = cand_outdirs[ci]
+    )
     next
   }
 
@@ -329,9 +451,9 @@ for (ci in seq_len(nrow(cand_dt))) {
     }
   }
 
-  # ── Flag flashlight-discordant samples ──
+  # ── Flag sv_prior-discordant samples ──
   discordant <- character(0)
-  if (flashlight_mode == "seeded") {
+  if (sv_prior_mode == "seeded") {
     for (sid in sample_names) {
       sv_gt <- if (sid %in% seeds$HOM_REF) "HOM_REF"
                 else if (sid %in% seeds$HET) "HET"
@@ -387,7 +509,7 @@ for (ci in seq_len(nrow(cand_dt))) {
       mean_pc1  = round(unname(mean_pc1[sid]), 4),
       mean_pc2  = round(unname(mean_pc2[sid]), 4),
       window_consistency = round(unname(pw$consistency[sid]), 3),
-      flashlight_seeded  = sid %in% c(seeds$HOM_REF, seeds$HET, seeds$HOM_INV),
+      sv_prior_seeded  = sid %in% c(seeds$HOM_REF, seeds$HET, seeds$HOM_INV),
       discordant = sid %in% discordant,
       cheat2_constrained = sid %in% cheat2_constrained
     )
@@ -399,20 +521,35 @@ for (ci in seq_len(nrow(cand_dt))) {
     n_samples = as.integer(n_samples),
     n_windows = as.integer(n_windows),
     k_used = as.integer(opt$k_decomp),
+    # Chat-12: explicit status field so downstream readers can distinguish
+    # "succeeded with seeds" from "skipped with no_seeding".
+    decomp_status = "seeded_ok",
+    seed_source   = seed_result$source,
+    n_seed_agree    = as.integer(seed_result$n_agree    %||% 0L),
+    n_seed_conflict = as.integer(seed_result$n_conflict %||% 0L),
     # Class counts (preliminary — final counts come from C01i_d_seal)
     n_HOM_REF_prelim = as.integer(class_counts$HOM_REF %||% 0),
     n_HET_prelim     = as.integer(class_counts$HET %||% 0),
     n_HOM_INV_prelim = as.integer(class_counts$HOM_INV %||% 0),
     # Quality metrics
     silhouette_score = round(silhouette, 4),
+    # chat-13 Finding AV: non-gating decomp_quality annotation derived
+    # from silhouette. At 9x with limited samples, silhouette >= 0.40 is
+    # "clean" (well-separated clusters), below is "noisy". This is a
+    # flag only — the chat-14 HPC run on Quentin's cohort will
+    # recalibrate the 0.40 cutoff against the observed distribution.
+    # C01d / C01f must NOT gate on this for the first wiring pass.
+    decomp_quality = if (is.na(silhouette)) NA_character_
+                      else if (silhouette >= 0.40) "clean"
+                      else "noisy",
     bic_gap_k3_vs_k2 = round(bic_gap, 4),
     phase_concordance = round(phase_concordance, 3),
     n_phase_supported = as.integer(n_phase_support),
     # Flashlight integration
-    flashlight_mode = flashlight_mode,
-    n_seed_HOM_REF = if (flashlight_mode == "seeded") as.integer(km$n_seed_ref) else 0L,
-    n_seed_HET     = if (flashlight_mode == "seeded") as.integer(km$n_seed_het) else 0L,
-    n_seed_HOM_INV = if (flashlight_mode == "seeded") as.integer(km$n_seed_inv) else 0L,
+    sv_prior_mode = sv_prior_mode,
+    n_seed_HOM_REF = as.integer(km$n_seed_ref %||% length(seeds$HOM_REF)),
+    n_seed_HET     = as.integer(km$n_seed_het %||% length(seeds$HET)),
+    n_seed_HOM_INV = as.integer(km$n_seed_inv %||% length(seeds$HOM_INV)),
     n_discordant = as.integer(length(discordant)),
     n_cheat2_reclassified = as.integer(n_cheat2_reclassified),
     discordant_samples = discordant,

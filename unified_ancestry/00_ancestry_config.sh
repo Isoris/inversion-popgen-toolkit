@@ -59,9 +59,27 @@ export HOBS_PLOT_R="${BASE}/Modules/MODULE_5B_inversion_followup/figures/05_plot
 # ── Cross-module wiring (v12.1) ─────────────────────────────────────────────
 export SAMPLES_IND="${BASE}/het_roh/01_inputs_check/samples.ind"
 export REGISTRY_DIR="${BASE}/sample_registry"
-export LOAD_BRIDGE="${BASE}/inversion_codebase_v8.5/utils/load_bridge.R"
-export SAMPLE_MAP_R="${BASE}/inversion_codebase_v8.5/utils/sample_map.R"
-export SAMPLE_REGISTRY_R="${BASE}/inversion_codebase_v8.5/utils/sample_registry.R"
+# LOAD_BRIDGE path: prefer the flattened layout, fall back to legacy v8.5.
+# The bridge itself auto-detects its location and doesn't strictly need this
+# env var; it's set so downstream scripts that just `source "$LOAD_BRIDGE"`
+# pick it up correctly.
+if [[ -z "${LOAD_BRIDGE:-}" ]]; then
+  for _try in \
+      "${BASE}/utils/load_bridge.R" \
+      "${BASE}/inversion_modules/utils/load_bridge.R" \
+      "${BASE}/inversion_codebase_v8.5/utils/load_bridge.R"; do
+    if [[ -f "$_try" ]]; then
+      export LOAD_BRIDGE="$_try"; break
+    fi
+  done
+  unset _try
+  : "${LOAD_BRIDGE:=${BASE}/utils/load_bridge.R}"  # default even if nothing found
+fi
+# sample_map.R / sample_registry.R co-live with load_bridge.R
+_LB_DIR=$(dirname "${LOAD_BRIDGE}" 2>/dev/null || echo "${BASE}/utils")
+export SAMPLE_MAP_R="${SAMPLE_MAP_R:-${_LB_DIR}/sample_map.R}"
+export SAMPLE_REGISTRY_R="${SAMPLE_REGISTRY_R:-${_LB_DIR}/sample_registry.R}"
+unset _LB_DIR
 
 # ── Step 1 outputs (Engine A → Engine B) ─────────────────────────────────────
 export STEP1_DIR="${BASE}/popstruct_thin"
@@ -103,7 +121,30 @@ export FOPT_FILE="${BEST_FOPT}"
 export SAMPLE_LIST="${STEP1_SAMPLE_LIST}"
 
 # ── Cache directory (Engine B output) ────────────────────────────────────────
-export LOCAL_Q_DIR="${BASE}/unified_ancestry/local_Q"
+# 2026-04-17: moved OUT of the code tree. Cache files are mutable run-state,
+# code is versioned under $BASE/unified_ancestry/. Keeping them separate means
+# a git status or a repo reclone doesn't see data files as untracked.
+# Legacy flat layout <LOCAL_Q_DIR>/<chr>.local_Q_*.tsv.gz is tolerated on read;
+# new writes go under <LOCAL_Q_DIR>/K<NN>/<chr>.local_Q_*.tsv.gz so the K
+# sweep has one sharded cache per K level.
+export LOCAL_Q_DIR="${LOCAL_Q_DIR:-${BASE}/ancestry_cache}"
+
+# Canonical K — what the precomp RDS flattens in as localQ_*_K<NN> columns.
+# Mirrors DEFAULT_K above; kept as a separate alias so the purpose at each
+# reference site is obvious.
+export CANONICAL_K="${CANONICAL_K:-${DEFAULT_K:-8}}"
+
+# K-sweep — which K levels to precompute during the per-chrom precompute
+# launcher. Default: full 2..20. Set K_SWEEP=8 to skip the sweep and only
+# precompute canonical.
+export K_SWEEP="${K_SWEEP:-2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20}"
+
+# Sample group — which registered sample_registry group this run targets.
+# Filenames + results_registry manifest rows use this as the group_id FK.
+# 2026-04-17 chat-16: replaces the chat-15 content-hash scheme (see
+# registries/DATABASE_DESIGN.md). Must be a group registered in
+# sample_registry (default "all_226" — registered by load_bridge.R STEP 6.5).
+export SAMPLE_GROUP="${SAMPLE_GROUP:-all_226}"
 
 # ── Window registry ──────────────────────────────────────────────────────────
 export WINDOW_REGISTRY="${BASE}/inversion_localpca_v7/06_mds_candidates/snake_regions_multiscale/precomp/windows_master.tsv.gz"

@@ -42,8 +42,8 @@ inversion_modules/
 │   └── 2e_ghsl/                        GHSL haplotype contrast (Layer C)
 │
 ├── phase_3_refine/                     bp-resolution breakpoint validation
-│   └── MODULE_5A2_breakpoint_validation/
 │                                       DELLY/Manta concordance, BND signal
+│                                       (flat layout — was MODULE_5A2_breakpoint_validation/)
 │
 ├── phase_4_postprocessing/             per-candidate postprocessing — the spine
 │   ├── 4a_existence_layers/            ← catalog birth (C01d/C01e/C01g)

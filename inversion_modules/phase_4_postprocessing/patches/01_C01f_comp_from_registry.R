@@ -273,14 +273,33 @@ compute_group_validation <- function(current_level,
 #     if (nrow(ev) > 0) ev$value[1] else "UNCERTAIN"
 #   }, error = function(e) "UNCERTAIN")
 #
+#   # Chat 7 FIX 31: read Layer D OR + p from registry (written by phase_3 STEP03).
+#   # Never hard-code NA — that made the VALIDATED promotion gate unreachable.
+#   layer_d_fisher_p <- tryCatch({
+#     if (exists("reg") && !is.null(reg$evidence) && !is.null(reg$evidence$get_evidence)) {
+#       ev <- reg$evidence$get_evidence(cid, "q7_layer_d_fisher_p")
+#       if (!is.null(ev) && is.data.frame(ev) && nrow(ev) > 0) {
+#         suppressWarnings(as.numeric(ev$value[1]))
+#       } else NA_real_
+#     } else NA_real_
+#   }, error = function(e) NA_real_)
+#   layer_d_fisher_or <- tryCatch({
+#     if (exists("reg") && !is.null(reg$evidence) && !is.null(reg$evidence$get_evidence)) {
+#       ev <- reg$evidence$get_evidence(cid, "q7_layer_d_fisher_or")
+#       if (!is.null(ev) && is.data.frame(ev) && nrow(ev) > 0) {
+#         suppressWarnings(as.numeric(ev$value[1]))
+#       } else NA_real_
+#     } else NA_real_
+#   }, error = function(e) NA_real_)
+#
 #   new_level <- compute_group_validation(
 #     current_level         = current_level,
 #     t8_concordance        = t8$concordance,
 #     t9_jackknife_status   = t9$status,
 #     t9_max_delta          = t9$max_delta,
 #     t10_theta_concordance = t10$concordance,
-#     layer_d_fisher_p      = NA,   # not computed in C01f v9.3.4
-#     layer_d_fisher_or     = NA    # STEP03 writes Layer D separately
+#     layer_d_fisher_p      = layer_d_fisher_p,   # NA-safe registry read
+#     layer_d_fisher_or     = layer_d_fisher_or   # NA-safe registry read
 #   )
 #
 #   message("[C01f] ", cid, ": group validation ", current_level, " → ", new_level)

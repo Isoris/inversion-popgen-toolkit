@@ -22,7 +22,7 @@ cli <- parse_diag_args()
 data <- load_diag_data(cli$precomp_dir, cli$chrom_filter)
 precomp_list <- data$precomp_list
 chroms <- data$chroms
-inv_like_dt <- data$inv_like_dt
+window_dt <- data$window_dt
 
 summ_dir <- file.path(cli$outdir, "summaries")
 dir.create(summ_dir, recursive = TRUE, showWarnings = FALSE)
@@ -32,8 +32,8 @@ message("[diag] Generating genome-wide summaries...")
 # =============================================================================
 # S01: Inv-likeness violin per chromosome
 # =============================================================================
-if (nrow(inv_like_dt) > 0) {
-  il_plot <- inv_like_dt[chrom %in% chroms & is.finite(inv_likeness)]
+if (nrow(window_dt) > 0) {
+  il_plot <- window_dt[chrom %in% chroms & is.finite(inv_likeness)]
   il_plot[, chrom := factor(chrom, levels = chroms)]
 
   # Per-chromosome adaptive q75 (shown instead of fixed 0.90)

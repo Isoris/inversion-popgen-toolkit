@@ -27,7 +27,7 @@ as valid R when integrated.
 | `patch_C01d_scoring_flashlight.R` | `STEP_C01d_candidate_scoring.R` | **PENDING** — adds SV-overlap score contribution to candidate scoring. |
 | `patch_C01f_hypothesis_flashlight.R` | `STEP_C01f_hypothesis_tests.R` | **PENDING** — adds anchor-sample group-validation check. |
 | `patch_C01i_decomposition_flashlight.R` | `STEP_C01i_decompose.R` | **PENDING** — uses SV anchors as seeds for k-means genotype decomposition. |
-| `patch_C04_ghsl_flashlight.R` | `STEP_C04_snake3_ghsl_v5.R` | **PENDING** — adds SV-prior cross-reference to GHSL Layer C outputs. |
+| `patch_C04_ghsl_flashlight.R` | `STEP_C04_snake3_ghsl_v6.R` | **PENDING** — adds SV-prior cross-reference to GHSL Layer C outputs. Target updated chat 14 (v5 → v6). |
 
 ## When you integrate one of these
 

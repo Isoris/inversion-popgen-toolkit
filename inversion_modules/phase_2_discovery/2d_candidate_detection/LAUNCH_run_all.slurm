@@ -57,7 +57,7 @@ echo "================================================================"
   --precomp-dir "${PRECOMP_DIR}" \
   --sv-file     "${DELLY_INV_VCF:-}" \
   --outdir      "${D_OUTDIR}" \
-  --nn-scales   "0,20,40,80" \
+  --nn-scales   "0,20,40,80,120,160,200,240,320" \
   --phases      "all"
 
 echo "[DONE] STEP_D run_all — ${CHR} — $(date)"

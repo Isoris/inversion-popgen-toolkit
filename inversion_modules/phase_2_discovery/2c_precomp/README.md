@@ -144,6 +144,39 @@ sv_inv_af, sv_het_del_count, sv_n_anchors) onto the per-window table
 by reading C00's output. These are pure annotations — they do not
 alter inv_likeness or any upstream computation.
 
+**Ancestry stamps (chat 15, 2026-04-17).** Once the local-Q cache is
+populated (see "Ancestry precompute" below), C01a also stamps three
+per-window ancestry summaries:
+
+- `localQ_delta12_K08` — cohort mean of |Q_max1 − Q_max2| per window
+- `localQ_entropy_K08` — cohort mean of Shannon(Q) per window
+- `localQ_ena_K08` — cohort mean effective-number-of-ancestries per window
+
+The `_K08` suffix is the canonical K flattened in. Full K=2..20 Q data
+lives in `$LOCAL_Q_DIR/K<NN>/` and is queryable on demand via
+`reg$compute$ancestry_at_interval(...)` or
+`reg$compute$ancestry_q_vector(...)` — the precomp RDS only keeps the
+canonical-K cohort scalars because those are what the scoring pass
+needs per window. Non-fatal if the cache isn't there yet.
+
+### Ancestry precompute (sidecar workflow)
+
+Before running C01a for the first time, populate the ancestry cache:
+
+```bash
+source "$BASE/utils/pipeline_bridge.sh"
+sbatch "$BASE/unified_ancestry/launchers/LAUNCH_instant_q_precompute.slurm"
+```
+
+This is a 532-task SLURM array (28 chroms × 19 K values = 2..20) that
+writes to `$LOCAL_Q_DIR/K<NN>/<chr>.<sample_set>.local_Q_*.tsv.gz`. The
+`<sample_set>` component is a short tag `N<count>_<6char-sha1>`
+computed from the sorted `SAMPLE_LIST`, so runs against different
+sample subsets don't collide. One run is enough — C01a re-reads the
+cache on every invocation without recomputing.
+
+To precompute just the canonical K (fast): `K_SWEEP=8 sbatch ...`.
+
 ### C01b_1 — `STEP_C01b_1_seeded_regions.R`
 
 Seeded region-growing. **Seeds come from MDS z-score outliers.** Three
@@ -224,18 +257,18 @@ similarity drop) cannot be distinguished from a small assembly gap.
 
 This needs to be stated because it is confusing and it is not a bug.
 
-Both `STEP_C00` (in this folder) and `MODULE_5A2_breakpoint_validation`
-(a separate module at `phase_3_refine/`, corresponding to the repo's
-`MODULE_5A2_breakpoint_validation/`) read the same DELLY and Manta
-VCFs. They answer different questions:
+Both `STEP_C00` (in this folder) and the breakpoint-validation pipeline
+at `phase_3_refine/` (flattened 2026-04-17 from its former
+`MODULE_5A2_breakpoint_validation/` wrapper) read the same DELLY and
+Manta VCFs. They answer different questions:
 
-|   | C00 — `build_sv_prior` | MODULE_5A2 — breakpoint validation |
+|   | C00 — `build_sv_prior` | phase_3 — breakpoint validation |
 |---|---|---|
 | Reads | DELLY / Manta INV / DEL / BND VCFs | DELLY / Manta INV / BND VCFs + BAMs |
-| Question | **WHO** carries what arrangement? | **WHERE** are the breakpoints at bp resolution? |
-| Output | per-sample genotypes, anchor assignments, het-DEL carriers | refined boundary coordinates, concordance scores, breakpoint confidence |
-| Consumed by | C01a precompute (stamps per-window), phase 4b decompose (seeds k-means) | phase 4a C01g boundary catalog, `classify_inversions` |
-| Granularity | sample-level | locus-level |
+| Question | **WHO** carries what arrangement? | **WHERE** are the breakpoints at bp resolution, and do PCA carriers have read evidence? |
+| Output | per-sample genotypes, anchor assignments, het-DEL carriers | refined boundary coordinates, OR test (Layer D), BND rescue (supplementary Layer B) |
+| Consumed by | C01a precompute (stamps per-window), phase 4b decompose (seeds k-means) | phase 4a Layer B/D scoring via `q7_layer_d_*` and `q7b_bnd_*` registry keys; phase 4c `compute_group_validation()` VALIDATED gate |
+| Granularity | sample-level | locus-level + per-candidate |
 
 They parse the same VCFs but extract different slices. C00 is about
 samples, breakpoint_validation is about coordinates. No duplicated

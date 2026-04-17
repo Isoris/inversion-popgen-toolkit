@@ -13,8 +13,8 @@
 # Downstream:  STEP_C01a (region precompute — stamps SV overlap onto windows)
 #              phase_4/4b decomposition (seeds k-means clustering)
 #              phase_4/4a C01g boundary catalog consults it for D7 layer
-# Formerly:    STEP_C00_build_flashlight_wired8_registry.R
-#              The pipeline's "flashlight" terminology has been retired in
+# Formerly:    STEP_C00_build_sv_prior_wired8_registry.R
+#              The pipeline's "sv_prior" terminology has been retired in
 #              favour of "sv_prior". See RENAMING.md for the full map.
 #
 # Purpose
@@ -117,7 +117,8 @@ SAMPLES_IND <- Sys.getenv("SAMPLES_IND",
 
 # Output
 INVDIR <- Sys.getenv("INVDIR", file.path(BASE, "inversion_localpca_v7"))
-SV_PRIOR_DIR <- file.path(INVDIR, "06_mds_candidates/snake_regions_multiscale/sv_prior")
+SV_PRIOR_DIR <- Sys.getenv("SV_PRIOR_DIR",
+  file.path(INVDIR, "06_mds_candidates/snake_regions_multiscale/sv_prior"))
 dir.create(SV_PRIOR_DIR, recursive = TRUE, showWarnings = FALSE)
 
 # Parameters

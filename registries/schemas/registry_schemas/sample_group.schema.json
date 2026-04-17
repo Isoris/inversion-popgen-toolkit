@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "sample_group.schema.json",
+  "title": "sample_registry sample_groups row",
+  "description": "Schema for one row of sample_registry/sample_groups.tsv. Each row declares one named sample group. The group_id is the primary key and is referenced as a foreign key by results_registry manifest rows (who_1.group_id, who_2.group_id). Members of the group live in sample_registry/groups/<group_id>.txt.",
+  "version": "v1_chat16",
+  "type": "object",
+  "required": ["group_id", "members_file", "n", "created"],
+  "properties": {
+    "group_id": {
+      "type": "string",
+      "description": "Primary key. Convention: lowercase with underscores. Examples: 'all_226', 'unrelated_81', 'ancestry_K8_Q3', 'inv_LG12_17_HOM_REF'.",
+      "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "chrom":    { "type": ["string", "null"], "description": "Optional: chromosome this group applies to (for inv_* carrier groups). '.' for cohort-wide groups." },
+    "inv_id":   { "type": ["string", "null"], "description": "Optional: candidate_id this group applies to (for inv_* carrier groups). '.' for cohort-wide groups." },
+    "subgroup": { "type": ["string", "null"], "description": "Optional: subgroup tag. '.' for top-level groups." },
+    "dimension": {
+      "type": ["string", "null"],
+      "description": "Chat-16 addition. Optional metadata tag classifying which structural dimension this group represents. Values: '.' (default/top-level), 'karyotype' (top-level karyotype for a candidate: HOM_REF/HET/HOM_INV), 'karyotype_subcluster' (sub-cluster inside a karyotype, from recursive PCA), 'ancestry' (from NGSadmix/local Q), 'ghsl' (GHSL haplotype band), 'family' (pedigree family), 'intersect' (intersection of dimensions). The database does not interpret this field; classification scripts may filter on it. See DATABASE_DESIGN.md § Sample group naming convention.",
+      "enum": [".", "karyotype", "karyotype_subcluster", "ancestry", "ghsl", "family", "intersect", "cohort", "unrelated", null]
+    },
+    "members_file": {
+      "type": "string",
+      "description": "Path to file containing one sample_id per line. Typically groups/<group_id>.txt relative to sample_registry/.",
+      "minLength": 1
+    },
+    "n": {
+      "type": "integer",
+      "description": "Number of samples in the group. Must match number of non-empty lines in members_file.",
+      "minimum": 0
+    },
+    "description": {
+      "type": ["string", "null"],
+      "description": "Human-readable description of what the group represents."
+    },
+    "created": {
+      "type": "string",
+      "description": "Group creation / last-overwrite timestamp (YYYY-MM-DD HH:MM:SS). Used as the 'group_version' when referenced by results_registry rows. A mismatch between this value and the stored group_version flags stale results."
+    }
+  },
+  "additionalProperties": true
+}

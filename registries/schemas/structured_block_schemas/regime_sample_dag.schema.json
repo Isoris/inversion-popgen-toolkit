@@ -1,0 +1,115 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "regime_sample_dag.schema.json",
+  "title": "regime_sample_dag",
+  "description": "Per-sample directed-graph summary of regime membership across the windows overlapping a candidate interval. Produced by lib_recomb_combination.R::derive_R_from_regime (DAG formulation, chat-12). For each sample, the per-window regime labels from C01j regime_memberships are collapsed by rle(); each distinct run becomes a node with a window-count weight, and each transition between consecutive runs becomes an edge. The deviation_fraction scalar (1 − dominant_run_windows / total_windows) is the primary per-sample recombinant-signal statistic: a sample whose interval is mostly one regime but contains a non-trivial stretch of a different regime has a non-zero deviation_fraction, and when that stretch is long enough in bp it fires R. Cohort-level aggregates feed C01d Layer C (inversion-vs-family / complex-system scoring) via keys_extracted.",
+  "type": "object",
+  "required": [
+    "candidate_id",
+    "per_sample",
+    "cohort",
+    "params"
+  ],
+  "properties": {
+    "candidate_id": { "type": "string" },
+
+    "per_sample": {
+      "type": "array",
+      "description": "One row per sample with at least one window overlapping the interval. Samples with zero overlap windows are NOT included (they are uninformative, not 'no deviation').",
+      "items": {
+        "type": "object",
+        "required": [
+          "sample_id",
+          "n_windows",
+          "n_distinct_nodes",
+          "n_edges",
+          "dominant_regime",
+          "dominant_run_windows",
+          "deviation_fraction",
+          "longest_deviation_windows",
+          "longest_deviation_bp",
+          "terminal_matches_start",
+          "R_fired"
+        ],
+        "properties": {
+          "sample_id":               { "type": "string" },
+          "n_windows":               { "type": "integer", "minimum": 1,
+                                        "description": "Total windows for this sample inside the interval." },
+          "n_distinct_nodes":        { "type": "integer", "minimum": 1,
+                                        "description": "Number of distinct regime labels visited (= number of unique rle values)." },
+          "n_edges":                 { "type": "integer", "minimum": 0,
+                                        "description": "Number of transitions between consecutive runs (= length(rle$values) - 1, 0 if only one run)." },
+          "dominant_regime":         { "type": "string",
+                                        "description": "Regime label with the most windows (argmax over summed run lengths, ties broken by first occurrence)." },
+          "dominant_run_windows":    { "type": "integer", "minimum": 1,
+                                        "description": "Total windows assigned to the dominant regime (summed across possibly-multiple runs of that regime)." },
+          "deviation_fraction":      { "type": "number", "minimum": 0, "maximum": 1,
+                                        "description": "1 − dominant_run_windows / n_windows. Key scalar: fraction of the sample's interval not in the dominant regime." },
+          "longest_deviation_windows": { "type": "integer", "minimum": 0,
+                                        "description": "Length in windows of the longest contiguous non-dominant run. 0 if the sample never leaves its dominant regime." },
+          "longest_deviation_bp":    { "type": "integer", "minimum": 0,
+                                        "description": "longest_deviation_windows mapped to bp via the window-bp span. NA in practice is encoded as 0 here to keep the type strict." },
+          "terminal_matches_start":  { "type": "boolean",
+                                        "description": "TRUE iff the first run's regime label equals the last run's regime label. A noise-like deviation tends to return to the dominant; a true recombinant often does NOT — so FALSE is weak additional recombinant evidence." },
+          "R_fired":                 { "type": "boolean",
+                                        "description": "Gate for the combination rule. Fires when deviation_fraction ≥ params.min_deviation_fraction AND longest_deviation_bp ≥ params.min_deviation_bp." },
+          "dag_nodes_compact":       { "type": "string",
+                                        "description": "Optional compact textual rendering of the DAG as regime labels joined by '→', e.g. 'A→B→A'. Diagnostic aid for the per-sample DAG plot." },
+          "dag_node_weights":        { "type": "array",
+                                        "items": { "type": "integer", "minimum": 1 },
+                                        "description": "Window counts per run in the same order as dag_nodes_compact." }
+        }
+      }
+    },
+
+    "cohort": {
+      "type": "object",
+      "required": [
+        "n_samples_total",
+        "n_samples_with_deviation",
+        "fraction_samples_deviating",
+        "n_samples_R_fired",
+        "fraction_samples_R_fired",
+        "dominant_regime_cohort"
+      ],
+      "properties": {
+        "n_samples_total":            { "type": "integer", "minimum": 0 },
+        "n_samples_with_deviation":   { "type": "integer", "minimum": 0,
+                                        "description": "Samples with deviation_fraction > 0 (any non-dominant window at all)." },
+        "fraction_samples_deviating": { "type": "number", "minimum": 0, "maximum": 1 },
+        "n_samples_R_fired":          { "type": "integer", "minimum": 0,
+                                        "description": "Samples where R_fired is TRUE — passed both the fraction and bp gates." },
+        "fraction_samples_R_fired":   { "type": "number", "minimum": 0, "maximum": 1 },
+        "dominant_regime_cohort":     { "type": "string",
+                                        "description": "Mode of per-sample dominant regimes. 'This interval is basically <X>' at the cohort level." },
+        "dominant_regime_support":    { "type": "number", "minimum": 0, "maximum": 1,
+                                        "description": "Fraction of samples whose dominant regime equals dominant_regime_cohort. High value ⇒ coherent single-regime interval." }
+      }
+    },
+
+    "params": {
+      "type": "object",
+      "description": "Parameters used for the DAG derivation, recorded for reproducibility.",
+      "required": [
+        "min_deviation_fraction",
+        "min_deviation_bp",
+        "window_size_bp"
+      ],
+      "properties": {
+        "min_deviation_fraction": { "type": "number", "minimum": 0, "maximum": 1,
+                                     "description": "Threshold on deviation_fraction for R_fired (default 0.15)." },
+        "min_deviation_bp":       { "type": "integer", "minimum": 0,
+                                     "description": "Threshold on longest_deviation_bp for R_fired (default 50000)." },
+        "window_size_bp":         { "type": "integer", "minimum": 1,
+                                     "description": "Median bp span of one window in the regime track; used for the windows→bp mapping of longest_deviation." }
+      }
+    }
+  },
+  "keys_extracted": [
+    { "key": "q2_dag_fraction_samples_R_fired",   "from": "cohort.fraction_samples_R_fired" },
+    { "key": "q2_dag_fraction_samples_deviating", "from": "cohort.fraction_samples_deviating" },
+    { "key": "q2_dag_dominant_regime_cohort",     "from": "cohort.dominant_regime_cohort" },
+    { "key": "q2_dag_dominant_regime_support",    "from": "cohort.dominant_regime_support" },
+    { "key": "q2_dag_n_samples_R_fired",          "from": "cohort.n_samples_R_fired" }
+  ]
+}

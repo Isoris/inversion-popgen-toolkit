@@ -33,7 +33,7 @@ set -euo pipefail
 
 # ── Config ───────────────────────────────────────────────────────────────────
 BASE="${BASE:-/scratch/lt200308-agbsci/Quentin_project_KEEP_2026-02-04}"
-MODULE_DIR="${BASE}/inversion-popgen-toolkit"
+MODULE_DIR="${BASE}/inversion_modules"
 CONFIG="${MODULE_DIR}/00_inversion_config.sh"
 REGISTRY_DIR="${REGISTRY_DIR:-${BASE}/sample_registry}"
 
@@ -107,13 +107,14 @@ submit_job () {
 # =============================================================================
 # 4a_scoring_pass1 — one job per chromosome (array), C01d pass-1
 # The launcher reads CHROM from $SLURM_ARRAY_TASK_ID
-LAUNCH_C01D_PASS1="${MODULE_DIR}/launchers/LAUNCH_C01d_scoring_pass1.sh"
-LAUNCH_C01G="${MODULE_DIR}/launchers/LAUNCH_C01g_boundary.sh"
-LAUNCH_C01I="${MODULE_DIR}/launchers/LAUNCH_C01i_decomposition.sh"
-LAUNCH_C01F="${MODULE_DIR}/launchers/LAUNCH_C01f_hypothesis.sh"
-LAUNCH_C01D_PASS2="${MODULE_DIR}/launchers/LAUNCH_C01d_scoring_pass2.sh"
-LAUNCH_GROUP_CHEATS="${MODULE_DIR}/launchers/LAUNCH_group_cheats.sh"
-LAUNCH_CHAR_CLASSIFY="${MODULE_DIR}/launchers/LAUNCH_characterize_classify.sh"
+LAUNCH_C01D_PASS1="${MODULE_DIR}/phase_4_postprocessing/4a_existence_layers/LAUNCH_C01d_scoring_pass1.sh"
+LAUNCH_C01G="${MODULE_DIR}/phase_4_postprocessing/4a_existence_layers/LAUNCH_C01g_boundary.sh"
+# FIX 49 (chat 10): LAUNCH_C01I removed — replaced by run_phase4b.sh
+# sub-orchestrator. 4b is now a 4-script DAG, not a single launcher.
+LAUNCH_C01F="${MODULE_DIR}/phase_4_postprocessing/4c_group_validation/LAUNCH_C01f_hypothesis.sh"
+LAUNCH_C01D_PASS2="${MODULE_DIR}/phase_4_postprocessing/4e_final_classification/LAUNCH_C01d_scoring_pass2.sh"
+LAUNCH_GROUP_CHEATS="${MODULE_DIR}/phase_4_postprocessing/orchestrator/LAUNCH_group_cheats.sh"
+LAUNCH_CHAR_CLASSIFY="${MODULE_DIR}/phase_4_postprocessing/4e_final_classification/LAUNCH_characterize_classify.sh"
 
 # Use array notation: the launchers should accept $SLURM_ARRAY_TASK_ID
 # and map it to a chromosome. Adjust below if your launchers take --chrom.
@@ -124,7 +125,35 @@ JID_BOUND=$(submit_job  "4a_bound"   ""  "${LAUNCH_C01G}"       --array="1-${N_C
 # =============================================================================
 # Phase 4b — depends on 4a_scoring_pass1 (candidate list must exist)
 # =============================================================================
-JID_DECOMP=$(submit_job "4b_decomp"  "${JID_SCORE1}"  "${LAUNCH_C01I}"  --chroms "${CHROMS_CSV}")
+# FIX 49 (chat 10): 4b is now a 4-script sub-DAG, not a single launcher.
+# Invoke run_phase4b.sh which submits the four jobs with their internal
+# dependency graph (decompose -> multi_recomb, nested_comp parallel, seal
+# gates on all three). Grep the final seal jobid from the sub-orchestrator's
+# stdout (emitted as "PHASE4B_SEAL_JID=<id>" on the last line — see
+# run_phase4b.sh FIX 48).
+#
+# Earlier versions of this script called LAUNCH_C01i_decomposition.sh as
+# a single job. That launcher is obsolete post-4b-rewrite. The sub-DAG
+# approach preserves the seal-gate contract: 4c still depends on 4b
+# completion, now expressed as dependency on the seal job specifically.
+#
+# NOTE: run_phase4b.sh itself submits jobs; it does not BE a SLURM job.
+# We run it on the login node (or wherever run_phase4.sh is invoked).
+# It respects ${DRY_RUN} via the --dry-run flag.
+DRY_FLAG=""
+[[ "${DRY_RUN}" -eq 1 ]] && DRY_FLAG="--dry-run"
+
+echo "[run_phase4] invoking run_phase4b.sh sub-orchestrator..."
+PHASE4B_OUT=$(bash "${MODULE_DIR}/orchestrator/run_phase4b.sh" \
+  ${DRY_FLAG} \
+  --chroms "${CHROMS_CSV}" \
+  2>&1 | tee /dev/stderr)
+JID_DECOMP=$(echo "${PHASE4B_OUT}" | grep '^PHASE4B_SEAL_JID=' | tail -n1 | cut -d= -f2)
+if [[ -z "${JID_DECOMP}" ]]; then
+  echo "[run_phase4] ERROR: could not parse PHASE4B_SEAL_JID from run_phase4b.sh output" >&2
+  exit 3
+fi
+echo "[run_phase4] 4b seal job id = ${JID_DECOMP}"
 
 # =============================================================================
 # Phase 4c — depends on 4b_decomposition (groups must be registered)

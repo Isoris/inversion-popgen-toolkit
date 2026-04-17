@@ -2,11 +2,11 @@
 # =============================================================================
 # PATCH: Flashlight annotation for STEP_C01a_snake1_precompute.R
 #
-# INSERT this block AFTER the inv_like_dt is computed (after the
+# INSERT this block AFTER the window_dt is computed (after the
 # compute_inv_likeness_all() call) and BEFORE the dosage het merge.
 #
 # What it does:
-#   For each window in inv_like_dt, checks whether a DELLY/Manta INV call
+#   For each window in window_dt, checks whether a DELLY/Manta INV call
 #   overlaps that window. If yes, annotates with:
 #     sv_inv_overlap      — 0/1 flag
 #     sv_inv_confidence   — confidence level of the best overlapping INV
@@ -18,11 +18,11 @@
 # structure_likeness, or family_likeness. Downstream scripts (merge,
 # scoring, decomposition) consume them for informed-prior decisions.
 #
-# REQUIRES: flashlight_loader.R sourced (provides load_flashlight, etc.)
+# REQUIRES: sv_prior_loader.R sourced (provides load_sv_prior, etc.)
 # =============================================================================
 
-# ─── Source flashlight loader ────────────────────────────────────────
-fl_loader_path <- Sys.getenv("FLASHLIGHT_LOADER", "")
+# ─── Source sv_prior loader ────────────────────────────────────────
+fl_loader_path <- Sys.getenv("SV_PRIOR_LOADER", "")
 if (!nzchar(fl_loader_path)) {
   # Auto-detect from codebase
   candidates <- c(
@@ -38,25 +38,25 @@ if (!nzchar(fl_loader_path)) {
   }
 }
 
-has_flashlight <- FALSE
+has_sv_prior <- FALSE
 if (nzchar(fl_loader_path) && file.exists(fl_loader_path)) {
   tryCatch({
     source(fl_loader_path)
-    has_flashlight <- TRUE
+    has_sv_prior <- TRUE
     message("[PRECOMP] Flashlight loader sourced: ", fl_loader_path)
   }, error = function(e) {
     message("[PRECOMP] Flashlight loader failed: ", e$message, " — continuing without")
   })
 } else {
-  message("[PRECOMP] No flashlight_loader.R found — SV annotation columns will be NA")
+  message("[PRECOMP] No sv_prior_loader.R found — SV annotation columns will be NA")
 }
 
-# ─── Annotate inv_like_dt with flashlight columns ────────────────────
-if (has_flashlight && nrow(inv_like_dt) > 0) {
+# ─── Annotate window_dt with sv_prior columns ────────────────────
+if (has_sv_prior && nrow(window_dt) > 0) {
   message("[PRECOMP] ── FLASHLIGHT ANNOTATION ──")
 
   # Pre-initialize columns
-  inv_like_dt[, `:=`(
+  window_dt[, `:=`(
     sv_inv_overlap    = 0L,
     sv_inv_confidence = NA_character_,
     sv_inv_af         = NA_real_,
@@ -65,16 +65,16 @@ if (has_flashlight && nrow(inv_like_dt) > 0) {
   )]
 
   n_annotated <- 0L
-  for (chr in unique(inv_like_dt$chrom)) {
-    fl <- load_flashlight(chr)
+  for (chr in unique(window_dt$chrom)) {
+    fl <- load_sv_prior(chr)
     if (is.null(fl) || nrow(fl$inv_calls) == 0) next
 
-    chr_idx <- which(inv_like_dt$chrom == chr)
+    chr_idx <- which(window_dt$chrom == chr)
     if (length(chr_idx) == 0) next
 
     for (wi in chr_idx) {
-      w_start <- inv_like_dt$start_bp[wi]
-      w_end   <- inv_like_dt$end_bp[wi]
+      w_start <- window_dt$start_bp[wi]
+      w_end   <- window_dt$end_bp[wi]
 
       # Cheat 1: Does an SV INV call overlap this window?
       overlapping <- fl$inv_calls[bp1 <= w_end & bp2 >= w_start]
@@ -88,7 +88,7 @@ if (has_flashlight && nrow(inv_like_dt) > 0) {
           best_idx <- which.min(ranks)
         }
 
-        inv_like_dt[wi, `:=`(
+        window_dt[wi, `:=`(
           sv_inv_overlap    = 1L,
           sv_inv_confidence = overlapping$confidence_level[best_idx],
           sv_inv_af         = overlapping$af[best_idx]
@@ -100,7 +100,7 @@ if (has_flashlight && nrow(inv_like_dt) > 0) {
           sv_genotype != "MISSING" &
           sv_confidence %in% c("HIGH", "MEDIUM")
         ]
-        inv_like_dt[wi, sv_n_anchors := nrow(anchors)]
+        window_dt[wi, sv_n_anchors := nrow(anchors)]
         n_annotated <- n_annotated + 1L
       }
 
@@ -110,7 +110,7 @@ if (has_flashlight && nrow(inv_like_dt) > 0) {
           bp_pos >= w_start & bp_pos <= w_end
         ]
         if (nrow(bp_dels_here) > 0) {
-          inv_like_dt[wi, sv_het_del_count := nrow(bp_dels_here)]
+          window_dt[wi, sv_het_del_count := nrow(bp_dels_here)]
         }
       }
 
@@ -120,22 +120,22 @@ if (has_flashlight && nrow(inv_like_dt) > 0) {
           del_start >= w_start & del_end <= w_end
         ]
         if (nrow(int_dels_here) > 0) {
-          inv_like_dt[wi, sv_het_del_count := sv_het_del_count + nrow(int_dels_here)]
+          window_dt[wi, sv_het_del_count := sv_het_del_count + nrow(int_dels_here)]
         }
       }
     }
   }
 
-  n_with_sv <- sum(inv_like_dt$sv_inv_overlap == 1, na.rm = TRUE)
-  n_with_del <- sum(inv_like_dt$sv_het_del_count > 0, na.rm = TRUE)
+  n_with_sv <- sum(window_dt$sv_inv_overlap == 1, na.rm = TRUE)
+  n_with_del <- sum(window_dt$sv_het_del_count > 0, na.rm = TRUE)
   message("[PRECOMP] Flashlight annotation complete:")
-  message("  Windows with SV INV overlap: ", n_with_sv, " / ", nrow(inv_like_dt))
-  message("  Windows with het-DEL: ", n_with_del, " / ", nrow(inv_like_dt))
-  message("  Anchor assignments: ", sum(inv_like_dt$sv_n_anchors, na.rm = TRUE))
+  message("  Windows with SV INV overlap: ", n_with_sv, " / ", nrow(window_dt))
+  message("  Windows with het-DEL: ", n_with_del, " / ", nrow(window_dt))
+  message("  Anchor assignments: ", sum(window_dt$sv_n_anchors, na.rm = TRUE))
 } else {
   # Add empty columns so downstream scripts don't break
-  if (nrow(inv_like_dt) > 0) {
-    inv_like_dt[, `:=`(
+  if (nrow(window_dt) > 0) {
+    window_dt[, `:=`(
       sv_inv_overlap    = 0L,
       sv_inv_confidence = NA_character_,
       sv_inv_af         = NA_real_,
@@ -146,5 +146,5 @@ if (has_flashlight && nrow(inv_like_dt) > 0) {
 }
 
 # NOTE: These columns propagate into per-chromosome precomp RDS files
-# via the existing merge(dt, inv_like_dt) block in precompute_one_chr().
+# via the existing merge(dt, window_dt) block in precompute_one_chr().
 # No additional changes needed — the merge is column-agnostic.

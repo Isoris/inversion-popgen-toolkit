@@ -1,0 +1,73 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "regime_segments.schema.json",
+  "title": "regime_segments",
+  "description": "Regime segments derived from C01j compatibility engine over a candidate interval. Each segment is a run of consecutive sliding windows with similar structural properties: group count, group thickness, separation score, persistence. Segment state ∈ {clean_inversion, structured_moderate, structured_complex, weak_signal, background_soup, transition}. Transitions between segments are boundary candidates.",
+  "type": "object",
+  "required": [
+    "candidate_id",
+    "segments",
+    "transitions",
+    "n_segments",
+    "dominant_state",
+    "regime_has_recombinant_signal"
+  ],
+  "properties": {
+    "candidate_id": { "type": "string" },
+    "segments": {
+      "type": "array",
+      "description": "Per-segment summary from C01j segment_regimes().",
+      "items": {
+        "type": "object",
+        "required": ["segment_id", "state", "n_windows", "start_mb", "end_mb"],
+        "properties": {
+          "segment_id":      { "type": "integer" },
+          "state":           { "type": "string",
+                               "enum": ["clean_inversion", "structured_moderate",
+                                        "structured_complex", "weak_signal",
+                                        "background_soup", "transition"] },
+          "n_windows":       { "type": "integer", "minimum": 1 },
+          "start_mb":        { "type": "number" },
+          "end_mb":          { "type": "number" },
+          "mean_n_groups":   { "type": "number" },
+          "mean_thickness":  { "type": "number" },
+          "mean_separation": { "type": "number" },
+          "mean_persistence":{ "type": ["number", "null"] },
+          "mean_entropy":    { "type": "number" }
+        }
+      }
+    },
+    "transitions": {
+      "type": "array",
+      "description": "Per-transition summary from C01j segment_regimes().",
+      "items": {
+        "type": "object",
+        "required": ["boundary_mb", "from_state", "to_state", "transition_type"],
+        "properties": {
+          "from_segment":    { "type": "integer" },
+          "to_segment":      { "type": "integer" },
+          "from_state":      { "type": "string" },
+          "to_state":        { "type": "string" },
+          "boundary_mb":     { "type": "number" },
+          "group_change":    { "type": "number" },
+          "thickness_change":{ "type": "number" },
+          "transition_type": { "type": "string" }
+        }
+      }
+    },
+    "n_segments":     { "type": "integer", "minimum": 0 },
+    "dominant_state": { "type": "string" },
+    "regime_has_recombinant_signal": {
+      "type": "boolean",
+      "description": "TRUE if regime shows structured→structured transition with group membership change within the interval — signature of recombinants."
+    },
+    "n_samples_with_regime_change": { "type": "integer", "minimum": 0 },
+    "scan_params": { "type": "object", "additionalProperties": true }
+  },
+  "keys_extracted": [
+    { "key": "q2_regime_n_segments",      "from": "n_segments" },
+    { "key": "q2_regime_dominant_state",  "from": "dominant_state" },
+    { "key": "q2_regime_has_recomb",      "from": "regime_has_recombinant_signal" },
+    { "key": "q2_regime_n_samples_changed","from": "n_samples_with_regime_change" }
+  ]
+}

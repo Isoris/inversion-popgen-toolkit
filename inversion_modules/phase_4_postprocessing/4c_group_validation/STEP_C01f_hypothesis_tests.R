@@ -303,26 +303,50 @@ comp_from_registry <- function(cid, sample_names,
   if (!exists("reg") || is.null(reg) || is.null(reg$has_group)) {
     return(NULL)
   }
-  # Accept HOM_REF (canonical, v10) or HOM_STD (alias, v9)
-  ref_gid <- if (reg$has_group(paste0("inv_", cid, "_HOM_REF"))) {
-    paste0("inv_", cid, "_HOM_REF")
-  } else if (reg$has_group(paste0("inv_", cid, "_HOM_STD"))) {
-    paste0("inv_", cid, "_HOM_STD")
+
+  # CHAT-12 AUDIT FIX: collapse 4×has_group + 4×get_group into one
+  # get_groups_for_candidate() call (chat-11 registry API extension).
+  # The old code looked up inv_<cid>_HOM_REF, inv_<cid>_HOM_STD (alias),
+  # inv_<cid>_HET, inv_<cid>_HOM_INV, and inv_<cid>_RECOMBINANT
+  # separately; the new one-call path fetches all statuses in a single
+  # pass and returns character(0) for absent groups.
+  # HOM_STD alias handling: if get_groups_for_candidate doesn't expose
+  # HOM_STD (it does, per registry_loader L335), we fall back to
+  # has_group/get_group so behaviour on old registry builds is unchanged.
+  gps <- if (is.function(reg$get_groups_for_candidate)) {
+    tryCatch(reg$get_groups_for_candidate(cid), error = function(e) NULL)
+  } else NULL
+
+  if (is.null(gps)) {
+    # Legacy path (pre-chat-11 registries) — unchanged semantics
+    ref_gid <- if (reg$has_group(paste0("inv_", cid, "_HOM_REF"))) {
+      paste0("inv_", cid, "_HOM_REF")
+    } else if (reg$has_group(paste0("inv_", cid, "_HOM_STD"))) {
+      paste0("inv_", cid, "_HOM_STD")
+    } else NULL
+    het_gid <- paste0("inv_", cid, "_HET")
+    inv_gid <- paste0("inv_", cid, "_HOM_INV")
+    rec_gid <- paste0("inv_", cid, "_RECOMBINANT")
+    if (is.null(ref_gid) || !reg$has_group(het_gid) || !reg$has_group(inv_gid)) {
+      return(NULL)
+    }
+    ref_samps <- reg$get_group(ref_gid)
+    het_samps <- reg$get_group(het_gid)
+    inv_samps <- reg$get_group(inv_gid)
+    rec_samps <- if (reg$has_group(rec_gid)) reg$get_group(rec_gid) else character(0)
   } else {
-    NULL
+    # One-call path (chat-11+). HOM_REF takes priority over HOM_STD alias.
+    ref_samps <- if (length(gps$HOM_REF) > 0L) gps$HOM_REF
+                 else if (length(gps$HOM_STD) > 0L) gps$HOM_STD
+                 else character(0)
+    het_samps <- gps$HET %||% character(0)
+    inv_samps <- gps$HOM_INV %||% character(0)
+    rec_samps <- gps$RECOMBINANT %||% character(0)
+    if (length(ref_samps) == 0L || length(het_samps) == 0L ||
+        length(inv_samps) == 0L) {
+      return(NULL)  # need all three core classes
+    }
   }
-  het_gid <- paste0("inv_", cid, "_HET")
-  inv_gid <- paste0("inv_", cid, "_HOM_INV")
-  rec_gid <- paste0("inv_", cid, "_RECOMBINANT")
-
-  if (is.null(ref_gid) || !reg$has_group(het_gid) || !reg$has_group(inv_gid)) {
-    return(NULL)  # need all three core classes
-  }
-
-  ref_samps <- reg$get_group(ref_gid)
-  het_samps <- reg$get_group(het_gid)
-  inv_samps <- reg$get_group(inv_gid)
-  rec_samps <- if (reg$has_group(rec_gid)) reg$get_group(rec_gid) else character(0)
 
   if (length(ref_samps) < min_per_band ||
       length(het_samps) < min_per_band ||
@@ -347,11 +371,88 @@ comp_from_registry <- function(cid, sample_names,
   comp
 }
 
+# ─── comp_from_kmeans_fallback ───────────────────────────────────────────────
+# BUGFIX 2026-04-17 (FIX 20): on-the-fly k-means(3) fallback ported from
+# C01e's compute_bands_for_candidate(). Called by build_comp_with_fallback()
+# when the C01i registry has no groups for this candidate.
+#
+# Before this fix, build_comp_with_fallback's second fallback was the
+# pre-v9.3 triangle_sample_composition.tsv.gz file (via a closure reading
+# comp_dt at L1983). That file isn't produced by the current pipeline, so
+# when the registry was empty the effective fallback was an empty
+# data.table and the candidate was silently skipped at L1985 with a
+# misleading "no composition (registry empty + no file entry)" message.
+#
+# Behaviour change: registry absent + triangle file absent now triggers
+# an on-the-fly k-means(3) on PC_1_<sample> columns from precomp within
+# the candidate interval — the same approach C01d L651-680 and
+# C01e::compute_bands_for_candidate() use. Returns data.table with
+# columns (sample, band, source) matching comp_from_registry's shape.
+# Returns NULL if precomp is missing or fewer than min_samples have
+# finite PC1 averages.
+#
+# Band ordering matches comp_from_registry convention:
+#   band1 = HOM_REF (lowest PC1), band2 = HET, band3 = HOM_INV (highest PC1)
+comp_from_kmeans_fallback <- function(pc, start_mb, end_mb, sample_names,
+                                       min_samples = 20L) {
+  if (is.null(pc) || is.null(pc$dt)) return(NULL)
+  if (!is.finite(start_mb) || !is.finite(end_mb)) return(NULL)
+
+  dt_chr <- pc$dt
+  s_bp <- start_mb * 1e6; e_bp <- end_mb * 1e6
+
+  # Windows fully inside the candidate
+  inner_w <- which(dt_chr$start_bp >= s_bp & dt_chr$end_bp <= e_bp)
+  if (length(inner_w) < 3) return(NULL)
+
+  pc1_cols <- grep("^PC_1_", names(dt_chr), value = TRUE)
+  if (length(pc1_cols) < min_samples) return(NULL)
+
+  avg_pc1 <- colMeans(as.matrix(dt_chr[inner_w, ..pc1_cols]), na.rm = TRUE)
+  valid <- is.finite(avg_pc1)
+  if (sum(valid) < min_samples) return(NULL)
+
+  vals <- avg_pc1[valid]
+  km <- tryCatch(kmeans(vals, centers = 3, nstart = 10),
+                 error = function(e) NULL)
+  if (is.null(km)) return(NULL)
+
+  # low PC1 -> band1 (REF), high PC1 -> band3 (INV)
+  co <- order(km$centers[, 1])
+  bands <- integer(length(vals))
+  for (b in 1:3) bands[km$cluster == co[b]] <- b
+
+  snames <- sub("^PC_1_", "", names(vals))
+
+  # Intersect with caller's sample_names (e.g. after kin-pruning) —
+  # matches what comp_from_registry does at L334-336.
+  if (length(sample_names) > 0) {
+    keep <- snames %in% sample_names
+    snames <- snames[keep]
+    bands  <- bands[keep]
+  }
+  if (length(snames) < min_samples) return(NULL)
+
+  comp <- data.table::data.table(
+    sample = snames,
+    band   = paste0("band", bands),
+    source = "kmeans_fallback"
+  )
+  attr(comp, "source") <- "kmeans_fallback"
+  comp
+}
+
 # ─── build_comp_with_fallback ────────────────────────────────────────────────
-# Try registry first; fall back to whatever the caller provides via `fallback_fn`
-# (typically: the per-candidate row from triangle_sample_composition.tsv.gz,
-# or an inline k-means closure).
-build_comp_with_fallback <- function(cid, sample_names, fallback_fn) {
+# BUGFIX 2026-04-17 (FIX 20): fallback chain expanded to three tiers.
+#   1. C01i registry (preferred; from multi-inversion decomposition)
+#   2. On-the-fly k-means(3) on precomp PC1 averages within the interval
+#      (via kmeans_fallback_fn, produced by the caller — has access to
+#      pc / start_mb / end_mb for the current candidate)
+#   3. Legacy triangle_sample_composition.tsv.gz (via file_fallback_fn;
+#      kept for back-compat but produced by no current pipeline)
+build_comp_with_fallback <- function(cid, sample_names,
+                                      kmeans_fallback_fn = NULL,
+                                      file_fallback_fn   = NULL) {
   comp <- comp_from_registry(cid, sample_names)
   if (!is.null(comp) && nrow(comp) >= 9) {
     message("[C01f] ", cid, ": using C01i groups from registry (",
@@ -359,13 +460,33 @@ build_comp_with_fallback <- function(cid, sample_names, fallback_fn) {
             length(attr(comp, "recombinants_excluded")), " recombinants excluded)")
     return(comp)
   }
-  message("[C01f] ", cid, ": registry groups absent/insufficient — using file/k-means fallback")
-  fb <- fallback_fn()
-  if (!is.null(fb) && nrow(fb) > 0) {
-    if (!"source" %in% names(fb)) fb[, source := "file_fallback"]
-    attr(fb, "source") <- if ("source" %in% names(fb)) fb$source[1] else "file_fallback"
+
+  # On-the-fly k-means fallback (preferred over legacy file)
+  if (!is.null(kmeans_fallback_fn)) {
+    fb <- tryCatch(kmeans_fallback_fn(), error = function(e) NULL)
+    if (!is.null(fb) && nrow(fb) > 0) {
+      message("[C01f] ", cid, ": registry empty — using on-the-fly k-means(3) fallback (",
+              nrow(fb), " samples)")
+      if (!"source" %in% names(fb)) fb[, source := "kmeans_fallback"]
+      attr(fb, "source") <- "kmeans_fallback"
+      return(fb)
+    }
   }
-  fb
+
+  # Legacy triangle-file fallback
+  if (!is.null(file_fallback_fn)) {
+    fb <- tryCatch(file_fallback_fn(), error = function(e) NULL)
+    if (!is.null(fb) && nrow(fb) > 0) {
+      message("[C01f] ", cid, ": registry+k-means empty — using legacy triangle file (",
+              nrow(fb), " samples)")
+      if (!"source" %in% names(fb)) fb[, source := "file_fallback"]
+      attr(fb, "source") <- if ("source" %in% names(fb)) fb$source[1] else "file_fallback"
+      return(fb)
+    }
+  }
+
+  message("[C01f] ", cid, ": all fallbacks empty — returning NULL")
+  NULL
 }
 
 # ─── compute_group_validation — merged v10 + v10.1 + v10.1.1 ────────────────
@@ -399,7 +520,16 @@ compute_group_validation <- function(current_level,
   } else if (jk == "multi_family_contributing") {
     family_linkage <- "multi_family"
     quality_flags <- c(quality_flags, "partial_robustness")
-  } else if (jk == "few_family") {
+  } else if (jk == "few_family_contributing") {
+    # FIX 39 (chat 9): T9 (test_ancestry_jackknife) emits
+    # "few_family_contributing" for the 2–3 families-drop-signal case,
+    # NOT "few_family" as patch 03's documented table stated. T9's
+    # "_contributing" suffix is used for both this case and the
+    # "multi_family_contributing" case symmetrically; the decision
+    # tree at L1801+ already reads the suffixed form. Without this
+    # fix a few_family jackknife verdict fell through the whole
+    # classifier: family_linkage stayed "unknown", no cap, no flag —
+    # same behaviour as a missing verdict.
     family_linkage <- "few_family"
     quality_flags <- c(quality_flags, "restricted_family_spread")
     internal_cap <- "SUPPORTED"
@@ -435,8 +565,10 @@ compute_group_validation <- function(current_level,
   }
   # SUPPORTED promotion when family-restricted but Clair3 agrees
   # (family-restricted pattern IS the inversion; Clair3 confirms the groups)
+  # FIX 39 (chat 9): match T9's "few_family_contributing" (not "few_family")
+  # — see the classifier branch above for rationale.
   if (is.finite(t8_concordance) && t8_concordance >= 0.70 &&
-      jk %in% c("single_family_fragile", "few_family")) {
+      jk %in% c("single_family_fragile", "few_family_contributing")) {
     candidate_levels <- c(candidate_levels, "SUPPORTED")
   }
 
@@ -1973,14 +2105,18 @@ for (ci in seq_len(nrow(cand_dt))) {
     }
   }
 
-  # Build composition — patch (B): try C01i registry first, fall back to the
-  # file-level comp_dt (PC1 k-means output from precomp / triangles). Both
-  # shapes produce the same columns (sample, band) so downstream tests don't
-  # care. `source` attr records which path was used.
+  # Build composition — patch (B): try C01i registry first, then on-the-fly
+  # k-means(3) on precomp PC1 averages for this interval (FIX 20), then the
+  # legacy file-level comp_dt. Both shapes produce the same columns
+  # (sample, band) so downstream tests don't care. `source` attr records
+  # which path was used.
   iv_comp <- build_comp_with_fallback(
-    cid          = cid,
-    sample_names = sample_names,
-    fallback_fn  = function() comp_dt[chrom == chr & interval_id == iid]
+    cid                = cid,
+    sample_names       = sample_names,
+    kmeans_fallback_fn = function() comp_from_kmeans_fallback(
+      pc, cand$start_mb, cand$end_mb, sample_names
+    ),
+    file_fallback_fn   = function() comp_dt[chrom == chr & interval_id == iid]
   )
   if (is.null(iv_comp) || nrow(iv_comp) == 0) {
     message("[C01f] ", cid, ": no composition (registry empty + no file entry) — skipping candidate")
@@ -2212,14 +2348,42 @@ for (ci in seq_len(nrow(cand_dt))) {
     } else NA_character_
   }, error = function(e) NA_character_)
 
+  # ── BUGFIX 2026-04-17 (chat 7, FIX 31): read Layer D Fisher OR and p ──
+  # from the evidence registry (written by phase_3/STEP03 per the chat-5
+  # FIX 29 v2 wiring) instead of hard-coding NA. The prior hard-code
+  # propagated from patches/01_C01f_comp_from_registry.R's template,
+  # whose author noted "STEP03 writes Layer D separately" but never
+  # supplied the reader. With both inputs NA, compute_group_validation's
+  # is.finite() guard made the VALIDATED-promotion branch unreachable.
+  # Pattern mirrors the q6_group_validation / q6_validation_promotion_cap
+  # reads immediately above. Graceful NA fallback preserves behaviour
+  # when STEP03 has not run for this candidate or registry is absent.
+  layer_d_fisher_p <- tryCatch({
+    if (exists("reg") && !is.null(reg$evidence) && !is.null(reg$evidence$get_evidence)) {
+      ev <- reg$evidence$get_evidence(cid, "q7_layer_d_fisher_p")
+      if (!is.null(ev) && is.data.frame(ev) && nrow(ev) > 0) {
+        suppressWarnings(as.numeric(ev$value[1]))
+      } else NA_real_
+    } else NA_real_
+  }, error = function(e) NA_real_)
+
+  layer_d_fisher_or <- tryCatch({
+    if (exists("reg") && !is.null(reg$evidence) && !is.null(reg$evidence$get_evidence)) {
+      ev <- reg$evidence$get_evidence(cid, "q7_layer_d_fisher_or")
+      if (!is.null(ev) && is.data.frame(ev) && nrow(ev) > 0) {
+        suppressWarnings(as.numeric(ev$value[1]))
+      } else NA_real_
+    } else NA_real_
+  }, error = function(e) NA_real_)
+
   gv <- compute_group_validation(
     current_level         = current_level,
     t8_concordance        = t8$concordance,
     t9_jackknife_verdict  = t9$jackknife_verdict,
     t9_max_delta          = t9$max_delta,
     t10_theta_concordance = t10$concordance,
-    layer_d_fisher_p      = NA,   # written by STEP03/Layer D, not C01f
-    layer_d_fisher_or     = NA,
+    layer_d_fisher_p      = layer_d_fisher_p,   # chat 7 FIX 31
+    layer_d_fisher_or     = layer_d_fisher_or,  # chat 7 FIX 31
     promotion_cap         = promotion_cap
   )
   message("[C01f] ", cid, ": group validation ", current_level, " → ", gv$level,

@@ -47,20 +47,44 @@ validation_order <- c("NONE" = 0, "SUSPECT" = 1, "UNCERTAIN" = 2,
 assess_group_validation <- function(keys) {
   # Determine group validation level from available keys
 
+  # BUGFIX 2026-04-17 (chat 7, FIX 32): add fisher_or > 5 to the OR-pass
+  # gate. Schema description requires both "OR>5, p<0.05"; C01f's
+  # compute_group_validation() tests both (L525–526). Previously this
+  # gate tested p only, which would award VALIDATED on a significant-
+  # but-low-OR Fisher test that C01f would withhold. Default OR = 0
+  # means a missing value blocks the gate (conservative).
   or_p <- suppressWarnings(as.numeric(keys[["q7_layer_d_fisher_p"]] %||% NA))
-  or_tested <- !is.na(or_p)
-  or_passed <- or_tested && or_p < 0.05
+  or_val <- suppressWarnings(as.numeric(keys[["q7_layer_d_fisher_or"]] %||% NA))
+  or_tested <- !is.na(or_p) && !is.na(or_val)
+  or_passed <- or_tested && or_p < 0.05 && or_val > 5
 
   ghsl_conc <- suppressWarnings(as.numeric(keys[["q7_layer_c_ghsl_pct_pass"]] %||% NA))
   ghsl_high <- !is.na(ghsl_conc) && ghsl_conc > 0.7
 
-  jk_status <- keys[["q7_t9_jackknife_status"]] %||% "unknown"
+  jk_status <- keys[["q7_t9_jackknife_status"]] %||% keys[["q7_t9_jackknife_verdict"]] %||% "unknown"
   jk_robust <- jk_status %in% c("robust_multi_family", "robust")
 
-  family_lik <- suppressWarnings(as.numeric(keys[["q1_family_likeness_mean"]] %||% 0))
-  jk_fragile <- jk_status == "single_family_fragile"
+  # FIX 43 (chat 9): q7_t9_jackknife_* keys are aspirational (see
+  # 4e/compute_candidate_status.R build_key_spec). The semantic info is
+  # reliably available via q6_family_linkage (written by 4b seal initially,
+  # overwritten by 4c C01f after jackknife). Prefer that path.
+  family_linkage <- keys[["q6_family_linkage"]] %||% "unknown"
+  if (family_linkage %in% c("multi_family")) {
+    jk_robust <- TRUE   # family_linkage=multi_family IS the robust case
+  }
 
-  has_groups <- !is.null(keys[["q6_n_HOM_STD"]]) || !is.null(keys[["q6_n_total"]])
+  family_lik <- suppressWarnings(as.numeric(keys[["q1_family_likeness_mean"]] %||% 0))
+  # FIX 43 (chat 9): canonical fragile signal is family_linkage=pca_family_confounded
+  # (written by C01f after jackknife, per patch 03 semantics). v9 fallback
+  # to jk_status==single_family_fragile kept but secondary.
+  jk_fragile <- family_linkage == "pca_family_confounded" ||
+                jk_status == "single_family_fragile"
+
+  # FIX 43 (chat 9): has_groups check accept both v10 HOM_REF and v9 HOM_STD
+  # aliases, and fall through to the frequency block summary (n_total).
+  has_groups <- !is.null(keys[["q6_n_HOM_REF"]]) ||
+                !is.null(keys[["q6_n_HOM_STD"]]) ||
+                !is.null(keys[["q6_n_total"]])
 
   if (!has_groups) {
     return(list(level = "NONE", reason = "No groups assigned (decomposition pending)"))
@@ -79,14 +103,16 @@ assess_group_validation <- function(keys) {
 
   if (or_passed && (ghsl_high || jk_robust)) {
     return(list(level = "VALIDATED",
-                reason = paste0("OR_p=", signif(or_p, 3),
+                reason = paste0("OR=", signif(or_val, 3),
+                                ", p=", signif(or_p, 3),
                                 if (ghsl_high) " + GHSL_concordant" else "",
                                 if (jk_robust) " + jackknife_robust" else "")))
   }
 
   if (or_passed) {
     return(list(level = "VALIDATED",
-                reason = paste0("OR_p=", signif(or_p, 3), " (OR test alone)")))
+                reason = paste0("OR=", signif(or_val, 3),
+                                ", p=", signif(or_p, 3), " (OR test alone)")))
   }
 
   if (ghsl_high && jk_robust) {

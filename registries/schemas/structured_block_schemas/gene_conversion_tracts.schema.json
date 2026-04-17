@@ -1,0 +1,118 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "gene_conversion_tracts.schema.json",
+  "title": "gene_conversion_tracts",
+  "description": "Per-candidate catalog of short intra-inversion arrangement-discordant tracts — stretches of ~2–10 consecutive diagnostic SNPs where one sample looks like the OTHER arrangement (a HOM_REF sample reading INV-like, or vice versa) then reverts to its baseline. The block name is kept as 'gene_conversion_tracts' for pipeline backward compatibility, but the signal is properly an IBS-with-other-arrangement signature: we observe that a short stretch LOOKS LIKE the opposite arrangement's diagnostic genotypes, but we cannot infer the causal mechanism from sequence data alone. Candidate causes: gene conversion (the classical interpretation; Harris 1993 reported GC tracts of 18–774 bp with 3–26 bp boundary mismatches), short double crossover, mapping artefact at paralogy, or simply coincidental IBS at a handful of diagnostic sites. The detector's job is to surface the tract; interpreting cause is downstream. Produced by gene_conversion_detector.R (PER-SNP run-length detector on diagnostic QC-clean SNPs — chat-12 rewrite; replaces earlier windowed-binning draft whose lower detection limit (~60 kb) was larger than the biology of GC tracts (typically 50 bp – ~800 bp; Harris 1993 upper bound ~5 kb is atypical). Recorded per sample as annotation; does NOT gate the RECOMBINANT call (recombinants are called by C01j compatibility groups at window scale).",
+  "type": "object",
+  "required": ["candidate_id", "per_sample_summary", "total_tracts"],
+  "properties": {
+    "candidate_id": { "type": "string" },
+
+    "per_sample_summary": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["sample_id", "n_tracts"],
+        "properties": {
+          "sample_id":     { "type": "string" },
+          "n_tracts":      { "type": "integer", "minimum": 0 },
+          "baseline_class":{ "type": ["string", "null"],
+                             "description": "Tier-1 decompose class used as the reference arrangement for flagging (HOM_REF / HET / HOM_INV / AMBIGUOUS). HET samples are skipped (ambiguous per-haplotype at 9x), so they will have n_tracts=0 and baseline_class='HET'." },
+          "flank_dosage":  { "type": ["number", "null"],
+                             "description": "Legacy field retained for backward compatibility; not populated by the per-SNP detector. Present as null to keep readers that expect the column happy." },
+          "detector":      { "type": "string",
+                             "description": "Detector name + version tag, e.g. 'per_snp_runlength_v1'." }
+        }
+      }
+    },
+
+    "tracts": {
+      "type": "array",
+      "description": "All tracts across all samples (flat list).",
+      "items": {
+        "type": "object",
+        "required": ["sample_id", "tract_start_bp", "tract_end_bp",
+                      "span_bp", "direction",
+                      "run_length_flagged_snps", "tolerance_snps",
+                      "confidence"],
+        "properties": {
+          "sample_id":               { "type": "string" },
+          "tract_start_bp":          { "type": "integer",
+                                        "description": "bp position of the first flagged diagnostic SNP in the tract." },
+          "tract_end_bp":            { "type": "integer",
+                                        "description": "bp position of the last flagged diagnostic SNP in the tract." },
+          "tract_center_bp":         { "type": "integer" },
+          "span_bp":                 { "type": "integer", "minimum": 0,
+                                        "description": "tract_end_bp − tract_start_bp. Replaces old tract_width_bp; kept as a distinct name to signal the detector change. A readable alias tract_width_bp is also emitted for backward-compat readers." },
+          "tract_width_bp":          { "type": "integer", "minimum": 0,
+                                        "description": "Alias for span_bp; same integer. Preserved so existing C01e figure code and cheat24 that reference tract_width_bp continue to work without a touch." },
+
+          "run_length_flagged_snps": { "type": "integer", "minimum": 2,
+                                        "description": "Count of flagged diagnostic SNPs in the run. Must be >= params.min_run (default 2)." },
+          "tolerance_snps":          { "type": "integer", "minimum": 0,
+                                        "description": "Count of intervening non-flagged-non-consistent (HET-looking or missing) SNPs tolerated inside the run. Bounded by params.max_tolerance (default 1)." },
+          "confidence":              { "type": "string",
+                                        "enum": ["LOW", "MEDIUM", "HIGH"],
+                                        "description": "Derived from run_length_flagged_snps under a geometric prior on per-SNP genotyping error p = 0.01 at 9x: len=2 LOW, len=3 MEDIUM, len>=4 HIGH." },
+
+          "mean_dosage_tract":       { "type": ["number", "null"],
+                                        "description": "Mean dosage across the flagged-SNP positions in the tract (for the tract sample). Diagnostic, not a gate." },
+          "mean_dosage_flank":       { "type": ["number", "null"],
+                                        "description": "Mean dosage across consistent-diagnostic SNPs outside the tract but inside the interval (for the tract sample)." },
+
+          "direction":               { "type": "string",
+                                        "enum": ["REF_in_INV_context",
+                                                 "INV_in_REF_context",
+                                                 "REF_in_HET_context",
+                                                 "INV_in_HET_context",
+                                                 "unknown"],
+                                        "description": "Which arrangement the tract LOOKS LIKE, in context of the sample's baseline class. INV_in_REF_context = HOM_REF sample reading INV-like over the tract. Describes pattern, not causal donor — we don't know the actual source of the discordant stretch." },
+
+          "tract_width_bins":        { "type": ["integer", "null"],
+                                        "description": "Legacy field from the windowed-binning draft. Null for the per-SNP detector." }
+        }
+      }
+    },
+
+    "total_tracts":          { "type": "integer", "minimum": 0 },
+    "total_samples_with_gc": { "type": "integer", "minimum": 0 },
+
+    "snp_qc": {
+      "type": "object",
+      "description": "Pre-filter statistics, recorded per candidate so the figure panel can explain what was dropped and why. Especially useful for paralog-dense regions (e.g. LG25 immune cluster near cand48) where a large fraction of vertical stripes in the heatmap are NOT GC events but SNP-level artefacts.",
+      "properties": {
+        "n_snps_total":             { "type": "integer", "minimum": 0 },
+        "n_snps_pass_qc":           { "type": "integer", "minimum": 0 },
+        "n_snps_pass_qc_diagnostic":{ "type": "integer", "minimum": 0,
+                                       "description": "QC-clean AND |Delta AF(HOM_REF,HOM_INV)| >= params.min_delta_af. Only these SNPs carry GC information." },
+        "n_dropped_missingness":    { "type": "integer", "minimum": 0 },
+        "n_dropped_excess_het":     { "type": "integer", "minimum": 0,
+                                       "description": "Likely paralog-mismapping sites (observed het fraction > 0.7)." },
+        "n_dropped_depth_anomaly":  { "type": "integer", "minimum": 0 },
+        "n_dropped_low_maf":        { "type": "integer", "minimum": 0 },
+        "n_dropped_non_diagnostic": { "type": "integer", "minimum": 0 }
+      }
+    },
+
+    "params": {
+      "type": "object",
+      "description": "Detector parameters used for this candidate (recorded for reproducibility).",
+      "properties": {
+        "min_run":           { "type": "integer" },
+        "max_tolerance":     { "type": "integer" },
+        "max_span_bp":       { "type": "integer" },
+        "max_flagged_snps":  { "type": "integer" },
+        "min_delta_af":      { "type": "number" },
+        "max_het_fraction":  { "type": "number" },
+        "min_maf":           { "type": "number" },
+        "min_call_rate":     { "type": "number" },
+        "depth_z_abs":       { "type": "number" }
+      }
+    }
+  },
+  "keys_extracted": [
+    { "key": "q2_gc_total_tracts",              "from": "total_tracts" },
+    { "key": "q2_gc_total_samples_with_gc",     "from": "total_samples_with_gc" },
+    { "key": "q2_gc_n_snps_pass_qc_diagnostic", "from": "snp_qc.n_snps_pass_qc_diagnostic" }
+  ]
+}

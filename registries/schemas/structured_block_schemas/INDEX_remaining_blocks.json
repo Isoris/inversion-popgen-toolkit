@@ -35,6 +35,14 @@
       "status": "written — existence_layer_d.schema.json"
     },
     {
+      "block_type": "existence_layer_b_bnd_rescue",
+      "question": "Q7",
+      "group_validation_required": "NONE",
+      "source_script": "phase_3_refine/06_bnd_inversion_signal.py",
+      "description": "Supplementary Layer B evidence from BND rescue pathway — paired CT=3to3/INV3 (left) + CT=5to5/INV5 (right) junctions that the strict INV callers missed. Co-exists with existence_layer_b. Added 2026-04-17.",
+      "status": "written — existence_layer_b_bnd_rescue.schema.json"
+    },
+    {
       "block_type": "boundary_left",
       "question": "Q3",
       "group_validation_required": "NONE",
@@ -57,10 +65,24 @@
     },
     {
       "block_type": "internal_dynamics",
-      "question": "Q2",
-      "group_validation_required": "UNCERTAIN",
-      "source_script": "C01i + decomp_stats + cheat24",
-      "status": "written — internal_dynamics.schema.json"
+      "question": "Q1, Q2",
+      "group_validation_required": "NONE (produces initial grouping; seal then synthesises)",
+      "source_script": "STEP_C01i_decompose.R",
+      "status": "written (rewritten chat-15 BK) — internal_dynamics.schema.json. Canonical schema now matches chat-12 decompose-flavor (silhouette / BIC / flashlight / seed counts). The pre-chat-12 recombinant-flavor schema is archived at _archive_superseded/bk_schemas_pre_canonical/internal_dynamics.schema.json.pre_BK; the recombinant content it formerly held is now in its own recombinant_map block."
+    },
+    {
+      "block_type": "recombinant_map",
+      "question": "Q2, Q4",
+      "group_validation_required": "NONE",
+      "source_script": "STEP_C01i_b_multi_recomb.R",
+      "status": "written (chat-15 BK) — recombinant_map.schema.json. Chat-12 R + G gate rewrite. Split out of internal_dynamics during the chat-12 rewrite; 10 keys_extracted entries (8 Q2 + 2 Q2-provenance)."
+    },
+    {
+      "block_type": "internal_ancestry_composition",
+      "question": "Q1, Q2",
+      "group_validation_required": "NONE (group-independent — reads Engine B directly)",
+      "source_script": "STEP_C01i_c_nested_composition.py",
+      "status": "written (chat-15 BK) — internal_ancestry_composition.schema.json. Governs C01f promotion gating via composite_flag. Stub variant when Engine B local-Q cache is unavailable (composite_flag = 'unknown_no_engine_b'). 12 keys_extracted entries (2 Q1 + 10 Q2)."
     },
     {
       "block_type": "mechanism",
@@ -140,8 +162,8 @@
       "description": "Cross-species synteny: is this inversion present in sister species? If present in C. macrocephalus and absent in outgroups → shared ancestral; if only in hatchery line → derived. Dollo parsimony call."
     }
   ],
-  "total": 18,
-  "written_so_far": ["existence_layer_d", "internal_dynamics", "hypothesis_verdict", "boundary_left", "boundary_right"],
-  "remaining": 14,
-  "note": "Remaining 14 schemas follow same pattern: required fields list, properties with descriptions and types, keys_extracted mapping block fields to flat key names. Each takes ~15 minutes to write from the corresponding script's output."
+  "total": 20,
+  "written_so_far": ["existence_layer_d", "internal_dynamics", "hypothesis_verdict", "boundary_left", "boundary_right", "recombinant_map", "internal_ancestry_composition"],
+  "remaining": 13,
+  "note": "Chat 15 BK added recombinant_map + internal_ancestry_composition as separate blocks (they were carved out of internal_dynamics during the chat-12 rewrite but had no canonical schema). internal_dynamics itself was rewritten chat-15 to match current C01i_decompose output. Remaining 13 schemas follow same pattern: required fields list, properties with descriptions and types, keys_extracted mapping block fields to flat key names. Each takes ~15 minutes to write from the corresponding script's output."
 }

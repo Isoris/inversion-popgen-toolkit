@@ -141,6 +141,61 @@ def main() -> int:
     assert res["status"] in ("validated", "incomplete"), f"status={res['status']}"
     print(f"  wrote {res['n_keys']} keys, status={res['status']}")
 
+    # ── Step 3b: write existence_layer_d (phase_3 STEP03, Layer D OR test) ──
+    # Added 2026-04-17 (chat 5 FIX 29 v2): mirrors what phase_3 STEP03
+    # writes per candidate via the Python registry API.
+    print("\n[test] writing existence_layer_d block (Layer D OR test)")
+    res_d = reg.evidence.write_block(
+        candidate_id=cid,
+        block_type="existence_layer_d",
+        data={
+            "fisher_or": 23.7,
+            "fisher_p": 4.98e-06,
+            "fisher_ci_lower": 8.9,
+            "fisher_ci_upper": 63.2,
+            "contingency_table": [[45, 8], [12, 161]],
+            "armitage_z": 5.12,
+            "armitage_p": 3.01e-07,
+            "n_inv_with_support": 45,
+            "n_inv_total": 53,
+            "n_ref_with_support": 12,
+            "n_ref_total": 173,
+            "samples_inv_with_support": ["CGA009", "CGA045", "CGA102"],
+        },
+        source_script="phase_3_refine/03_statistical_tests_and_seeds.py",
+    )
+    assert res_d["status"] in ("validated", "incomplete"), f"layer_d status={res_d['status']}"
+    print(f"  wrote {res_d['n_keys']} layer_d keys, status={res_d['status']}")
+
+    # ── Step 3c: write existence_layer_b_bnd_rescue (phase_3 STEP06) ────
+    # Represents a true orphan rescue — paired BND junctions that match
+    # no entry in the DELLY or Manta INV catalogs.
+    print("\n[test] writing existence_layer_b_bnd_rescue block (orphan BND pair)")
+    res_br = reg.evidence.write_block(
+        candidate_id=cid,
+        block_type="existence_layer_b_bnd_rescue",
+        data={
+            "bnd_rescued": True,
+            "rescue_source": "cross_caller",
+            "bnd_pair_bp1": 8420000,
+            "bnd_pair_bp2": 8505000,
+            "bnd_pair_size_bp": 85000,
+            "left_junction_id":  "DELLY_BND_00042",
+            "right_junction_id": "MantaBND:0:123:234:0:0:0:1",
+            "left_junction_source":  "delly",
+            "right_junction_source": "manta_raw",
+            "left_pe":  6,
+            "right_pe": 4,
+            "left_sr":  3,
+            "right_sr": 2,
+            "matched_inv_id": "",
+            "match_type": "no_inv_match",
+        },
+        source_script="phase_3_refine/06_bnd_inversion_signal.py",
+    )
+    assert res_br["status"] in ("validated", "incomplete"), f"bnd_rescue status={res_br['status']}"
+    print(f"  wrote {res_br['n_keys']} bnd_rescue keys, status={res_br['status']}")
+
     # ── Step 4: write internal_dynamics (C01i) ────────────────────────────
     print("\n[test] writing internal_dynamics block")
     reg.evidence.write_block(

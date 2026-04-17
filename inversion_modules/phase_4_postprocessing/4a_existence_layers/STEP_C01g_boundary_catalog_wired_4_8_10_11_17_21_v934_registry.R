@@ -43,7 +43,7 @@
 #     --landscape <01C_output_dir> \
 #     --staircase <inv_detect_output_dir> \
 #     --cores <snake1_output_dir> \
-#     --flashlight <flashlight_dir> \
+#     --sv_prior <sv_prior_dir> \
 #     --outdir <output_dir> \
 #     [--chrom C_gar_LG01]
 # =============================================================================
@@ -77,7 +77,7 @@ if (nzchar(.bridge_file) && file.exists(.bridge_file)) {
 
 args <- commandArgs(trailingOnly = TRUE)
 precomp_dir <- NULL; landscape_dir <- NULL; staircase_dir <- NULL
-cores_dir <- NULL; flashlight_dir <- NULL; outdir <- "boundary_catalog"
+cores_dir <- NULL; sv_prior_dir <- NULL; outdir <- "boundary_catalog"
 chrom_filter <- NULL; samples_file <- NULL
 bam_manifest <- NULL; mosdepth_dir <- NULL
 repeatmasker_file <- NULL
@@ -97,7 +97,7 @@ while (i <= length(args)) {
   else if (a == "--landscape" && i < length(args))  { landscape_dir <- args[i+1]; i <- i+2 }
   else if (a == "--staircase" && i < length(args))  { staircase_dir <- args[i+1]; i <- i+2 }
   else if (a == "--cores" && i < length(args))      { cores_dir <- args[i+1]; i <- i+2 }
-  else if (a == "--flashlight" && i < length(args)) { flashlight_dir <- args[i+1]; i <- i+2 }
+  else if (a == "--sv_prior" && i < length(args)) { sv_prior_dir <- args[i+1]; i <- i+2 }
   else if (a == "--outdir" && i < length(args))     { outdir <- args[i+1]; i <- i+2 }
   else if (a == "--chrom" && i < length(args))      { chrom_filter <- args[i+1]; i <- i+2 }
   else if (a == "--samples" && i < length(args))    { samples_file <- args[i+1]; i <- i+2 }
@@ -124,9 +124,9 @@ SAMPLES_IND <- Sys.getenv("SAMPLES_IND",
 
 # Auto-detect if not provided via args
 if (is.null(mosdepth_dir) && dir.exists(MARKDUP_DIR)) mosdepth_dir <- MARKDUP_DIR
-if (is.null(flashlight_dir)) {
-  fl_auto <- file.path(BASE, "inversion_localpca_v7/06_mds_candidates/snake_regions_multiscale/flashlight")
-  if (dir.exists(fl_auto)) flashlight_dir <- fl_auto
+if (is.null(sv_prior_dir)) {
+  fl_auto <- file.path(BASE, "inversion_localpca_v7/06_mds_candidates/snake_regions_multiscale/sv_prior")
+  if (dir.exists(fl_auto)) sv_prior_dir <- fl_auto
 }
 if (is.null(landscape_dir)) {
   ls_auto <- file.path(BASE, "inversion_localpca_v7/06_mds_candidates/snake_regions_multiscale/landscape")
@@ -141,7 +141,7 @@ message("  Precomp:    ", precomp_dir %||% "NONE")
 message("  Landscape:  ", landscape_dir %||% "NONE")
 message("  Staircase:  ", staircase_dir %||% "NONE")
 message("  Cores:      ", cores_dir %||% "NONE")
-message("  Flashlight: ", flashlight_dir %||% "NONE")
+message("  Flashlight: ", sv_prior_dir %||% "NONE")
 message("  Output:     ", outdir)
 
 # =============================================================================
@@ -336,13 +336,13 @@ for (chr in chroms) {
     }
     if (file.exists(f)) {
       cores <- fread(f)
-      # Normalise column names (new input uses region_id; legacy used snake_id)
-      if ("region_id" %in% names(cores) && !"snake_id" %in% names(cores)) {
-        cores[, snake_id := region_id]
+      # Normalise column names (new input uses region_id; legacy used region_id)
+      if ("region_id" %in% names(cores) && !"region_id" %in% names(cores)) {
+        cores[, region_id := region_id]
       }
       for (ci in seq_len(nrow(cores))) {
         cr <- cores[ci]
-        cid <- cr$snake_id %||% paste0("region_", ci)
+        cid <- cr$region_id %||% paste0("region_", ci)
 
         # Left edge
         bid <- bid + 1L
@@ -371,16 +371,16 @@ for (chr in chroms) {
     message("  Seeded regions: ", n_snake, " boundaries")
   }
 
-  # ── SOURCE 4: SV prior breakpoints (formerly flashlight) ───────────
-  # The CLI flag is still --flashlight for back-compat with launchers;
+  # ── SOURCE 4: SV prior breakpoints (formerly sv_prior) ───────────
+  # The CLI flag is still --sv_prior for back-compat with launchers;
   # the underlying dir is what STEP_C00_build_sv_prior.R writes.
   n_sv <- 0L
-  if (!is.null(flashlight_dir)) {
+  if (!is.null(sv_prior_dir)) {
     # New filename from STEP_C00_build_sv_prior.R
-    fl_file <- file.path(flashlight_dir, paste0("sv_prior_", chr, ".rds"))
+    fl_file <- file.path(sv_prior_dir, paste0("sv_prior_", chr, ".rds"))
     if (!file.exists(fl_file)) {
       # Fallback for pre-rename output directories
-      fl_file <- file.path(flashlight_dir, paste0("sv_flashlight_", chr, ".rds"))
+      fl_file <- file.path(sv_prior_dir, paste0("sv_flashlight_", chr, ".rds"))
     }
     if (file.exists(fl_file)) {
       fl <- tryCatch(readRDS(fl_file), error = function(e) NULL)
@@ -466,6 +466,23 @@ deduped <- catalog[, {
   best_idx <- which.min(type_rank)
   sources_all <- unique(source)
   cands_all <- unique(na.omit(candidate_id))
+  # BUGFIX 2026-04-17 (chat 7, FIX 35): produce matched_core_id as the
+  # first non-NA candidate_id in the cluster. The registry-write block
+  # at L1407 guards on `"matched_core_id" %in% names(confirmed)`, which
+  # was always FALSE because no prior step set this column. When the
+  # registry helper lib lands (flagged in chat 7 Finding 8/9), the
+  # guard will now succeed and the per-boundary blocks will write.
+  # Note: candidate_ids (semicolon-joined, all ids in cluster) is kept
+  # for traceability; matched_core_id is the canonical single id for
+  # the boundary's candidate-association (picked from best_idx row when
+  # available, otherwise the first cluster candidate).
+  best_cid <- if (!is.na(candidate_id[best_idx]) && nzchar(candidate_id[best_idx])) {
+    candidate_id[best_idx]
+  } else if (length(cands_all) > 0) {
+    cands_all[1]
+  } else {
+    NA_character_
+  }
   .(boundary_bp = boundary_bp[best_idx],
     boundary_type = boundary_type[best_idx],
     side = side[best_idx],
@@ -475,6 +492,7 @@ deduped <- catalog[, {
     block_right = block_right[best_idx],
     sources = paste(sources_all, collapse = ";"),
     candidate_ids = paste(cands_all, collapse = ";"),
+    matched_core_id = as.character(best_cid),
     n_sources = length(sources_all),
     n_within_cluster = .N
   )

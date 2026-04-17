@@ -36,7 +36,7 @@ resolve_decomp_paths <- function(args = list()) {
                 "06_mds_candidates/snake_regions_multiscale/precomp")),
     clair3_dir   = args$clair3_dir %||% Sys.getenv("CLAIR3_DIR",
       file.path(base, "MODULE_4A_SNP_INDEL50_Clair3/postprocess_results")),
-    flashlight_dir = args$flashlight_dir %||% Sys.getenv("FLASHLIGHT_DIR",
+    sv_prior_dir = args$sv_prior_dir %||% Sys.getenv("FLASHLIGHT_DIR",
       file.path(base, "flashlight_v2/cache")),
     q_cache_dir = args$q_cache_dir %||% Sys.getenv("Q_CACHE_DIR",
       file.path(base, "unified_ancestry/local_Q"))
@@ -81,12 +81,31 @@ extract_pc_loadings <- function(pc, start_bp, end_bp, min_windows = 5L) {
            dimnames = list(NULL, sample_names))
   }
 
+  # FIX 38 (chat 8): previous code was
+  #   win_starts = wins$start_bp %||% wins$mid_bp - 50000L,
+  #   win_ends   = wins$end_bp   %||% wins$mid_bp + 50000L,
+  # which parses as (wins$start_bp %||% wins$mid_bp) - 50000L because
+  # %||% binds tighter than +/- in R. When wins$start_bp is present
+  # (the common case) this shifted every window start back 50 kb from
+  # its real value, inflating every window interval by 100 kb.
+  #
+  # The precomp (C01a STEP_C01a_precompute.R L849) ALWAYS writes
+  # start_bp and end_bp as real window boundaries inherited from the
+  # upstream per-window table `dt`. So the %||% fallback branch was
+  # never supposed to fire — and the 50000 magic number was an
+  # arbitrary guess (real window sizes come from C01a's multiscale
+  # ladder: 20/40/80/120/160/200/240/320, not a fixed ±50 kb).
+  #
+  # Using the real columns directly:
+  win_starts <- wins$start_bp
+  win_ends   <- wins$end_bp
+
   list(
     pc1_mat = pc1_mat, pc2_mat = pc2_mat,
     sample_names = sample_names,
     n_windows = nrow(wins),
-    win_starts = wins$start_bp %||% wins$mid_bp - 50000L,
-    win_ends   = wins$end_bp   %||% wins$mid_bp + 50000L,
+    win_starts = win_starts,
+    win_ends   = win_ends,
     win_mids   = wins$mid_bp
   )
 }
@@ -195,12 +214,12 @@ assign_class_labels <- function(km, x, k_use = 3L) {
 # Loading optional data sources (fall back gracefully if absent)
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Try to load flashlight for a chromosome. Returns NULL if unavailable.
-try_load_flashlight <- function(chr, flashlight_dir) {
-  fl_path <- file.path(flashlight_dir, paste0(chr, ".rds"))
+# Try to load sv_prior for a chromosome. Returns NULL if unavailable.
+try_load_sv_prior <- function(chr, sv_prior_dir) {
+  fl_path <- file.path(sv_prior_dir, paste0(chr, ".rds"))
   if (!file.exists(fl_path)) return(NULL)
   tryCatch(readRDS(fl_path), error = function(e) {
-    message("[lib] flashlight load failed for ", chr, ": ", conditionMessage(e))
+    message("[lib] sv_prior load failed for ", chr, ": ", conditionMessage(e))
     NULL
   })
 }

@@ -22,7 +22,7 @@ cli <- parse_diag_args()
 data <- load_diag_data(cli$precomp_dir, cli$chrom_filter)
 precomp_list <- data$precomp_list
 chroms <- data$chroms
-inv_like_dt <- data$inv_like_dt
+window_dt <- data$window_dt
 dir.create(cli$outdir, recursive = TRUE, showWarnings = FALSE)
 
 # =============================================================================

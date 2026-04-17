@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "distance_concordance.schema.json",
+  "title": "distance_concordance",
+  "description": "Multi-scale sample-pair concordance from C01m. For a candidate (chrom-wide computation subset to interval), reports for each tested distance d ∈ {80, 160, 320, 640 windows (configurable)} how persistent the sample-pair co-grouping is. Biologically, inversion-carrier pairs maintain co-grouping at all distances (recombination suppressed); family-LD pairs decay. The persistence profile is diagnostic of inversion vs family structure.",
+  "type": "object",
+  "required": [
+    "candidate_id",
+    "chrom",
+    "distances_tested",
+    "inversion_vs_family_score"
+  ],
+  "properties": {
+    "candidate_id": { "type": "string" },
+    "chrom":        { "type": "string" },
+    "distances_tested": {
+      "type": "array",
+      "items": { "type": "integer", "minimum": 1 }
+    },
+    "per_distance_summary": {
+      "type": "array",
+      "description": "One entry per tested distance with aggregate concordance stats inside the candidate interval.",
+      "items": {
+        "type": "object",
+        "required": ["distance_windows", "mean_concordance"],
+        "properties": {
+          "distance_windows":    { "type": "integer" },
+          "mean_concordance":    { "type": "number", "minimum": 0, "maximum": 1 },
+          "n_pairs_high":        { "type": "integer",
+                                     "description": "pairs with concordance > 0.8" },
+          "n_pairs_decaying":    { "type": "integer",
+                                     "description": "pairs with concordance dropping >0.3 vs shortest distance" }
+        }
+      }
+    },
+    "persistent_carriers": {
+      "type": "array",
+      "description": "Samples whose pairwise co-grouping persists across all tested distances → likely inversion carriers.",
+      "items": { "type": "string" }
+    },
+    "decaying_pairs_count": {
+      "type": "integer",
+      "description": "Number of sample pairs with concordance decaying across distances (likely family LD, not inversion)."
+    },
+    "inversion_vs_family_score": {
+      "type": "number",
+      "description": "Summary score in [0,1]. 1 = strong inversion-carrier signal (persistent pairs dominate). 0 = family-LD signal dominates."
+    }
+  },
+  "keys_extracted": [
+    { "key": "q2_distance_conc_inv_vs_fam_score", "from": "inversion_vs_family_score" },
+    { "key": "q2_distance_conc_n_persistent",    "from": "persistent_carriers" },
+    { "key": "q2_distance_conc_n_decaying",       "from": "decaying_pairs_count" }
+  ]
+}

@@ -1,0 +1,245 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "internal_ancestry_composition.schema.json",
+  "block_type": "internal_ancestry_composition",
+  "title": "internal_ancestry_composition",
+  "version": "v2_phase4b_rewrite",
+  "description": "Per-candidate internal ancestry structure classification from STEP_C01i_c_nested_composition.py. For each sample, walks the Engine B per-window ancestry labels inside the candidate interval and classifies the pattern as homogeneous, dominant_plus_secondary, two_block_composite, continuous_gradient, multi_block_fragmented, or diffuse_mixed. The per-candidate rollup derives composite_flag \u2208 {clean, maybe_composite, likely_composite, unknown_no_engine_b, unknown_no_data}, which governs whether C01f can promote the candidate's groups to SUPPORTED/VALIDATED. Stub block is emitted when Engine B local-Q cache is not available \u2014 composite_flag = 'unknown_no_engine_b' and pct_* are null. This block catches 'same interval, different sample groups' \u2014 composite intervals get flagged and capped at UNCERTAIN. See BK_KEYS_EXPLAINED.md in this directory for per-key documentation (biological meaning, provenance, downstream consumer).",
+  "question": "Q1, Q2",
+  "group_validation_required": "NONE (group-independent \u2014 reads Engine B directly)",
+  "source_script": "STEP_C01i_c_nested_composition.py",
+  "type": "object",
+  "required": [
+    "parent_id",
+    "chrom",
+    "start_bp",
+    "end_bp",
+    "composite_flag"
+  ],
+  "properties": {
+    "parent_id": {
+      "type": "string",
+      "description": "candidate_id of the parent interval (called parent_id because Engine B analyzes nested composition beneath a parent candidate)"
+    },
+    "chrom": {
+      "type": "string"
+    },
+    "start_bp": {
+      "type": "integer"
+    },
+    "end_bp": {
+      "type": "integer"
+    },
+    "K_used": {
+      "type": "integer",
+      "description": "Engine B K; 0 in stub blocks"
+    },
+    "n_samples_analyzed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "n_windows_in_parent": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "dominant_structure_type": {
+      "type": "string",
+      "enum": [
+        "homogeneous",
+        "dominant_plus_secondary",
+        "two_block_composite",
+        "continuous_gradient",
+        "multi_block_fragmented",
+        "diffuse_mixed",
+        "too_sparse",
+        "unknown"
+      ]
+    },
+    "dominant_structure_count": {
+      "type": "integer"
+    },
+    "structure_breakdown": {
+      "type": "string",
+      "description": "human-readable like 'homogeneous:120; two_block_composite:45'"
+    },
+    "structure_counts": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer"
+      }
+    },
+    "mean_fragmentation": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "mean_internal_entropy": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "mean_switches": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "composite_flag": {
+      "type": "string",
+      "enum": [
+        "clean",
+        "maybe_composite",
+        "likely_composite",
+        "unknown_no_engine_b",
+        "unknown_no_data"
+      ],
+      "description": "Governs C01f promotion gating: likely_composite caps at UNCERTAIN; maybe_composite allows but logs; clean = no effect; unknown_* = treat as clean + log."
+    },
+    "composite_rationale": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "pct_homogeneous_like": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "pct_two_block_composite": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "pct_multi_block_fragmented": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "pct_continuous_gradient": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "pct_diffuse_mixed": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "per_sample": {
+      "type": "array",
+      "description": "one entry per sample analyzed; excluded if too few windows",
+      "items": {
+        "type": "object",
+        "required": [
+          "sample_id",
+          "structure_type"
+        ],
+        "properties": {
+          "sample_id": {
+            "type": "string"
+          },
+          "n_windows": {
+            "type": "integer"
+          },
+          "n_labels_unique": {
+            "type": "integer"
+          },
+          "dominant_label": {
+            "type": "string"
+          },
+          "dominant_fraction": {
+            "type": "number"
+          },
+          "n_blocks": {
+            "type": "integer"
+          },
+          "n_switches": {
+            "type": "integer"
+          },
+          "largest_block": {
+            "type": "integer"
+          },
+          "second_block": {
+            "type": "integer"
+          },
+          "fragmentation_score": {
+            "type": "number"
+          },
+          "internal_entropy": {
+            "type": "number"
+          },
+          "structure_type": {
+            "type": "string"
+          },
+          "mean_delta12": {
+            "type": "number"
+          },
+          "mean_entropy": {
+            "type": "number"
+          },
+          "mean_ena": {
+            "type": "number"
+          }
+        }
+      }
+    }
+  },
+  "keys_extracted": [
+    {
+      "key": "q1_composite_flag",
+      "from": "composite_flag"
+    },
+    {
+      "key": "q1_ancestry_dominant_pattern",
+      "from": "dominant_structure_type"
+    },
+    {
+      "key": "q2_pct_samples_two_block_ancestry",
+      "from": "pct_two_block_composite"
+    },
+    {
+      "key": "q2_pct_samples_multi_block_ancestry",
+      "from": "pct_multi_block_fragmented"
+    },
+    {
+      "key": "q2_pct_samples_homogeneous_ancestry",
+      "from": "pct_homogeneous_like"
+    },
+    {
+      "key": "q2_pct_samples_gradient_ancestry",
+      "from": "pct_continuous_gradient"
+    },
+    {
+      "key": "q2_pct_samples_diffuse_ancestry",
+      "from": "pct_diffuse_mixed"
+    },
+    {
+      "key": "q2_mean_ancestry_fragmentation",
+      "from": "mean_fragmentation"
+    },
+    {
+      "key": "q2_mean_ancestry_entropy_within_sample",
+      "from": "mean_internal_entropy"
+    },
+    {
+      "key": "q2_mean_ancestry_switches_per_sample",
+      "from": "mean_switches"
+    },
+    {
+      "key": "q2_ancestry_K_used",
+      "from": "K_used"
+    },
+    {
+      "key": "q2_ancestry_n_samples_analyzed",
+      "from": "n_samples_analyzed"
+    }
+  ]
+}

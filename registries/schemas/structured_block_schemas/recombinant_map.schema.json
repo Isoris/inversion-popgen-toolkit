@@ -1,0 +1,311 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "recombinant_map.schema.json",
+  "block_type": "recombinant_map",
+  "title": "recombinant_map",
+  "version": "v2_chat12_rewrite",
+  "description": "Per-candidate map of recombinant samples produced by STEP_C01i_b_multi_recomb.R (chat-12 DAG R + G gate rewrite). The R signal is the regime-DAG-derived deviation_fraction gate (lib_recomb_combination.R::derive_R_from_regime); the G signal is GHSL ghsl_call == 'SPLIT' at the candidate interval. Combination rule: R \u2227 G = RECOMBINANT (HIGH); R \u2227 \u00acG with insufficient GHSL resolution = RECOMBINANT (MEDIUM); R \u2227 \u00acG with sufficient GHSL = recomb_disputed; \u00acR \u2227 G = recomb_ghsl_only. Within RECOMBINANT, event_class \u2208 {double_crossover, gene_conversion_embedded, single_crossover_or_ambiguous} is derived from the longest_deviation_bp threshold (gate_params.min_dco_bp) and the presence of GC tracts from the per-SNP detector; recomb_subgroup \u2208 {RECOMBINANT_DCO, RECOMBINANT_GC, RECOMBINANT} mirrors event_class at the group-registration layer (consumed by STEP_C01i_d_seal). Posterior probability comes from the external cheat24_recombinant_prior.R if reachable; otherwise recorded as NA with cheat24_version = 'cheat24_unavailable_posterior_na' (chat-12 Finding V \u2014 no inline fallback). See BK_KEYS_EXPLAINED.md in this directory for per-key documentation (biological meaning, provenance, downstream consumer).",
+  "question": "Q2, Q4",
+  "group_validation_required": "NONE",
+  "source_script": "STEP_C01i_b_multi_recomb.R",
+  "type": "object",
+  "required": [
+    "candidate_id",
+    "chrom",
+    "start_bp",
+    "end_bp",
+    "n_samples",
+    "n_recombinants",
+    "combination_rule",
+    "cheat24_version"
+  ],
+  "properties": {
+    "candidate_id": {
+      "type": "string"
+    },
+    "chrom": {
+      "type": "string"
+    },
+    "start_bp": {
+      "type": "integer"
+    },
+    "end_bp": {
+      "type": "integer"
+    },
+    "n_samples": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total samples in the combo table; includes all recomb_status values plus NOT_RECOMB."
+    },
+    "n_recombinants": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "count of recomb_status == 'RECOMBINANT' (HIGH + MEDIUM). Disputed / ghsl_only are NOT counted here."
+    },
+    "n_recombinant_gc": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "recombinants with recomb_subgroup == 'RECOMBINANT_GC' (event_class == 'gene_conversion_embedded')."
+    },
+    "n_recombinant_dco": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "recombinants with recomb_subgroup == 'RECOMBINANT_DCO' (event_class == 'double_crossover'; longest_deviation_bp \u2265 gate_params.min_dco_bp)."
+    },
+    "n_disputed": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "samples with recomb_status == 'recomb_disputed' \u2014 R fired but GHSL was sufficient and did not report SPLIT."
+    },
+    "n_ghsl_only": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "samples with recomb_status == 'recomb_ghsl_only' \u2014 GHSL reported SPLIT but the DAG gate did not fire."
+    },
+    "cheat24_version": {
+      "type": "string",
+      "description": "Provenance string; 'cheat24_recombinant_prior.R' when reachable, 'cheat24_unavailable_posterior_na' when not \u2014 in which case posterior is NA for every recombinant."
+    },
+    "combination_rule": {
+      "type": "string",
+      "description": "Human-readable marker identifying the combination implementation; stable string 'lib_recomb_combination.R (DAG R + G gate, chat-12)' for this version."
+    },
+    "gate_params": {
+      "type": "object",
+      "description": "Parameters used at gate evaluation time, recorded for reproducibility.",
+      "properties": {
+        "min_deviation_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "R-fire threshold on deviation_fraction (default 0.15)."
+        },
+        "min_deviation_bp": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "R-fire threshold on longest_deviation_bp (default 50000)."
+        },
+        "min_dco_bp": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Threshold above which a RECOMBINANT's longest_deviation_bp is labeled double_crossover rather than gene_conversion_embedded or single_crossover_or_ambiguous (default 200000; inherited from v5 as an educated guess per chat-12 notes)."
+        }
+      }
+    },
+    "recombinants": {
+      "type": "array",
+      "description": "One entry per sample in the cohort combo table. Filterable by recomb_status; keys_extracted aggregates below use per-candidate counts, not per-sample fields.",
+      "items": {
+        "type": "object",
+        "required": [
+          "sample_id",
+          "recomb_status"
+        ],
+        "properties": {
+          "sample_id": {
+            "type": "string"
+          },
+          "recomb_status": {
+            "type": "string",
+            "enum": [
+              "NOT_RECOMB",
+              "RECOMBINANT",
+              "recomb_disputed",
+              "recomb_ghsl_only"
+            ]
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "HIGH",
+              "MEDIUM",
+              "DISPUTED",
+              "GHSL_ONLY",
+              "n/a"
+            ]
+          },
+          "R_fired": {
+            "type": "boolean"
+          },
+          "G_fired": {
+            "type": "boolean"
+          },
+          "ghsl_call": {
+            "type": "string"
+          },
+          "ghsl_resolution": {
+            "type": "string",
+            "enum": [
+              "sufficient",
+              "insufficient",
+              "no_annot"
+            ]
+          },
+          "n_regime_changes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "n_gc_tracts": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "s2_phase_switches": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "s3_flashlight_hemi": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "flag": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "annotation": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "longest_deviation_bp": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "deviation_fraction": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "dominant_regime": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "n_edges": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "terminal_matches_start": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "event_class": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "double_crossover",
+              "gene_conversion_embedded",
+              "single_crossover_or_ambiguous",
+              null
+            ]
+          },
+          "recomb_subgroup": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "RECOMBINANT_DCO",
+              "RECOMBINANT_GC",
+              "RECOMBINANT",
+              null
+            ]
+          },
+          "posterior": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "cheat24-derived posterior when reachable; NA otherwise (chat-12 V \u2014 no inline fallback)."
+          },
+          "s1_mosaic_start_bp": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "s1_mosaic_end_bp": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "s1_mosaic_length_bp": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "s1_n_switch_windows": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "keys_extracted": [
+    {
+      "key": "q2_n_recombinant_samples",
+      "from": "n_recombinants"
+    },
+    {
+      "key": "q2_n_recombinant_gc_samples",
+      "from": "n_recombinant_gc"
+    },
+    {
+      "key": "q2_n_recombinant_dco_samples",
+      "from": "n_recombinant_dco"
+    },
+    {
+      "key": "q2_n_regime_ghsl_disputed_samples",
+      "from": "n_disputed"
+    },
+    {
+      "key": "q2_n_ghsl_split_only_samples",
+      "from": "n_ghsl_only"
+    },
+    {
+      "key": "q2_recomb_posterior_source",
+      "from": "cheat24_version"
+    },
+    {
+      "key": "q2_recomb_gate_rule_version",
+      "from": "combination_rule"
+    },
+    {
+      "key": "q2_recomb_min_regime_dev_fraction",
+      "from": "gate_params.min_deviation_fraction"
+    },
+    {
+      "key": "q2_recomb_min_regime_dev_bp",
+      "from": "gate_params.min_deviation_bp"
+    },
+    {
+      "key": "q2_recomb_dco_threshold_bp",
+      "from": "gate_params.min_dco_bp"
+    }
+  ]
+}

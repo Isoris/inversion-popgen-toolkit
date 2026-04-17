@@ -59,7 +59,7 @@ option_list <- list(
   make_option("--coseg-dir",   type="character", default="",
               help="C01i multi_inversion output dir (Phase 9)"),
   make_option("--outdir",      type="character", default="inv_detect_out_v9.3"),
-  make_option("--nn-scales",   type="character", default="0,20,40,80"),
+  make_option("--nn-scales",   type="character", default="0,20,40,80,120,160,200,240,320"),
   make_option("--phases",      type="character", default="all",
               help="Which phases: 'all', '1', '1:3', '2:5', etc."),
   make_option("--skip-transforms", type="logical",   default=FALSE, action="store_true",
@@ -78,7 +78,7 @@ if (interactive()) {
     pruned_list = if (exists("PRUNED_LIST")) PRUNED_LIST else "",
     coseg_dir   = if (exists("COSEG_DIR")) COSEG_DIR else "",
     outdir      = if (exists("OUTDIR")) OUTDIR else "inv_detect_out_v9.3",
-    nn_scales   = if (exists("NN_SCALES")) NN_SCALES else "0,20,40,80",
+    nn_scales   = if (exists("NN_SCALES")) NN_SCALES else "0,20,40,80,120,160,200,240,320",
     phases      = if (exists("PHASES")) PHASES else "all",
     skip_transforms = if (exists("SKIP_TRANSFORMS")) SKIP_TRANSFORMS else FALSE,
     skip_tree   = if (exists("SKIP_TREE")) SKIP_TREE else FALSE
@@ -405,10 +405,196 @@ if (8 %in% run_phases) {
     tab <- merge(tab, nn_evidence, by="candidate_id", all.x=TRUE)
   }
 
+  # BUGFIX 2026-04-17 (FIX 16, DESIGN): merge nn_birth from the NN sweep
+  # tree (Phase 5, D09). C01d's D3 scoring reads iv$nn_birth (L210) and
+  # expects it to saturate at 200. Before this fix nn_birth was never
+  # merged into the scoring table — D09 wrote nn_tree_<chr>.tsv to disk
+  # but Phase 8 never joined it in. Result: iv$nn_birth was always NA,
+  # safe_num(NA, 0) = 0, nn_birth_score = 0, and D3 capped at 0.6 instead
+  # of 1.0 on every candidate, every chromosome.
+  #
+  # Mapping strategy: tree nodes are intervals in bin coordinates
+  # (matching blocks$start/end). For each block, pick the tree node whose
+  # interval has the highest reciprocal overlap with the block. Take that
+  # node's nn_birth. If no node overlaps, leave as NA (not 0 — the
+  # downstream safe_num(NA, 0) already handles that correctly).
+  if (!is.null(tree) && nrow(tree) > 0 &&
+      all(c("start", "end", "nn_birth") %in% names(tree))) {
+    nn_birth_per_block <- numeric(nrow(tab))
+    nn_birth_per_block[] <- NA_real_
+    for (ti in seq_len(nrow(tab))) {
+      bs <- tab$start[ti]; be <- tab$end[ti]
+      if (!is.finite(bs) || !is.finite(be)) next
+      bw <- be - bs + 1
+      # Reciprocal overlap with every tree node
+      ov_num <- pmax(0, pmin(tree$end, be) - pmax(tree$start, bs) + 1)
+      tw <- tree$end - tree$start + 1
+      recip <- pmin(ov_num / bw, ov_num / pmax(tw, 1))
+      best <- which.max(recip)
+      if (length(best) > 0 && recip[best] >= 0.5) {
+        nn_birth_per_block[ti] <- tree$nn_birth[best]
+      }
+    }
+    tab[, nn_birth := nn_birth_per_block]
+    cat("  Merged nn_birth from tree for",
+        sum(!is.na(nn_birth_per_block)), "/", nrow(tab), "blocks\n")
+  }
+
+  # BUGFIX 2026-04-17 (FIX 22, DESIGN): wire 2e GHSL (C04 snake3
+  # phased-Clair3 haplotype divergence) into the scoring table.
+  # Chat 14 (2026-04-18): rewired from v5 to v6. v6 annot RDS uses
+  # v6-native column names — ghsl_v6_score / ghsl_v6_status plus
+  # unprefixed rank_stability, div_contrast_z, div_bimodal. Paths now
+  # <chr>.ghsl_v6.annot.rds.
+  #
+  # Before this fix, C04's per-window annot.rds shards existed but were
+  # read by nobody in the main C01d pipeline — they were consumed only
+  # by two phase_5_followup supplementary-figure scripts. D10 in C01d
+  # read partition_stability from D05's sim_mat clustering, never from
+  # C04. The 2c_precomp README's "Layer C = GHSL" 4-layer independence
+  # framework was aspirational on the scoring path.
+  #
+  # Wiring strategy: C04 writes <chr>.ghsl_v6.annot.rds keyed by
+  # global_window_id, where global_window_id = bin index matching
+  # D01/D09's start/end columns. For each block, aggregate across the
+  # block's windows (cols the interval [start, end]):
+  #   ghsl_v6_score_max       : peak composite score within block
+  #   ghsl_rank_stability_max : peak inter-window rank stability
+  #   ghsl_div_contrast_z_max : peak bimodality-contrast z-score
+  #   ghsl_div_bimodal_frac   : fraction of windows with >=2 density modes
+  #   ghsl_pass_frac          : fraction of windows with status=="PASS"
+  #   ghsl_n_scored_windows   : windows in block that C04 scored
+  #
+  # If --ghsl-dir is empty or no <chr>.ghsl_v6.annot.rds exists (Clair3
+  # still running on this chromosome), the merge is a no-op. C01d handles
+  # missing columns via safe_num()/%||% fallbacks.
+  if (ARGS$ghsl_dir != "") {
+    ghsl_annot_file <- file.path(ARGS$ghsl_dir, "annot",
+                                  paste0(ARGS$chr, ".ghsl_v6.annot.rds"))
+    # Fallback: accept annot.rds directly in ghsl_dir (no annot/ subdir)
+    if (!file.exists(ghsl_annot_file)) {
+      ghsl_annot_file <- file.path(ARGS$ghsl_dir,
+                                    paste0(ARGS$chr, ".ghsl_v6.annot.rds"))
+    }
+    # Chat 14 back-compat: also accept v5 annot if v6 not yet emitted on
+    # this chromosome (allows a partial transition when not every chrom
+    # has been re-classified with v6 yet). v5 column names mapped below.
+    using_v5_compat <- FALSE
+    if (!file.exists(ghsl_annot_file)) {
+      v5_candidate <- file.path(ARGS$ghsl_dir, "annot",
+                                  paste0(ARGS$chr, ".ghsl_v5.annot.rds"))
+      if (!file.exists(v5_candidate)) {
+        v5_candidate <- file.path(ARGS$ghsl_dir,
+                                    paste0(ARGS$chr, ".ghsl_v5.annot.rds"))
+      }
+      if (file.exists(v5_candidate)) {
+        ghsl_annot_file <- v5_candidate
+        using_v5_compat <- TRUE
+      }
+    }
+    if (file.exists(ghsl_annot_file)) {
+      cat(sprintf("  Loading GHSL %s annot: %s\n",
+                   if (using_v5_compat) "v5 (compat)" else "v6",
+                   ghsl_annot_file))
+      ghsl_annot <- tryCatch(readRDS(ghsl_annot_file),
+                              error = function(e) NULL)
+      # Column-name resolution: v6 uses ghsl_v6_score + unprefixed
+      # rank_stability, div_contrast_z, div_bimodal. v5 used ghsl_v5_score
+      # + ghsl_rank_stability + ghsl_div_contrast_z + ghsl_div_bimodal.
+      if (!is.null(ghsl_annot) && nrow(ghsl_annot) > 0 &&
+          "global_window_id" %in% names(ghsl_annot)) {
+        if (using_v5_compat) {
+          score_col    <- "ghsl_v5_score"
+          rstab_col    <- "ghsl_rank_stability"
+          divcz_col    <- "ghsl_div_contrast_z"
+          divbim_col   <- "ghsl_div_bimodal"
+        } else {
+          score_col    <- "ghsl_v6_score"
+          rstab_col    <- "rank_stability"
+          divcz_col    <- "div_contrast_z"
+          divbim_col   <- "div_bimodal"
+        }
+        # Aggregate per block
+        ghsl_per_block <- data.table(
+          block_id                 = integer(nrow(tab)),
+          ghsl_v6_score_max        = NA_real_,
+          ghsl_rank_stability_max  = NA_real_,
+          ghsl_div_contrast_z_max  = NA_real_,
+          ghsl_div_bimodal_frac    = NA_real_,
+          ghsl_pass_frac           = NA_real_,
+          ghsl_n_scored_windows    = 0L
+        )
+        for (ti in seq_len(nrow(tab))) {
+          bs <- tab$start[ti]; be <- tab$end[ti]
+          bid <- tab$block_id[ti]
+          ghsl_per_block$block_id[ti] <- bid
+          if (!is.finite(bs) || !is.finite(be)) next
+          win_rows <- ghsl_annot[global_window_id >= bs & global_window_id <= be]
+          score_vals <- if (score_col %in% names(win_rows)) win_rows[[score_col]] else NA_real_
+          n_scored <- sum(!is.na(score_vals))
+          ghsl_per_block$ghsl_n_scored_windows[ti] <- n_scored
+          if (n_scored >= 3) {
+            ghsl_per_block$ghsl_v6_score_max[ti] <-
+              max(score_vals, na.rm = TRUE)
+            if (rstab_col %in% names(win_rows)) {
+              ghsl_per_block$ghsl_rank_stability_max[ti] <-
+                max(win_rows[[rstab_col]], na.rm = TRUE)
+            }
+            if (divcz_col %in% names(win_rows)) {
+              ghsl_per_block$ghsl_div_contrast_z_max[ti] <-
+                max(win_rows[[divcz_col]], na.rm = TRUE)
+            }
+            if (divbim_col %in% names(win_rows)) {
+              ghsl_per_block$ghsl_div_bimodal_frac[ti] <-
+                mean(win_rows[[divbim_col]] >= 2, na.rm = TRUE)
+            }
+            # PASS fraction — v6 emits ghsl_v6_status directly; v5 did
+            # not carry status on the annot RDS and we approximated with
+            # score > 0.65. Honor that distinction.
+            if ("ghsl_v6_status" %in% names(win_rows)) {
+              ghsl_per_block$ghsl_pass_frac[ti] <-
+                mean(win_rows$ghsl_v6_status == "PASS", na.rm = TRUE)
+            } else {
+              ghsl_per_block$ghsl_pass_frac[ti] <-
+                mean(score_vals > 0.65, na.rm = TRUE)
+            }
+          }
+        }
+        # Replace infinite max()/mean() on empty-after-na.rm with NA
+        for (col in c("ghsl_v6_score_max", "ghsl_rank_stability_max",
+                       "ghsl_div_contrast_z_max", "ghsl_div_bimodal_frac",
+                       "ghsl_pass_frac")) {
+          vals <- ghsl_per_block[[col]]
+          vals[!is.finite(vals)] <- NA_real_
+          ghsl_per_block[[col]] <- vals
+        }
+        tab <- merge(tab, ghsl_per_block, by = "block_id", all.x = TRUE)
+        cat("  Merged GHSL v6 annotations for",
+            sum(ghsl_per_block$ghsl_n_scored_windows > 0), "/",
+            nrow(tab), "blocks\n")
+      } else {
+        cat("  GHSL annot file present but empty or malformed — skipping\n")
+      }
+    } else {
+      cat("  Phase 8 GHSL merge: no annot.rds at ", ghsl_annot_file,
+          " (Clair3 still running?) — skipping\n")
+    }
+  }
+
   # Join block scores (raw variant)
+  # BUGFIX 2026-04-17 (FIX 15, SILENT): D01 writes a `contrast` column
+  # (block_height - bg_sim), and D08 also writes `contrast`
+  # (inside_mean - flank_outside_mean). A plain merge on block_id produced
+  # `contrast.x` (D01) and `contrast.y` (D08), so `iv$contrast` in C01d
+  # was NULL → safe_num(NULL,0)=0 → D1_block_strength silently collapsed
+  # to 0.35*squareness + 0.25*sharpness. Drop D01's contrast before the
+  # merge so D08's (more informative, flank-based, variant-aware) version
+  # is what C01d sees. D01's original `height` and `bg_sim` columns still
+  # survive for anyone who wants the global-background contrast.
   if (!is.null(scores_all) && nrow(scores_all) > 0) {
     raw_scores <- scores_all[variant == "raw"]
     if (nrow(raw_scores) > 0) {
+      if ("contrast" %in% names(tab)) tab[, contrast := NULL]
       tab <- merge(tab, raw_scores[, .(block_id, contrast, squareness,
                                         occupancy, patchiness, sharpness,
                                         shape_class)],

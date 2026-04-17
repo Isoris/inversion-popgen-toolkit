@@ -29,10 +29,19 @@ export BASE="${BASE:-/scratch/lt200308-agbsci/Quentin_project_KEEP_2026-02-04}"
 _PB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ── Source inversion config ──────────────────────────────────────────────────
-_INV_CFG="${BASE}/inversion_codebase_v8.5/00_inversion_config.sh"
-if [[ -f "$_INV_CFG" ]]; then
+# Prefer flattened layout; fall back to legacy v8.5.
+for _try in \
+    "${BASE}/00_inversion_config.sh" \
+    "${BASE}/inversion_modules/00_inversion_config.sh" \
+    "${BASE}/inversion_codebase_v8.5/00_inversion_config.sh"; do
+  if [[ -f "$_try" ]]; then
+    _INV_CFG="$_try"; break
+  fi
+done
+if [[ -n "${_INV_CFG:-}" && -f "$_INV_CFG" ]]; then
   source "$_INV_CFG"
 fi
+unset _try
 
 # ── Source ancestry config ───────────────────────────────────────────────────
 _ANC_CFG="${BASE}/unified_ancestry/00_ancestry_config.sh"
@@ -56,18 +65,22 @@ export REGISTRY_DIR="${REGISTRY_DIR:-${BASE}/sample_registry}"
 mkdir -p "${REGISTRY_DIR}/groups" "${REGISTRY_DIR}/backups" 2>/dev/null || true
 
 # ── Load bridge (for R scripts to source) ────────────────────────────────────
-export LOAD_BRIDGE="${BASE}/inversion_codebase_v8.5/utils/load_bridge.R"
-if [[ ! -f "$LOAD_BRIDGE" ]]; then
-  # Try alternative location
+# Prefer flattened layout. Search order: co-located (when this file itself is
+# in utils/), BASE/utils/, inversion_modules/utils/, legacy v8.5.
+if [[ -z "${LOAD_BRIDGE:-}" ]]; then
   for _try in \
     "${_PB_DIR}/load_bridge.R" \
+    "${BASE}/utils/load_bridge.R" \
+    "${BASE}/inversion_modules/utils/load_bridge.R" \
     "${_PB_DIR}/../utils/load_bridge.R" \
-    "${BASE}/utils/load_bridge.R"; do
+    "${BASE}/inversion_codebase_v8.5/utils/load_bridge.R"; do
     if [[ -f "$_try" ]]; then
       export LOAD_BRIDGE="$_try"
       break
     fi
   done
+  unset _try
+  : "${LOAD_BRIDGE:=${BASE}/utils/load_bridge.R}"
 fi
 
 # ── Unified ancestry module paths ────────────────────────────────────────────
@@ -77,6 +90,20 @@ export DISPATCHER_R="${BASE}/unified_ancestry/dispatchers/region_stats_dispatche
 export INSTANT_Q_BIN="${BASE}/unified_ancestry/src/instant_q"
 export POPSTATS_BIN="${BASE}/unified_ancestry/engines/fst_dxy/region_popstats"
 export HOBS_WINDOWER_BIN="${BASE}/unified_ancestry/engines/hobs_hwe/scripts/hobs_windower"
+
+# 2026-04-17: data dirs kept OUT of the code tree.
+# LOCAL_Q_DIR defaults to $BASE/ancestry_cache (ancestry config also sets
+# this; the `:=` default below respects whatever the ancestry config picked).
+# RESULTS_REGISTRY_DIR is the chat-16 rewrite of chat-15 stats_cache — a
+# first-class fourth registry. See registries/DATABASE_DESIGN.md.
+: "${LOCAL_Q_DIR:=${BASE}/ancestry_cache}"
+: "${RESULTS_REGISTRY_DIR:=${BASE}/registries/data/results_registry}"
+: "${STATS_CACHE_DIR:=$RESULTS_REGISTRY_DIR}"   # deprecated alias, same dir
+: "${SAMPLE_REGISTRY:=${BASE}/registries/data/sample_registry}"
+: "${SAMPLE_GROUP:=all_226}"
+: "${CANONICAL_K:=${DEFAULT_K:-8}}"
+export LOCAL_Q_DIR RESULTS_REGISTRY_DIR STATS_CACHE_DIR \
+       SAMPLE_REGISTRY SAMPLE_GROUP CANONICAL_K
 
 # ── BEAGLE directory ─────────────────────────────────────────────────────────
 export BEAGLE_DIR="${BASE}/popstruct_thin/04_beagle_byRF_majmin"

@@ -62,8 +62,6 @@ DIP_PVAL_THRESHOLD    <- 0.05    # Hartigan's dip test for bimodality
 # ── Compute pairwise GDS from dosage matrix ───────────────────────────
 
 compute_pairwise_gds <- function(dosage_mat) {
-# Backward-compatible alias
-compute_pairwise_ibs <- compute_pairwise_gds
   # dosage_mat: sites × samples (values 0-2, expected dosage)
   n <- ncol(dosage_mat)
   ns <- nrow(dosage_mat)
@@ -92,6 +90,14 @@ compute_pairwise_ibs <- compute_pairwise_gds
   diag(ibs) <- 1
   ibs
 }
+
+# FIX 41 (chat 9): module-scope backward-compat alias. The alias was
+# previously at L66 INSIDE compute_pairwise_gds's function body, which
+# placed it in local frame scope — it vanished when compute_pairwise_gds
+# returned and was never visible at module scope. run_cheat30 at L220
+# calls compute_pairwise_ibs, which would crash with "could not find
+# function 'compute_pairwise_ibs'" on every cheat30 run.
+compute_pairwise_ibs <- compute_pairwise_gds
 
 # ── Stratify GDS by genotype pairs ────────────────────────────────────
 

@@ -2,7 +2,7 @@
 # =============================================================================
 # PATCH: Flashlight integration for STEP_C01i_multi_inversion_decomposition.R
 #
-# THE KEY CONNECTION — this is where the flashlight has the biggest impact.
+# THE KEY CONNECTION — this is where the sv_prior has the biggest impact.
 #
 # THREE modifications:
 #
@@ -26,14 +26,14 @@
 #    This resolves heterozygotes that PCA struggles with at 9× coverage.
 #
 # INSERT POINTS:
-#   - Source flashlight_loader.R at script top
-#   - Replace classify_samples_per_block() with flashlight-aware version
+#   - Source sv_prior_loader.R at script top
+#   - Replace classify_samples_per_block() with sv_prior-aware version
 #   - Add Cheat 3 interpretation after initial classification
 # =============================================================================
 
-# ─── Source flashlight (add at script top) ───────────────────────────
+# ─── Source sv_prior (add at script top) ───────────────────────────
 
-fl_loader <- Sys.getenv("FLASHLIGHT_LOADER", "")
+fl_loader <- Sys.getenv("SV_PRIOR_LOADER", "")
 if (!nzchar(fl_loader)) {
   for (p in c(
     file.path(dirname(outdir), "utils", "flashlight_loader_v2.R")
@@ -42,11 +42,11 @@ if (!nzchar(fl_loader)) {
     if (!file.exists(fl_loader_path)) fl_loader_path <- sub("_v2", "", fl_loader_path)
   )) if (file.exists(p)) { fl_loader <- p; break }
 }
-.decomp_has_flashlight <- FALSE
+.decomp_has_sv_prior <- FALSE
 if (nzchar(fl_loader) && file.exists(fl_loader)) {
   tryCatch({
     source(fl_loader)
-    .decomp_has_flashlight <- TRUE
+    .decomp_has_sv_prior <- TRUE
     message("[C01i] Flashlight loader sourced — seeded decomposition available")
   }, error = function(e) message("[C01i] Flashlight: ", e$message))
 }
@@ -118,12 +118,12 @@ seeded_kmeans <- function(x, seeds, k = 3L, nstart_fallback = 10L) {
 
 # ─── FLASHLIGHT-AWARE SAMPLE CLASSIFICATION ─────────────────────────
 # Replaces the unsupervised classify_samples_per_block() with one that:
-# 1. Checks flashlight for anchor genotypes (Cheat 1)
+# 1. Checks sv_prior for anchor genotypes (Cheat 1)
 # 2. Uses seeded k-means if enough anchors exist
 # 3. Applies Cheat 2 constraint (het-DEL → not HOM_INV)
 # 4. Flags discordant samples
 
-classify_samples_flashlight <- function(gt, block, samples, chr, candidate_start, candidate_end) {
+classify_samples_sv_prior <- function(gt, block, samples, chr, candidate_start, candidate_end) {
   # First: standard dosage computation (same as original)
   b_gt <- gt[block$marker_idx, , drop = FALSE]
   ns <- ncol(b_gt)
@@ -135,13 +135,13 @@ classify_samples_flashlight <- function(gt, block, samples, chr, candidate_start
   dosage_mean <- (n1 + 2 * n2) / pmax(n_valid, 1)
   names(dosage_mean) <- samples
 
-  # ── Cheat 1: Query flashlight for anchor samples ──
+  # ── Cheat 1: Query sv_prior for anchor samples ──
   seeds <- list(HOM_REF = character(0), HET = character(0), HOM_INV = character(0))
   cheat2_constrained <- character(0)
-  flashlight_mode <- "unsupervised"
+  sv_prior_mode <- "unsupervised"
 
-  if (.decomp_has_flashlight) {
-    fl <- load_flashlight(chr)
+  if (.decomp_has_sv_prior) {
+    fl <- load_sv_prior(chr)
     if (!is.null(fl)) {
       # Get SV anchors overlapping this candidate region
       anchors <- get_sv_anchors(chr, candidate_start, candidate_end,
@@ -151,8 +151,8 @@ classify_samples_flashlight <- function(gt, block, samples, chr, candidate_start
         seeds$HOM_REF <- unique(anchors[sv_genotype == "HOM_REF"]$sample_id)
         seeds$HET     <- unique(anchors[sv_genotype == "HET"]$sample_id)
         seeds$HOM_INV <- unique(anchors[sv_genotype == "HOM_INV"]$sample_id)
-        flashlight_mode <- "seeded"
-        message("    [flashlight] Seeded mode: REF=", length(seeds$HOM_REF),
+        sv_prior_mode <- "seeded"
+        message("    [sv_prior] Seeded mode: REF=", length(seeds$HOM_REF),
                 " HET=", length(seeds$HET), " INV=", length(seeds$HOM_INV))
       }
 
@@ -166,14 +166,14 @@ classify_samples_flashlight <- function(gt, block, samples, chr, candidate_start
       ))
       cheat2_constrained <- intersect(all_bp_del_carriers, samples)
       if (length(cheat2_constrained) > 0) {
-        message("    [flashlight] Cheat 2: ", length(cheat2_constrained),
+        message("    [sv_prior] Cheat 2: ", length(cheat2_constrained),
                 " samples constrained (het-DEL at breakpoint → not HOM_INV)")
       }
     }
   }
 
   # ── Clustering ──
-  if (flashlight_mode == "seeded") {
+  if (sv_prior_mode == "seeded") {
     km <- seeded_kmeans(dosage_mean, seeds, k = 3L)
   } else {
     km <- tryCatch(kmeans(dosage_mean, centers = 3, nstart = 10),
@@ -203,14 +203,14 @@ classify_samples_flashlight <- function(gt, block, samples, chr, candidate_start
       }
     }
     if (n_cheat2_reclassified > 0) {
-      message("    [flashlight] Cheat 2 reclassified ", n_cheat2_reclassified,
+      message("    [sv_prior] Cheat 2 reclassified ", n_cheat2_reclassified,
               " samples: HOM_INV → HET (het-DEL at breakpoint)")
     }
   }
 
   # ── Flag discordant samples (SV says X, clustering says Y) ──
   discordant <- character(0)
-  if (flashlight_mode == "seeded") {
+  if (sv_prior_mode == "seeded") {
     for (si in seq_len(ns)) {
       sid <- samples[si]
       sv_gt <- NULL
@@ -223,7 +223,7 @@ classify_samples_flashlight <- function(gt, block, samples, chr, candidate_start
       }
     }
     if (length(discordant) > 0) {
-      message("    [flashlight] Discordant: ", length(discordant),
+      message("    [sv_prior] Discordant: ", length(discordant),
               " samples (SV ≠ clustering)")
     }
   }
@@ -241,7 +241,7 @@ classify_samples_flashlight <- function(gt, block, samples, chr, candidate_start
     dosage_mean = round(dosage_mean, 3), het_rate = round(het_rate, 3),
     n_valid = n_valid, profile = profiles,
     frequency = round(freq, 4),
-    flashlight_mode = flashlight_mode,
+    sv_prior_mode = sv_prior_mode,
     is_discordant = samples %in% discordant,
     is_cheat2_constrained = samples %in% cheat2_constrained
   )
@@ -256,7 +256,7 @@ classify_samples_flashlight <- function(gt, block, samples, chr, candidate_start
 
 interpret_hemizygous_segments <- function(gt, pos, samples, sample_class,
                                            chr, candidate_start, candidate_end) {
-  if (!.decomp_has_flashlight) return(data.table())
+  if (!.decomp_has_sv_prior) return(data.table())
 
   int_dels <- get_internal_dels(chr, candidate_start, candidate_end)
   if (nrow(int_dels) == 0) return(data.table())
@@ -329,7 +329,7 @@ interpret_hemizygous_segments <- function(gt, pos, samples, sample_class,
     n_high <- sum(hemi_dt$confidence == "HIGH")
     n_ref  <- sum(hemi_dt$surviving_haplotype == "REF")
     n_inv  <- sum(hemi_dt$surviving_haplotype == "INV")
-    message("    [flashlight] Cheat 3: ", nrow(hemi_dt), " hemizygous segments",
+    message("    [sv_prior] Cheat 3: ", nrow(hemi_dt), " hemizygous segments",
             " (", n_high, " HIGH conf, REF=", n_ref, " INV=", n_inv, ")")
   }
 
@@ -339,7 +339,7 @@ interpret_hemizygous_segments <- function(gt, pos, samples, sample_class,
 # ─── USAGE IN MAIN LOOP ─────────────────────────────────────────────
 # Replace the call to classify_samples_per_block() with:
 #
-#   samp_class <- classify_samples_flashlight(
+#   samp_class <- classify_samples_sv_prior(
 #     gt_data$gt, blk, gt_data$samples,
 #     chr, cand$start_mb * 1e6, cand$end_mb * 1e6
 #   )
