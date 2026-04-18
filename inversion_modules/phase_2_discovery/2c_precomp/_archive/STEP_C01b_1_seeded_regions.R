@@ -194,24 +194,6 @@ for (obj in obj_list) {
 }
 message("[seeded_regions] ", length(chroms), " chromosome(s) in ", round((proc.time() - t_load)[3], 1), "s")
 
-# ── Load-stage QC (non-destructive) ──
-if (length(chroms) > 0) {
-  n_win_per <- sapply(chroms, function(c) precomp_list[[c]]$n_windows %||% nrow(precomp_list[[c]]$dt))
-  total_win <- sum(n_win_per)
-  message(sprintf("[seeded_regions]   Total windows: %d  (mean=%d/chr, min=%d, max=%d)",
-    total_win,
-    as.integer(round(mean(n_win_per))),
-    min(n_win_per), max(n_win_per)))
-  pc_first <- precomp_list[[chroms[1]]]
-  if (!is.null(pc_first$dt) && all(c("start_bp", "end_bp") %in% names(pc_first$dt))) {
-    w_bp <- pc_first$dt$end_bp - pc_first$dt$start_bp
-    if (length(w_bp) > 0) {
-      message(sprintf("[seeded_regions]   Window size (on %s): mean=%.1f kb, median=%.1f kb",
-        chroms[1], mean(w_bp) / 1000, stats::median(w_bp) / 1000))
-    }
-  }
-}
-
 # Sample names
 sample_names_snake <- NULL
 for (chr_tmp in chroms) {
@@ -617,23 +599,9 @@ run_extension_scale <- function(dt, sim_mat, mds_mat, chr, region_id_start,
 
 region_id <- 0L
 
-# Accumulators for genome-wide summary (non-destructive addition)
-all_chr_summary_rows <- list()
-n_chr_input    <- length(chroms)
-n_chr_processed <- 0L
-n_chr_skipped  <- 0L
-skip_reasons <- character(0)
-
 for (chr in chroms) {
   pc <- precomp_list[[chr]]
-  if (is.null(pc) || pc$n_windows < 3) {
-    message("[SKIP] ", chr)
-    n_chr_skipped <- n_chr_skipped + 1L
-    skip_reasons <- c(skip_reasons, sprintf("%s: n_windows=%s < 3",
-      chr, if (is.null(pc)) "NULL" else as.character(pc$n_windows)))
-    next
-  }
-  n_chr_processed <- n_chr_processed + 1L
+  if (is.null(pc) || pc$n_windows < 3) { message("[SKIP] ", chr); next }
 
   message("\n[seeded_regions] ======= ", chr, " =======")
   dt <- pc$dt; sim_mat <- pc$sim_mat; mds_mat <- pc$mds_mat
@@ -945,153 +913,16 @@ for (chr in chroms) {
   n_2fam      <- sum(state_dt$n_families_claimed == 2)
   n_1fam      <- sum(state_dt$n_families_claimed == 1)
 
-  # ── Extra stats, non-destructive additions ──
-
-  # Per-tier span stats (in bp) — how big are regions at each scale?
-  reg_dt_local <- if (length(all_region_rows) > 0) rbindlist(all_region_rows, fill = TRUE) else data.table()
-  region_span_stats <- function(tier) {
-    if (nrow(reg_dt_local) == 0 || !"scale_tier" %in% names(reg_dt_local)) {
-      return(list(mean_bp = NA_real_, median_bp = NA_integer_, max_bp = NA_integer_,
-                  mean_windows = NA_real_, median_windows = NA_real_))
-    }
-    sub <- reg_dt_local[scale_tier == tier]
-    if (nrow(sub) == 0) {
-      return(list(mean_bp = NA_real_, median_bp = NA_integer_, max_bp = NA_integer_,
-                  mean_windows = NA_real_, median_windows = NA_real_))
-    }
-    spans <- sub$end_bp - sub$start_bp
-    list(
-      mean_bp = as.integer(round(mean(spans))),
-      median_bp = as.integer(stats::median(spans)),
-      max_bp = as.integer(max(spans)),
-      mean_windows = round(mean(sub$n_windows), 1),
-      median_windows = stats::median(sub$n_windows)
-    )
-  }
-  s_1S <- region_span_stats("1S")
-  s_1M <- region_span_stats("1M")
-  s_1L <- region_span_stats("1L")
-
-  # Region coherence stats (how compact/internally-similar are the regions?)
-  coh_mean <- NA_real_; coh_median <- NA_real_; n_high_coh <- 0L; n_low_coh <- 0L
-  if (nrow(reg_dt_local) > 0 && "coherence" %in% names(reg_dt_local)) {
-    cv <- reg_dt_local$coherence[is.finite(reg_dt_local$coherence)]
-    if (length(cv) > 0) {
-      coh_mean   <- round(mean(cv), 4)
-      coh_median <- round(stats::median(cv), 4)
-      n_high_coh <- sum(cv >= 0.7)
-      n_low_coh  <- sum(cv <  0.3)
-    }
-  }
-
-  # Score stats (acceptance quality)
-  score_mean <- NA_real_; score_median <- NA_real_
-  if (nrow(reg_dt_local) > 0 && "mean_score" %in% names(reg_dt_local)) {
-    sv <- reg_dt_local$mean_score[is.finite(reg_dt_local$mean_score)]
-    if (length(sv) > 0) {
-      score_mean   <- round(mean(sv), 4)
-      score_median <- round(stats::median(sv), 4)
-    }
-  }
-
-  # test_26 kin-pruned retention outcomes (per region)
-  t26_pass <- 0L; t26_fail <- 0L; t26_flag <- 0L; t26_na <- 0L
-  if (nrow(reg_dt_local) > 0 && "test26_status" %in% names(reg_dt_local)) {
-    t26 <- reg_dt_local$test26_status
-    t26_pass <- sum(t26 == "pass", na.rm = TRUE)
-    t26_fail <- sum(t26 == "fail", na.rm = TRUE)
-    t26_flag <- sum(t26 == "flag", na.rm = TRUE)
-    t26_na   <- sum(is.na(t26))
-  }
-  t26_retention_mean <- if (nrow(reg_dt_local) > 0 && "test26_retention" %in% names(reg_dt_local)) {
-    rv <- reg_dt_local$test26_retention[is.finite(reg_dt_local$test26_retention)]
-    if (length(rv) > 0) round(mean(rv), 4) else NA_real_
-  } else NA_real_
-
-  # Decision-log stats (from the accumulated global decision_log for this chr)
-  chr_log <- if (length(decision_log) > 0) rbindlist(decision_log, fill = TRUE) else data.table()
-  n_log_accepted  <- if ("decision" %in% names(chr_log)) sum(chr_log$decision == "accepted", na.rm = TRUE) else 0L
-  n_log_tolerated <- if ("decision" %in% names(chr_log)) sum(chr_log$decision == "tolerated", na.rm = TRUE) else 0L
-  n_log_halted    <- if ("decision" %in% names(chr_log)) sum(chr_log$decision %in% c("halt", "halted"), na.rm = TRUE) else 0L
-  n_log_gap       <- if ("decision" %in% names(chr_log)) sum(chr_log$decision == "gap", na.rm = TRUE) else 0L
-  n_log_rejected  <- if ("decision" %in% names(chr_log)) sum(chr_log$decision == "rejected", na.rm = TRUE) else 0L
-  accept_rate <- if ((n_log_accepted + n_log_tolerated + n_log_rejected) > 0) {
-    round(n_log_accepted / (n_log_accepted + n_log_tolerated + n_log_rejected), 3)
-  } else NA_real_
-
-  # Total genomic span covered by regions (union of intervals per chrom)
-  covered_bp <- 0L
-  if (nrow(reg_dt_local) > 0) {
-    # Sort and merge overlapping ranges
-    sorted <- reg_dt_local[order(start_bp)]
-    cur_start <- sorted$start_bp[1]; cur_end <- sorted$end_bp[1]
-    for (i in seq_len(nrow(sorted))[-1]) {
-      if (sorted$start_bp[i] <= cur_end) {
-        cur_end <- max(cur_end, sorted$end_bp[i])
-      } else {
-        covered_bp <- covered_bp + (cur_end - cur_start)
-        cur_start <- sorted$start_bp[i]; cur_end <- sorted$end_bp[i]
-      }
-    }
-    covered_bp <- covered_bp + (cur_end - cur_start)
-  }
-  covered_mb <- round(covered_bp / 1e6, 3)
-
   summ_row <- data.table(
     chrom = chr, n_windows = n,
-    # Original columns (kept for back-compat)
     n_regions_1S = n_s, n_regions_1M = n_m, n_regions_1L = n_l,
     n_regions_total = length(all_regions),
     windows_collected = n_collected,
     windows_seed_uncollected = n_seed_unc,
     windows_all3 = n_all3, windows_2fam = n_2fam, windows_1fam = n_1fam,
     pct_collected = round(100 * n_collected / n, 1),
-    pct_seed_uncollected = round(100 * n_seed_unc / n, 1),
-    # NEW: per-tier span stats
-    region_1S_mean_bp     = s_1S$mean_bp,
-    region_1S_median_bp   = s_1S$median_bp,
-    region_1S_max_bp      = s_1S$max_bp,
-    region_1S_mean_windows = s_1S$mean_windows,
-    region_1M_mean_bp     = s_1M$mean_bp,
-    region_1M_median_bp   = s_1M$median_bp,
-    region_1M_max_bp      = s_1M$max_bp,
-    region_1M_mean_windows = s_1M$mean_windows,
-    region_1L_mean_bp     = s_1L$mean_bp,
-    region_1L_median_bp   = s_1L$median_bp,
-    region_1L_max_bp      = s_1L$max_bp,
-    region_1L_mean_windows = s_1L$mean_windows,
-    # NEW: genome coverage
-    covered_bp = covered_bp,
-    covered_mb = covered_mb,
-    # NEW: coherence stats
-    coherence_mean        = coh_mean,
-    coherence_median      = coh_median,
-    n_regions_high_coh_07 = n_high_coh,
-    n_regions_low_coh_03  = n_low_coh,
-    # NEW: score stats
-    score_mean   = score_mean,
-    score_median = score_median,
-    # NEW: test_26 outcomes
-    n_test26_pass = t26_pass,
-    n_test26_fail = t26_fail,
-    n_test26_flag = t26_flag,
-    n_test26_na   = t26_na,
-    test26_retention_mean = t26_retention_mean,
-    # NEW: decision log
-    n_log_accepted  = n_log_accepted,
-    n_log_tolerated = n_log_tolerated,
-    n_log_rejected  = n_log_rejected,
-    n_log_halted    = n_log_halted,
-    n_log_gap       = n_log_gap,
-    accept_rate     = accept_rate
+    pct_seed_uncollected = round(100 * n_seed_unc / n, 1)
   )
-
-  message(sprintf("[seeded_regions]   %s: n_reg=%d (1S=%d 1M=%d 1L=%d)  covered=%.1f Mb  coh_mean=%s  accept_rate=%s  test26: pass=%d fail=%d flag=%d",
-    chr, length(all_regions), n_s, n_m, n_l,
-    covered_mb,
-    if (is.finite(coh_mean)) sprintf("%.3f", coh_mean) else "NA",
-    if (is.finite(accept_rate)) sprintf("%.2f", accept_rate) else "NA",
-    t26_pass, t26_fail, t26_flag))
 
   message("[seeded_regions] PA summary: collected=", n_collected,
           " (all3=", n_all3, " 2fam=", n_2fam, " 1fam=", n_1fam,
@@ -1110,131 +941,12 @@ for (chr in chroms) {
   fwrite(state_dt,  file.path(outdir, paste0("seeded_regions_window_states_", chr, ".tsv.gz")), sep = "\t")
   fwrite(summ_row,  file.path(outdir, paste0("seeded_regions_summary_per_chr_",       chr, ".tsv")),    sep = "\t")
 
-  # Accumulate for genome-wide summary
-  all_chr_summary_rows[[length(all_chr_summary_rows) + 1L]] <- summ_row
-
   # Reset decision log for next chr
   decision_log <<- list()
 
   message("[seeded_regions] Saved: ", chr, " (", length(all_regions), " seeded regions, ",
           nrow(win_dt), " windows, ", nrow(state_dt), " states, ",
           nrow(log_dt), " decisions)")
-}
-
-# =============================================================================
-# GENOME-WIDE SUMMARY (non-destructive addition)
-# =============================================================================
-
-all_chr_summary <- if (length(all_chr_summary_rows) > 0) {
-  rbindlist(all_chr_summary_rows, fill = TRUE)
-} else data.table()
-
-if (nrow(all_chr_summary) > 0) {
-  f_all <- file.path(outdir, "seeded_regions_all_chr_summary.tsv")
-  fwrite(all_chr_summary, f_all, sep = "\t")
-  message("\n[seeded_regions] Genome-wide summary: ", f_all)
-}
-
-message("\n[seeded_regions] ═══ PROCESSING SUMMARY ═══")
-message(sprintf("  Chromosomes input:    %d", n_chr_input))
-message(sprintf("  Chromosomes processed: %d", n_chr_processed))
-message(sprintf("  Chromosomes skipped:   %d", n_chr_skipped))
-if (n_chr_skipped > 0 && length(skip_reasons) > 0) {
-  message("  Skip reasons:")
-  for (sr in head(skip_reasons, 10)) message("    ", sr)
-  if (length(skip_reasons) > 10) message("    ... and ", length(skip_reasons) - 10, " more")
-}
-
-if (nrow(all_chr_summary) > 0) {
-  # Region totals by scale tier
-  message("\n[seeded_regions] ═══ REGION TOTALS ═══")
-  message(sprintf("  Total seeded regions:  %d", sum(all_chr_summary$n_regions_total)))
-  message(sprintf("    1S (small scale):    %d", sum(all_chr_summary$n_regions_1S)))
-  message(sprintf("    1M (medium scale):   %d", sum(all_chr_summary$n_regions_1M)))
-  message(sprintf("    1L (large scale):    %d", sum(all_chr_summary$n_regions_1L)))
-
-  # Genome coverage
-  if ("covered_mb" %in% names(all_chr_summary)) {
-    tot_cov_mb <- sum(all_chr_summary$covered_mb, na.rm = TRUE)
-    tot_win    <- sum(all_chr_summary$n_windows, na.rm = TRUE)
-    tot_coll   <- sum(all_chr_summary$windows_collected, na.rm = TRUE)
-    message(sprintf("  Genome coverage:       %.1f Mb union of region intervals", tot_cov_mb))
-    message(sprintf("  Windows collected:     %d / %d  (%.1f%%)",
-      tot_coll, tot_win, if (tot_win > 0) 100 * tot_coll / tot_win else NA_real_))
-  }
-
-  # Per-tier size characteristics (weighted mean of per-chrom means)
-  if ("region_1S_mean_bp" %in% names(all_chr_summary)) {
-    message("\n[seeded_regions] ═══ REGION SIZE BY TIER ═══")
-    for (tier in c("1S", "1M", "1L")) {
-      col_mean_bp <- paste0("region_", tier, "_mean_bp")
-      col_max_bp  <- paste0("region_", tier, "_max_bp")
-      col_n       <- paste0("n_regions_", tier)
-      n_t   <- sum(all_chr_summary[[col_n]], na.rm = TRUE)
-      if (n_t > 0) {
-        # Weighted mean of per-chrom means (weight by regions per chrom)
-        w <- all_chr_summary[[col_n]]
-        v <- all_chr_summary[[col_mean_bp]]
-        keep <- is.finite(v) & w > 0
-        wmean_bp <- if (sum(w[keep]) > 0) sum(v[keep] * w[keep]) / sum(w[keep]) else NA_real_
-        max_bp <- if (any(is.finite(all_chr_summary[[col_max_bp]]))) {
-          max(all_chr_summary[[col_max_bp]], na.rm = TRUE)
-        } else NA_integer_
-        message(sprintf("  %s: n=%d  weighted_mean=%s kb  max=%s kb",
-          tier, n_t,
-          if (is.finite(wmean_bp)) sprintf("%.1f", wmean_bp / 1000) else "NA",
-          if (is.finite(max_bp))  sprintf("%.1f", max_bp / 1000)  else "NA"))
-      }
-    }
-  }
-
-  # Coherence
-  if ("coherence_mean" %in% names(all_chr_summary)) {
-    cv <- all_chr_summary$coherence_mean[is.finite(all_chr_summary$coherence_mean)]
-    if (length(cv) > 0) {
-      message("\n[seeded_regions] ═══ COHERENCE ═══")
-      message(sprintf("  Mean-of-per-chrom-mean:  %.3f", mean(cv)))
-      message(sprintf("  Median-of-per-chrom:     %.3f", stats::median(cv)))
-      message(sprintf("  Regions with coh >= 0.7: %d", sum(all_chr_summary$n_regions_high_coh_07, na.rm = TRUE)))
-      message(sprintf("  Regions with coh <  0.3: %d", sum(all_chr_summary$n_regions_low_coh_03,  na.rm = TRUE)))
-    }
-  }
-
-  # Decision log totals
-  if ("n_log_accepted" %in% names(all_chr_summary)) {
-    tot_acc <- sum(all_chr_summary$n_log_accepted, na.rm = TRUE)
-    tot_tol <- sum(all_chr_summary$n_log_tolerated, na.rm = TRUE)
-    tot_rej <- sum(all_chr_summary$n_log_rejected, na.rm = TRUE)
-    tot_halt <- sum(all_chr_summary$n_log_halted, na.rm = TRUE)
-    tot_gap <- sum(all_chr_summary$n_log_gap, na.rm = TRUE)
-    tot_decisions <- tot_acc + tot_tol + tot_rej
-    message("\n[seeded_regions] ═══ DECISION LOG ═══")
-    message(sprintf("  Accepted:   %d  (%.1f%%)", tot_acc, if (tot_decisions > 0) 100 * tot_acc / tot_decisions else NA_real_))
-    message(sprintf("  Tolerated:  %d  (%.1f%%)", tot_tol, if (tot_decisions > 0) 100 * tot_tol / tot_decisions else NA_real_))
-    message(sprintf("  Rejected:   %d  (%.1f%%)", tot_rej, if (tot_decisions > 0) 100 * tot_rej / tot_decisions else NA_real_))
-    message(sprintf("  Halted:     %d", tot_halt))
-    message(sprintf("  Gap:        %d", tot_gap))
-  }
-
-  # Test_26 outcomes
-  if ("n_test26_pass" %in% names(all_chr_summary)) {
-    tot_pass <- sum(all_chr_summary$n_test26_pass, na.rm = TRUE)
-    tot_fail <- sum(all_chr_summary$n_test26_fail, na.rm = TRUE)
-    tot_flag <- sum(all_chr_summary$n_test26_flag, na.rm = TRUE)
-    tot_na   <- sum(all_chr_summary$n_test26_na,   na.rm = TRUE)
-    if (tot_pass + tot_fail + tot_flag + tot_na > 0) {
-      message("\n[seeded_regions] ═══ TEST_26 (kin-pruned retention) ═══")
-      message(sprintf("  pass:  %d", tot_pass))
-      message(sprintf("  fail:  %d   (region collapses after kin pruning)", tot_fail))
-      message(sprintf("  flag:  %d   (borderline — review manually)", tot_flag))
-      message(sprintf("  NA:    %d", tot_na))
-      ret <- all_chr_summary$test26_retention_mean[is.finite(all_chr_summary$test26_retention_mean)]
-      if (length(ret) > 0) {
-        message(sprintf("  Retention (per-chrom mean): mean=%.3f  range=[%.3f, %.3f]",
-          mean(ret), min(ret), max(ret)))
-      }
-    }
-  }
 }
 
 message("\n[DONE] STEP_C01b_1_cores complete")

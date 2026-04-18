@@ -1946,78 +1946,8 @@ precompute_one_chr <- function(chr) {
   elapsed <- round((proc.time() - t_chr)[3], 1)
   message("[PRECOMP] ", chr, ": ", nrow(dt), " windows (", elapsed, "s)")
 
-  # ── Derive per-chrom QC stats from the merged dt ──
-  # These stats are added alongside the existing counts; no existing column
-  # is removed or renamed (non-destructive).
-
-  # Window-width stats (kb)
-  win_bp <- if (all(c("start_bp", "end_bp") %in% names(dt))) dt$end_bp - dt$start_bp else integer(0)
-  win_kb_mean   <- if (length(win_bp) > 0) round(mean(win_bp) / 1000, 2) else NA_real_
-  win_kb_median <- if (length(win_bp) > 0) round(stats::median(win_bp) / 1000, 2) else NA_real_
-  chrom_span_mb <- if (length(win_bp) > 0) round((max(dt$end_bp) - min(dt$start_bp)) / 1e6, 3) else NA_real_
-  windows_per_mb <- if (is.finite(chrom_span_mb) && chrom_span_mb > 0) round(nrow(dt) / chrom_span_mb, 2) else NA_real_
-
-  # inv_likeness distribution (more bins than just the >=0.5 threshold)
-  inv_like_mean   <- if ("inv_likeness" %in% names(dt)) round(mean(dt$inv_likeness, na.rm = TRUE), 4) else NA_real_
-  inv_like_median <- if ("inv_likeness" %in% names(dt)) round(stats::median(dt$inv_likeness, na.rm = TRUE), 4) else NA_real_
-  inv_like_q95    <- if ("inv_likeness" %in% names(dt)) round(stats::quantile(dt$inv_likeness, 0.95, na.rm = TRUE, names = FALSE), 4) else NA_real_
-  n_inv_like_030  <- if ("inv_likeness" %in% names(dt)) sum(dt$inv_likeness >= 0.30, na.rm = TRUE) else 0L
-  n_inv_like_070  <- if ("inv_likeness" %in% names(dt)) sum(dt$inv_likeness >= 0.70, na.rm = TRUE) else 0L
-
-  # family_likeness (diagnostic — is this chrom's signal family-driven?)
-  fam_mean   <- if ("family_likeness" %in% names(dt)) round(mean(dt$family_likeness, na.rm = TRUE), 4) else NA_real_
-  fam_median <- if ("family_likeness" %in% names(dt)) round(stats::median(dt$family_likeness, na.rm = TRUE), 4) else NA_real_
-  n_fam_050  <- if ("family_likeness" %in% names(dt)) sum(dt$family_likeness >= 0.5, na.rm = TRUE) else 0L
-
-  # band shape descriptors (v9.3)
-  n_bd_high      <- if ("band_discreteness" %in% names(dt)) sum(dt$band_discreteness > 2, na.rm = TRUE) else 0L
-  bd_mean        <- if ("band_discreteness" %in% names(dt)) round(mean(dt$band_discreteness, na.rm = TRUE), 4) else NA_real_
-  diff_mean      <- if ("diffuse_score" %in% names(dt))     round(mean(dt$diffuse_score, na.rm = TRUE), 4) else NA_real_
-  n_three_cluster <- if ("n_effective_clusters" %in% names(dt)) sum(dt$n_effective_clusters == 3L, na.rm = TRUE) else 0L
-
-  # Dosage coverage (how many windows got dosage-based het rate?)
-  dos_cov_n       <- if ("dosage_het_rate_median" %in% names(dt)) sum(is.finite(dt$dosage_het_rate_median)) else 0L
-  dos_cov_frac    <- if (nrow(dt) > 0) round(dos_cov_n / nrow(dt), 3) else NA_real_
-
-  # localQ merge coverage (chat-16 silent-bug watch: this should be > 0)
-  localQ_cov_n    <- if ("localQ_delta12" %in% names(dt)) sum(is.finite(dt$localQ_delta12)) else 0L
-  localQ_cov_frac <- if (nrow(dt) > 0) round(localQ_cov_n / nrow(dt), 3) else NA_real_
-  localQ_delta_mean <- if (localQ_cov_n > 0) round(mean(dt$localQ_delta12, na.rm = TRUE), 4) else NA_real_
-  localQ_ena_mean   <- if (("localQ_ena" %in% names(dt)) && sum(is.finite(dt$localQ_ena)) > 0) {
-    round(mean(dt$localQ_ena, na.rm = TRUE), 4)
-  } else NA_real_
-
-  # SV prior stamping coverage (how many windows got an overlapping SV annotation?)
-  n_sv_overlap <- if ("sv_inv_overlap" %in% names(dt)) sum(dt$sv_inv_overlap > 0, na.rm = TRUE)
-                  else if ("sv_overlap" %in% names(dt)) sum(dt$sv_overlap > 0, na.rm = TRUE)
-                  else 0L
-
-  # Seed-eligible windows (|z| above threshold OR inv_likeness very high)
-  n_seed_eligible <- if ("max_abs_z" %in% names(dt) && "inv_likeness" %in% names(dt)) {
-    sum((dt$max_abs_z >= 2.5) | (dt$inv_likeness >= 0.7), na.rm = TRUE)
-  } else NA_integer_
-
-  # Per-chrom log line (readable QC scan at a glance)
-  message(sprintf("[PRECOMP]   %s  span=%s Mb  win=%d  mean_kb=%s  inv_like>=0.5=%d  fam_like>=0.5=%d  localQ_cov=%s%%  sv_overlap=%d  seed_elig=%s",
-    chr,
-    if (is.finite(chrom_span_mb)) sprintf("%.1f", chrom_span_mb) else "NA",
-    nrow(dt),
-    if (is.finite(win_kb_mean)) sprintf("%.1f", win_kb_mean) else "NA",
-    sum(dt$inv_likeness >= 0.5, na.rm = TRUE),
-    n_fam_050,
-    if (is.finite(localQ_cov_frac)) sprintf("%.0f", 100 * localQ_cov_frac) else "NA",
-    n_sv_overlap,
-    if (is.finite(n_seed_eligible)) as.character(n_seed_eligible) else "NA"
-  ))
-
   data.table(
     chrom = chr, n_windows = nrow(dt),
-    # ── Window geometry ──
-    window_kb_mean   = win_kb_mean,
-    window_kb_median = win_kb_median,
-    chrom_span_mb    = chrom_span_mb,
-    windows_per_mb   = windows_per_mb,
-    # ── Original counts (kept for back-compat) ──
     n_inv_like_050 = sum(dt$inv_likeness >= 0.5, na.rm = TRUE),
     n_z_above_2 = sum(dt$max_abs_z >= 2.0, na.rm = TRUE),
     n_z_above_3 = sum(dt$max_abs_z >= 3.0, na.rm = TRUE),
@@ -2031,33 +1961,6 @@ precompute_one_chr <- function(chr) {
     n_flat_030 = sum(dt$flat_inv_score > 0.3, na.rm = TRUE),
     n_spiky_030 = sum(dt$spiky_inv_score > 0.3, na.rm = TRUE),
     n_frag_030 = sum(dt$fragmentation_score > 0.3, na.rm = TRUE),
-    # ── NEW: inv_likeness distribution (beyond the single threshold) ──
-    inv_like_mean   = inv_like_mean,
-    inv_like_median = inv_like_median,
-    inv_like_q95    = inv_like_q95,
-    n_inv_like_030  = n_inv_like_030,
-    n_inv_like_070  = n_inv_like_070,
-    # ── NEW: family_likeness (family-driven vs structural) ──
-    family_like_mean   = fam_mean,
-    family_like_median = fam_median,
-    n_family_050       = n_fam_050,
-    # ── NEW: band shape descriptors ──
-    band_discreteness_mean = bd_mean,
-    n_band_discrete_gt2    = n_bd_high,
-    diffuse_score_mean     = diff_mean,
-    n_three_cluster        = n_three_cluster,
-    # ── NEW: dosage-het coverage ──
-    n_dosage_covered       = dos_cov_n,
-    dosage_coverage_frac   = dos_cov_frac,
-    # ── NEW: localQ merge coverage (chat-16 silent-bug canary) ──
-    n_localQ_covered       = localQ_cov_n,
-    localQ_coverage_frac   = localQ_cov_frac,
-    localQ_delta12_mean    = localQ_delta_mean,
-    localQ_ena_mean        = localQ_ena_mean,
-    # ── NEW: SV prior stamping ──
-    n_sv_overlap_windows   = n_sv_overlap,
-    # ── NEW: seed-eligible count ──
-    n_seed_eligible        = n_seed_eligible,
     elapsed_sec = elapsed
   )
 }
@@ -2086,97 +1989,6 @@ message("  ── Morphology (v9) ──")
 message("    flat_inv_score > 0.3:      ", sum(summary_dt$n_flat_030))
 message("    spiky_inv_score > 0.3:     ", sum(summary_dt$n_spiky_030))
 message("    fragmentation_score > 0.3: ", sum(summary_dt$n_frag_030))
-
-# ── Extra genome-wide QC blocks (non-destructive addition) ──
-if ("window_kb_mean" %in% names(summary_dt)) {
-  message("  -- Window geometry --")
-  message(sprintf("    Window size kb:       mean-of-per-chrom-mean=%.2f  median-of-per-chrom=%.2f",
-    mean(summary_dt$window_kb_mean, na.rm = TRUE),
-    stats::median(summary_dt$window_kb_median, na.rm = TRUE)))
-  tot_span_mb <- sum(summary_dt$chrom_span_mb, na.rm = TRUE)
-  if (is.finite(tot_span_mb) && tot_span_mb > 0) {
-    message(sprintf("    Genome-wide span:     %.1f Mb across %d chroms (overall %.2f windows/Mb)",
-      tot_span_mb, nrow(summary_dt), sum(summary_dt$n_windows) / tot_span_mb))
-  }
-}
-
-if ("n_inv_like_030" %in% names(summary_dt)) {
-  message("  -- Inv-likeness distribution --")
-  message(sprintf("    >=0.30:  %d  (total)", sum(summary_dt$n_inv_like_030)))
-  message(sprintf("    >=0.50:  %d", sum(summary_dt$n_inv_like_050)))
-  message(sprintf("    >=0.70:  %d", sum(summary_dt$n_inv_like_070)))
-  il_means <- summary_dt$inv_like_mean[is.finite(summary_dt$inv_like_mean)]
-  if (length(il_means) > 0) {
-    message(sprintf("    Per-chrom mean inv_likeness: mean=%.3f  range=[%.3f, %.3f]",
-      mean(il_means), min(il_means), max(il_means)))
-  }
-}
-
-if ("n_family_050" %in% names(summary_dt)) {
-  message("  -- Family_likeness (diagnostic) --")
-  message(sprintf("    Windows with family_likeness >= 0.5: %d",
-    sum(summary_dt$n_family_050, na.rm = TRUE)))
-  fm <- summary_dt$family_like_mean[is.finite(summary_dt$family_like_mean)]
-  if (length(fm) > 0) {
-    message(sprintf("    Per-chrom mean family_likeness: mean=%.3f  range=[%.3f, %.3f]",
-      mean(fm), min(fm), max(fm)))
-    high_fam <- summary_dt[family_like_mean >= 0.5]$chrom
-    if (length(high_fam) > 0) {
-      message(sprintf("    Chroms with mean family_likeness >= 0.5 (family-dominated): %s",
-        paste(high_fam, collapse = ", ")))
-    }
-  }
-}
-
-if ("n_band_discrete_gt2" %in% names(summary_dt)) {
-  message("  -- Band shape descriptors --")
-  message(sprintf("    Windows with band_discreteness > 2:  %d",
-    sum(summary_dt$n_band_discrete_gt2, na.rm = TRUE)))
-  message(sprintf("    Windows with 3 effective clusters:   %d",
-    sum(summary_dt$n_three_cluster, na.rm = TRUE)))
-}
-
-if ("n_localQ_covered" %in% names(summary_dt)) {
-  message("  -- Local-Q merge coverage (chat-16 silent-bug canary) --")
-  tot_localQ <- sum(summary_dt$n_localQ_covered, na.rm = TRUE)
-  tot_win    <- sum(summary_dt$n_windows, na.rm = TRUE)
-  pct_cov    <- if (tot_win > 0) 100 * tot_localQ / tot_win else NA_real_
-  message(sprintf("    Windows with localQ stamped: %d / %d (%.1f%%)",
-    tot_localQ, tot_win, pct_cov))
-  if (tot_localQ == 0L) {
-    message("    WARNING: localQ coverage is ZERO genome-wide. Re-check the ancestry")
-    message("             precompute chain: did STEP_C01a run BEFORE the localQ cache")
-    message("             was built? Or is the merge function not in scope?")
-  } else if (!is.na(pct_cov) && pct_cov < 50) {
-    message(sprintf("    NOTE: localQ coverage <50%%. Chroms with zero coverage:"))
-    zero_chr <- summary_dt[n_localQ_covered == 0L]$chrom
-    if (length(zero_chr) > 0) message("          ", paste(zero_chr, collapse = ", "))
-  }
-}
-
-if ("n_dosage_covered" %in% names(summary_dt)) {
-  tot_dos <- sum(summary_dt$n_dosage_covered, na.rm = TRUE)
-  tot_win <- sum(summary_dt$n_windows, na.rm = TRUE)
-  if (tot_dos > 0) {
-    message(sprintf("  -- Dosage het coverage: %d / %d windows (%.1f%%)",
-      tot_dos, tot_win, 100 * tot_dos / tot_win))
-  }
-}
-
-if ("n_sv_overlap_windows" %in% names(summary_dt)) {
-  tot_sv <- sum(summary_dt$n_sv_overlap_windows, na.rm = TRUE)
-  if (tot_sv > 0) {
-    message(sprintf("  -- SV-prior-stamped windows:  %d", tot_sv))
-  }
-}
-
-if ("n_seed_eligible" %in% names(summary_dt)) {
-  tot_seed <- sum(summary_dt$n_seed_eligible, na.rm = TRUE)
-  if (!is.na(tot_seed)) {
-    message(sprintf("  -- Seed-eligible windows (|z|>=2.5 OR inv_like>=0.7): %d", tot_seed))
-  }
-}
-
 message("  Precomp dir: ", precomp_dir)
 message("  Inv-likeness: ", f_inv)
 message("  Summary: ", file.path(outdir, "precomp_summary.tsv"))

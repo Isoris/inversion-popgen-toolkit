@@ -86,19 +86,7 @@ BLOCK_PAL <- c(
 
 rds_files <- sort(list.files(precomp_dir, pattern = "\\.precomp\\.rds$", full.names = TRUE))
 precomp_list <- list()
-n_rds_total   <- length(rds_files)
-n_rds_loaded  <- 0L
-n_rds_failed  <- 0L
-load_failures <- character(0)
-for (f in rds_files) {
-  obj <- tryCatch(readRDS(f), error = function(e) {
-    load_failures <<- c(load_failures, paste0(basename(f), ": ", conditionMessage(e)))
-    NULL
-  })
-  if (is.null(obj)) { n_rds_failed <- n_rds_failed + 1L; next }
-  precomp_list[[obj$chrom]] <- obj
-  n_rds_loaded <- n_rds_loaded + 1L
-}
+for (f in rds_files) { obj <- readRDS(f); precomp_list[[obj$chrom]] <- obj }
 chroms <- names(precomp_list)
 if (!is.null(chrom_filter)) chroms <- intersect(chroms, chrom_filter)
 
@@ -108,46 +96,7 @@ for (chr_tmp in chroms) {
   if (length(pc1_cols) > 0) { sample_names <- sub("^PC_1_", "", pc1_cols); break }
 }
 n_samples <- length(sample_names)
-
-# ── Loading QC report ──
-message("[01C] ── Load summary ──")
-message(sprintf("  RDS files found:       %d in %s", n_rds_total, precomp_dir))
-message(sprintf("  RDS loaded:            %d", n_rds_loaded))
-if (n_rds_failed > 0) {
-  message(sprintf("  RDS failed:            %d", n_rds_failed))
-  for (lf in head(load_failures, 5)) message("    FAIL: ", lf)
-  if (length(load_failures) > 5) message("    ... and ", length(load_failures) - 5, " more")
-}
-if (!is.null(chrom_filter)) {
-  message(sprintf("  Chrom filter applied:  keeping %d of %d chroms matching '%s'",
-    length(chroms), n_rds_loaded, paste(chrom_filter, collapse = ",")))
-}
-message(sprintf("  Samples detected:      %d (from PC_1_* columns)", n_samples))
-
-# Per-chrom window count summary (before filtering chroms with <50 windows)
-if (length(chroms) > 0) {
-  n_win_per_chr <- sapply(chroms, function(c) precomp_list[[c]]$n_windows %||% nrow(precomp_list[[c]]$dt))
-  total_windows <- sum(n_win_per_chr)
-  small_chroms  <- chroms[n_win_per_chr < 50]
-  message(sprintf("  Total windows:         %d across %d chroms (mean=%d/chr median=%d/chr min=%d max=%d)",
-    total_windows, length(chroms),
-    as.integer(round(mean(n_win_per_chr))), as.integer(stats::median(n_win_per_chr)),
-    min(n_win_per_chr), max(n_win_per_chr)))
-  if (length(small_chroms) > 0) {
-    message(sprintf("  Chroms <50 windows (will be skipped): %d  [%s]",
-      length(small_chroms), paste(small_chroms, collapse = ",")))
-  }
-  # Mean kb per window (window size QC — helps catch precomp config drift)
-  pc_first <- precomp_list[[chroms[1]]]
-  if (!is.null(pc_first$dt) && "start_bp" %in% names(pc_first$dt) && "end_bp" %in% names(pc_first$dt)) {
-    widths <- pc_first$dt$end_bp - pc_first$dt$start_bp
-    if (length(widths) > 0) {
-      message(sprintf("  Window size (on %s): mean=%.1f kb median=%.1f kb range=[%d, %d] bp",
-        chroms[1], mean(widths) / 1000, stats::median(widths) / 1000,
-        min(widths), max(widths)))
-    }
-  }
-}
+message("[01C] ", length(chroms), " chromosomes, ", n_samples, " samples")
 
 # Optional: assembly gaps + AGP
 gap_dt <- data.table()
@@ -202,34 +151,13 @@ band_concordance <- function(bands_a, bands_b) {
 all_blocks <- list(); all_boundaries <- list(); all_crosses <- list()
 all_concordances <- list(); all_pa <- list()
 
-# Per-chromosome summary rows — written to disk at the end.
-chr_summary_rows <- list()
-# Track skip reasons for the QC block at the end.
-chr_skip_log <- list()
-# Sink for chroms that pass every gate but yield zero blocks (vs chroms skipped upfront).
-n_chroms_input <- length(chroms)
-n_chroms_too_small <- 0L
-n_chroms_no_pc1 <- 0L
-n_chroms_no_blocks <- 0L
-n_chroms_processed <- 0L
-
 for (chr in chroms) {
   pc <- precomp_list[[chr]]
-  if (is.null(pc) || pc$n_windows < 50) {
-    n_chroms_too_small <- n_chroms_too_small + 1L
-    chr_skip_log[[chr]] <- sprintf("skipped: n_windows=%s < 50",
-      if (is.null(pc)) "NULL" else as.character(pc$n_windows))
-    next
-  }
+  if (is.null(pc) || pc$n_windows < 50) next
   dt <- pc$dt; sim_mat <- pc$sim_mat; n <- nrow(dt)
   pc1_cols <- paste0("PC_1_", sample_names)
   available_pc1 <- intersect(pc1_cols, names(dt))
-  if (length(available_pc1) < 20) {
-    n_chroms_no_pc1 <- n_chroms_no_pc1 + 1L
-    chr_skip_log[[chr]] <- sprintf("skipped: only %d PC_1_* columns (need >=20)", length(available_pc1))
-    next
-  }
-  n_chroms_processed <- n_chroms_processed + 1L
+  if (length(available_pc1) < 20) next
 
   message("\n[01C] === ", chr, " === (", n, " windows)")
 
@@ -258,49 +186,7 @@ for (chr in chroms) {
   block_tab <- table(block_id[block_id > 0])
   valid_blocks <- as.integer(names(block_tab[block_tab >= MIN_BLOCK]))
   block_id[!block_id %in% valid_blocks] <- 0L
-  if (length(valid_blocks) == 0) {
-    n_chroms_no_blocks <- n_chroms_no_blocks + 1L
-    chr_skip_log[[chr]] <- sprintf("no blocks found (local_sim bg_median=%.4f, threshold>+%.2f)",
-      bg_median, BLOCK_THRESH_ABOVE)
-    # Still emit a summary row so the user sees "I processed this chrom but found nothing"
-    # Columns mirror the full summary row below (same order, same names) so the
-    # per-chrom TSV is a proper rectangular table.
-    chr_summary_rows[[length(chr_summary_rows) + 1L]] <- data.table(
-      chrom = chr,
-      n_windows = n,
-      n_samples_with_pc1 = length(available_pc1),
-      bg_median_sim = round(bg_median, 4),
-      frac_in_block = 0,
-      n_blocks = 0L,
-      mean_block_windows    = NA_real_,
-      median_block_windows  = NA_real_,
-      max_block_windows     = NA_integer_,
-      total_block_windows   = 0L,
-      mean_block_mean_sim   = NA_real_,
-      # Boundary-type counts (outer + inner total)
-      n_boundaries_clear_hard      = 0L,
-      n_boundaries_clear_soft      = 0L,
-      n_boundaries_diffuse         = 0L,
-      n_boundaries_chromosome_edge = 0L,
-      n_boundaries_inner           = 0L,
-      # Blue-cross inner_type breakdown
-      n_blue_crosses                  = 0L,
-      n_inner_hard_same_system        = 0L,
-      n_inner_hard_different_systems  = 0L,
-      n_inner_hard_assembly           = 0L,
-      n_inner_hard_suspect_assembly   = 0L,
-      n_inner_soft_boundary_candidate = 0L,
-      n_inner_ambiguous               = 0L,
-      # Concordance stats (off-diagonal)
-      mean_concordance    = NA_real_,
-      median_concordance  = NA_real_,
-      n_high_concordance_pairs = 0L,
-      n_low_concordance_pairs  = 0L,
-      n_blocks_with_3bands     = 0L
-    )
-    message(sprintf("[01C]   %s: no blocks (bg_median=%.4f)", chr, bg_median))
-    next
-  }
+  if (length(valid_blocks) == 0) { message("  No blocks"); next }
 
   block_sizes <- sort(block_tab[as.character(valid_blocks)], decreasing = TRUE)
   keep <- as.integer(names(block_sizes))[seq_len(min(TOP_BLOCKS, length(block_sizes)))]
@@ -372,8 +258,6 @@ for (chr in chroms) {
 
       boundary_rows[[length(boundary_rows) + 1]] <- data.table(
         chrom = chr, block = bm$name, side = "left",
-        global_window_id = if ("global_window_id" %in% names(dt)) dt$global_window_id[left_edge] else NA_integer_,
-        window_idx = left_edge,
         pos_bp = dt$start_bp[left_edge],
         pos_mb = round(dt$start_bp[left_edge] / 1e6, 3),
         drop_magnitude = round(drop_mag, 4),
@@ -400,8 +284,6 @@ for (chr in chroms) {
 
       boundary_rows[[length(boundary_rows) + 1]] <- data.table(
         chrom = chr, block = bm$name, side = "right",
-        global_window_id = if ("global_window_id" %in% names(dt)) dt$global_window_id[right_edge] else NA_integer_,
-        window_idx = right_edge,
         pos_bp = dt$end_bp[right_edge],
         pos_mb = round(dt$end_bp[right_edge] / 1e6, 3),
         drop_magnitude = round(drop_mag, 4),
@@ -433,8 +315,6 @@ for (chr in chroms) {
     if (zone_drop < DROP_THRESH * 0.7) next
 
     cross_rows[[length(cross_rows) + 1]] <- data.table(
-      chrom = chr,
-      global_window_id = if ("global_window_id" %in% names(dt)) dt$global_window_id[wi] else NA_integer_,
       window_idx = wi, block = block_label[wi],
       pos_mb = round((dt$start_bp[wi] + dt$end_bp[wi]) / 2e6, 4),
       start_bp = dt$start_bp[wi], end_bp = dt$end_bp[wi],
@@ -444,13 +324,9 @@ for (chr in chroms) {
 
   if (length(cross_rows) > 0) {
     cross_dt <- rbindlist(cross_rows)
-    # Merge nearby crosses. The summary picks the strongest (max drop) and
-    # keeps its global_window_id as the identifier; chrom is constant across
-    # all rows of this chromosome so pass it through directly.
+    # Merge nearby
     cross_dt[, group := cumsum(c(TRUE, diff(window_idx) > 10))]
     cross_dt <- cross_dt[, .(
-      chrom = chrom[1],
-      global_window_id = global_window_id[which.max(drop)],
       window_idx = window_idx[which.max(drop)],
       block = block[1],
       pos_mb = pos_mb[which.max(drop)],
@@ -509,8 +385,6 @@ for (chr in chroms) {
       # Also add to boundary catalog
       boundary_rows[[length(boundary_rows) + 1]] <- data.table(
         chrom = chr, block = cx$block, side = "inner",
-        global_window_id = cx$global_window_id,
-        window_idx = cx$window_idx,
         pos_bp = as.integer(mid_bp),
         pos_mb = round(mid_bp / 1e6, 3),
         drop_magnitude = cx$drop,
@@ -559,16 +433,10 @@ for (chr in chroms) {
   for (bi in seq_len(n_blocks)) {
     bm <- block_meta[[bi]]
     has_bands <- bm$name %in% names(block_bands)
-    # First/last window of the block (in local order). These paired global_window_ids
-    # let downstream scripts join back to the precompute dt without needing to match
-    # on bp coordinates.
-    first_idx <- min(bm$idxs); last_idx <- max(bm$idxs)
     block_reg_rows[[bi]] <- data.table(
       chrom = chr, block_id = bm$name,
       start_bp = bm$start_bp, end_bp = bm$end_bp,
       start_mb = bm$start_mb, end_mb = bm$end_mb,
-      start_global_window_id = if ("global_window_id" %in% names(dt)) dt$global_window_id[first_idx] else NA_integer_,
-      end_global_window_id   = if ("global_window_id" %in% names(dt)) dt$global_window_id[last_idx]  else NA_integer_,
       n_windows = bm$n_windows, mean_sim = bm$mean_sim,
       has_3bands = has_bands
     )
@@ -589,115 +457,7 @@ for (chr in chroms) {
   all_pa[[length(all_pa) + 1]] <- rbindlist(pa_rows)
   all_boundaries[[length(all_boundaries) + 1]] <- rbindlist(boundary_rows, fill = TRUE)
 
-  # =========================================================================
-  # PER-CHROMOSOME SUMMARY ROW
-  # =========================================================================
-  # Assemble everything useful about what happened on this chromosome for
-  # the summary TSV and the end-of-run genome-wide report.
-
-  # Block-size stats
-  block_win_counts <- sapply(block_meta, function(bm) bm$n_windows)
-  block_mean_sims  <- sapply(block_meta, function(bm) bm$mean_sim)
-  total_block_windows <- sum(block_win_counts)
-  frac_in_block <- round(total_block_windows / n, 4)
-  mean_block_win <- round(mean(block_win_counts), 1)
-  median_block_win <- stats::median(block_win_counts)
-  max_block_win <- as.integer(max(block_win_counts))
-  mean_block_mean_sim <- round(mean(block_mean_sims), 4)
-  n_blocks_with_3bands <- sum(sapply(block_meta, function(bm) bm$name %in% names(block_bands)))
-
-  # Boundary-type counts (from this chromosome's boundary_rows)
-  bt_counts <- c(clear_hard = 0L, clear_soft = 0L, diffuse = 0L,
-                 chromosome_edge = 0L, inner = 0L)
-  if (length(boundary_rows) > 0) {
-    chr_bounds <- rbindlist(boundary_rows, fill = TRUE)
-    if ("boundary_type" %in% names(chr_bounds)) {
-      # Outer boundary types
-      for (bt in c("clear_hard", "clear_soft", "diffuse", "chromosome_edge")) {
-        bt_counts[bt] <- sum(chr_bounds$boundary_type == bt, na.rm = TRUE)
-      }
-      # Inner boundaries: everything with side == "inner" (inner_hard_*, inner_soft_*, inner_ambiguous)
-      if ("side" %in% names(chr_bounds)) {
-        bt_counts["inner"] <- sum(chr_bounds$side == "inner", na.rm = TRUE)
-      }
-    }
-  }
-
-  # Blue-cross inner_type counts (only exists when crosses were found)
-  it_counts <- c(inner_hard_same_system = 0L, inner_hard_different_systems = 0L,
-                 inner_hard_assembly = 0L, inner_hard_suspect_assembly = 0L,
-                 inner_soft_boundary_candidate = 0L, inner_ambiguous = 0L)
-  n_blue <- 0L
-  if (exists("cross_dt") && !is.null(cross_dt) && nrow(cross_dt) > 0) {
-    n_blue <- nrow(cross_dt)
-    if ("inner_type" %in% names(cross_dt)) {
-      for (it in names(it_counts)) {
-        it_counts[it] <- sum(cross_dt$inner_type == it, na.rm = TRUE)
-      }
-    }
-  }
-
-  # Concordance stats (exclude self-pairs where block_a == block_b)
-  mean_conc <- NA_real_; median_conc <- NA_real_
-  n_high_conc <- 0L; n_low_conc <- 0L
-  if (exists("conc_rows") && length(conc_rows) > 0) {
-    cdt <- rbindlist(conc_rows)
-    off_diag <- cdt[block_a != block_b]
-    if (nrow(off_diag) > 0) {
-      mean_conc   <- round(mean(off_diag$concordance, na.rm = TRUE), 4)
-      median_conc <- round(stats::median(off_diag$concordance, na.rm = TRUE), 4)
-      n_high_conc <- sum(off_diag$concordance >= 0.85, na.rm = TRUE)
-      n_low_conc  <- sum(off_diag$concordance <  0.50, na.rm = TRUE)
-    }
-  }
-
-  chr_summary_rows[[length(chr_summary_rows) + 1L]] <- data.table(
-    chrom = chr,
-    n_windows = n,
-    n_samples_with_pc1 = length(available_pc1),
-    bg_median_sim = round(bg_median, 4),
-    frac_in_block = frac_in_block,
-    n_blocks = n_blocks,
-    mean_block_windows    = mean_block_win,
-    median_block_windows  = median_block_win,
-    max_block_windows     = max_block_win,
-    total_block_windows   = total_block_windows,
-    mean_block_mean_sim   = mean_block_mean_sim,
-    # Boundary-type counts (outer + inner total)
-    n_boundaries_clear_hard      = bt_counts["clear_hard"],
-    n_boundaries_clear_soft      = bt_counts["clear_soft"],
-    n_boundaries_diffuse         = bt_counts["diffuse"],
-    n_boundaries_chromosome_edge = bt_counts["chromosome_edge"],
-    n_boundaries_inner           = bt_counts["inner"],
-    # Blue-cross inner_type breakdown
-    n_blue_crosses                  = n_blue,
-    n_inner_hard_same_system        = it_counts["inner_hard_same_system"],
-    n_inner_hard_different_systems  = it_counts["inner_hard_different_systems"],
-    n_inner_hard_assembly           = it_counts["inner_hard_assembly"],
-    n_inner_hard_suspect_assembly   = it_counts["inner_hard_suspect_assembly"],
-    n_inner_soft_boundary_candidate = it_counts["inner_soft_boundary_candidate"],
-    n_inner_ambiguous               = it_counts["inner_ambiguous"],
-    # Concordance stats (off-diagonal, block_a != block_b)
-    mean_concordance    = mean_conc,
-    median_concordance  = median_conc,
-    n_high_concordance_pairs = n_high_conc,
-    n_low_concordance_pairs  = n_low_conc,
-    n_blocks_with_3bands     = n_blocks_with_3bands
-  )
-
-  # Per-chrom log line
-  message(sprintf("[01C]   %s: n_win=%d  bg_med=%.3f  blocks=%d (in_block=%.1f%%  mean_sz=%.0f)  boundaries=%d (hard=%d soft=%d diffuse=%d inner=%d)  blue_x=%d  mean_conc=%s",
-    chr, n, bg_median, n_blocks,
-    100 * frac_in_block, mean_block_win,
-    length(boundary_rows),
-    bt_counts["clear_hard"], bt_counts["clear_soft"], bt_counts["diffuse"], bt_counts["inner"],
-    n_blue,
-    if (is.finite(mean_conc)) sprintf("%.3f", mean_conc) else "NA"
-  ))
-
-  # Clean up per-chrom objects so the 'exists()' checks work correctly next iter
-  if (exists("cross_dt")) rm(cross_dt)
-  if (exists("conc_rows")) rm(conc_rows)
+  message("  Blocks: ", n_blocks, " | Boundaries: ", length(boundary_rows))
 }
 
 # =============================================================================
@@ -726,112 +486,16 @@ if (nrow(conc_dt) > 0) {
 }
 fwrite(pa_dt, file.path(outdir, "01C_window_pa.tsv.gz"), sep = "\t")
 
-# =============================================================================
-# PER-CHROM SUMMARY TSV + GENOME-WIDE REPORT
-# =============================================================================
-
-chr_summary_dt <- if (length(chr_summary_rows) > 0) rbindlist(chr_summary_rows) else data.table()
-if (nrow(chr_summary_dt) > 0) {
-  f_chr_summ <- file.path(outdir, "01C_chrom_summary.tsv")
-  fwrite(chr_summary_dt, f_chr_summ, sep = "\t")
-  message("[01C] Per-chrom summary: ", f_chr_summ)
-}
-
-# ── Processing-stage accounting ──
-message("\n[01C] ═══ PROCESSING SUMMARY ═══")
-message(sprintf("  Chromosomes input:              %d", n_chroms_input))
-message(sprintf("  Processed (blocks found):       %d", nrow(chr_summary_dt) - n_chroms_no_blocks))
-message(sprintf("  Processed (no blocks found):    %d", n_chroms_no_blocks))
-message(sprintf("  Skipped (<50 windows):          %d", n_chroms_too_small))
-message(sprintf("  Skipped (<20 PC_1_* cols):      %d", n_chroms_no_pc1))
-if (length(chr_skip_log) > 0) {
-  message("")
-  message("  Skip reasons:")
-  for (chr in names(chr_skip_log)) {
-    message(sprintf("    %-20s %s", chr, chr_skip_log[[chr]]))
-  }
-}
-
-# ── Genome-wide block stats ──
-if (nrow(chr_summary_dt) > 0 && any(chr_summary_dt$n_blocks > 0)) {
-  chr_with_blocks <- chr_summary_dt[n_blocks > 0]
-  message("\n[01C] ═══ BLOCK SUMMARY (genome-wide) ═══")
-  message(sprintf("  Total blocks detected:          %d", sum(chr_with_blocks$n_blocks)))
-  message(sprintf("  Chroms with blocks:             %d / %d",
-    nrow(chr_with_blocks), nrow(chr_summary_dt)))
-  message(sprintf("  Blocks per chrom:               mean=%.1f  median=%.0f  min=%d  max=%d",
-    mean(chr_with_blocks$n_blocks), stats::median(chr_with_blocks$n_blocks),
-    min(chr_with_blocks$n_blocks), max(chr_with_blocks$n_blocks)))
-  message(sprintf("  Windows in blocks (frac):       mean=%.2f  median=%.2f  max=%.2f",
-    mean(chr_with_blocks$frac_in_block),
-    stats::median(chr_with_blocks$frac_in_block),
-    max(chr_with_blocks$frac_in_block)))
-  message(sprintf("  Mean block size (windows):      mean=%.1f  median=%.0f  max=%d",
-    mean(chr_with_blocks$mean_block_windows, na.rm = TRUE),
-    stats::median(chr_with_blocks$mean_block_windows, na.rm = TRUE),
-    max(chr_with_blocks$max_block_windows, na.rm = TRUE)))
-  message(sprintf("  Blocks with valid 3-band split: %d / %d (%.0f%%)",
-    sum(chr_with_blocks$n_blocks_with_3bands),
-    sum(chr_with_blocks$n_blocks),
-    100 * sum(chr_with_blocks$n_blocks_with_3bands) / max(1L, sum(chr_with_blocks$n_blocks))))
-}
-
-# ── Boundary-type totals ──
+# Summary
 if (nrow(bound_dt) > 0) {
-  message("\n[01C] ═══ BOUNDARY SUMMARY (genome-wide) ═══")
-  for (bt in sort(unique(bound_dt$boundary_type))) {
-    n_bt <- sum(bound_dt$boundary_type == bt, na.rm = TRUE)
-    pct <- 100 * n_bt / nrow(bound_dt)
-    message(sprintf("  %-32s %6d  (%5.1f%%)", bt, n_bt, pct))
-  }
-  # Outer vs inner breakdown
-  if ("side" %in% names(bound_dt)) {
-    n_outer <- sum(bound_dt$side %in% c("left", "right"), na.rm = TRUE)
-    n_inner <- sum(bound_dt$side == "inner", na.rm = TRUE)
-    message(sprintf("  [outer edges: %d | inner: %d]", n_outer, n_inner))
-  }
+  message("\n[01C] === BOUNDARY SUMMARY ===")
+  for (bt in sort(unique(bound_dt$boundary_type)))
+    message("  ", bt, ": ", sum(bound_dt$boundary_type == bt))
 }
-
-# ── Blue-cross totals ──
 if (nrow(cross_dt_all) > 0) {
-  message("\n[01C] ═══ BLUE CROSS SUMMARY (genome-wide) ═══")
-  message(sprintf("  Total blue crosses detected: %d", nrow(cross_dt_all)))
-  for (it in sort(unique(cross_dt_all$inner_type[!is.na(cross_dt_all$inner_type)]))) {
-    n_it <- sum(cross_dt_all$inner_type == it, na.rm = TRUE)
-    pct <- 100 * n_it / nrow(cross_dt_all)
-    message(sprintf("  %-32s %6d  (%5.1f%%)", it, n_it, pct))
-  }
-  n_assembly <- sum(cross_dt_all$inner_type %in%
-    c("inner_hard_assembly", "inner_hard_suspect_assembly"), na.rm = TRUE)
-  n_different_systems <- sum(cross_dt_all$inner_type == "inner_hard_different_systems", na.rm = TRUE)
-  n_soft_cand <- sum(cross_dt_all$inner_type == "inner_soft_boundary_candidate", na.rm = TRUE)
-  message("")
-  message(sprintf("  Assembly-error candidates:      %d", n_assembly))
-  message(sprintf("  Different-systems (real bdy):   %d", n_different_systems))
-  message(sprintf("  Soft-boundary candidates:       %d", n_soft_cand))
-}
-
-# ── Concordance totals ──
-if (nrow(conc_dt) > 0) {
-  off_diag <- conc_dt[block_a != block_b]
-  if (nrow(off_diag) > 0) {
-    message("\n[01C] ═══ CONCORDANCE SUMMARY (genome-wide, off-diagonal pairs) ═══")
-    message(sprintf("  Pairs examined:         %d", nrow(off_diag)))
-    message(sprintf("  Concordance:            mean=%.3f  median=%.3f  min=%.3f  max=%.3f",
-      mean(off_diag$concordance, na.rm = TRUE),
-      stats::median(off_diag$concordance, na.rm = TRUE),
-      min(off_diag$concordance, na.rm = TRUE),
-      max(off_diag$concordance, na.rm = TRUE)))
-    message(sprintf("  Jaccard:                mean=%.3f  median=%.3f",
-      mean(off_diag$jaccard, na.rm = TRUE),
-      stats::median(off_diag$jaccard, na.rm = TRUE)))
-    message(sprintf("  High concordance >=0.85 (likely same system): %d (%.1f%%)",
-      sum(off_diag$concordance >= 0.85, na.rm = TRUE),
-      100 * sum(off_diag$concordance >= 0.85, na.rm = TRUE) / nrow(off_diag)))
-    message(sprintf("  Low  concordance <0.50  (different systems): %d (%.1f%%)",
-      sum(off_diag$concordance <  0.50, na.rm = TRUE),
-      100 * sum(off_diag$concordance <  0.50, na.rm = TRUE) / nrow(off_diag)))
-  }
+  message("\n[01C] === BLUE CROSS SUMMARY ===")
+  for (it in sort(unique(cross_dt_all$inner_type[!is.na(cross_dt_all$inner_type)])))
+    message("  ", it, ": ", sum(cross_dt_all$inner_type == it, na.rm = TRUE))
 }
 
 message("\n[DONE] -> ", outdir)

@@ -121,23 +121,6 @@ SV_PRIOR_DIR <- Sys.getenv("SV_PRIOR_DIR",
   file.path(INVDIR, "06_mds_candidates/snake_regions_multiscale/sv_prior"))
 dir.create(SV_PRIOR_DIR, recursive = TRUE, showWarnings = FALSE)
 
-# Chromosome lengths (for density / QC stats in summary).
-# Reads REF_FAI if exported by the launcher config; silently skips on failure.
-CHROM_LENS <- tryCatch({
-  fai_path <- Sys.getenv("REF_FAI", "")
-  if (nzchar(fai_path) && file.exists(fai_path)) {
-    f <- fread(fai_path, header = FALSE, sep = "\t",
-               col.names = c("chrom", "length", "offset", "linebases", "linewidth"))
-    setNames(f$length, f$chrom)
-  } else {
-    setNames(integer(0), character(0))
-  }
-}, error = function(e) {
-  message("[sv_prior] NOTE: chrom lengths unavailable (", conditionMessage(e), ")")
-  setNames(integer(0), character(0))
-})
-
-
 # Parameters
 BP_MATCH_WINDOW <- 50000L   # ±50 kb: het-DEL within this of INV breakpoint = Test 02
 MIN_DEL_SIZE    <- 5000L    # minimum het-DEL size for Test 02/03
@@ -412,16 +395,8 @@ parse_sv_vcf <- function(vcf_path, caller_name, svtype_filter = NULL,
 
   message("[sv_prior]   Total records: ", n_total, " → ", n_pass, " pass filters")
 
-  if (n_pass == 0) {
-    dt <- data.table()
-    attr(dt, "n_loaded") <- n_total
-    attr(dt, "n_retained") <- 0L
-    return(dt)
-  }
-  dt <- rbindlist(records)
-  attr(dt, "n_loaded") <- n_total
-  attr(dt, "n_retained") <- n_pass
-  dt
+  if (n_pass == 0) return(data.table())
+  rbindlist(records)
 }
 
 # =============================================================================
@@ -503,40 +478,12 @@ delly_del <- parse_sv_vcf(DELLY_DEL_VCF, "delly", "DEL", MIN_DEL_SIZE, Inf)
 manta_del <- parse_sv_vcf(MANTA_DEL_VCF, "manta", "DEL", MIN_DEL_SIZE, Inf)
 all_del <- rbind(delly_del, manta_del, fill = TRUE)
 
-# Filter to het-DELs only (at least one sample is HET for the deletion).
-# Also capture full genotype class counts and a "splitting power" score so
-# downstream stats can tell "rare het-DELs" from "het-DELs that meaningfully
-# partition the cohort" — the latter are more useful as inversion markers.
+# Filter to het-DELs only (at least one sample is HET for the deletion)
 het_del_rows <- list()
 for (di in seq_len(nrow(all_del))) {
   gt <- all_del$gt_class[[di]]
   het_samples <- names(gt)[gt == "HET"]
   if (length(het_samples) > 0) {
-    n_het     <- sum(gt == "HET")
-    n_hom_del <- sum(gt == "HOM_INV")   # HOM_ALT genotype on a DEL = homozygous deletion
-    n_hom_ref <- sum(gt == "HOM_REF")
-    n_miss    <- sum(gt == "MISSING")
-    n_called  <- n_het + n_hom_del + n_hom_ref
-    af        <- if (n_called > 0) (n_het + 2 * n_hom_del) / (2 * n_called) else NA_real_
-    # Minor-allele fraction of CARRIERS (HET + HOM_ALT). Max at 0.5; a het-DEL
-    # with MAC ≈ 0.3–0.5 meaningfully partitions the cohort, one with 0.005
-    # is a singleton.
-    carrier_frac <- if (n_called > 0) (n_het + n_hom_del) / n_called else NA_real_
-    # Splitting-power classification. Thresholds chosen for a 226-sample cohort:
-    #   singleton:    1 carrier           (≈0.004)
-    #   rare:         2–5 carriers        (≈0.009–0.022)
-    #   informative:  6–22 carriers (AF 0.01–0.05) — enough to test but not fixed
-    #   polymorphic:  >22 carriers and carrier_frac < 0.5
-    #   fixed-like:   carrier_frac ≥ 0.5  (likely reference-allele miscall,
-    #                                      but still recorded)
-    n_carriers <- n_het + n_hom_del
-    split_class <- if      (n_carriers == 1L)                 "singleton"
-                   else if (n_carriers <= 5L)                 "rare"
-                   else if (!is.finite(af))                   "unknown"
-                   else if (af < 0.05)                        "informative"
-                   else if (carrier_frac < 0.5)               "polymorphic"
-                   else                                       "fixed_like"
-
     het_del_rows[[length(het_del_rows) + 1L]] <- data.table(
       del_id = all_del$inv_id[di],
       chrom = all_del$chrom[di],
@@ -545,12 +492,6 @@ for (di in seq_len(nrow(all_del))) {
       del_svlen = all_del$svlen[di],
       caller = all_del$caller[di],
       n_het_carriers = length(het_samples),
-      n_hom_del_carriers = n_hom_del,
-      n_hom_ref = n_hom_ref,
-      n_missing = n_miss,
-      af = round(af, 4),
-      carrier_frac = round(carrier_frac, 4),
-      split_class = split_class,
       het_carriers = list(het_samples)
     )
   }
@@ -558,19 +499,9 @@ for (di in seq_len(nrow(all_del))) {
 het_dels <- if (length(het_del_rows) > 0) rbindlist(het_del_rows) else {
   data.table(del_id = character(), chrom = character(), del_start = integer(),
              del_end = integer(), del_svlen = integer(), caller = character(),
-             n_het_carriers = integer(), n_hom_del_carriers = integer(),
-             n_hom_ref = integer(), n_missing = integer(),
-             af = numeric(), carrier_frac = numeric(),
-             split_class = character(), het_carriers = list())
+             n_het_carriers = integer(), het_carriers = list())
 }
-message("[sv_prior] Het-DELs >= ", MIN_DEL_SIZE / 1000, " kb: ", nrow(het_dels))
-if (nrow(het_dels) > 0) {
-  split_tbl <- table(factor(het_dels$split_class,
-    levels = c("singleton", "rare", "informative", "polymorphic", "fixed_like", "unknown")))
-  message(sprintf("[sv_prior]   Split-power: singleton=%d  rare=%d  informative=%d  polymorphic=%d  fixed_like=%d  unknown=%d",
-    split_tbl["singleton"], split_tbl["rare"], split_tbl["informative"],
-    split_tbl["polymorphic"], split_tbl["fixed_like"], split_tbl["unknown"]))
-}
+message("[sv_prior] Het-DELs ≥", MIN_DEL_SIZE / 1000, " kb: ", nrow(het_dels))
 
 # =============================================================================
 # LOAD POPULATION CONFIDENCE (if available)
@@ -888,216 +819,18 @@ for (chr in chroms) {
   n_anchors <- sum(sample_inv_states$sv_genotype != "MISSING" &
                     sample_inv_states$sv_confidence %in% c("HIGH", "MEDIUM"))
 
-  # het-DELs on this chrom (retained, from global het_dels table)
-  chr_het_dels <- if (nrow(het_dels) > 0) het_dels[chrom == chr] else het_dels
-  # ── Enhanced per-chromosome summary ──
-  chr_delly <- chr_inv[caller == "delly"]
-  chr_manta <- chr_inv[caller == "manta"]
-  chr_len_bp <- CHROM_LENS[chr] %||% NA_integer_
-  chr_len_mb <- if (is.finite(chr_len_bp)) round(chr_len_bp / 1e6, 3) else NA_real_
-
-  # ── INV size distribution (retained set) ──
-  if (nrow(chr_inv) > 0) {
-    sz <- chr_inv$svlen
-    inv_sz_min    <- as.integer(min(sz))
-    inv_sz_median <- as.integer(stats::median(sz))
-    inv_sz_mean   <- as.integer(round(mean(sz)))
-    inv_sz_max    <- as.integer(max(sz))
-    inv_sz_p25    <- as.integer(round(stats::quantile(sz, 0.25, names = FALSE)))
-    inv_sz_p75    <- as.integer(round(stats::quantile(sz, 0.75, names = FALSE)))
-    # Size-class bins (kb ranges)
-    n_inv_small   <- sum(sz <   50000)   # <50 kb
-    n_inv_medium  <- sum(sz >=  50000 & sz < 500000)
-    n_inv_large   <- sum(sz >= 500000 & sz < 5000000)
-    n_inv_huge    <- sum(sz >= 5000000)
-  } else {
-    inv_sz_min <- inv_sz_median <- inv_sz_mean <- inv_sz_max <-
-      inv_sz_p25 <- inv_sz_p75 <- NA_integer_
-    n_inv_small <- n_inv_medium <- n_inv_large <- n_inv_huge <- 0L
-  }
-
-  # ── INV carriers / AF distribution ──
-  if (nrow(chr_inv) > 0) {
-    inv_carr_mean   <- round(mean(chr_inv$n_carriers), 2)
-    inv_carr_median <- stats::median(chr_inv$n_carriers)
-    inv_het_mean    <- round(mean(chr_inv$n_het), 2)
-    inv_homi_mean   <- round(mean(chr_inv$n_hom_inv), 2)
-    inv_af_mean     <- round(mean(chr_inv$af), 4)
-    inv_af_median   <- round(stats::median(chr_inv$af), 4)
-    inv_af_max      <- round(max(chr_inv$af), 4)
-    # AF-frequency bins (cohort-level)
-    n_af_singleton   <- sum(chr_inv$n_carriers == 1L)
-    n_af_rare        <- sum(chr_inv$af > 0   & chr_inv$af < 0.01)
-    n_af_lowfreq     <- sum(chr_inv$af >= 0.01 & chr_inv$af < 0.05)
-    n_af_common      <- sum(chr_inv$af >= 0.05 & chr_inv$af < 0.25)
-    n_af_frequent    <- sum(chr_inv$af >= 0.25)
-    # Presence of samples in all three genotype states (HOM_REF + HET + HOM_INV
-    # ≥1 each). These are the candidates where the classic three-class
-    # inversion signature is recoverable — the most useful as priors.
-    n_three_class    <- sum(chr_inv$n_het > 0 & chr_inv$n_hom_inv > 0 &
-                             (n_samples - chr_inv$n_carriers) > 0)
-  } else {
-    inv_carr_mean <- inv_carr_median <- NA_real_
-    inv_het_mean <- inv_homi_mean <- NA_real_
-    inv_af_mean <- inv_af_median <- inv_af_max <- NA_real_
-    n_af_singleton <- n_af_rare <- n_af_lowfreq <- n_af_common <- n_af_frequent <- 0L
-    n_three_class <- 0L
-  }
-
-  # ── INV confidence-class breakdown (HIGH / MEDIUM / LOW / UNKNOWN) ──
-  # sample_inv_states is the per-sample × per-INV long table. Aggregate
-  # per INV call to get mean carriers within each confidence class.
-  inv_conf_levels <- c("HIGH", "MEDIUM", "LOW", "UNKNOWN")
-  n_inv_conf <- setNames(rep(0L, length(inv_conf_levels)), inv_conf_levels)
-  carr_by_conf <- setNames(rep(NA_real_, length(inv_conf_levels)), inv_conf_levels)
-  if ("confidence_level" %in% names(chr_inv) && nrow(chr_inv) > 0) {
-    for (cl in inv_conf_levels) {
-      sub <- chr_inv[confidence_level == cl]
-      n_inv_conf[cl] <- nrow(sub)
-      if (nrow(sub) > 0) carr_by_conf[cl] <- round(mean(sub$n_carriers), 2)
-    }
-  }
-
-  # ── DELLY ∩ Manta concordance (bp ± 5 kb, size within 10%) ──
-  n_concordant <- 0L
-  if (nrow(chr_delly) > 0 && nrow(chr_manta) > 0) {
-    for (di in seq_len(nrow(chr_delly))) {
-      d_bp1 <- chr_delly$bp1[di]; d_bp2 <- chr_delly$bp2[di]; d_sz <- chr_delly$svlen[di]
-      hits <- chr_manta[abs(bp1 - d_bp1) <= 5000 & abs(bp2 - d_bp2) <= 5000 &
-                         abs(svlen - d_sz) / pmax(d_sz, svlen) <= 0.10]
-      if (nrow(hits) > 0) n_concordant <- n_concordant + 1L
-    }
-  }
-  concordance_frac <- if (min(nrow(chr_delly), nrow(chr_manta)) > 0) {
-    round(n_concordant / min(nrow(chr_delly), nrow(chr_manta)), 3)
-  } else NA_real_
-
-  # ── Het-DEL split-power breakdown (per chrom) ──
-  # These distinguish "rare-variant junk" from "het-DELs that meaningfully
-  # partition the cohort" — the latter are the ones that can serve as
-  # marker evidence for an inversion.
-  split_classes <- c("singleton", "rare", "informative", "polymorphic", "fixed_like", "unknown")
-  n_del_by_split <- setNames(rep(0L, length(split_classes)), split_classes)
-  if (nrow(chr_het_dels) > 0) {
-    tab <- table(factor(chr_het_dels$split_class, levels = split_classes))
-    n_del_by_split[names(tab)] <- as.integer(tab)
-  }
-  # Mean carrier count per split class (informative metric for
-  # "informative/polymorphic" dels — too small = noise, too large = probably
-  # reference-strain-specific)
-  del_carr_mean_informative <- if (n_del_by_split["informative"] > 0) {
-    round(mean(chr_het_dels[split_class == "informative"]$n_het_carriers), 2)
-  } else NA_real_
-  del_carr_mean_polymorphic <- if (n_del_by_split["polymorphic"] > 0) {
-    round(mean(chr_het_dels[split_class == "polymorphic"]$n_het_carriers), 2)
-  } else NA_real_
-
-  # Het-DEL size stats
-  if (nrow(chr_het_dels) > 0) {
-    del_sz_median <- as.integer(stats::median(chr_het_dels$del_svlen))
-    del_sz_mean   <- as.integer(round(mean(chr_het_dels$del_svlen)))
-    del_sz_max    <- as.integer(max(chr_het_dels$del_svlen))
-  } else {
-    del_sz_median <- del_sz_mean <- del_sz_max <- NA_integer_
-  }
-
-  # ── Densities per Mb ──
-  density_inv_per_mb     <- if (is.finite(chr_len_mb) && chr_len_mb > 0) round(nrow(chr_inv) / chr_len_mb, 2) else NA_real_
-  density_het_del_per_mb <- if (is.finite(chr_len_mb) && chr_len_mb > 0) round(nrow(chr_het_dels) / chr_len_mb, 2) else NA_real_
-  density_informative_het_del_per_mb <- if (is.finite(chr_len_mb) && chr_len_mb > 0) {
-    round((n_del_by_split["informative"] + n_del_by_split["polymorphic"]) / chr_len_mb, 2)
-  } else NA_real_
-
-  # ── Per-chrom log line (readable QC scan) ──
-  message(sprintf("[sv_prior] %s  len=%.1f Mb  INV: n=%d (delly=%d manta=%d, concord=%d/%s)  size_med=%d kb  carriers_mean=%.1f  af_max=%.3f  three_class=%d",
-    chr,
-    if (is.finite(chr_len_mb)) chr_len_mb else NA_real_,
-    nrow(chr_inv), nrow(chr_delly), nrow(chr_manta),
-    n_concordant,
-    if (min(nrow(chr_delly), nrow(chr_manta)) > 0) as.character(min(nrow(chr_delly), nrow(chr_manta))) else "NA",
-    if (is.finite(inv_sz_median)) as.integer(inv_sz_median / 1000) else NA_integer_,
-    if (is.finite(inv_carr_mean)) inv_carr_mean else NA_real_,
-    if (is.finite(inv_af_max)) inv_af_max else NA_real_,
-    n_three_class
-  ))
-  message(sprintf("[sv_prior]      AF bins: singleton=%d rare=%d lowfreq=%d common=%d frequent=%d | conf HIGH=%d MED=%d LOW=%d UNK=%d",
-    n_af_singleton, n_af_rare, n_af_lowfreq, n_af_common, n_af_frequent,
-    n_inv_conf["HIGH"], n_inv_conf["MEDIUM"], n_inv_conf["LOW"], n_inv_conf["UNKNOWN"]))
-  message(sprintf("[sv_prior]      Het-DELs: n=%d  size_med=%s kb | split: singleton=%d rare=%d informative=%d polymorphic=%d fixed_like=%d",
-    nrow(chr_het_dels),
-    if (is.finite(del_sz_median)) as.character(as.integer(del_sz_median / 1000)) else "NA",
-    n_del_by_split["singleton"], n_del_by_split["rare"],
-    n_del_by_split["informative"], n_del_by_split["polymorphic"],
-    n_del_by_split["fixed_like"]))
-
   summary_rows[[length(summary_rows) + 1L]] <- data.table(
     chrom = chr,
-    chrom_len_bp = chr_len_bp,
-    chrom_len_mb = chr_len_mb,
-    # ── INV counts (original columns kept for back-compat) ──
     n_inv_calls = nrow(chr_inv),
-    n_inv_delly = nrow(chr_delly),
-    n_inv_manta = nrow(chr_manta),
+    n_inv_delly = sum(chr_inv$caller == "delly"),
+    n_inv_manta = sum(chr_inv$caller == "manta"),
     n_breakpoint_dels = nrow(breakpoint_dels),
     n_internal_dels = nrow(internal_dels),
     n_test02_confirmed = sum(test02_dt$test02_concordant, na.rm = TRUE),
     n_bnd_triangulated = nrow(bnd_pairs_all[chrom == chr]),
     n_anchor_assignments = n_anchors,
     n_high_conf = n_high_conf,
-    n_discordant = n_discordant,
-    # ── Density ──
-    density_inv_per_mb = density_inv_per_mb,
-    density_het_del_per_mb = density_het_del_per_mb,
-    density_informative_het_del_per_mb = density_informative_het_del_per_mb,
-    # ── INV size distribution ──
-    inv_size_min    = inv_sz_min,
-    inv_size_p25    = inv_sz_p25,
-    inv_size_median = inv_sz_median,
-    inv_size_mean   = inv_sz_mean,
-    inv_size_p75    = inv_sz_p75,
-    inv_size_max    = inv_sz_max,
-    n_inv_lt_50kb    = n_inv_small,
-    n_inv_50kb_500kb = n_inv_medium,
-    n_inv_500kb_5mb  = n_inv_large,
-    n_inv_gte_5mb    = n_inv_huge,
-    # ── INV carriers / AF ──
-    inv_carrier_mean   = inv_carr_mean,
-    inv_carrier_median = inv_carr_median,
-    inv_het_mean       = inv_het_mean,
-    inv_hom_inv_mean   = inv_homi_mean,
-    inv_af_mean        = inv_af_mean,
-    inv_af_median      = inv_af_median,
-    inv_af_max         = inv_af_max,
-    # AF-frequency class counts
-    n_inv_af_singleton = n_af_singleton,
-    n_inv_af_rare      = n_af_rare,
-    n_inv_af_lowfreq   = n_af_lowfreq,
-    n_inv_af_common    = n_af_common,
-    n_inv_af_frequent  = n_af_frequent,
-    n_inv_three_class  = n_three_class,
-    # INV confidence-class counts + mean carriers per class
-    n_inv_conf_HIGH    = n_inv_conf["HIGH"],
-    n_inv_conf_MEDIUM  = n_inv_conf["MEDIUM"],
-    n_inv_conf_LOW     = n_inv_conf["LOW"],
-    n_inv_conf_UNKNOWN = n_inv_conf["UNKNOWN"],
-    inv_carriers_mean_HIGH   = carr_by_conf["HIGH"],
-    inv_carriers_mean_MEDIUM = carr_by_conf["MEDIUM"],
-    inv_carriers_mean_LOW    = carr_by_conf["LOW"],
-    # ── Caller concordance ──
-    n_inv_concordant_bp_match = n_concordant,
-    concordance_frac = concordance_frac,
-    # ── Het-DEL breakdown ──
-    n_het_del                 = nrow(chr_het_dels),
-    het_del_size_median       = del_sz_median,
-    het_del_size_mean         = del_sz_mean,
-    het_del_size_max          = del_sz_max,
-    n_het_del_singleton       = n_del_by_split["singleton"],
-    n_het_del_rare            = n_del_by_split["rare"],
-    n_het_del_informative     = n_del_by_split["informative"],
-    n_het_del_polymorphic     = n_del_by_split["polymorphic"],
-    n_het_del_fixed_like      = n_del_by_split["fixed_like"],
-    het_del_carriers_mean_informative = del_carr_mean_informative,
-    het_del_carriers_mean_polymorphic = del_carr_mean_polymorphic
+    n_discordant = n_discordant
   )
 }
 
@@ -1111,7 +844,6 @@ fwrite(summary_dt, f_summ, sep = "\t")
 
 message("\n[sv_prior] ═══ GENOME-WIDE SUMMARY ═══")
 if (nrow(summary_dt) > 0) {
-  # Core totals
   message("  Chromosomes:          ", nrow(summary_dt))
   message("  Total INV calls:      ", sum(summary_dt$n_inv_calls))
   message("    DELLY:              ", sum(summary_dt$n_inv_delly))
@@ -1119,123 +851,14 @@ if (nrow(summary_dt) > 0) {
   message("  Breakpoint het-DELs:  ", sum(summary_dt$n_breakpoint_dels))
   message("  Internal het-DELs:    ", sum(summary_dt$n_internal_dels))
   message("  Test 02 confirmed:    ", sum(summary_dt$n_test02_confirmed))
-  message("  BND triangulated:     ", sum(summary_dt$n_bnd_triangulated))
+  message("  BND triangulated :  ", sum(summary_dt$n_bnd_triangulated))
   message("  Anchor assignments:   ", sum(summary_dt$n_anchor_assignments))
   message("  HIGH confidence:      ", sum(summary_dt$n_high_conf))
   message("  Discordant:           ", sum(summary_dt$n_discordant))
-
-  # INV size-class totals
-  if ("n_inv_lt_50kb" %in% names(summary_dt)) {
-    message("")
-    message("  INV size classes (genome-wide):")
-    message(sprintf("    <50 kb:           %d", sum(summary_dt$n_inv_lt_50kb)))
-    message(sprintf("    50 kb – 500 kb:   %d", sum(summary_dt$n_inv_50kb_500kb)))
-    message(sprintf("    500 kb – 5 Mb:    %d", sum(summary_dt$n_inv_500kb_5mb)))
-    message(sprintf("    >=5 Mb:           %d", sum(summary_dt$n_inv_gte_5mb)))
-    inv_sz_all_med <- if (sum(summary_dt$n_inv_calls) > 0) {
-      # weighted by-chrom medians isn't quite right; use mean of chrom medians as a proxy
-      round(mean(summary_dt$inv_size_median, na.rm = TRUE) / 1000, 1)
-    } else NA_real_
-    message(sprintf("    mean-of-per-chrom-median size: %.1f kb", inv_sz_all_med))
-  }
-
-  # INV AF-class totals
-  if ("n_inv_af_singleton" %in% names(summary_dt)) {
-    message("")
-    message("  INV cohort allele-frequency bins:")
-    message(sprintf("    singleton (1 carrier):    %d", sum(summary_dt$n_inv_af_singleton)))
-    message(sprintf("    rare (AF<0.01):           %d", sum(summary_dt$n_inv_af_rare)))
-    message(sprintf("    low-freq (0.01-0.05):     %d", sum(summary_dt$n_inv_af_lowfreq)))
-    message(sprintf("    common (0.05-0.25):       %d", sum(summary_dt$n_inv_af_common)))
-    message(sprintf("    frequent (>=0.25):        %d", sum(summary_dt$n_inv_af_frequent)))
-    message(sprintf("    three-class present (HOM_REF + HET + HOM_INV all >=1): %d", sum(summary_dt$n_inv_three_class)))
-  }
-
-  # INV confidence-class totals + mean carriers
-  if ("n_inv_conf_HIGH" %in% names(summary_dt)) {
-    message("")
-    message("  INV confidence classes (genome-wide):")
-    message(sprintf("    HIGH:    %d calls  |  mean carriers: %.2f",
-      sum(summary_dt$n_inv_conf_HIGH),
-      weighted.mean(summary_dt$inv_carriers_mean_HIGH,
-                    w = summary_dt$n_inv_conf_HIGH, na.rm = TRUE)))
-    message(sprintf("    MEDIUM:  %d calls  |  mean carriers: %.2f",
-      sum(summary_dt$n_inv_conf_MEDIUM),
-      weighted.mean(summary_dt$inv_carriers_mean_MEDIUM,
-                    w = summary_dt$n_inv_conf_MEDIUM, na.rm = TRUE)))
-    message(sprintf("    LOW:     %d calls  |  mean carriers: %.2f",
-      sum(summary_dt$n_inv_conf_LOW),
-      weighted.mean(summary_dt$inv_carriers_mean_LOW,
-                    w = summary_dt$n_inv_conf_LOW, na.rm = TRUE)))
-    message(sprintf("    UNKNOWN: %d calls", sum(summary_dt$n_inv_conf_UNKNOWN)))
-  }
-
-  # Het-DEL split-power totals
-  if ("n_het_del_informative" %in% names(summary_dt)) {
-    tot_het    <- sum(summary_dt$n_het_del)
-    tot_single <- sum(summary_dt$n_het_del_singleton)
-    tot_rare   <- sum(summary_dt$n_het_del_rare)
-    tot_info   <- sum(summary_dt$n_het_del_informative)
-    tot_poly   <- sum(summary_dt$n_het_del_polymorphic)
-    tot_fixed  <- sum(summary_dt$n_het_del_fixed_like)
-    pct <- function(x) if (tot_het > 0) sprintf("(%.1f%%)", 100 * x / tot_het) else "(NA)"
-    message("")
-    message("  Het-DEL splitting power (genome-wide):")
-    message(sprintf("    total het-DELs:   %d", tot_het))
-    message(sprintf("    singleton:        %d %s", tot_single, pct(tot_single)))
-    message(sprintf("    rare (2-5 carr):  %d %s", tot_rare, pct(tot_rare)))
-    message(sprintf("    informative:      %d %s  <-- useful marker candidates",
-                    tot_info, pct(tot_info)))
-    message(sprintf("    polymorphic:      %d %s  <-- useful marker candidates",
-                    tot_poly, pct(tot_poly)))
-    message(sprintf("    fixed-like:       %d %s", tot_fixed, pct(tot_fixed)))
-  }
 }
-# Loaded/retained counts from parse_sv_vcf attributes (if present)
-tryCatch({
-  n_delly_inv_loaded <- attr(delly_inv, "n_loaded") %||% NA_integer_
-  n_delly_inv_retain <- attr(delly_inv, "n_retained") %||% nrow(delly_inv)
-  n_manta_inv_loaded <- attr(manta_inv, "n_loaded") %||% NA_integer_
-  n_manta_inv_retain <- attr(manta_inv, "n_retained") %||% nrow(manta_inv)
-  n_delly_del_loaded <- attr(delly_del, "n_loaded") %||% NA_integer_
-  n_delly_del_retain <- attr(delly_del, "n_retained") %||% nrow(delly_del)
-  n_manta_del_loaded <- attr(manta_del, "n_loaded") %||% NA_integer_
-  n_manta_del_retain <- attr(manta_del, "n_retained") %||% nrow(manta_del)
-  message("")
-  message("[sv_prior] ── Loaded vs retained ──")
-  message(sprintf("  DELLY INV: %s loaded -> %s retained (size filter %s - %s bp)",
-    n_delly_inv_loaded, n_delly_inv_retain, MIN_INV_SIZE, format(MAX_INV_SIZE, scientific = FALSE)))
-  message(sprintf("  Manta INV: %s loaded -> %s retained", n_manta_inv_loaded, n_manta_inv_retain))
-  message(sprintf("  DELLY DEL: %s loaded -> %s retained (size >= %s bp)",
-    n_delly_del_loaded, n_delly_del_retain, MIN_DEL_SIZE))
-  message(sprintf("  Manta DEL: %s loaded -> %s retained (size >= %s bp)",
-    n_manta_del_loaded, n_manta_del_retain, MIN_DEL_SIZE))
-  if (nrow(summary_dt) > 0) {
-    tot_len_mb <- sum(summary_dt$chrom_len_mb, na.rm = TRUE)
-    if (is.finite(tot_len_mb) && tot_len_mb > 0) {
-      n_het_del_total <- if ("n_het_del" %in% names(summary_dt)) sum(summary_dt$n_het_del) else 0L
-      message(sprintf("  Genome-wide density: %.2f INV/Mb, %.2f het-DEL/Mb (over %.1f Mb)",
-        sum(summary_dt$n_inv_calls) / tot_len_mb,
-        n_het_del_total / tot_len_mb,
-        tot_len_mb))
-      if ("n_het_del_informative" %in% names(summary_dt)) {
-        message(sprintf("  Informative het-DEL density: %.2f /Mb  (informative+polymorphic combined)",
-          (sum(summary_dt$n_het_del_informative) + sum(summary_dt$n_het_del_polymorphic)) / tot_len_mb))
-      }
-    }
-    if ("concordance_frac" %in% names(summary_dt)) {
-      cv <- summary_dt$concordance_frac[is.finite(summary_dt$concordance_frac)]
-      if (length(cv) > 0) {
-        message(sprintf("  DELLY x Manta concordance (per chrom, retained): mean=%.3f  median=%.3f  min=%.3f  max=%.3f",
-          mean(cv), stats::median(cv), min(cv), max(cv)))
-      }
-    }
-  }
-}, error = function(e) message("[sv_prior] (loaded/retained summary failed: ", conditionMessage(e), ")"))
-
 message("\n[sv_prior] Output: ", SV_PRIOR_DIR)
 message("[sv_prior] Summary: ", f_summ)
-message("\n[DONE] SV prior build complete")
+message("\n[DONE] Flashlight build complete")
 
 # ── Register in evidence registry (SV breakpoints per chr) ──
 tryCatch({
