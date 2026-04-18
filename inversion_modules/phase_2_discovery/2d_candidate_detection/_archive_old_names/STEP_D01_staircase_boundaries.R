@@ -54,27 +54,10 @@ detect_blocks_staircase <- function(smat,
                                      smooth_span     = CFG$STAIR_SMOOTH_SPAN,
                                      ema_alpha       = CFG$STAIR_EMA_ALPHA,
                                      max_steps       = 8L,
-                                     vote_blur       = 2L,
-                                     chrom           = NA_character_,
-                                     global_window_ids = NULL) {
+                                     vote_blur       = 2L) {
 
   N <- nrow(smat)
-
-  # Identity args: chrom + global_window_ids are optional. When provided they
-  # get stamped onto every output data.table so downstream modules can join
-  # the staircase results back to the precompute window grid without needing
-  # to match on bp coordinates. When NULL, the rows still carry the local
-  # integer window_id (1..N) as before.
-  if (!is.null(global_window_ids)) {
-    if (length(global_window_ids) != N) {
-      warning("[staircase] global_window_ids length (", length(global_window_ids),
-              ") != smat rows (", N, "); ignoring")
-      global_window_ids <- NULL
-    }
-  }
-
   cat("Staircase detector v9.3 | N =", N, "\n")
-  if (!is.na(chrom)) cat("  chrom =", chrom, "\n")
   cat("  min_drop =", min_drop, "| persist_n =", persist_n,
       "| vote_blur =", vote_blur, "\n")
 
@@ -142,29 +125,9 @@ detect_blocks_staircase <- function(smat,
     }
   }
 
-  # Combined vote: total evidence at each position from either direction.
-  #
-  # BUGFIX (2026-04-18, CRITICAL): the old v9.3 code used
-  #   vote_combined <- pmin(vote_right, vote_left)
-  # with the stated intent "a boundary should be seen from BOTH directions".
-  # The intent is wrong: at a block's LEFT edge (say pos L), only windows
-  # INSIDE the block vote for L as a LEFT-step; windows OUTSIDE the block
-  # don't see L as any kind of right-step (their right-steps land further
-  # right). So vote_left[L] is high and vote_right[L] is zero — pmin = 0.
-  # Same symmetric problem at the RIGHT edge. pmin silently zeros out
-  # every real boundary found on both synthetic and real data.
-  #
-  # The correct aggregation is total evidence at each position:
-  #   vote_combined <- vote_right + vote_left
-  # This accumulates contributions from both walking directions without
-  # requiring the same position to be seen as both a right-step and a
-  # left-step — which it almost never is for a real block boundary.
-  #
-  # Max votes at a strong boundary is approximately:
-  #   width_of_block windows (looking outward from inside the block)
-  # which is consistent with the "votes_threshold = min_block_width"
-  # heuristic in the comment above Step 3.
-  vote_combined <- vote_right + vote_left
+  # Combined vote: a boundary should be seen from BOTH directions
+  # Windows to the left see a right-step here. Windows to the right see a left-step here.
+  vote_combined <- pmin(vote_right, vote_left)
 
   # Smooth votes to merge nearby peaks
   vote_smooth <- running_med_vec(vote_combined, span = smooth_span)
@@ -196,14 +159,10 @@ detect_blocks_staircase <- function(smat,
   cat("  Blocks:", nrow(blocks), "\n")
 
   # ==== STEP 5: Build step table (for inspection — keeps EVERYTHING) ====
-  step_table <- build_step_table(step_list, N, blocks = blocks,
-                                  chrom = chrom,
-                                  global_window_ids = global_window_ids)
+  step_table <- build_step_table(step_list, N, blocks = blocks)
 
   # ==== STEP 6: Build rank table (per-window rank structure + background) ====
-  rank_table <- build_rank_table(step_list, N, bg_level,
-                                  chrom = chrom,
-                                  global_window_ids = global_window_ids)
+  rank_table <- build_rank_table(step_list, N, bg_level)
 
   # ==== STEP 7: Parent/child nesting ====
   if (nrow(blocks) > 1) {
@@ -212,135 +171,21 @@ detect_blocks_staircase <- function(smat,
 
   cat("  Final blocks:", nrow(blocks), "\n")
 
-  # ---- Stamp identity fields on blocks + vote_profile ----
-  # blocks: a block spans windows start..end, so stamp paired gwids. chrom
-  # is a scalar column (same value for every row).
-  if (nrow(blocks) > 0) {
-    blocks[, chrom := chrom]
-    if (!is.null(global_window_ids)) {
-      # Guard each lookup — start/end are 1-based local positions on smat.
-      safe_gwid <- function(i) if (is.finite(i) && i >= 1 && i <= length(global_window_ids))
-                                 global_window_ids[i] else NA_integer_
-      blocks[, start_global_window_id := vapply(start, safe_gwid, integer(1))]
-      blocks[, end_global_window_id   := vapply(end,   safe_gwid, integer(1))]
-    } else {
-      blocks[, start_global_window_id := NA_integer_]
-      blocks[, end_global_window_id   := NA_integer_]
-    }
-    # Reorder so chrom + identity cols come first (readable columns leading)
-    id_cols  <- intersect(c("chrom", "block_id", "start_global_window_id", "end_global_window_id"), names(blocks))
-    rest     <- setdiff(names(blocks), id_cols)
-    setcolorder(blocks, c(id_cols, rest))
-  }
-
-  vote_profile <- data.table(
-    chrom         = chrom,
-    position      = seq_len(N),
-    global_window_id = if (!is.null(global_window_ids)) global_window_ids else NA_integer_,
-    vote_right    = vote_right,
-    vote_left     = vote_left,
-    vote_combined = vote_combined,
-    vote_smooth   = vote_smooth,
-    bg_level      = round(bg_level, 4),
-    family_ld     = family_ld_flag
-  )
-
-  # Boundaries as a proper data.table (was a bare integer vector). Back-compat
-  # note: if an older downstream caller expected an integer vector, it should
-  # read `$position` instead. We keep the same name because it's clearer.
-  boundaries_dt <- if (length(boundaries) > 0) {
-    data.table(
-      chrom = chrom,
-      position = boundaries,
-      global_window_id = if (!is.null(global_window_ids)) global_window_ids[boundaries] else NA_integer_,
-      votes = vote_smooth[boundaries]
-    )
-  } else {
-    data.table(chrom = character(), position = integer(),
-               global_window_id = integer(), votes = numeric())
-  }
-
-  # ---- Summary statistics (non-destructive; new table in the return list) ----
-  # Per-chromosome stats so a log scan / QC pass has meaningful numbers.
-  n_steps_per_window <- vapply(step_list, function(sl) {
-    length(sl$right$positions) + length(sl$left$positions)
-  }, integer(1))
-
-  step_drops <- if (nrow(step_table) > 0) step_table$drop_size[is.finite(step_table$drop_size)] else numeric(0)
-  block_widths <- if (nrow(blocks) > 0) blocks$width else integer(0)
-  block_heights <- if (nrow(blocks) > 0) blocks$height else numeric(0)
-  block_contrasts <- if (nrow(blocks) > 0) blocks$contrast else numeric(0)
-  vote_peaks <- vote_smooth[vote_smooth > 0]
-
-  summary_stats <- data.table(
-    chrom = chrom,
-    n_windows = N,
-
-    # Step-detection stats
-    n_steps_total         = nrow(step_table),
-    n_steps_per_win_mean  = round(mean(n_steps_per_window), 3),
-    n_steps_per_win_median = stats::median(n_steps_per_window),
-    n_steps_per_win_max   = max(n_steps_per_window),
-    n_windows_with_steps  = sum(n_steps_per_window > 0),
-    n_windows_no_steps    = sum(n_steps_per_window == 0),
-    frac_windows_with_steps = if (N > 0) round(sum(n_steps_per_window > 0) / N, 4) else NA_real_,
-
-    # Drop-size distribution (per step)
-    drop_size_mean   = if (length(step_drops) > 0) round(mean(step_drops), 4) else NA_real_,
-    drop_size_median = if (length(step_drops) > 0) round(stats::median(step_drops), 4) else NA_real_,
-    drop_size_p95    = if (length(step_drops) > 0) round(stats::quantile(step_drops, 0.95, names = FALSE), 4) else NA_real_,
-    drop_size_max    = if (length(step_drops) > 0) round(max(step_drops), 4) else NA_real_,
-
-    # Vote-profile stats
-    vote_smooth_max     = if (length(vote_peaks) > 0) round(max(vote_peaks), 2) else 0,
-    vote_smooth_mean    = if (length(vote_peaks) > 0) round(mean(vote_peaks), 2) else 0,
-    vote_smooth_p95     = if (length(vote_peaks) > 0) round(stats::quantile(vote_peaks, 0.95, names = FALSE), 2) else 0,
-    n_positions_voted   = length(vote_peaks),
-
-    # Boundary stats
-    n_boundaries       = length(boundaries),
-    boundary_votes_mean = if (length(boundaries) > 0) round(mean(vote_smooth[boundaries]), 2) else NA_real_,
-    boundary_votes_min  = if (length(boundaries) > 0) round(min(vote_smooth[boundaries]), 2) else NA_real_,
-
-    # Block-shape distribution
-    n_blocks            = nrow(blocks),
-    block_width_mean    = if (length(block_widths) > 0) round(mean(block_widths), 1) else NA_real_,
-    block_width_median  = if (length(block_widths) > 0) stats::median(block_widths) else NA_real_,
-    block_width_max     = if (length(block_widths) > 0) as.integer(max(block_widths)) else NA_integer_,
-    block_width_min     = if (length(block_widths) > 0) as.integer(min(block_widths)) else NA_integer_,
-    block_height_mean   = if (length(block_heights) > 0) round(mean(block_heights), 4) else NA_real_,
-    block_contrast_mean = if (length(block_contrasts) > 0) round(mean(block_contrasts), 4) else NA_real_,
-    n_nested_blocks     = if ("parent_id" %in% names(blocks)) sum(!is.na(blocks$parent_id)) else 0L,
-
-    # Background / family-LD stats
-    chr_bg_median      = round(chr_bg_median, 4),
-    chr_bg_mad         = round(chr_bg_mad, 4),
-    n_family_ld_windows = sum(family_ld_flag, na.rm = TRUE),
-    frac_family_ld      = if (N > 0) round(sum(family_ld_flag, na.rm = TRUE) / N, 4) else NA_real_
-  )
-
-  # Per-chrom log line so tail -f log.txt shows the highlights
-  cat(sprintf("[staircase-summary] %s  N=%d  blocks=%d (mean_width=%s max=%s)  steps/win=%.2f  n_bdy=%d (votes_mean=%s)  family_LD=%d (%.1f%%)\n",
-    if (is.na(chrom)) "(no_chrom)" else chrom,
-    N, nrow(blocks),
-    if (length(block_widths) > 0) as.character(as.integer(round(mean(block_widths)))) else "NA",
-    if (length(block_widths) > 0) as.character(as.integer(max(block_widths))) else "NA",
-    mean(n_steps_per_window),
-    length(boundaries),
-    if (length(boundaries) > 0) sprintf("%.1f", mean(vote_smooth[boundaries])) else "NA",
-    sum(family_ld_flag, na.rm = TRUE),
-    100 * if (N > 0) sum(family_ld_flag, na.rm = TRUE) / N else NA_real_
-  ))
-
   return(list(
     blocks        = blocks,
     step_table    = step_table,
     rank_table    = rank_table,
-    vote_profile  = vote_profile,
-    boundaries    = boundaries_dt,
-    summary_stats = summary_stats,
-    artifacts     = data.table(),
-    chrom         = chrom
+    vote_profile  = data.table(
+      position   = seq_len(N),
+      vote_right = vote_right,
+      vote_left  = vote_left,
+      vote_combined = vote_combined,
+      vote_smooth = vote_smooth,
+      bg_level   = round(bg_level, 4),
+      family_ld  = family_ld_flag
+    ),
+    boundaries    = boundaries,
+    artifacts     = data.table()
   ))
 }
 
@@ -646,23 +491,16 @@ build_blocks_from_boundaries <- function(boundaries, smat, N,
 # "internal_feature" not deleted. Could be recombinant double crossover
 # or assembly error — downstream modules decide.
 
-build_step_table <- function(step_list, N, blocks = NULL,
-                              chrom = NA_character_,
-                              global_window_ids = NULL) {
+build_step_table <- function(step_list, N, blocks = NULL) {
   rows <- list()
-  gwid_of <- function(i) if (!is.null(global_window_ids) && i >= 1 && i <= length(global_window_ids))
-                           global_window_ids[i] else NA_integer_
   for (i in seq_len(N)) {
     sl <- step_list[[i]]
     for (j in seq_along(sl$right$positions)) {
       rows[[length(rows) + 1]] <- data.table(
-        chrom         = chrom,
         window_id     = i,
-        global_window_id = gwid_of(i),
         direction     = "right",
         step_rank     = j,
         step_position = sl$right$positions[j],
-        step_global_window_id = gwid_of(sl$right$positions[j]),
         height_before = round(sl$right$heights[j], 4),
         height_after  = round(sl$right$drops[j], 4),
         drop_size     = round(sl$right$heights[j] - sl$right$drops[j], 4)
@@ -670,13 +508,10 @@ build_step_table <- function(step_list, N, blocks = NULL,
     }
     for (j in seq_along(sl$left$positions)) {
       rows[[length(rows) + 1]] <- data.table(
-        chrom         = chrom,
         window_id     = i,
-        global_window_id = gwid_of(i),
         direction     = "left",
         step_rank     = j,
         step_position = sl$left$positions[j],
-        step_global_window_id = gwid_of(sl$left$positions[j]),
         height_before = round(sl$left$heights[j], 4),
         height_after  = round(sl$left$drops[j], 4),
         drop_size     = round(sl$left$heights[j] - sl$left$drops[j], 4)
@@ -710,9 +545,7 @@ build_step_table <- function(step_list, N, blocks = NULL,
 # Windows with the same rank signature are in the same structural context.
 # Background level = family LD indicator.
 
-build_rank_table <- function(step_list, N, bg_level,
-                              chrom = NA_character_,
-                              global_window_ids = NULL) {
+build_rank_table <- function(step_list, N, bg_level) {
   rows <- list()
   for (i in seq_len(N)) {
     sl <- step_list[[i]]
@@ -720,13 +553,9 @@ build_rank_table <- function(step_list, N, bg_level,
     n_steps <- length(all_steps)
 
     sig <- if (n_steps > 0) paste(all_steps, collapse = "_") else "none"
-    gwid <- if (!is.null(global_window_ids) && i >= 1 && i <= length(global_window_ids))
-              global_window_ids[i] else NA_integer_
 
     rows[[length(rows) + 1]] <- data.table(
-      chrom       = chrom,
       window_id   = i,
-      global_window_id = gwid,
       n_steps     = n_steps,
       signature   = sig,
       steps_right = paste(sl$right$positions, collapse = ","),
@@ -834,24 +663,9 @@ if (!interactive() && length(commandArgs(trailingOnly = TRUE)) > 0) {
 
   cat("Loading sim_mat:", sim_mat_file, "\n")
   obj <- readRDS(sim_mat_file)
-
-  # Pull identity fields from the RDS when available. Standard precomp object
-  # contains $sim_mat, $chrom, $dt (with global_window_id). Bare matrix input
-  # still works — we just don't get the identity stamps.
   smat <- if (is.list(obj) && "sim_mat" %in% names(obj)) obj$sim_mat else obj
-  chrom_val <- if (is.list(obj) && "chrom" %in% names(obj)) as.character(obj$chrom) else NA_character_
-  gwids <- NULL
-  if (is.list(obj) && !is.null(obj$dt) && "global_window_id" %in% names(obj$dt)) {
-    gwids <- obj$dt$global_window_id
-    if (length(gwids) != nrow(smat)) {
-      cat("  WARNING: obj$dt rows (", length(gwids), ") != smat rows (",
-          nrow(smat), ") — ignoring gwids\n")
-      gwids <- NULL
-    }
-  }
 
-  result <- detect_blocks_staircase(smat, chrom = chrom_val,
-                                    global_window_ids = gwids)
+  result <- detect_blocks_staircase(smat)
 
   dir.create(outdir, recursive = TRUE, showWarnings = FALSE)
   bn <- gsub("\\.rds$", "", basename(sim_mat_file))
@@ -872,8 +686,6 @@ if (!interactive() && length(commandArgs(trailingOnly = TRUE)) > 0) {
 
   fwrite(result$rank_table, file.path(outdir, paste0(bn, "_ranks.tsv.gz")), sep = "\t")
   fwrite(result$vote_profile, file.path(outdir, paste0(bn, "_votes.tsv.gz")), sep = "\t")
-  fwrite(result$boundaries, file.path(outdir, paste0(bn, "_boundaries.tsv")), sep = "\t")
-  fwrite(result$summary_stats, file.path(outdir, paste0(bn, "_summary.tsv")), sep = "\t")
   saveRDS(result, file.path(outdir, paste0(bn, "_staircase.rds")))
-  cat("Done. Summary TSV:", file.path(outdir, paste0(bn, "_summary.tsv")), "\n")
+  cat("Done.\n")
 }
