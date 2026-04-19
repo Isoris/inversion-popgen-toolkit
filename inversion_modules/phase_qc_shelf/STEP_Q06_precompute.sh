@@ -49,8 +49,13 @@ source "${here}/00_config.sh"
 # (These are not in phase_qc_shelf's own config since they belong to unified_ancestry)
 ANC_CFG="${UNIFIED_ANCESTRY_DIR}/00_ancestry_config.sh"
 if [[ -f "${ANC_CFG}" ]]; then
+  _preserve_bin="${INSTANT_Q_BIN:-}"
+  _preserve_local_q="${LOCAL_Q_DIR:-}"
   # shellcheck disable=SC1090
   source "${ANC_CFG}"
+  [[ -n "${_preserve_bin}"      ]] && INSTANT_Q_BIN="${_preserve_bin}"
+  [[ -n "${_preserve_local_q}"  ]] && LOCAL_Q_DIR="${_preserve_local_q}"
+  unset _preserve_bin _preserve_local_q
 fi
 
 CHR="${1:-}"
