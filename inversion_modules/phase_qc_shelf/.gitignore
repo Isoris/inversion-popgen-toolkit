@@ -1,0 +1,22 @@
+# Local per-user config (paths, thresholds)
+config.local.sh
+
+# Output directories — these contain data, not code
+results/
+logs/
+tracks/
+figures/
+
+# Common build/editor crud
+*.log
+*.tmp
+*.swp
+.Rhistory
+.Rproj.user/
+__pycache__/
+*.pyc
+.DS_Store
+
+# SLURM outputs
+slurm-*.out
+slurm-*.err
