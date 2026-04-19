@@ -59,7 +59,9 @@ check_path() {
     printf "  [OK]    %-20s %s\n" "${label}" "${path}"
   else
     printf "  [MISS]  %-20s %s\n" "${label}" "${path}"
-    [[ "${hard}" == "1" ]] && missing=$((missing + 1))
+    if [[ "${hard}" == "1" ]]; then
+      missing=$((missing + 1))
+    fi
   fi
 }
 

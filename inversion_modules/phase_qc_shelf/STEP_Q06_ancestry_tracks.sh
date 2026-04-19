@@ -30,6 +30,7 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${here}/00_config.sh"
 
 CHR="${1:-}"
+: "${Q06_PRIMARY_SCALE:=dense}"    # which scale to use for the "main" ancestry track
 : "${LOCAL_Q_DIR:=${BASE}/unified_ancestry/local_Q}"
 [[ -z "${CHR}" ]] && qc_die "Usage: $0 <CHR|all>"
 
@@ -38,17 +39,38 @@ if [[ ! -d "${LOCAL_Q_DIR}" ]]; then
   qc_log "  Set LOCAL_Q_DIR env var or check unified_ancestry install"
 fi
 
+# Resolve which cache to use: prefer $Q06_PRIMARY_SCALE, then the other scale,
+# then the flat fallback at LOCAL_Q_DIR root.
+resolve_cache() {
+  local chr="$1" kind="$2"   # kind = summary | samples
+  local ext
+  for ext in tsv.gz tsv; do
+    # Preferred scale first
+    for scale in "${Q06_PRIMARY_SCALE}" "dense" "thin" ""; do
+      local path
+      if [[ -n "${scale}" ]]; then
+        path="${LOCAL_Q_DIR}/scale_${scale}/${chr}.local_Q_${kind}.${ext}"
+      else
+        path="${LOCAL_Q_DIR}/${chr}.local_Q_${kind}.${ext}"
+      fi
+      if [[ -f "${path}" ]]; then
+        echo "${path}"; return 0
+      fi
+    done
+  done
+  echo ""
+}
+
 run_one() {
   local chr="$1"
-  local summary="${LOCAL_Q_DIR}/${chr}.local_Q_summary.tsv.gz"
-  [[ -f "${summary}" ]] || summary="${LOCAL_Q_DIR}/${chr}.local_Q_summary.tsv"
-  if [[ ! -f "${summary}" ]]; then
-    qc_log "SKIP ${chr}: no local_Q summary in ${LOCAL_Q_DIR}"
+  local summary
+  summary=$(resolve_cache "${chr}" "summary")
+  if [[ -z "${summary}" ]]; then
+    qc_log "SKIP ${chr}: no local_Q summary in ${LOCAL_Q_DIR} (tried scale_${Q06_PRIMARY_SCALE}, scale_dense, scale_thin, flat)"
     return 0
   fi
-  local samples_file="${LOCAL_Q_DIR}/${chr}.local_Q_samples.tsv.gz"
-  [[ -f "${samples_file}" ]] || samples_file="${LOCAL_Q_DIR}/${chr}.local_Q_samples.tsv"
-  [[ -f "${samples_file}" ]] || samples_file=""
+  local samples_file
+  samples_file=$(resolve_cache "${chr}" "samples")
 
   local out_win="${QC_TRACKS}/ancestry_window.${chr}.tsv"
   local out_samp="${QC_TRACKS}/ancestry_sample.${chr}.tsv.gz"
