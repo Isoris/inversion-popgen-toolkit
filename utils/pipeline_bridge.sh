@@ -3,7 +3,7 @@
 # pipeline_bridge.sh — Universal bash loader for cross-module wiring
 #
 # Source this at the top of any SLURM launcher or shell script.
-# It exports all env vars that load_bridge.R and R scripts need.
+# It exports all env vars that registry_bridge.R and R scripts need.
 #
 # Usage (in SLURM launchers):
 #   set -a; source pipeline_bridge.sh; set +a
@@ -12,7 +12,7 @@
 #   1. Sources inversion config (if present)
 #   2. Sources ancestry config (if present)
 #   3. Sources module2b config (if present)
-#   4. Exports LOAD_BRIDGE, REGISTRY_DIR, sample paths
+#   4. Exports REGISTRY_BRIDGE (+ legacy LOAD_BRIDGE alias), REGISTRY_DIR, sample paths
 #   5. Ensures registry directory exists
 #   6. Compiles C binaries if missing (instant_q, region_popstats)
 #
@@ -64,24 +64,37 @@ export PRUNED_LIST="${PRUNED_LIST:-${BASE}/popstruct_thin/06_relatedness/pruned_
 export REGISTRY_DIR="${REGISTRY_DIR:-${BASE}/sample_registry}"
 mkdir -p "${REGISTRY_DIR}/groups" "${REGISTRY_DIR}/backups" 2>/dev/null || true
 
-# ── Load bridge (for R scripts to source) ────────────────────────────────────
-# Prefer flattened layout. Search order: co-located (when this file itself is
-# in utils/), BASE/utils/, inversion_modules/utils/, legacy v8.5.
-if [[ -z "${LOAD_BRIDGE:-}" ]]; then
+# ── Registry bridge (for R scripts to source) ────────────────────────────────
+# Chat-18: the bridge file was renamed utils/load_bridge.R → utils/registry_bridge.R
+# to make it obvious that this is the registry entry point. The old name is
+# preserved as a shim so in-flight scripts keep working. Search order below
+# prefers the new name but accepts the old one if the rename hasn't been
+# deployed yet.
+#
+# Exports two env vars so scripts and SLURM jobs can find the bridge:
+#   REGISTRY_BRIDGE (preferred, post-chat-18)
+#   LOAD_BRIDGE     (legacy alias, same value, kept for compatibility)
+if [[ -z "${REGISTRY_BRIDGE:-}" ]]; then
   for _try in \
+    "${_PB_DIR}/registry_bridge.R" \
+    "${BASE}/utils/registry_bridge.R" \
+    "${BASE}/inversion_modules/utils/registry_bridge.R" \
+    "${_PB_DIR}/../utils/registry_bridge.R" \
     "${_PB_DIR}/load_bridge.R" \
     "${BASE}/utils/load_bridge.R" \
     "${BASE}/inversion_modules/utils/load_bridge.R" \
     "${_PB_DIR}/../utils/load_bridge.R" \
     "${BASE}/inversion_codebase_v8.5/utils/load_bridge.R"; do
     if [[ -f "$_try" ]]; then
-      export LOAD_BRIDGE="$_try"
+      export REGISTRY_BRIDGE="$_try"
       break
     fi
   done
   unset _try
-  : "${LOAD_BRIDGE:=${BASE}/utils/load_bridge.R}"
+  : "${REGISTRY_BRIDGE:=${BASE}/utils/registry_bridge.R}"
 fi
+# Legacy alias — keeps old SLURM launchers and R scripts working unchanged.
+export LOAD_BRIDGE="${LOAD_BRIDGE:-${REGISTRY_BRIDGE}}"
 
 # ── Unified ancestry module paths ────────────────────────────────────────────
 export ANCESTRY_CONFIG="${_ANC_CFG}"
@@ -141,7 +154,7 @@ init_registry_if_needed() {
   if [[ ! -s "$master" ]]; then
     echo "[pipeline_bridge] Initializing sample registry..."
     "${RSCRIPT_BIN}" -e "
-      source('${LOAD_BRIDGE}')
+      source('${REGISTRY_BRIDGE}')
       # Registry auto-initializes from samples.ind on first load
       cat('[registry] Master:', nrow(reg\$get_master()), 'samples\n')
 
@@ -164,7 +177,7 @@ init_registry_if_needed
 # ── Summary ──────────────────────────────────────────────────────────────────
 _pb_log() { echo "[$(date '+%F %T')] [pipeline_bridge] $*"; }
 _pb_log "BASE=$BASE"
-_pb_log "LOAD_BRIDGE=$LOAD_BRIDGE"
+_pb_log "REGISTRY_BRIDGE=$REGISTRY_BRIDGE"
 _pb_log "REGISTRY_DIR=$REGISTRY_DIR"
 _pb_log "ANCESTRY_CONFIG=$ANCESTRY_CONFIG"
 [[ -x "$INSTANT_Q_BIN" ]] && _pb_log "instant_q: compiled" || _pb_log "instant_q: NOT compiled"

@@ -150,9 +150,17 @@ load_registry <- function(registries_root = NULL, create_if_missing = TRUE) {
     stats     = results,    # DEPRECATED alias for one chat cycle
 
     # Shortcuts for the most common v9-style calls (forward-compat during migration)
+    # Chat-18: extended to cover every flat-API method that real consumer scripts
+    # (load_bridge.R, region_stats_dispatcher.R, STEP_C01f, cheat6, etc.) still
+    # use. Adding an alias here is cheaper than rewriting each call site. New
+    # code should still use the nested form (reg$samples$*).
     add_group         = samples$add_group,
     get_group         = samples$get_group,
     has_group         = samples$has_group,
+    list_groups       = samples$list_groups,
+    get_master        = samples$get_master,
+    count_groups      = samples$count_groups,
+    get_groups_for_candidate = samples$get_groups_for_candidate,
     register_candidate = evidence$register_candidate,
     add_evidence      = evidence$add_evidence,
     get_evidence      = evidence$get_evidence,

@@ -63,28 +63,72 @@ configure_dispatcher <- function(config_file = NULL, ...) {
   }
 
   # v12.1: Try to load registry
+  # Chat-18: prefer the full 4-table loader (registries/api/R/registry_loader.R)
+  # over the old flat sample-only one. Either works via top-level aliases
+  # (reg$has_group / reg$get_group / reg$list_groups), but the full one also
+  # exposes reg$samples / reg$intervals / reg$evidence / reg$results for any
+  # downstream caller that needs them. If a script sourced load_bridge.R
+  # first, reg is already in the global env and branch 1 wins — we only
+  # reach branch 2 in standalone invocations.
   .disp_env$reg <- NULL
   if (exists("reg", envir = .GlobalEnv) && !is.null(get("reg", envir = .GlobalEnv))) {
     .disp_env$reg <- get("reg", envir = .GlobalEnv)
     message("[dispatcher] Using registry from global env")
   } else {
+    # Search order: respect explicit env override, then look for the FULL
+    # loader in canonical/fallback paths, then the old FLAT loader.
     reg_r <- Sys.getenv("SAMPLE_REGISTRY_R", "")
-    if (!nzchar(reg_r)) {
-      # Try common locations
-      for (p in c(
-        file.path(.disp_env$registry_dir %||% ".", "..", "inversion_codebase_v8.5", "utils", "sample_registry.R"),
-        Sys.getenv("BASE", ""),
-        "utils/sample_registry.R"
-      )) {
-        cand <- if (grepl("sample_registry.R$", p)) p else file.path(p, "inversion_codebase_v8.5/utils/sample_registry.R")
-        if (file.exists(cand)) { reg_r <- cand; break }
+    loader_flavor <- "none"
+
+    if (nzchar(reg_r) && file.exists(reg_r)) {
+      # Explicit override wins; assume caller knows the flavor. We'll
+      # detect post-source whether it's full (has samples$) or flat.
+      loader_flavor <- "override"
+    } else {
+      base <- Sys.getenv("BASE", "")
+      # Full-loader candidates
+      full_cands <- c(
+        file.path(.disp_env$registry_dir %||% ".", "..", "registries",
+                  "api", "R", "registry_loader.R"),
+        file.path(base, "registries", "api", "R", "registry_loader.R"),
+        file.path(base, "inversion-popgen-toolkit", "registries", "api", "R",
+                  "registry_loader.R"),
+        "registries/api/R/registry_loader.R"
+      )
+      for (p in full_cands) {
+        if (file.exists(p)) { reg_r <- p; loader_flavor <- "full"; break }
+      }
+
+      # Flat-loader fallback (chat-11 behavior preserved)
+      if (!nzchar(reg_r)) {
+        flat_cands <- c(
+          file.path(.disp_env$registry_dir %||% ".", "..",
+                    "inversion_codebase_v8.5", "utils", "sample_registry.R"),
+          file.path(base, "utils", "sample_registry.R"),
+          "utils/sample_registry.R"
+        )
+        for (p in flat_cands) {
+          if (file.exists(p)) { reg_r <- p; loader_flavor <- "flat"; break }
+        }
       }
     }
+
     if (nzchar(reg_r) && file.exists(reg_r)) {
       tryCatch({
         source(reg_r, local = TRUE)
-        .disp_env$reg <- load_registry(.disp_env$registry_dir)
-        message("[dispatcher] Registry loaded: ", nrow(.disp_env$reg$list_groups()), " groups")
+        if (loader_flavor == "full") {
+          # Full loader auto-resolves registries_root via $REGISTRIES / $BASE
+          .disp_env$reg <- load_registry()
+        } else {
+          # Flat loader takes the sample-registry dir directly
+          .disp_env$reg <- load_registry(.disp_env$registry_dir)
+          message("[dispatcher] NOTE: using FLAT registry fallback. ",
+                  "Full API (reg$samples, reg$intervals, reg$results) unavailable.")
+        }
+        n_groups <- tryCatch(nrow(.disp_env$reg$list_groups()),
+                             error = function(e) NA_integer_)
+        message("[dispatcher] Registry loaded (", loader_flavor,
+                "): ", n_groups, " groups")
       }, error = function(e) {
         message("[dispatcher] Registry load failed: ", conditionMessage(e))
       })
