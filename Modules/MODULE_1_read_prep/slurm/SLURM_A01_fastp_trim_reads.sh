@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 ###############################################################################
-# S01_fastp_trim_reads.slurm
+# SLURM_A01_fastp_trim_reads.slurm
 #
 # Re-runs fastp on a TSV-defined set of read pairs (typically redo cases
 # such as unexpected EOF), using parallel per-sample jobs on a full node.
 #
 # Usage:
-#   sbatch --export=ALL,TSV=/path/to/redo.tsv S01_fastp_trim_reads.slurm
+#   sbatch --export=ALL,TSV=/path/to/redo.tsv SLURM_A01_fastp_trim_reads.slurm
 #
 # Input TSV columns (tab-separated, with header):
 #   Sample  Run  Lane  R1  R2
@@ -17,9 +17,9 @@
 #   ${LOGDIR}/<Sample>.<Run>.<Lane>.fastp.redo.log
 #
 # Sidecar files:
-#   ${OUTFQDIR}/S01_fastp_trim_reads.arg
-#   ${OUTFQDIR}/S01_fastp_trim_reads.results
-#   ${OUTFQDIR}/S01_fastp_trim_reads.metric.tsv
+#   ${OUTFQDIR}/SLURM_A01_fastp_trim_reads.arg
+#   ${OUTFQDIR}/SLURM_A01_fastp_trim_reads.results
+#   ${OUTFQDIR}/SLURM_A01_fastp_trim_reads.metric.tsv
 ###############################################################################
 #SBATCH -p compute
 #SBATCH -N 1
@@ -64,7 +64,7 @@ FASTP_ARGS=(
 timestamp(){ date '+%F %T'; }
 
 # ---- Sidecar setup ----
-STEP="S01_fastp_trim_reads"
+STEP="SLURM_A01_fastp_trim_reads"
 ARGFILE="${OUTFQDIR}/${STEP}.arg"
 RESULTSFILE="${OUTFQDIR}/${STEP}.results"
 METRICFILE="${OUTFQDIR}/${STEP}.metric.tsv"

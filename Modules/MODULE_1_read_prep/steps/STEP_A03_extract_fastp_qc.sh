@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
 ###############################################################################
-# S03_extract_fastp_qc.sh
+# STEP_A03_extract_fastp_qc.sh
 #
 # Parses fastp log files into a per-sample QC table and a compact numeric
 # summary (min/mean/median/max) for key read-quality metrics.
 #
 # Usage:
-#   bash S03_extract_fastp_qc.sh
+#   bash STEP_A03_extract_fastp_qc.sh
 #
 # Outputs:
 #   ${LOGDIR}/fastp_qc_table.tsv
 #   ${LOGDIR}/fastp_qc_summary.tsv
-#   ${LOGDIR}/S03_extract_fastp_qc.arg
-#   ${LOGDIR}/S03_extract_fastp_qc.results
+#   ${LOGDIR}/STEP_A03_extract_fastp_qc.arg
+#   ${LOGDIR}/STEP_A03_extract_fastp_qc.results
 ###############################################################################
 set -euo pipefail
 
-STEP="S03_extract_fastp_qc"
+STEP="STEP_A03_extract_fastp_qc"
 timestamp(){ date '+%F %T'; }
 
 LOGDIR="/scratch/lt200308-agbsci/Quentin_project/00-samples/fastp/logs"

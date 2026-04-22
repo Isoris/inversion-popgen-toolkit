@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ###############################################################################
-# S14_qc_depth_table.slurm
+# SLURM_B06_qc_depth_table.slurm
 #
 # Comprehensive depth and coverage QC using mosdepth, across multiple region
 # classes (whole-chromosome, repeat, nonrepeat, callable, noncallable).
@@ -9,15 +9,15 @@
 # Region classes come from the mask BED files generated during genome assembly.
 #
 # Usage:
-#   sbatch S14_qc_depth_table.slurm
+#   sbatch SLURM_B06_qc_depth_table.slurm
 #
 # Outputs:
 #   ${OUTDIR}/all_samples.coverage_context_qc.tsv
 #   ${OUTDIR}/all_samples.per_chrom.coverage_context_qc.tsv
 #   ${OUTDIR}/summary.coverage_context_qc.tsv
 #   ${OUTDIR}/summary.per_chrom.coverage_context_qc.tsv
-#   ${OUTDIR}/S14_qc_depth_table.arg
-#   ${OUTDIR}/S14_qc_depth_table.results
+#   ${OUTDIR}/SLURM_B06_qc_depth_table.arg
+#   ${OUTDIR}/SLURM_B06_qc_depth_table.results
 ###############################################################################
 #SBATCH -p compute
 #SBATCH -N 1
@@ -33,7 +33,7 @@ set -euo pipefail
 source ~/.bashrc
 mamba activate assembly
 
-STEP="S14_qc_depth_table"
+STEP="SLURM_B06_qc_depth_table"
 timestamp(){ date '+%F %T'; }
 
 BASE="/scratch/lt200308-agbsci/Quentin_project_KEEP_2026-02-04"

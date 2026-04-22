@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 ###############################################################################
-# S06_plot_species_assign.py
+# STEP_A06_plot_species_assign.py
 #
 # Plots species assignment results: scatter, histogram, and suspicious-sample
 # ranking from Mash distance tables.
 #
 # Usage:
-#   python3 S06_plot_species_assign.py \
+#   python3 STEP_A06_plot_species_assign.py \
 #     --per_cga results.per_CGA.tsv \
 #     [--per_run results.tsv] \
 #     [--outprefix mash_species_assign] \
@@ -19,8 +19,8 @@
 #   <prefix>.most_suspicious_perCGA.tsv     (Tables/)
 #   [optional] <prefix>.scatter_perRUN.{png,pdf}
 #   [optional] <prefix>.most_suspicious_perRUN.tsv
-#   S06_plot_species_assign.arg
-#   S06_plot_species_assign.results
+#   STEP_A06_plot_species_assign.arg
+#   STEP_A06_plot_species_assign.results
 ###############################################################################
 import argparse
 import os

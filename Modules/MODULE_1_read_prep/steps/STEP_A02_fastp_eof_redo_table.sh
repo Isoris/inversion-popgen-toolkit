@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
 ###############################################################################
-# S02_fastp_eof_redo_table.sh
+# STEP_A02_fastp_eof_redo_table.sh
 #
 # Finds fastp outputs with unexpected EOF errors, extracts affected sample IDs,
 # searches uploadku for matching raw read pairs, and writes redo/missing tables.
 #
 # Usage:
-#   bash S02_fastp_eof_redo_table.sh
+#   bash STEP_A02_fastp_eof_redo_table.sh
 #
 # Outputs:
 #   ${REPORT_DIR}/fastp_unexpected_eof_redo.tsv
 #   ${REPORT_DIR}/fastp_unexpected_eof_notfound_in_uploadku.tsv
-#   ${REPORT_DIR}/S02_fastp_eof_redo_table.arg
-#   ${REPORT_DIR}/S02_fastp_eof_redo_table.results
+#   ${REPORT_DIR}/STEP_A02_fastp_eof_redo_table.arg
+#   ${REPORT_DIR}/STEP_A02_fastp_eof_redo_table.results
 ###############################################################################
 set -euo pipefail
 
-STEP="S02_fastp_eof_redo_table"
+STEP="STEP_A02_fastp_eof_redo_table"
 timestamp(){ date '+%F %T'; }
 
 # ---- Paths ----

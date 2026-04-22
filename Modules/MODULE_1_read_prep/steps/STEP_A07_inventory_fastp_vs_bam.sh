@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
 ###############################################################################
-# S07_inventory_fastp_vs_bam.sh
+# STEP_A07_inventory_fastp_vs_bam.sh
 #
 # Compares fastp output pairs against generated .sr.bam files and their
 # indexes, then reports whether each sample is complete, missing, or
 # inconsistent.
 #
 # Usage:
-#   bash S07_inventory_fastp_vs_bam.sh
+#   bash STEP_A07_inventory_fastp_vs_bam.sh
 #
 # Outputs:
 #   fastp_vs_bam.tsv
-#   S07_inventory_fastp_vs_bam.arg
-#   S07_inventory_fastp_vs_bam.results
+#   STEP_A07_inventory_fastp_vs_bam.arg
+#   STEP_A07_inventory_fastp_vs_bam.results
 ###############################################################################
 set -euo pipefail
 
-STEP="S07_inventory_fastp_vs_bam"
+STEP="STEP_A07_inventory_fastp_vs_bam"
 timestamp(){ date '+%F %T'; }
 
 FASTP_DIR="/scratch/lt200308-agbsci/Quentin_project/00-samples/fastp"

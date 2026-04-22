@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
 ###############################################################################
-# S08_check_bam_bai_pairs.sh
+# STEP_A08_check_bam_bai_pairs.sh
 #
 # Checks that each .sr.bam has a matching .sr.bam.bai and vice versa.
 # Reports missing BAM or BAI files.
 #
 # Usage:
-#   cd /path/to/minimap2-bams && bash S08_check_bam_bai_pairs.sh
+#   cd /path/to/minimap2-bams && bash STEP_A08_check_bam_bai_pairs.sh
 #
 # Outputs:
 #   bam_bai_check.tsv
-#   S08_check_bam_bai_pairs.arg
-#   S08_check_bam_bai_pairs.results
+#   STEP_A08_check_bam_bai_pairs.arg
+#   STEP_A08_check_bam_bai_pairs.results
 ###############################################################################
 set -euo pipefail
 
-STEP="S08_check_bam_bai_pairs"
+STEP="STEP_A08_check_bam_bai_pairs"
 timestamp(){ date '+%F %T'; }
 
 OUT="bam_bai_check.tsv"

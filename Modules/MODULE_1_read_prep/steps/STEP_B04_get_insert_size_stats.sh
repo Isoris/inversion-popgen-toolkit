@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ###############################################################################
-# S12_get_insert_size_stats.sh
+# STEP_B04_get_insert_size_stats.sh
 #
 # Computes detailed insert size statistics from a merged/markdup BAM:
 # raw stats, robust MAD-trimmed stats, layout detection.
@@ -9,18 +9,18 @@
 # with MAPQ >= 30 and same-reference mate pairs only.
 #
 # Usage:
-#   bash S12_get_insert_size_stats.sh sample.markdup.bam > insert_stats.tsv
+#   bash STEP_B04_get_insert_size_stats.sh sample.markdup.bam > insert_stats.tsv
 #
 # Notes:
 #   - PE151 means read_length=151, not insert size
 #   - Standard Illumina PE layout is inward-facing (FR / ><)
 #   - Trimming window: median ± 10*MAD (robust outlier removal)
 #
-# Sidecar: <bam_dir>/S12_get_insert_size_stats.<sample>.arg
+# Sidecar: <bam_dir>/STEP_B04_get_insert_size_stats.<sample>.arg
 ###############################################################################
 set -euo pipefail
 
-STEP="S12_get_insert_size_stats"
+STEP="STEP_B04_get_insert_size_stats"
 timestamp(){ date '+%F %T'; }
 
 [[ $# -eq 1 ]] || { echo "Usage: bash $0 sample.markdup.bam" >&2; exit 1; }

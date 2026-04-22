@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
 ###############################################################################
-# S16_make_bam_provenance.sh
+# STEP_B08_make_bam_provenance.sh
 #
 # Builds a provenance table linking each sample to its raw minimap2 BAM
 # and final popgen-filtered BAM path. This table is used by downstream
 # modules (MODULE_2, MODULE_3) as the definitive sample manifest.
 #
 # Usage:
-#   bash S16_make_bam_provenance.sh
+#   bash STEP_B08_make_bam_provenance.sh
 #
 # Outputs:
 #   ${OUT}
-#   S16_make_bam_provenance.arg
-#   S16_make_bam_provenance.results
+#   STEP_B08_make_bam_provenance.arg
+#   STEP_B08_make_bam_provenance.results
 ###############################################################################
 set -euo pipefail
 
-STEP="S16_make_bam_provenance"
+STEP="STEP_B08_make_bam_provenance"
 timestamp(){ date '+%F %T'; }
 
 ROOT="/scratch/lt200308-agbsci/Quentin_project_KEEP_2026-02-04"

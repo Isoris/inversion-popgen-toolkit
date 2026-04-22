@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ###############################################################################
-# S10_merge_markdup_clip.slurm
+# SLURM_B02_merge_markdup_clip.slurm
 #
 # SLURM array job: merges per-run BAMs into one BAM per sample, validates
 # RG/SM consistency, performs fixmate + markdup, optionally runs clipOverlap,
@@ -8,7 +8,7 @@
 #
 # Usage:
 #   # First run once to build sample list, then:
-#   sbatch --array=1-<N> S10_merge_markdup_clip.slurm
+#   sbatch --array=1-<N> SLURM_B02_merge_markdup_clip.slurm
 #
 # Outputs per sample:
 #   ${OUTBASE}/<Sample>/<Sample>.merged.markdup.clip.bam
@@ -17,7 +17,7 @@
 #   ${OUTBASE}/results/QC_ROWS.tsv  (one row appended per sample)
 #
 # Sidecar (written once if missing):
-#   ${OUTBASE}/S10_merge_markdup_clip.arg
+#   ${OUTBASE}/SLURM_B02_merge_markdup_clip.arg
 ###############################################################################
 #SBATCH -p compute
 #SBATCH -N 1
@@ -32,7 +32,7 @@ set -euo pipefail
 source ~/.bashrc
 mamba activate assembly
 
-STEP="S10_merge_markdup_clip"
+STEP="SLURM_B02_merge_markdup_clip"
 timestamp(){ date '+%F %T'; }
 
 # ---- Config ----

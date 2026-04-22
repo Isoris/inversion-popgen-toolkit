@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
 ###############################################################################
-# S11_get_tlen_percentiles.sh
+# STEP_B03_get_tlen_percentiles.sh
 #
 # Computes approximate p95 and p99 absolute TLEN values from a properly
 # paired, primary, high-quality BAM.
 #
 # Usage:
-#   bash S11_get_tlen_percentiles.sh sample.markdup.clip.bam
-#   bash S11_get_tlen_percentiles.sh sample.markdup.clip.bam > tlen_pcts.tsv
+#   bash STEP_B03_get_tlen_percentiles.sh sample.markdup.clip.bam
+#   bash STEP_B03_get_tlen_percentiles.sh sample.markdup.clip.bam > tlen_pcts.tsv
 #
 # Filters: -f 0x2 (proper pair) -F 0xF0C (exclude unmapped/secondary/dup/supp) -q 60
 #
 # Output (stdout): tab-separated p95 and p99 values
-# Sidecar: <bam_dir>/S11_get_tlen_percentiles.<sample>.arg
+# Sidecar: <bam_dir>/STEP_B03_get_tlen_percentiles.<sample>.arg
 ###############################################################################
 set -euo pipefail
 
-STEP="S11_get_tlen_percentiles"
+STEP="STEP_B03_get_tlen_percentiles"
 timestamp(){ date '+%F %T'; }
 
 BAM="${1:?Usage: $0 sample.bam}"

@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
 ###############################################################################
-# S15_summarize_bam_qc.sh
+# STEP_B07_summarize_bam_qc.sh
 #
 # Parses per-sample samtools stats and flagstat outputs from merged BAMs,
 # writes a per-sample QC table, and generates a summary report with depth
 # distributions and heuristic ANGSD depth cutoff suggestions.
 #
 # Usage:
-#   sbatch S15_summarize_bam_qc.sh
-#   # or: bash S15_summarize_bam_qc.sh  (if run interactively)
+#   sbatch STEP_B07_summarize_bam_qc.sh
+#   # or: bash STEP_B07_summarize_bam_qc.sh  (if run interactively)
 #
 # Outputs:
 #   ${OUTDIR}/all_samples.bam_qc.tsv
 #   ${OUTDIR}/summary.txt
-#   ${OUTDIR}/S15_summarize_bam_qc.arg
-#   ${OUTDIR}/S15_summarize_bam_qc.results
+#   ${OUTDIR}/STEP_B07_summarize_bam_qc.arg
+#   ${OUTDIR}/STEP_B07_summarize_bam_qc.results
 ###############################################################################
 #SBATCH -p compute
 #SBATCH -N 1
@@ -30,7 +30,7 @@ set -euo pipefail
 source ~/.bashrc
 mamba activate assembly >/dev/null 2>&1 || true
 
-STEP="S15_summarize_bam_qc"
+STEP="STEP_B07_summarize_bam_qc"
 timestamp(){ date '+%F %T'; }
 
 BASE="$(pwd)"

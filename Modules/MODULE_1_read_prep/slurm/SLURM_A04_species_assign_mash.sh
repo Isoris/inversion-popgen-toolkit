@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
 ###############################################################################
-# S04_species_assign_mash.slurm
+# SLURM_A04_species_assign_mash.slurm
 #
 # Builds Mash sketches for Gar and Mac references, sketches all fastp read
 # pairs, assigns each run-lane unit by Mash distance in parallel, and writes
 # both per-run and collapsed per-CGA species assignment tables.
 #
 # Usage:
-#   sbatch S04_species_assign_mash.slurm
+#   sbatch SLURM_A04_species_assign_mash.slurm
 #
 # Outputs:
 #   ${OUTDIR}/results.tsv              Per-run Mash distances + call
 #   ${OUTDIR}/results.per_CGA.tsv      Collapsed per-CGA majority call
-#   ${OUTDIR}/S04_species_assign_mash.arg
-#   ${OUTDIR}/S04_species_assign_mash.results
-#   ${OUTDIR}/S04_species_assign_mash.metric.tsv
+#   ${OUTDIR}/SLURM_A04_species_assign_mash.arg
+#   ${OUTDIR}/SLURM_A04_species_assign_mash.results
+#   ${OUTDIR}/SLURM_A04_species_assign_mash.metric.tsv
 ###############################################################################
 #SBATCH -p compute
 #SBATCH -N 1
@@ -29,7 +29,7 @@ set -euo pipefail
 source ~/.bashrc
 mamba activate assembly
 
-STEP="S04_species_assign_mash"
+STEP="SLURM_A04_species_assign_mash"
 timestamp(){ date '+%F %T'; }
 
 # ---- Paths ----

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ###############################################################################
-# S05_species_assign_kmers.sh
+# STEP_A05_species_assign_kmers.sh
 #
 # Builds Mash sketches and/or meryl k-mer sets for two reference species,
 # scores each WGS sample, and assigns it to Species1, Species2, or Ambiguous.
@@ -9,18 +9,18 @@
 # version optimized for the fClaHyb project, see S04_species_assign_mash.slurm.
 #
 # Usage:
-#   bash S05_species_assign_kmers.sh \
+#   bash STEP_A05_species_assign_kmers.sh \
 #     -a Species1.fa -b Species2.fa -r /path/to/reads -o outdir [options]
 #
 # Outputs:
 #   ${OUTDIR}/results.tsv
-#   ${OUTDIR}/S05_species_assign_kmers.arg
-#   ${OUTDIR}/S05_species_assign_kmers.results
-#   ${OUTDIR}/S05_species_assign_kmers.metric.tsv
+#   ${OUTDIR}/STEP_A05_species_assign_kmers.arg
+#   ${OUTDIR}/STEP_A05_species_assign_kmers.results
+#   ${OUTDIR}/STEP_A05_species_assign_kmers.metric.tsv
 ###############################################################################
 set -euo pipefail
 
-STEP="S05_species_assign_kmers"
+STEP="STEP_A05_species_assign_kmers"
 timestamp(){ date '+%F %T'; }
 
 # ---- Defaults ----

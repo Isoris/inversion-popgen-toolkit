@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 ###############################################################################
-# S09_map_minimap2.slurm
+# SLURM_B01_map_minimap2.slurm
 #
 # Maps fastp-processed paired-end reads with minimap2 in SR mode, adds
 # read-group information, sorts and indexes each per-run BAM.
 #
 # Usage:
-#   sbatch --export=ALL,BATCH=00 S09_map_minimap2.slurm
-#   sbatch --export=ALL,BATCH=01,TSV=/path/to/batch01.tsv S09_map_minimap2.slurm
+#   sbatch --export=ALL,BATCH=00 SLURM_B01_map_minimap2.slurm
+#   sbatch --export=ALL,BATCH=01,TSV=/path/to/batch01.tsv SLURM_B01_map_minimap2.slurm
 #
 # Input TSV columns (tab-separated, with header):
 #   Sample  Run  Lane  R1  R2
@@ -18,8 +18,8 @@
 #   ${LOGDIR}/<Sample>.<Run>.<Lane>.log
 #
 # Sidecar files:
-#   ${OUTDIR}/S09_map_minimap2.arg
-#   ${OUTDIR}/S09_map_minimap2.results
+#   ${OUTDIR}/SLURM_B01_map_minimap2.arg
+#   ${OUTDIR}/SLURM_B01_map_minimap2.results
 ###############################################################################
 #SBATCH -p compute
 #SBATCH -N 1
@@ -34,7 +34,7 @@ set -euo pipefail
 source ~/.bashrc
 mamba activate assembly
 
-STEP="S09_map_minimap2"
+STEP="SLURM_B01_map_minimap2"
 timestamp(){ date '+%F %T'; }
 
 # ---- Paths ----

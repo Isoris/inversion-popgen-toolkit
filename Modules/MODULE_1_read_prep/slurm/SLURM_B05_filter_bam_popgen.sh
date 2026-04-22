@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
 ###############################################################################
-# S13_filter_bam_popgen.slurm
+# SLURM_B05_filter_bam_popgen.slurm
 #
 # SLURM array job: filters merged markdup+clip BAMs for population genomics.
 # Applies: MAPQ >= 60, proper pair, exclude unmapped/secondary/dup/supp,
 # same-chromosome mate, absolute TLEN within empirical p99 band.
 #
 # Usage:
-#   sbatch --array=0-<N-1> S13_filter_bam_popgen.slurm
+#   sbatch --array=0-<N-1> SLURM_B05_filter_bam_popgen.slurm
 #
 # Outputs per sample:
 #   <sample>.filtered.bam + .bai
 #   <sample>.filtered.flagstat.txt
 #
 # Sidecar:
-#   ${RESULTS_DIR}/S13_filter_bam_popgen.arg
+#   ${RESULTS_DIR}/SLURM_B05_filter_bam_popgen.arg
 ###############################################################################
 #SBATCH -p compute
 #SBATCH -N 1
@@ -29,7 +29,7 @@ set -euo pipefail
 source ~/.bashrc
 mamba activate assembly
 
-STEP="S13_filter_bam_popgen"
+STEP="SLURM_B05_filter_bam_popgen"
 timestamp(){ date '+%F %T'; }
 
 SAMTOOLS="$(command -v samtools)"
