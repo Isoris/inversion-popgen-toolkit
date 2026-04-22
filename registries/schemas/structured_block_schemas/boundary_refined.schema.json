@@ -1,0 +1,57 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "boundary_refined.schema.json",
+  "block_type_template": "boundary_refined_{left|right}",
+  "title": "boundary_refined",
+  "version": "v1_chat18",
+  "description": "Refined consensus breakpoint from the dosage-based breakpoint pipeline. Parallel to boundary_{left|right} (from STEP_C01g) but produced by 03_consensus_merge via weighted median over multiple per-method sources (ancestral_fragments, block_extension, c01j_transitions, step40_coherence, step41_switches, c01l_segments, step37_sv). CI is derived from the weighted MAD of agreeing methods. Written twice per candidate (boundary_refined_left, boundary_refined_right). Does NOT overwrite boundary_{side}; the two blocks coexist so downstream consumers can compare the refined estimate against the original C01g catalog. Long-format per-method table lives at breakpoints_per_method.json alongside.",
+  "question": "Q3",
+  "group_validation_required": "NONE",
+  "source_script": "03_consensus_merge.R",
+  "type": "object",
+  "required": ["side", "final_bp"],
+  "properties": {
+    "side": { "type": "string", "enum": ["left", "right"] },
+    "final_bp": {
+      "type": "integer",
+      "description": "Consensus breakpoint position (weighted median over agreeing methods, in bp)."
+    },
+    "ci_low":              { "type": ["integer", "null"] },
+    "ci_high":             { "type": ["integer", "null"] },
+    "ci_width_kb":         { "type": ["number", "null"], "minimum": 0 },
+    "n_methods_total":     { "type": ["integer", "null"], "minimum": 0,
+                              "description": "Number of methods that contributed an estimate (available sources)." },
+    "n_methods_agreeing":  { "type": ["integer", "null"], "minimum": 0,
+                              "description": "Count of methods within 2 × weighted-MAD of final_bp." },
+    "primary_source":      { "type": ["string", "null"],
+                              "enum": ["ancestral_fragments", "block_extension", "c01j_transitions",
+                                       "step40_coherence", "step41_switches", "c01l_segments",
+                                       "step37_sv", null],
+                              "description": "Highest-weight method that was available and within the agreement band." },
+    "sources_available":   { "type": ["array", "null"],
+                              "items": { "type": "string" },
+                              "description": "List of method names that supplied an estimate for this side." },
+    "weighted_mad_kb":     { "type": ["number", "null"], "minimum": 0 },
+    "refined_vs_input_shift_kb": {
+      "type": ["number", "null"],
+      "description": "Signed shift from the originally-registered candidate boundary (start_bp for side=left, end_bp for side=right), in kb."
+    },
+    "refined_vs_c01g_shift_kb": {
+      "type": ["number", "null"],
+      "description": "Signed shift from the STEP_C01g boundary_{side} call if present; NA otherwise. Lets reviewers compare the two methods directly."
+    },
+    "weights_used": {
+      "type": ["object", "null"],
+      "description": "Per-method weights actually applied in the consensus (recorded for reproducibility)."
+    }
+  },
+  "keys_extracted": [
+    { "key": "q3_refined_{side}_bp",                "from": "final_bp" },
+    { "key": "q3_refined_{side}_ci_width_kb",       "from": "ci_width_kb" },
+    { "key": "q3_refined_{side}_n_methods",         "from": "n_methods_total" },
+    { "key": "q3_refined_{side}_n_methods_agreeing","from": "n_methods_agreeing" },
+    { "key": "q3_refined_{side}_primary_source",    "from": "primary_source" },
+    { "key": "q3_refined_{side}_shift_kb",          "from": "refined_vs_input_shift_kb" }
+  ],
+  "note_on_side_templating": "The library substitutes {side} with 'left' or 'right' at key extraction time based on block_type — matches the pre-existing boundary.schema.json convention."
+}

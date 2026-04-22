@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "encoding_robustness.schema.json",
+  "block_type": "encoding_robustness",
+  "title": "encoding_robustness",
+  "version": "v1_chat18",
+  "description": "Diagnostic block from 05_four_encoding_diagnostic.R. For each candidate with composite/uncertain structure, the dosage matrix is re-encoded four ways (minor, major, 012, STEP29-polarized), a hclust(ward.D2) cutree(k=3) clustering is computed under each, and pairwise Adjusted Rand Index is reported. Interpretation: min_ari >= 0.9 = structure is robust to encoding choice; min_ari in [0.5, 0.9] = one encoding disagrees (inspect); min_ari < 0.5 = candidate is ambiguous / composite. Does NOT enter the consensus merge; it's a robustness check for composite candidates only.",
+  "question": "Q2",
+  "group_validation_required": "NONE",
+  "source_script": "05_four_encoding_diagnostic.R",
+  "type": "object",
+  "required": ["status"],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["ok", "insufficient_markers", "insufficient_samples", "no_polarity"],
+      "description": "ok = 4x4 ARI matrix computed; other values indicate a skip reason."
+    },
+    "reason":            { "type": ["string", "null"] },
+    "n_markers_used":    { "type": ["integer", "null"], "minimum": 0 },
+    "n_samples_used":    { "type": ["integer", "null"], "minimum": 0 },
+    "encodings_used": {
+      "type": ["array", "null"],
+      "items": { "type": "string", "enum": ["minor", "major", "012", "polarized"] }
+    },
+    "ari_matrix": {
+      "type": ["object", "null"],
+      "description": "4x4 symmetric matrix keyed by encoding pair. Example: { 'minor_vs_major': 1.0, 'minor_vs_012': 0.98, 'minor_vs_polarized': 0.94, 'major_vs_012': 0.98, 'major_vs_polarized': 0.94, '012_vs_polarized': 0.95 }."
+    },
+    "min_ari":           { "type": ["number", "null"], "minimum": -1, "maximum": 1,
+                            "description": "Minimum pairwise ARI across all encoding pairs." },
+    "mean_ari":          { "type": ["number", "null"], "minimum": -1, "maximum": 1 },
+    "verdict": {
+      "type": ["string", "null"],
+      "enum": ["robust", "partial", "ambiguous", null],
+      "description": "robust = min_ari >= 0.9, partial = [0.5, 0.9), ambiguous = <0.5."
+    },
+    "clusters_disagreeing": {
+      "type": ["array", "null"],
+      "items": { "type": "string" },
+      "description": "Encoding pair(s) with ARI below the robust threshold, if any."
+    },
+    "heatmap_pdf_path":  { "type": ["string", "null"] },
+    "mds_pdf_path":      { "type": ["string", "null"] }
+  },
+  "keys_extracted": [
+    { "key": "q2_encoding_min_ari",  "from": "min_ari" },
+    { "key": "q2_encoding_mean_ari", "from": "mean_ari" },
+    { "key": "q2_encoding_verdict",  "from": "verdict" }
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "breakpoints_per_method.schema.json",
+  "block_type": "breakpoints_per_method",
+  "title": "breakpoints_per_method",
+  "version": "v1_chat18",
+  "description": "Long-format companion to boundary_refined_{left,right}. One row per (method, side) with the method's own estimate, weight applied in the consensus, optional per-method CI (where the method natively produces one), signed distance to the consensus, and a boolean flag for 'within the agreement band' (|distance_to_consensus| <= 2 * weighted_MAD). Used for audit and for the diagnostic figure (script 04), which plots per-method estimates as horizontal tick marks colored by within_agreement_band. Methods: ancestral_fragments (weight 3.0), block_extension (2.0), c01j_transitions (2.0), step40_coherence (1.0), step41_switches (1.0), c01l_segments (1.0), step37_sv (0.5).",
+  "question": "Q3",
+  "group_validation_required": "NONE",
+  "source_script": "03_consensus_merge.R",
+  "type": "object",
+  "required": ["methods"],
+  "properties": {
+    "methods": {
+      "type": "array",
+      "description": "One entry per (method, side) that contributed an estimate.",
+      "items": {
+        "type": "object",
+        "required": ["method", "side", "breakpoint_bp", "weight"],
+        "properties": {
+          "method": {
+            "type": "string",
+            "enum": ["ancestral_fragments", "block_extension", "c01j_transitions",
+                     "step40_coherence", "step41_switches", "c01l_segments",
+                     "step37_sv"]
+          },
+          "side": { "type": "string", "enum": ["left", "right"] },
+          "breakpoint_bp": { "type": "integer" },
+          "weight": { "type": "number", "minimum": 0 },
+          "ci_low":  { "type": ["integer", "null"] },
+          "ci_high": { "type": ["integer", "null"] },
+          "distance_to_consensus_kb": { "type": ["number", "null"],
+                                         "description": "Signed distance in kb (method_bp - consensus_bp) / 1000." },
+          "within_agreement_band": { "type": ["boolean", "null"],
+                                      "description": "|distance_to_consensus_kb| <= 2 * weighted_MAD_kb." },
+          "source_path": { "type": ["string", "null"],
+                            "description": "Path to the upstream file this estimate was read from, for provenance." }
+        }
+      }
+    },
+    "n_methods": { "type": "integer", "minimum": 0 },
+    "sides_populated": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["left", "right"] }
+    }
+  },
+  "keys_extracted": [
+    { "key": "q3_n_methods_total", "from": "n_methods" }
+  ]
+}

@@ -1,0 +1,63 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "dosage_blocks.schema.json",
+  "block_type": "dosage_blocks",
+  "title": "dosage_blocks",
+  "version": "v1_chat18",
+  "description": "Per-candidate dosage-signal core block and extension breakpoints. Produced by 01_dosage_signal.R via marker correlation (core block) and per-marker correlation walk outward from the core (extension). One of the per-method sources consumed by 03_consensus_merge when it computes the refined consensus breakpoint. The 'ext_left_bp' and 'ext_right_bp' fields are the block-extension breakpoint estimates (weight 2.0 in the consensus).",
+  "question": "Q3",
+  "group_validation_required": "NONE",
+  "source_script": "01_dosage_signal.R",
+  "type": "object",
+  "required": ["status"],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["ok", "insufficient_informative_markers", "no_core_block", "extension_failed"],
+      "description": "ok = all four steps succeeded; other values indicate which step aborted."
+    },
+    "reason": {
+      "type": ["string", "null"],
+      "description": "Human-readable reason when status != 'ok'."
+    },
+    "core_left_marker_idx":  { "type": ["integer", "null"] },
+    "core_right_marker_idx": { "type": ["integer", "null"] },
+    "core_left_bp":          { "type": ["integer", "null"] },
+    "core_right_bp":         { "type": ["integer", "null"] },
+    "core_n_markers":        { "type": ["integer", "null"], "minimum": 0 },
+    "core_top_tier_n":       { "type": ["integer", "null"], "minimum": 0 },
+    "core_mean_block_cor":   { "type": ["number", "null"], "minimum": -1, "maximum": 1 },
+    "ext_left_marker_idx":   { "type": ["integer", "null"] },
+    "ext_right_marker_idx":  { "type": ["integer", "null"] },
+    "ext_left_bp": {
+      "type": ["integer", "null"],
+      "description": "Block-extension LEFT breakpoint estimate (bp). Per-method source for 03_consensus_merge, method='block_extension', weight=2.0."
+    },
+    "ext_right_bp": {
+      "type": ["integer", "null"],
+      "description": "Block-extension RIGHT breakpoint estimate (bp). Per-method source for 03_consensus_merge."
+    },
+    "extended_left_snps":    { "type": ["integer", "null"], "minimum": 0 },
+    "extended_right_snps":   { "type": ["integer", "null"], "minimum": 0 },
+    "left_cor_stop":         { "type": ["number", "null"] },
+    "right_cor_stop":        { "type": ["number", "null"] },
+    "delta_min":             { "type": "number", "description": "Parameter used; informative if |h2_mean - h1_mean| >= delta_min." },
+    "rho_block":             { "type": "number", "description": "Parameter used; min marker-marker |cor| for core-block adjacency." },
+    "rho_ext":               { "type": "number", "description": "Parameter used; min |cor| to extend past core-block edge." },
+    "input_start_bp":        { "type": ["integer", "null"] },
+    "input_end_bp":          { "type": ["integer", "null"] },
+    "shift_left_kb":         { "type": ["number", "null"] },
+    "shift_right_kb":        { "type": ["number", "null"] },
+    "extended_span_bp":      { "type": ["integer", "null"], "minimum": 0 },
+    "n_informative":         { "type": ["integer", "null"], "minimum": 0 },
+    "markers_tsv_path":      { "type": ["string", "null"], "description": "Path to the per-marker TSV under evidence_registry/.../raw/" }
+  },
+  "keys_extracted": [
+    { "key": "q3_dosage_status",          "from": "status" },
+    { "key": "q3_dosage_ext_left_bp",     "from": "ext_left_bp" },
+    { "key": "q3_dosage_ext_right_bp",    "from": "ext_right_bp" },
+    { "key": "q3_dosage_core_n_markers",  "from": "core_n_markers" },
+    { "key": "q3_dosage_shift_left_kb",   "from": "shift_left_kb" },
+    { "key": "q3_dosage_shift_right_kb",  "from": "shift_right_kb" }
+  ]
+}

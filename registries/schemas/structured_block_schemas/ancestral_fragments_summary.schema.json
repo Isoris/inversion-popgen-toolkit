@@ -1,0 +1,54 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "ancestral_fragments_summary.schema.json",
+  "block_type": "ancestral_fragments_summary",
+  "title": "ancestral_fragments_summary",
+  "version": "v1_chat18",
+  "description": "Per-candidate summary of the ancestral-fragment scan (02_ancestral_fragments.R). For each inversion carrier (HET + HOM_INV), the per-carrier fragment boundaries were found by extending outward from the core block one SNP at a time until the carrier's dosage correlation with the core consensus drops. The distribution of boundaries across carriers gives the population-level breakpoint estimate (KDE mode) and its CI (bootstrap). This block stores the per-candidate summary only; the per-carrier fragment table lives under evidence_registry/.../raw/ancestral_fragments_per_sample.tsv.gz. Primary source for 03_consensus_merge (method='ancestral_fragments', weight=3.0).",
+  "question": "Q3",
+  "group_validation_required": "NONE",
+  "source_script": "02_ancestral_fragments.R",
+  "type": "object",
+  "required": ["status"],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["ok", "insufficient_carriers", "no_block_available", "bootstrap_failed"],
+      "description": "ok = KDE mode and bootstrap CI computed; other values indicate abort reason."
+    },
+    "reason":                 { "type": ["string", "null"] },
+    "n_carriers":             { "type": ["integer", "null"], "minimum": 0,
+                                 "description": "n_HET + n_HOM_INV used for the per-carrier scan." },
+    "n_het":                  { "type": ["integer", "null"], "minimum": 0 },
+    "n_hom_inv":              { "type": ["integer", "null"], "minimum": 0 },
+    "frag_left_bp_mode": {
+      "type": ["integer", "null"],
+      "description": "KDE mode of per-carrier LEFT fragment boundaries. Primary LEFT breakpoint estimate. Consumed by 03_consensus_merge with weight 3.0."
+    },
+    "frag_right_bp_mode": {
+      "type": ["integer", "null"],
+      "description": "KDE mode of per-carrier RIGHT fragment boundaries. Primary RIGHT breakpoint estimate."
+    },
+    "frag_left_ci_low":       { "type": ["integer", "null"] },
+    "frag_left_ci_high":      { "type": ["integer", "null"] },
+    "frag_right_ci_low":      { "type": ["integer", "null"] },
+    "frag_right_ci_high":     { "type": ["integer", "null"] },
+    "frag_left_ci_width_kb":  { "type": ["number", "null"], "minimum": 0 },
+    "frag_right_ci_width_kb": { "type": ["number", "null"], "minimum": 0 },
+    "frag_left_mad_kb":       { "type": ["number", "null"], "minimum": 0,
+                                 "description": "Median absolute deviation (kb) of per-carrier LEFT boundaries — tail-weight summary." },
+    "frag_right_mad_kb":      { "type": ["number", "null"], "minimum": 0 },
+    "rho_frag":               { "type": "number", "description": "Per-sample correlation threshold used in scan (default 0.5)." },
+    "bootstrap_reps":         { "type": "integer", "minimum": 0 },
+    "ci_level":               { "type": "number", "minimum": 0, "maximum": 1 },
+    "fragments_tsv_path":     { "type": ["string", "null"], "description": "Path to per-carrier fragments TSV under raw/." }
+  },
+  "keys_extracted": [
+    { "key": "q3_frag_status",           "from": "status" },
+    { "key": "q3_frag_left_bp_mode",     "from": "frag_left_bp_mode" },
+    { "key": "q3_frag_right_bp_mode",    "from": "frag_right_bp_mode" },
+    { "key": "q3_frag_left_ci_width_kb", "from": "frag_left_ci_width_kb" },
+    { "key": "q3_frag_right_ci_width_kb","from": "frag_right_ci_width_kb" },
+    { "key": "q3_frag_n_carriers",       "from": "n_carriers" }
+  ]
+}
