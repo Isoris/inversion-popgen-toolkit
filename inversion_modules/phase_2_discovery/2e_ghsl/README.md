@@ -1,8 +1,16 @@
-# phase_2_discovery/2e_ghsl — Snake 3 / GHSL v6
+# phase_2_discovery/2e_ghsl — GHSL haplotype contrast (Layer C), v6
 
 **Status:** v6 installed 2026-04-18. v5 archived to
 `_archive_superseded/2e_ghsl_v5/` (original README kept as
 `README_v5.md` in that dir).
+
+*Terminology:* what older docs called "Snake 3" is this folder's GHSL
+haplotype-contrast layer, which maps onto Layer C of the 4-layer
+independence framework described in `inversion_modules/README.md`. The
+"Snake" name is retired from current vocabulary; legacy references
+remain in archived design docs and in identifiers inside produced data
+files (e.g. `snake3v6_*` output filenames) — those are tracked for a
+coordinated rename in `2c_precomp/RENAMING.md` and not touched here.
 
 ## Why v6 replaces v5
 

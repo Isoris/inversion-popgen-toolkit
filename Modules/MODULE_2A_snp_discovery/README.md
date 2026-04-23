@@ -4,7 +4,7 @@ Callable-site masking, ANGSD biSNP discovery, distance-thinned panels, BEAGLE GL
 
 ## Why this module exists (for the inversion paper)
 
-Every ancestry-flavored inversion signal is anchored to this module's biallelic SNP panel. ANGSD calls biSNPs from genotype likelihoods at cohort scale — the only statistically appropriate way to work with low-coverage data without hard genotype calls. The thinned panel produced here feeds NGSadmix for global ancestry Q, and Engine B / instant_q for per-window local Q. MODULE_5A's three-snake inversion-discovery consensus computes against those Q estimates — without this module's panel, there is nothing to compute against.
+Every ancestry-flavored inversion signal is anchored to this module's biallelic SNP panel. ANGSD calls biSNPs from genotype likelihoods at cohort scale — the only statistically appropriate way to work with low-coverage data without hard genotype calls. The thinned panel produced here feeds NGSadmix for global ancestry Q, and Engine B / instant_q for per-window local Q. The downstream inversion-discovery pipeline (`inversion_modules/phase_2_discovery/`) uses these Q estimates in its 4-layer evidence framework (Layer A = dosage / local PCA, Layer B = SV calls, Layer C = GHSL haplotype contrast, Layer D = genotype-breakpoint association) — without this module's panel, there is nothing to compute against.
 
 NAToRA first-degree pruning (A07) also produces the 81-unrelated subset used for Hardy-Weinberg-sensitive tests including Hobs confirmation (MODULE_5E) and inversion genotype-frequency tests.
 
@@ -151,7 +151,7 @@ Matches inversion codebase v8.5:
 
 ## Key design decisions
 
-**Folded SFS throughout.** No suitable outgroup species; hatchery F₁ hybrids violate HWE assumptions required for unfolded SFS. All SFS computations use `-fold 1`.
+**Folded SFS throughout.** No suitable outgroup species; hatchery broodstock with limited founders violates HWE assumptions required for unfolded SFS. All SFS computations use `-fold 1`.
 
 **Pest prior for SNP discovery.** Per-site allele frequency prior estimated from folded SFS via realSFS, applied to biSNP calling with `-pest`. This avoids the common ANGSD pitfall of flat priors biasing low-MAF calls.
 

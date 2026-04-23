@@ -86,13 +86,13 @@
 # The question is: what's the RIGHT K for each use?
 #
 # UPFRONT — this cohort is NOT structure-matched by K. The hatchery has
-# 20+ small families, so the K that would actually match the ancestry
-# structure is ~20. But K is used here as a *scan parameter for inversion
-# regime detection*, not as a tool for describing cohort structure, and
-# the right K for inversion detection is well below the structure K. The
-# ancestry layer routinely scans K=2..12 (and occasionally up to 20) to
-# verify stability; K=8 is the default presented here for per-candidate
-# downstream steps.
+# 20+ small families as the biological structure; the K that would
+# actually match the ancestry structure is ~20. But K is used here as a
+# *scan parameter for inversion regime detection*, not as a tool for
+# describing cohort structure, and the right K for inversion detection
+# is well below the structure K. The ancestry layer routinely scans
+# K=2..12 (and occasionally up to 20) for stability checks; K=8 is the
+# default presented here for per-candidate downstream steps.
 #
 # Why K=8 is the default for inversion-regime scans:
 #
@@ -104,10 +104,10 @@
 #
 #   2. Statistical tractability. At K=8 the average group size is ~28
 #      samples, which is the minimum useful regime for Fst / jackknife
-#      tests on a 226-sample cohort. At K=20 (structure-matched), you
-#      get ~11 samples per group — Fst estimator variance dominates and
-#      "drop-one-group" jackknife barely moves the signal because each
-#      group is too small to matter.
+#      tests on a 226-sample cohort. At K=20 (approximately structure-
+#      matched), you get ~11 samples per group — Fst estimator variance
+#      dominates and "drop-one-group" jackknife barely moves the signal
+#      because each group is too small to matter.
 #
 #   3. Composite-detection alphabet. nested_composition reads the local
 #      assigned_pop label per window per sample; at K=8 you have 8
@@ -147,9 +147,10 @@
 #     it's real. If it disappears at K=12, K=8 was too coarse.
 #     Cheap: <20 candidates × 2 min each.
 #
-#   - Ancestry-structure questions (how many founder lines, which
-#     samples share broodline background) → use the full K=2..12 sweep
-#     directly, don't rely on the K=8 default.
+#   - Ancestry-structure questions (how many broodlines, which samples
+#     share broodline background) → use the full K=2..12 sweep directly,
+#     don't rely on the K=8 default. For this cohort K=12-20 is the
+#     right range to actually resolve the ~20 hatchery broodlines.
 #
 #   - A new cohort with different sample size → re-pick K to keep
 #     samples/component ≥ 25; that's the binding statistical constraint.

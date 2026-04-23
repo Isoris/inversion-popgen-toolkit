@@ -236,7 +236,7 @@ The MODULE_4A output is the **foundation for all per-sample analyses** that need
 
 5. **Clair3 has no cohort-level joint calling.** Unlike GATK's joint genotyping or DeepVariant's GVCF-based aggregation, Clair3 calls each sample independently. The pipeline's regenotyping (STEP_P07A) partially mitigates by forcing per-sample genotypes at all population sites, but this is regenotyping after independent discovery, not true joint calling. Cohort-level coverage information that could rescue per-sample weak calls is not used by Clair3 directly.
 
-6. **The per-sample classification (BC0–BC4) requires SnpEff annotation.** SnpEff databases are reference-specific. MODULE_CON's scoring pipeline depends on a SnpEff database built for the catfish hybrid reference; quality of annotation depends on the gene model quality (`fClaHyb_Gar_LG.from_CGAR.gff3_polished.sorted.gff3`).
+6. **The per-sample classification (BC0–BC4) requires SnpEff annotation.** SnpEff databases are reference-specific. MODULE_CON's scoring pipeline depends on a SnpEff database built for the *C. gariepinus* Gar subgenome reference (extracted from the haplotype-resolved F1 hybrid assembly in Section 1 of the manuscript); quality of annotation depends on the gene model quality (`fClaHyb_Gar_LG.from_CGAR.gff3_polished.sorted.gff3`).
 
 ---
 

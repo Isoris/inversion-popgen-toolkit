@@ -240,7 +240,7 @@ build_key_spec <- function() {
   )
   q4_aspir <- c(
     # TE and GO enrichment require RepeatMasker + GO annotation — may not
-    # be run on the hybrid genome. Mark as aspirational.
+    # be run on the Gar subgenome reference. Mark as aspirational.
     "q4_te_family_left", "q4_te_family_right",
     "q4_te_enrichment", "q4_te_enrichment_fold",
     "q4_te_name_left", "q4_te_name_right",

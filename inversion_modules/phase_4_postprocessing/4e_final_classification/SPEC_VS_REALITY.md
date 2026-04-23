@@ -151,7 +151,7 @@ Population-prior sub-block (3 keys):
 
 **Q3 repeat annotation (RepeatMasker) — 9 keys**
 
-These require RepeatMasker to be run on the hybrid genome. The pipeline
+These require RepeatMasker to be run on the Gar subgenome reference. The pipeline
 exists but hasn't been run on all chromosomes in the current tarball.
 Wiring target: RepeatMasker run + TSV → registry key extraction in C01g.
 
@@ -167,10 +167,10 @@ Wiring target: RepeatMasker run + TSV → registry key extraction in C01g.
 
 **Q4 TE + GO enrichment — 9 keys**
 
-Require RepeatMasker TE tracks + GO annotation on the *C. gariepinus*
-reference (`fClaHyb_Gar_LG.fa`, the *gariepinus* haplotype extracted
-from the haplotype-resolved F1 hybrid assembly). These were marked
-aspirational because TE family / GO annotation coverage on this
+Require RepeatMasker TE tracks + GO annotation on the Gar subgenome
+reference (`fClaHyb_Gar_LG.fa`, the *C. gariepinus* haplotype extracted
+from Section 1's haplotype-resolved F₁ hybrid assembly). These were
+marked aspirational because TE family / GO annotation coverage on this
 reference may be incomplete compared to long-established reference
 species.
 

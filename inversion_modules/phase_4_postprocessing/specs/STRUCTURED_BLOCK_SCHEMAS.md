@@ -120,7 +120,7 @@
 
 # ─────────────────────────────────────────────────────────────────────────────
 # BLOCK 3: existence_layer_c.json (GHSL haplotype contrast)
-# Source: C04 Snake 3 GHSL
+# Source: C04 GHSL (Layer C — haplotype contrast)
 # Question: Q7
 # Group requirement: NONE (GHSL produces its own partition)
 # ─────────────────────────────────────────────────────────────────────────────

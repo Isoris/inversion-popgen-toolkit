@@ -273,7 +273,7 @@ REPORT="${DIR_REF}/reference_summary.txt"
     echo "======================================"
     echo "REFERENCE GENOME SUMMARY"
     echo "======================================"
-    echo "Genome:    fClaHyb_Gar_LG (Clarias gariepinus × C. macrocephalus F1 hybrid, Gar haplotype)"
+    echo "Genome:    fClaHyb_Gar_LG (Clarias gariepinus Gar subgenome, extracted from the haplotype-resolved F1 hybrid assembly)"
     echo "FASTA:     ${REF_FASTA}"
     echo ""
 

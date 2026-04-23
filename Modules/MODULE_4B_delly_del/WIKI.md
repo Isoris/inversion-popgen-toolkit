@@ -188,7 +188,7 @@ MODULE_4B's `SLURM_A01_prep_inputs.sh` builds the **exclusion BED** that all oth
 
 ### How the exclusion BED is constructed
 
-The standard approach for DELLY is to download a curated exclusion list (telomeres, centromeres, gaps) for the reference genome. The catfish hybrid reference does not have such a list. Instead, MODULE_4B builds it empirically:
+The standard approach for DELLY is to download a curated exclusion list (telomeres, centromeres, gaps) for the reference genome. The *C. gariepinus* Gar subgenome reference (`fClaHyb_Gar_LG.fa`, extracted from the haplotype-resolved F1 hybrid assembly in Section 1 of the manuscript) does not have such a list. Instead, MODULE_4B builds it empirically:
 
 ```
 Step 1: Run mosdepth at 50-kb bins across the reference (output: callable_bp per bin)
