@@ -5,7 +5,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="${SLURM_SUBMIT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
-source "${SCRIPT_DIR}/00_breakpoint_validation_config.sh"
+source "${SCRIPT_DIR}/00_phase3_config.sh"
 
 bpv_init_dirs
 
@@ -21,7 +21,7 @@ echo ""
 JID1=$(sbatch --parsable \
   --account=lt200308 \
   -o "${BPV_LOGS}/01_extract.%j.out" -e "${BPV_LOGS}/01_extract.%j.err" \
-  "${SCRIPT_DIR}/01_extract_inv_candidates.sh")
+  "${SCRIPT_DIR}/STEP_A01_extract_inv_candidates.sh")
 echo "  [1/6] Extract candidates (DELLY+Manta):  Job ${JID1}"
 
 # STEP 2: Per-sample BAM evidence (caller-agnostic pysam)
@@ -34,14 +34,14 @@ JID2=$(sbatch --parsable --dependency=afterok:${JID1} \
     set -euo pipefail
     source ~/.bashrc
     mamba activate assembly
-    source '${SCRIPT_DIR}/00_breakpoint_validation_config.sh'
+    source '${SCRIPT_DIR}/00_phase3_config.sh'
 
     SNAKE2_ARG=''
     [[ -f '${SNAKE2_BANDS}' ]] && SNAKE2_ARG='--snake2_bands ${SNAKE2_BANDS}'
     DOSAGE_ARG=''
     [[ -d '${DOSAGE_DIR:-/dev/null}' ]] && DOSAGE_ARG='--dosage_dir ${DOSAGE_DIR}'
 
-    python3 '${SCRIPT_DIR}/02_extract_breakpoint_evidence.py' \
+    python3 '${SCRIPT_DIR}/STEP_A02_extract_breakpoint_evidence.py' \
       --candidates '${BPV_EVIDENCE}/matched_inv_candidates.tsv' \
       --bam_dir '${DELLY_MARKDUP_DIR}' \
       --samples '${SAMPLES_ALL}' \
@@ -53,8 +53,8 @@ echo "  [2/6] BAM evidence:    Job ${JID2} (after ${JID1})"
 
 # STEP 3: Statistical tests + seed generation
 # Registry wiring (FIX 29 v2 2026-04-17): if REGISTRIES_ROOT is set in
-# config, pass it through to STEP03 so it writes existence_layer_d blocks
-# per candidate. CANDIDATE_MAP is optional — when absent, STEP03 uses
+# config, pass it through to STEP_D03 so it writes existence_layer_d blocks
+# per candidate. CANDIDATE_MAP is optional — when absent, STEP_D03 uses
 # phase_3's inv_id verbatim as the registry candidate_id.
 REGISTRY_ARG=""
 CANDMAP_ARG=""
@@ -79,7 +79,7 @@ JID3=$(sbatch --parsable --dependency=afterok:${JID2} \
     source ~/.bashrc
     mamba activate assembly
 
-    python3 '${SCRIPT_DIR}/03_statistical_tests_and_seeds.py' \
+    python3 '${SCRIPT_DIR}/STEP_D03_statistical_tests_and_seeds.py' \
       --evidence_dir '${BPV_EVIDENCE}' \
       --stats_dir '${BPV_STATS}' \
       --seeds_dir '${BPV_SEEDS}' \
@@ -101,14 +101,14 @@ JID4=$(sbatch --parsable --dependency=afterok:${JID3} \
     source ~/.bashrc
     mamba activate assembly
 
-    python3 '${SCRIPT_DIR}/04_validation_plots.py' \
+    python3 '${SCRIPT_DIR}/STEP_D04_validation_plots.py' \
       --evidence_dir '${BPV_EVIDENCE}' \
       --stats_dir '${BPV_STATS}' \
       --plot_dir '${BPV_PLOTS}'
   ")
 echo "  [4/6] Plots:               Job ${JID4} (after ${JID3})"
 
-# STEP 5: Cross-caller concordance report (reads unified table from STEP01)
+# STEP 5: Cross-caller concordance report (reads unified table from STEP_A01)
 JID5=$(sbatch --parsable --dependency=afterok:${JID3} \
   --account=lt200308 \
   -p compute -N 1 -n 4 --mem=16G -t 0-01:00:00 \
@@ -118,9 +118,9 @@ JID5=$(sbatch --parsable --dependency=afterok:${JID3} \
     set -euo pipefail
     source ~/.bashrc
     mamba activate assembly
-    source '${SCRIPT_DIR}/00_breakpoint_validation_config.sh'
+    source '${SCRIPT_DIR}/00_phase3_config.sh'
 
-    python3 '${SCRIPT_DIR}/05_delly_manta_concordance.py' \
+    python3 '${SCRIPT_DIR}/STEP_B05_delly_manta_concordance.py' \
       --candidates '${BPV_EVIDENCE}/matched_inv_candidates.tsv' \
       --tests '${BPV_STATS}/all_candidates_tests.tsv' \
       --outdir '${BPV_CONCORDANCE}'
@@ -145,7 +145,7 @@ if [[ -n "${BND_ARGS}" ]]; then
       source ~/.bashrc
       mamba activate assembly
 
-      python3 '${SCRIPT_DIR}/06_bnd_inversion_signal.py' \
+      python3 '${SCRIPT_DIR}/STEP_B06_bnd_rescue.py' \
         ${BND_ARGS} \
         ${REGISTRY_ARG} ${CANDMAP_ARG} \
         --outdir '${BPV_ROOT}/06_bnd_signal'

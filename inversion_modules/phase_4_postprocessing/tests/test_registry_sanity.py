@@ -162,12 +162,12 @@ def main() -> int:
             "n_ref_total": 173,
             "samples_inv_with_support": ["CGA009", "CGA045", "CGA102"],
         },
-        source_script="phase_3_refine/03_statistical_tests_and_seeds.py",
+        source_script="phase_3_refine/STEP_D03_statistical_tests_and_seeds.py",
     )
     assert res_d["status"] in ("validated", "incomplete"), f"layer_d status={res_d['status']}"
     print(f"  wrote {res_d['n_keys']} layer_d keys, status={res_d['status']}")
 
-    # ── Step 3c: write existence_layer_b_bnd_rescue (phase_3 STEP06) ────
+    # ── Step 3c: write existence_layer_b_bnd_rescue (phase_3 STEP_B06) ────
     # Represents a true orphan rescue — paired BND junctions that match
     # no entry in the DELLY or Manta INV catalogs.
     print("\n[test] writing existence_layer_b_bnd_rescue block (orphan BND pair)")
@@ -191,7 +191,7 @@ def main() -> int:
             "matched_inv_id": "",
             "match_type": "no_inv_match",
         },
-        source_script="phase_3_refine/06_bnd_inversion_signal.py",
+        source_script="phase_3_refine/STEP_B06_bnd_rescue.py",
     )
     assert res_br["status"] in ("validated", "incomplete"), f"bnd_rescue status={res_br['status']}"
     print(f"  wrote {res_br['n_keys']} bnd_rescue keys, status={res_br['status']}")

@@ -4,7 +4,7 @@
 
 **Keep `00_inversion_config.sh` where it is, inside the inversion codebase.
 Do NOT add a separate repo-root master config.** Per-module configs (like
-`00_breakpoint_validation_config.sh`) source the inversion config as their
+`00_phase3_config.sh`) source the inversion config as their
 parent. This is a proven pattern in the codebase. A repo-root master config
 would add a layer that does not pay for itself.
 
@@ -17,7 +17,7 @@ inversion_codebase_v8.5/
 ├── 00_inversion_config.sh                         # MASTER for anything inversion
 │
 ├── phase_3_refine/
-│   └── 00_breakpoint_validation_config.sh         # sources master, adds module-specific
+│   └── 00_phase3_config.sh                         # sources master, adds module-specific
 │                                                  # (flat layout — was MODULE_5A2_breakpoint_validation/)
 │
 ├── utils/
@@ -44,7 +44,7 @@ A module's config does two things, in this order:
 The `breakpoint_validation` config demonstrates this exactly:
 
 ```bash
-# 00_breakpoint_validation_config.sh, lines 37-42
+# 00_phase3_config.sh, lines 37-42
 SCRIPT_DIR_BPV="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INV_CONFIG="${SCRIPT_DIR_BPV}/../00_inversion_config.sh"
 [[ -f "${INV_CONFIG}" ]] || INV_CONFIG="${BASE:-/scratch/.../inversion_codebase_v8.5}/00_inversion_config.sh"
@@ -177,7 +177,7 @@ requires updating every reference.
 Already compliant with this pattern:
 
 - `00_inversion_config.sh` — master
-- `phase_3_refine/00_breakpoint_validation_config.sh` —
+- `phase_3_refine/00_phase3_config.sh` —
   module config, sources master
 
 Suggested next modules to add a config for:
@@ -195,7 +195,7 @@ filter thresholds.
 ## See also
 
 - `00_inversion_config.sh` — master project config
-- `phase_3_refine/00_breakpoint_validation_config.sh` —
+- `phase_3_refine/00_phase3_config.sh` —
   reference implementation of a module config
 - `phase_2_discovery/*/README.md` — per-phase documentation
 - `phase_2_discovery/2c_precomp/RENAMING.md` — terminology migration

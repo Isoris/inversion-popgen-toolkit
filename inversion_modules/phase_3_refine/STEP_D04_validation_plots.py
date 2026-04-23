@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-04_validation_plots.py — Publication-quality breakpoint validation figures
+STEP_D04_validation_plots.py — Publication-quality breakpoint validation figures
 
 For each candidate with a test result, generates:
   - Panel A: Support proportion barplot (REF blue / HET grey / INV red)
@@ -12,7 +12,7 @@ For each candidate with a test result, generates:
 Also generates a genome-wide summary figure.
 
 Usage:
-  python3 04_validation_plots.py \\
+  python3 STEP_D04_validation_plots.py \\
     --evidence_dir 01_per_sample_evidence \\
     --stats_dir 03_statistical_tests \\
     --plot_dir 05_plots

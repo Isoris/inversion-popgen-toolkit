@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-03_statistical_tests_and_seeds.py
-==================================
+STEP_D03_statistical_tests_and_seeds.py
+=======================================
 For each validated candidate:
   1. Fisher's exact test (INV vs non-INV)
   2. Chi-square 3×2 (REF/HET/INV × support)
@@ -97,7 +97,7 @@ def parse_args():
     p.add_argument("--seed_min_support_frac", type=float, default=0.60)
     p.add_argument("--seed_min_samples", type=int, default=5)
     p.add_argument("--bonferroni", action="store_true")
-    # BUGFIX 2026-04-17 (chat 5, FIX 29 v2): STEP03's OR test IS Layer D
+    # BUGFIX 2026-04-17 (chat 5, FIX 29 v2): STEP_D03's OR test IS Layer D
     # of the 4-layer evidence model (A=PCA, B=SV callers, C=GHSL, D=OR).
     # Wire this into the evidence registry directly by writing one
     # `existence_layer_d` block per candidate. Schema:
@@ -308,7 +308,7 @@ def main():
                     candidate_id=cid,
                     block_type="existence_layer_d",
                     data=block_data,
-                    source_script="phase_3_refine/03_statistical_tests_and_seeds.py",
+                    source_script="phase_3_refine/STEP_D03_statistical_tests_and_seeds.py",
                 )
                 n_layer_d_written += 1
             except Exception as e:
@@ -366,13 +366,13 @@ def main():
 
             # Write seed file for C01i
             # BUGFIX 2026-04-17 (chat 7, FIX 30): evidence_score was
-            # r['total_score'] but the STEP02 evidence TSV schema has no
+            # r['total_score'] but the STEP_A02 evidence TSV schema has no
             # total_score column (columns are: sample, group, support, pe,
             # sr, …). KeyError crashed the script for every qualifying
             # candidate. Chat 5 FIX 27 fixed the adjacent seed_summary
             # header drift but didn't exercise the qualifying branch.
             # Fix: derive a per-sample evidence score from pe + sr (the
-            # two support-read counts STEP02 actually writes). Defensive
+            # two support-read counts STEP_A02 actually writes). Defensive
             # cast handles missing/empty values from legacy TSVs.
             def _ev_score(r):
                 try:

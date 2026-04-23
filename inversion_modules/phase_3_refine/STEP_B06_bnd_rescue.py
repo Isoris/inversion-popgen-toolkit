@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-06_bnd_inversion_signal.py — v2: dual-caller BND inversion signal
-=================================================================
+STEP_B06_bnd_rescue.py — v2: dual-caller BND inversion signal
+=============================================================
 Extracts inversion-orientation BND records from:
   - DELLY2 BND catalog: uses INFO/CT=3to3 or CT=5to5
   - Manta RAW pre-conversion VCF: uses ALT bracket patterns for orientation
@@ -111,7 +111,7 @@ def _match_cid(cand_map, chrom, bp1, bp2, tol=10000):
         if abs(e["bp1"] - bp1) <= tol and abs(e["bp2"] - bp2) <= tol:
             return e["cid"]
     # Synthetic ID for standalone runs. Matches the inv_id convention of
-    # phase_3 STEP01 output so joins with STEP03's Layer D writes.
+    # phase_3 STEP_A01 output so joins with STEP_D03's Layer D writes.
     return f"{chrom}:{bp1}-{bp2}:bnd_rescue"
 
 def extract_delly_bnd_inv_signal(vcf_path):
@@ -344,7 +344,7 @@ def main():
                     candidate_id=cid,
                     block_type="existence_layer_b_bnd_rescue",
                     data=block_data,
-                    source_script="phase_3_refine/06_bnd_inversion_signal.py",
+                    source_script="phase_3_refine/STEP_B06_bnd_rescue.py",
                 )
                 n_blocks_written += 1
             except Exception as e:

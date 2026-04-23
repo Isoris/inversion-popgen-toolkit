@@ -11,7 +11,7 @@
 #     "candidate_id": "LG12_inv17",
 #     "chrom": "C_gar_LG12",
 #     "region": [8204500, 12510000],
-#     "source_script": "STEP03_statistical_tests_and_seeds.py",
+#     "source_script": "STEP_D03_statistical_tests_and_seeds.py",
 #     "source_version": "v2",
 #     "computed_at": "2026-04-16T14:32:00",
 #     "groups_used": {

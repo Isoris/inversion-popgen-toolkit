@@ -6,6 +6,13 @@ was unnecessary — phase 3 *is* this module — and was flattened. Scripts
 now live directly in `phase_3_refine/`. Comments, echos, and doc headers
 that still say "MODULE_5A2" are cosmetic.
 
+**Layout note (2026-04-24):** numeric-only script names (`01_…` through
+`06_…`) were renamed to `STEP_{A,B,D}0N_…` to tag each step with the
+evidence Layer it feeds (see `## Pipeline steps` below). The chain and
+run order are unchanged. Config renamed from
+`00_breakpoint_validation_config.sh` → `00_phase3_config.sh` to match
+the `MODULE_*/00_moduleX_config.sh` convention used elsewhere.
+
 ## Position in the pipeline (4-layer evidence model)
 
 The inversion catalogue is built from four **independent** evidence layers
@@ -18,14 +25,14 @@ and physical breakpoint evidence) and for **supplementary Layer B**
 |---|---|---|---|
 | **A** — PCA sim_mat | Local genotype-covariance structure | phase 2c (C01a) + phase 2d (inv_detect) | `q1_d*`, `q7_layer_a_*` |
 | **B** — SV callers (primary) | DELLY2 / Manta INV concordance | phase 2c (`STEP_C00_build_sv_prior.R`) | `q7_layer_b_*` |
-| **B** — SV callers (BND rescue) | Paired CT=3to3/INV3 + CT=5to5/INV5 junctions the strict callers missed | **phase 3 STEP06** | `q7b_bnd_*` |
+| **B** — SV callers (BND rescue) | Paired CT=3to3/INV3 + CT=5to5/INV5 junctions the strict callers missed | **phase 3 STEP_B06** | `q7b_bnd_*` |
 | **C** — GHSL haplotypes | Clair3 phased within-sample haplotype divergence | phase 2e (`STEP_C04_snake3_ghsl_v6.R` + `STEP_C04b_snake3_ghsl_classify.R`) | `q7_layer_c_*` |
-| **D** — OR association | Fisher / Armitage test linking PCA groups to read evidence | **phase 3 STEP03** | `q7_layer_d_*` |
+| **D** — OR association | Fisher / Armitage test linking PCA groups to read evidence | **phase 3 STEP_D03** | `q7_layer_d_*` |
 
 The gate that matters is in phase 4c `compute_group_validation()`:
 > **if `q7_layer_d_fisher_p < 0.05` AND `q7_layer_d_fisher_or > 5` → group validation = VALIDATED**
 
-No other step writes `q7_layer_d_*`. If phase 3 STEP03 doesn't run for
+No other step writes `q7_layer_d_*`. If phase 3 STEP_D03 doesn't run for
 a candidate, that candidate cannot reach the VALIDATED tier. This is
 by design: Layer D is the statistical link between the structural layers
 (A/B/C) and the biology (do PCA-INV carriers actually carry the
@@ -37,7 +44,7 @@ At 5–9× coverage DELLY's paired `CT=3to3`+`CT=5to5` rule fails on many
 true inversions — the weaker junction misses the threshold and DELLY
 emits only the surviving junction as a BND. Manta has the equivalent
 with `INV3`/`INV5` flags on pre-conversion BND records. If we stop at
-the INV catalogs alone, we miss those inversions. STEP06 rescues them
+the INV catalogs alone, we miss those inversions. STEP_B06 rescues them
 by:
 
 1. Filtering DELLY BND catalog to `CT∈{3to3,5to5}` (inversion orientation).
@@ -55,21 +62,32 @@ by:
 
 ## Pipeline steps
 
+The 6-step chain is grouped by which evidence layer each step *feeds*
+(`_A…` candidate discovery → `_D…` association tests → `_B…` SV-caller
+layer writes):
+
 ```
-STEP 01 — Extract DELLY+Manta INV calls, match to phase 2d staircase candidates
-            → matched_inv_candidates.tsv
-STEP 02 — Per-sample pysam evidence extraction at each bp ± 300 bp
-            + REF/HET/INV group assignment (community-detection bands [legacy: Snake2] → local PCA fallback)
-            → {inv_id}_evidence.tsv + {inv_id}_group_assignments.tsv
-STEP 03 — Fisher exact + Chi-square + Cochran–Armitage trend tests + seeds
-          + WRITE existence_layer_d block per candidate (Layer D)
-            → {inv_id}_tests.tsv + all_candidates_tests.tsv + Layer D registry blocks
-STEP 04 — Publication figures (OR forest, contingency table, evidence heatmap)
-STEP 05 — DELLY × Manta concordance table + manuscript sentences
-STEP 06 — BND orphan rescue (DELLY CT + Manta raw INV3/INV5)
-          + WRITE existence_layer_b_bnd_rescue block per paired junction
-            → bnd_inv_crossref.tsv + bnd_inv_rescued_candidates.tsv + Layer B rescue blocks
+STEP_A01 — Extract DELLY+Manta INV calls, match to phase 2d staircase candidates
+             → matched_inv_candidates.tsv
+STEP_A02 — Per-sample pysam evidence extraction at each bp ± 300 bp
+           + REF/HET/INV group assignment (community-detection bands [legacy: Snake2] → local PCA fallback)
+             → {inv_id}_evidence.tsv + {inv_id}_group_assignments.tsv
+STEP_D03 — Fisher exact + Chi-square + Cochran–Armitage trend tests + seeds
+           + WRITE existence_layer_d block per candidate (Layer D)
+             → {inv_id}_tests.tsv + all_candidates_tests.tsv + Layer D registry blocks
+STEP_D04 — Publication figures (OR forest, contingency table, evidence heatmap)
+STEP_B05 — DELLY × Manta concordance table + manuscript sentences
+STEP_B06 — BND orphan rescue (DELLY CT + Manta raw INV3/INV5)
+           + WRITE existence_layer_b_bnd_rescue block per paired junction
+             → bnd_inv_crossref.tsv + bnd_inv_rescued_candidates.tsv + Layer B rescue blocks
 ```
+
+**Naming convention.** `STEP_{layer}{NN}_{slug}` where:
+- `{layer}` is the Layer tag from the evidence-model table above
+  (`A` for upstream candidate-discovery steps feeding Layer A, `B` for
+  SV-caller layer steps, `D` for OR-association Layer D steps). There
+  is no `_C` step in phase 3 because Layer C (GHSL) lives in phase 2e.
+- `{NN}` is the run order (01–06).
 
 ## Key outputs
 
@@ -90,8 +108,8 @@ Registry blocks (for phase 4):
 
 | Block type | Written by | Populates flat keys |
 |---|---|---|
-| `existence_layer_d` | STEP03 (per candidate) | `q7_layer_d_fisher_or`, `q7_layer_d_fisher_p`, `q7_layer_d_fisher_ci_lower/upper`, `q7_layer_d_armitage_z/p`, `q7_layer_d_n_inv_with_support`, `q7_layer_d_n_inv_total` |
-| `existence_layer_b_bnd_rescue` | STEP06 (per paired junction) | `q7b_bnd_rescued`, `q7b_bnd_rescue_source`, `q7b_bnd_pair_bp1/bp2`, `q7b_bnd_pair_size_bp`, `q7b_bnd_match_type`, `q7b_bnd_matched_inv_id`, `q7b_bnd_left/right_pe`, `q7b_bnd_left/right_sr` |
+| `existence_layer_d` | STEP_D03 (per candidate) | `q7_layer_d_fisher_or`, `q7_layer_d_fisher_p`, `q7_layer_d_fisher_ci_lower/upper`, `q7_layer_d_armitage_z/p`, `q7_layer_d_n_inv_with_support`, `q7_layer_d_n_inv_total` |
+| `existence_layer_b_bnd_rescue` | STEP_B06 (per paired junction) | `q7b_bnd_rescued`, `q7b_bnd_rescue_source`, `q7b_bnd_pair_bp1/bp2`, `q7b_bnd_pair_size_bp`, `q7b_bnd_match_type`, `q7b_bnd_matched_inv_id`, `q7b_bnd_left/right_pe`, `q7b_bnd_left/right_sr` |
 
 Schemas in `registries/schemas/structured_block_schemas/`:
 - `existence_layer_d.schema.json`
@@ -135,8 +153,8 @@ CANDIDATE_MAP=/path/to/inv_id_to_candidate_id.tsv \
 
 1. **One-sided BNDs can't be rescued.** If only one of the two inversion
    junctions passes BND emission, pairing fails. These inversions are
-   invisible to STEP06 and must be validated via phase 2d's PCA signal +
-   STEP02's per-sample BAM extraction at the *inferred* breakpoint from
+   invisible to STEP_B06 and must be validated via phase 2d's PCA signal +
+   STEP_A02's per-sample BAM extraction at the *inferred* breakpoint from
    the PCA candidate boundary.
 2. **Repeat-rich breakpoints fail twice.** A breakpoint inside a repeat
    fails INV-typing (lands in BND) AND often fails BND emission too
@@ -145,20 +163,20 @@ CANDIDATE_MAP=/path/to/inv_id_to_candidate_id.tsv \
 3. **Fixed inversions (all 226 carriers)** show zero PCA contrast →
    invisible to Layer A → D1 = 0 even when Layers B/C/D all pass.
    Flag as "SV-only, fixed" candidates.
-4. **Ambiguous groups.** STEP02 community-detection band assignments
+4. **Ambiguous groups.** STEP_A02 community-detection band assignments
    (legacy name: Snake2) use majority vote across overlapping windows.
    If the community-detection track covers <50% of samples,
-   STEP02 falls back to local k-means PCA (k=3 on PC1). Both are
+   STEP_A02 falls back to local k-means PCA (k=3 on PC1). Both are
    documented per-candidate in `{inv_id}_group_assignments.tsv`.
 
 ## Dependencies
 
 - Python 3.9+ with pysam, numpy, matplotlib
-- bcftools (STEP01 candidate extraction)
+- bcftools (STEP_A01 candidate extraction)
 - DELLY2 INV + BND catalogs (from MODULE_4D + MODULE_4F)
 - Manta INV PASS + raw pre-conversion catalogs (from MODULE_4H)
 - Markdup BAMs (from MODULE_4B)
-- Community-detection band assignments (legacy name: Snake 2) (optional, for STEP02 group source A)
-- Dosage files (optional, for STEP02 group source B fallback)
+- Community-detection band assignments (legacy name: Snake 2) (optional, for STEP_A02 group source A)
+- Dosage files (optional, for STEP_A02 group source B fallback)
 - Registry API at `registries/api/python/registry_loader.py` (optional —
   gracefully skipped if absent, script remains runnable standalone)

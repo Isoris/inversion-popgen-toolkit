@@ -80,7 +80,7 @@ Add this block near the "Stable external inputs" section, before the
 +export POP_CONF_DIR="${MANTA_BASE}/10_population_confidence"
 ```
 
-### 2. Update `phase_3_refine/00_breakpoint_validation_config.sh`
+### 2. Update `phase_3_refine/00_phase3_config.sh`
 
 Remove the duplicated `DELLY_INV_VCF` etc. definitions; keep only the
 module-specific ones (like `DELLY_INV_BED`, `DELLY_INV_GT`,

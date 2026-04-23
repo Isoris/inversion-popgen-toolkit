@@ -7,7 +7,7 @@
 #SBATCH -J bpv_s01
 #SBATCH --account=lt200308
 # =============================================================================
-# 01_extract_inv_candidates.sh — v3: robust dual-caller extraction
+# STEP_A01_extract_inv_candidates.sh — v3: robust dual-caller extraction
 # =============================================================================
 # Extracts INV candidates from DELLY2 + Manta, applies caller-specific
 # quality filters, deduplicates, and matches to Snake candidates.
@@ -24,7 +24,7 @@ set -euo pipefail
 
 # ── Source config (works both interactive and SLURM) ──
 SCRIPT_DIR="${SLURM_SUBMIT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
-BPV_CONFIG="${SCRIPT_DIR}/00_breakpoint_validation_config.sh"
+BPV_CONFIG="${SCRIPT_DIR}/00_phase3_config.sh"
 
 if [[ ! -f "${BPV_CONFIG}" ]]; then
   echo "[FATAL] Config not found: ${BPV_CONFIG}" >&2
@@ -504,4 +504,4 @@ for f in "${DELLY_PARSED}" "${MANTA_PARSED}" "${MERGED_RAW}" "${MERGED_DEDUP}" "
 done
 
 bpv_log ""
-bpv_log "  Next: bash 02_extract_breakpoint_evidence.py --candidates ${MATCHED}"
+bpv_log "  Next: bash STEP_A02_extract_breakpoint_evidence.py --candidates ${MATCHED}"

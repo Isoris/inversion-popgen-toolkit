@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # =============================================================================
-# 00_breakpoint_validation_config.sh — v2: dual-caller (DELLY2 + Manta)
+# 00_phase3_config.sh — v2: dual-caller (DELLY2 + Manta)
 # =============================================================================
 #
 # v2 changes:
 #   - Adds Manta INV candidates as a second source alongside DELLY2
-#   - Manta raw pre-conversion VCF for BND inversion signal (STEP06)
+#   - Manta raw pre-conversion VCF for BND inversion signal (STEP_B06)
 #   - Caller-aware evidence field documentation
 #   - Unified candidate table with caller provenance column
 #
@@ -28,10 +28,10 @@
 #   │   consensus  │                    │                         │
 #   └──────────────┴────────────────────┴─────────────────────────┘
 #
-# The BAM-level evidence extraction (STEP02) is caller-agnostic — it reads
+# The BAM-level evidence extraction (STEP_A02) is caller-agnostic — it reads
 # BAMs directly with pysam looking for discordant pairs, split reads, and
-# soft clips. The caller-specific fields are only used in STEP01 (candidate
-# extraction) and STEP05/06 (cross-caller concordance).
+# soft clips. The caller-specific fields are only used in STEP_A01 (candidate
+# extraction) and STEP_B05/06 (cross-caller concordance).
 # =============================================================================
 
 # ── Source parent inversion config ───────────────────────────────────────────
@@ -52,7 +52,7 @@ DELLY_INV_VCF="${DELLY_INV_BASE}/07_final_catalogs/catalog_226.INV.vcf.gz"
 DELLY_INV_BED="${DELLY_INV_BASE}/07_final_catalogs/catalog_226.INV.bed"
 DELLY_INV_GT="${DELLY_INV_BASE}/07_final_catalogs/catalog_226.INV.GT_matrix.tsv"
 
-# DELLY2 BND catalog (for BND inversion signal in STEP06)
+# DELLY2 BND catalog (for BND inversion signal in STEP_B06)
 DELLY_BND_VCF="${DELLY_BND_BASE}/07_final_catalogs/catalog_226.BND.vcf.gz"
 
 # ── Manta SV paths (from MODULE_4H) ─────────────────────────────────────────
@@ -67,7 +67,7 @@ MANTA_INV_VCF="${MANTA_BASE}/05_final_catalogs/catalog_226.INV.PASS.vcf.gz"
 MANTA_BND_POST_VCF="${MANTA_BASE}/05_final_catalogs/catalog_226.BND.PASS.vcf.gz"
 
 # Manta RAW pre-conversion merged VCF — still has BND records with inversion
-# orientation (for STEP06 BND inversion signal analysis).
+# orientation (for STEP_B06 BND inversion signal analysis).
 MANTA_RAW_MERGED_VCF="${MANTA_BASE}/02_merged_cohort/cohort_226.ALL.raw.vcf.gz"
 
 # ── Inversion pipeline outputs to consume ────────────────────────────────────
@@ -116,8 +116,8 @@ SAMPLES_ALL="${BASE}/MODULE_4B_DEL_Delly/samples_all_226.txt"
 SAMPLES_UNRELATED="${BASE}/MODULE_4B_DEL_Delly/samples_unrelated_81.txt"
 
 # ── Evidence registry wiring (FIX 29 v2, 2026-04-17) ─────────────────────────
-# STEP03's OR test writes existence_layer_d blocks per candidate, and
-# STEP06's BND rescue writes bnd_rescue_* keys into existence_layer_b.
+# STEP_D03's OR test writes existence_layer_d blocks per candidate, and
+# STEP_B06's BND rescue writes bnd_rescue_* keys into existence_layer_b.
 # These feed the 4-layer evidence model (A=PCA, B=SV callers, C=GHSL,
 # D=OR association) consumed by C01f's compute_group_validation() and
 # C01d's Layer B/D accounting in 4a.

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-02_extract_breakpoint_evidence.py
-=================================
+STEP_A02_extract_breakpoint_evidence.py
+=======================================
 For each DELLY2 INV candidate, extract per-sample breakpoint evidence
 from markdup BAMs and assign sample groups from two sources:
 
@@ -13,7 +13,7 @@ Outputs per candidate:
   {inv_id}_group_assignments.tsv — sample groups from both sources
 
 Usage:
-  python3 02_extract_breakpoint_evidence.py \\
+  python3 STEP_A02_extract_breakpoint_evidence.py \\
     --candidates matched_inv_candidates.tsv \\
     --bam_dir /path/to/00_markdup \\
     --samples samples_all_226.txt \\
@@ -31,7 +31,7 @@ from collections import Counter, defaultdict
 def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--candidates", required=True,
-                   help="matched_inv_candidates.tsv from STEP01")
+                   help="matched_inv_candidates.tsv from STEP_A01")
     p.add_argument("--bam_dir", required=True,
                    help="Directory with {sample}.markdup.bam files")
     p.add_argument("--samples", required=True,

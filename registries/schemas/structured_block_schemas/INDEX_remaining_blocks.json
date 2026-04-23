@@ -38,7 +38,7 @@
       "block_type": "existence_layer_b_bnd_rescue",
       "question": "Q7",
       "group_validation_required": "NONE",
-      "source_script": "phase_3_refine/06_bnd_inversion_signal.py",
+      "source_script": "phase_3_refine/STEP_B06_bnd_rescue.py",
       "description": "Supplementary Layer B evidence from BND rescue pathway — paired CT=3to3/INV3 (left) + CT=5to5/INV5 (right) junctions that the strict INV callers missed. Co-exists with existence_layer_b. Added 2026-04-17.",
       "status": "written — existence_layer_b_bnd_rescue.schema.json"
     },

@@ -2,10 +2,10 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "existence_layer_b_bnd_rescue.schema.json",
   "block_type": "existence_layer_b_bnd_rescue",
-  "description": "Supplementary Layer B evidence from phase_3/STEP06 BND rescue pathway. When DELLY's INV-typing fails on one of the two inversion junctions at low coverage (~5-9x), the surviving junction lands in the BND catalog with INFO/CT=3to3 (left bp) or CT=5to5 (right bp). Manta's equivalent is INV3/INV5 flags on BND records in the pre-conversion raw VCF. STEP06 greedily pairs unmatched CT=3to3/INV3 with CT=5to5/INV5 within a 5 Mb window and cross-references the resulting pairs against the INV catalog. Pairs with no catalog match are 'orphan rescue' candidates — inversions the strict INV callers missed. This block records the rescue evidence for a specific candidate so downstream 4a/4e scoring can account for it. Added 2026-04-17 (chat 5 FIX 29 v2). Co-exists with existence_layer_b (the primary Layer B block written by C00 in phase_2c).",
+  "description": "Supplementary Layer B evidence from phase_3/STEP_B06 BND rescue pathway. When DELLY's INV-typing fails on one of the two inversion junctions at low coverage (~5-9x), the surviving junction lands in the BND catalog with INFO/CT=3to3 (left bp) or CT=5to5 (right bp). Manta's equivalent is INV3/INV5 flags on BND records in the pre-conversion raw VCF. STEP_B06 greedily pairs unmatched CT=3to3/INV3 with CT=5to5/INV5 within a 5 Mb window and cross-references the resulting pairs against the INV catalog. Pairs with no catalog match are 'orphan rescue' candidates — inversions the strict INV callers missed. This block records the rescue evidence for a specific candidate so downstream 4a/4e scoring can account for it. Added 2026-04-17 (chat 5 FIX 29 v2). Co-exists with existence_layer_b (the primary Layer B block written by C00 in phase_2c).",
   "question": "Q7",
   "group_validation_required": "NONE",
-  "source_script": "phase_3_refine/06_bnd_inversion_signal.py",
+  "source_script": "phase_3_refine/STEP_B06_bnd_rescue.py",
   "required": ["bnd_rescued", "rescue_source"],
   "properties": {
     "bnd_rescued": {

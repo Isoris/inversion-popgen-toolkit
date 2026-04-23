@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-05_delly_manta_concordance.py — v2: reads from unified candidate table
-======================================================================
-The concordance between DELLY2 and Manta is now computed in STEP01
+STEP_B05_delly_manta_concordance.py — v2: reads from unified candidate table
+============================================================================
+The concordance between DELLY2 and Manta is now computed in STEP_A01
 (cross_caller_match / concordance_class columns). This script:
 
   1. Reads the unified matched candidate table
-  2. Loads test results from STEP03 (Fisher P, OR, etc.)
+  2. Loads test results from STEP_D03 (Fisher P, OR, etc.)
   3. Produces a clean concordance report with evidence from both callers
   4. Generates manuscript-ready sentences
 
@@ -23,9 +23,9 @@ from collections import defaultdict
 def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--candidates", required=True,
-                   help="matched_inv_candidates.tsv from STEP01")
+                   help="matched_inv_candidates.tsv from STEP_A01")
     p.add_argument("--tests", default="",
-                   help="all_candidates_tests.tsv from STEP03")
+                   help="all_candidates_tests.tsv from STEP_D03")
     p.add_argument("--outdir", required=True)
     return p.parse_args()
 

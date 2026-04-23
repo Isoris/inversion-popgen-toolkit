@@ -101,6 +101,27 @@ The five 2*x* blocks form a DAG:
 Data flow:
 `2a` → `2b` → `2c` → `2d` + `2e` → `phase_3_refine/` → `phase_4_postprocessing/`
 
+### `phase_3_refine/` scripts
+
+A 6-step chain (+ config + orchestrator). Each step is tagged with the
+evidence Layer it **feeds** (Layer A/B/C/D in the 4-layer framework):
+
+| Step | Role | Layer |
+|---|---|---|
+| `00_phase3_config.sh` | Module config (sources master `00_inversion_config.sh`) | — |
+| `STEP_A01_extract_inv_candidates.sh` | DELLY+Manta INV extraction, dedup, match to phase-2d candidates | A upstream |
+| `STEP_A02_extract_breakpoint_evidence.py` | Per-sample pysam BAM evidence + REF/HET/INV group assignment | A upstream (→ feeds D) |
+| `STEP_D03_statistical_tests_and_seeds.py` | Fisher / χ² / Armitage tests + Layer D registry writes + C01i seeds | **D** |
+| `STEP_D04_validation_plots.py` | Publication figures (OR forest, contingency, evidence heatmap) | D diagnostic |
+| `STEP_B05_delly_manta_concordance.py` | DELLY × Manta concordance report + manuscript sentences | **B** |
+| `STEP_B06_bnd_rescue.py` | Orphan BND pair rescue + `existence_layer_b_bnd_rescue` writes | **B** (supplementary) |
+| `run_breakpoint_validation.sh` | SLURM orchestrator chaining 01→06 | — |
+| `annotate_population_confidence.sh` | Side-tool: add confidence scores to ALL PASS SVs (not a filter) | — |
+| `breakpoint_validator_standalone.py` | Single-candidate standalone validator | — |
+
+No `STEP_C*` script exists in phase 3 because Layer C (GHSL) is
+produced in `phase_2_discovery/2e_ghsl/`, not here.
+
 ### `phase_4_postprocessing/` sub-blocks
 
 | Block | Role |
@@ -109,7 +130,7 @@ Data flow:
 | `4b_group_proposal/` | C01i decompose / multi_recomb / nested_comp / seal |
 | `4c_group_validation/` | C01f hypothesis tests + gate |
 | `4d_group_dependent/` | Q5 age + Q6 burden + cheat28/29/30 (forensic modules) |
-| `4e_final_classification/` | characterize_candidate + compute_candidate_status + axis 5 wiring (pending) |
+| `4e_final_classification/` | characterize_candidate + compute_candidate_status + axis 5 (wired via `V7_FINAL_DIR` env) |
 
 Plus `docs/`, `orchestrator/`, `patches/`, `schemas/`, `specs/`,
 `tests/` under phase_4 root.
