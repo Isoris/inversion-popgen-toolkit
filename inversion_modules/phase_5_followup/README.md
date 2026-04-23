@@ -69,7 +69,8 @@ phase_4 candidate catalog (candidate_status.tsv + contrast groups)
         ▼
   analysis/04_candidate_overlay.py
   figures/05_plot_hobs_hwe.R
-  (feeds phase_6_secondary/MODULE_5E Hobs confirmation module)
+  (consumed by phase_qc_shelf Q07b+Q07c outputs; the Hobs confirmation
+   formerly in phase_6_secondary/MODULE_5E was archived in April 2026)
 ```
 
 ## Relationship to other phases
@@ -79,11 +80,13 @@ phase_4 candidate catalog (candidate_status.tsv + contrast groups)
   candidate coordinates.
 - **Shares BEAGLE inputs with phase 1**: residual dosage computation
   re-reads the BEAGLE from phase_1 outputs.
-- **Feeds phase 6 secondary**: Hobs overlay (`04_candidate_overlay.py`
-  + `05_plot_hobs_hwe.R`) is the upstream prep for
-  `phase_6_secondary/MODULE_5E_Inversion_HOBS/`. The phase 6 modules
-  then do the secondary confirmation tests (LD structure, FST
-  elevation, Hobs pattern).
+- **Feeds phase 6 secondary**: the LD and Fst modules read
+  per-candidate data from phase_5 compute products. The Hobs
+  confirmation path moved to `phase_qc_shelf/STEP_Q07b + STEP_Q07c`
+  (per-group Hobs, superseded `MODULE_5E_Inversion_HOBS` in April 2026).
+  `analysis/04_candidate_overlay.py` + `05_plot_hobs_hwe.R` still
+  serve as the per-candidate Hobs overlay / plotter against the
+  phase_qc_shelf outputs.
 
 ## Current vs legacy
 

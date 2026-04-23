@@ -55,7 +55,9 @@ DISCOVERYDIR="${CODEBASE}/MODULE_5A2_Discovery_Core"
 FOLLOWUPDIR="${CODEBASE}/MODULE_5B_Inversion_Followup"
 LDDIR="${CODEBASE}/MODULE_5C_Inversion_LD"
 FSTDIR="${CODEBASE}/MODULE_5D_Inversion_FST"
-HOBSDIR="${CODEBASE}/MODULE_5E_Inversion_HOBS"
+# HOBSDIR removed 2026-04-24: MODULE_5E archived to
+# inversion_modules/_archive_superseded/MODULE_5E_Inversion_HOBS_superseded_by_Q07b/
+# (superseded by phase_qc_shelf/STEP_Q07b + Q07c per-group Hobs).
 DISCOVERY1DIR="${CODEBASE}/MODULE_5A1_Discovery_Inputs"
 DISCOVERY2DIR="${CODEBASE}/MODULE_5A2_Discovery_Core"
 DISCOVERY3DIR="${CODEBASE}/MODULE_5A3_Discovery_Postprocessing"

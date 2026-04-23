@@ -80,7 +80,7 @@ pipeline.
 | `phase_3_refine/` | MODULE_5A2_breakpoint_validation | bp-resolution breakpoint refinement, DELLY/Manta concordance, BND rescue | §3.4 |
 | `phase_4_postprocessing/` | (new) | Per-candidate postprocessing — the spine. **5 sub-blocks (4a–4e)** | §3.5 |
 | `phase_5_followup/` | MODULE_5A_Discovery_Visualisations | Per-candidate deep analysis (dosage rasters, region-grow plots, diagnostic figures) | §3.6 |
-| `phase_6_secondary/` | MODULE_5C/5D/5E | LD / Fst / Hobs secondary analyses (still under legacy names inside) | §3.7 |
+| `phase_6_secondary/` | MODULE_5C/5D | LD / Fst secondary analyses (5E archived 2026-04-24; still under legacy names inside) | §3.7 |
 | `phase_7_cargo/` | MODULE_6_Cargo | Gene content + per-arrangement evolution (breeding implications) | §4 |
 | `phase_qc_shelf/` | MODULE_QC_ShelfDiagnosis | Systematic QC tracks to diagnose Z-plateau authenticity | §3.3 supplement |
 | `breakpoint_pipeline/` | (inline) | 7-script dosage-signal → ancestral-fragment → consensus-merge chain, feeds phase 4's axis 5 | §3.4 |
@@ -148,7 +148,7 @@ Plus `docs/`, `orchestrator/`, `patches/`, `schemas/`, `specs/`,
 | "Where is the inversion candidate catalog?" | `inversion_modules/phase_4_postprocessing/4a_existence_layers/` |
 | "Where does bp-resolution refinement happen?" | `inversion_modules/phase_3_refine/` + `inversion_modules/breakpoint_pipeline/` |
 | "Where are per-candidate figures?" | `inversion_modules/phase_5_followup/` + `phase_7_cargo/plot/` |
-| "Where is the Hobs secondary confirmation?" | `inversion_modules/phase_6_secondary/MODULE_5E_Inversion_HOBS/` |
+| "Where is the Hobs secondary confirmation?" | `inversion_modules/phase_qc_shelf/STEP_Q07b_hobs_per_group.sh` + `STEP_Q07c_hobs_windower.sh` (per-group Hobs; MODULE_5E archived 2026-04-24) |
 | "Where is the burden analysis?" | `Modules/MODULE_CONSERVATION_CORE/` + `phase_4_postprocessing/4d_group_dependent/` |
 
 ---
@@ -158,10 +158,15 @@ Plus `docs/`, `orchestrator/`, `patches/`, `schemas/`, `specs/`,
 1. **`Modules/MODULE_5*` missing.** Migrated to `inversion_modules/`.
    Filenames like `STEP_5A2_*.R` still carry the old number for
    provenance.
-2. **`inversion_modules/phase_6_secondary/MODULE_5C`…`5E`.** These
-   still carry `MODULE_5*` folder names internally. Consistent with the
-   legacy naming; renaming would break several `source(...)` paths. Left
-   as-is, documented here.
+2. **`inversion_modules/phase_6_secondary/MODULE_5C` and `MODULE_5D`.**
+   Still carry `MODULE_5*` folder names internally. Consistent with the
+   legacy naming; renaming would break several self-relative paths in
+   their SLURM launchers. Tracked for the HPC-coordinated Cat 3
+   RENAMING pass (see `phase_2_discovery/2c_precomp/RENAMING.md`).
+   `MODULE_5E_Inversion_HOBS` was archived on 2026-04-24 to
+   `_archive_superseded/MODULE_5E_Inversion_HOBS_superseded_by_Q07b/`
+   — Hobs confirmation is now done per-karyotype-group by
+   `phase_qc_shelf/STEP_Q07b + STEP_Q07c`.
 3. **`Modules/Others/` is placeholders only.** `MODULE_6_founder_packs`
    and `MODULE_PAV_presence_absence` contain only `.gitkeep`. The real
    work for these (if/when done) will likely land in

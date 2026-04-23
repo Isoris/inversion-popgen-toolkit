@@ -70,8 +70,10 @@ inversion_modules/
 │   └── tests/                          5 test suites (all pass)
 │
 ├── phase_5_followup/                   per-candidate deep analysis
-├── phase_6_secondary/                  LD / Fst / HOBS secondary analyses
-│   └── MODULE_5C_Inversion_LD/, MODULE_5D_Inversion_FST/, MODULE_5E_Inversion_HOBS/
+├── phase_6_secondary/                  LD / Fst secondary analyses
+│   └── MODULE_5C_Inversion_LD/, MODULE_5D_Inversion_FST/
+│       (MODULE_5E_Inversion_HOBS archived 2026-04-24 — Hobs confirmation
+│        now lives in phase_qc_shelf/STEP_Q07b + STEP_Q07c)
 │
 └── _archive/                           legacy v8.5 HPC tree (kept for reference)
 ```
