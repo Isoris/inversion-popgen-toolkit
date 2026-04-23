@@ -1,0 +1,63 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "mechanism_assembled.schema.json",
+  "block_type": "mechanism_assembled",
+  "description": "Assembled-junction forensics. Reads INFO/CONSENSUS + HOMLEN + HOMSEQ from DELLY/Manta PRECISE records that overlap the candidate's boundary zone. Distinct from mechanism.schema.json (which operates on reference-genome context via cheat29). When both blocks are present, this block is the preferred source of junction evidence — it describes the assembled rearrangement junction rather than the reference sequence at the estimated breakpoint.",
+  "question": "Q4",
+  "group_validation_required": "NONE",
+  "source_script": "cheat29b_assembled_junction.py",
+  "required": ["q4b_asm_precise_record_available", "q4b_asm_source"],
+  "properties": {
+    "q4b_asm_precise_record_available": {
+      "type": "boolean",
+      "description": "Is there at least one PRECISE SV record (DELLY INV, DELLY BND pair, or Manta INV) spanning or near this candidate's boundary zones?"
+    },
+    "q4b_asm_source": {
+      "type": "string",
+      "enum": ["delly_inv", "delly_bnd_pair", "delly_bnd_single",
+               "manta_inv", "manta_bnd_pair", "none"],
+      "description": "Which caller/record class provided the evidence."
+    },
+    "q4b_asm_homlen": {
+      "type": ["integer", "null"],
+      "description": "INFO/HOMLEN from the chosen record — microhomology length at the ASSEMBLED junction, not at reference."
+    },
+    "q4b_asm_homseq": {
+      "type": ["string", "null"],
+      "description": "INFO/HOMSEQ from the chosen record."
+    },
+    "q4b_asm_consensus_available": {
+      "type": "boolean",
+      "description": "Was INFO/CONSENSUS populated (assembled contig from split reads present)?"
+    },
+    "q4b_asm_consensus_length": {
+      "type": ["integer", "null"]
+    },
+    "q4b_asm_junction_class": {
+      "type": "string",
+      "enum": ["blunt", "MH_short", "MH_long", "insertion",
+               "unclear", "unresolved_no_precise_sv"],
+      "description": "Junction classification from HOMLEN on the assembled sequence. blunt=0, MH_short=1-7, MH_long>=8, unresolved_no_precise_sv when no PRECISE record available."
+    },
+    "q4b_asm_vs_ref_concordance": {
+      "type": "string",
+      "enum": ["agree", "disagree", "ref_unavailable", "asm_unavailable"],
+      "description": "Does the assembled-junction class match cheat29's reference-based class? Discordance is meaningful evidence — it means cheat29 was reading the wrong position."
+    },
+    "q4b_ref_junction_class": {
+      "type": ["string", "null"],
+      "description": "For convenience: cheat29's reference-based class when concordance was computed."
+    },
+    "n_matching_records": {
+      "type": "integer"
+    }
+  },
+  "keys_extracted": [
+    { "key": "q4b_asm_precise_record_available", "from": "q4b_asm_precise_record_available" },
+    { "key": "q4b_asm_source",                    "from": "q4b_asm_source" },
+    { "key": "q4b_asm_homlen",                    "from": "q4b_asm_homlen" },
+    { "key": "q4b_asm_consensus_available",       "from": "q4b_asm_consensus_available" },
+    { "key": "q4b_asm_junction_class",            "from": "q4b_asm_junction_class" },
+    { "key": "q4b_asm_vs_ref_concordance",        "from": "q4b_asm_vs_ref_concordance" }
+  ]
+}

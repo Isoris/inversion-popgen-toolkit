@@ -1,0 +1,69 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "fragment_distribution.schema.json",
+  "block_type": "fragment_distribution",
+  "description": "Derived keys from the breakpoint_pipeline (scripts 01+02+03) outputs. The primary breakpoint signal is the per-carrier ancestral fragment scan (breakpoint_pipeline/02_ancestral_fragments.R): each carrier contributes a left and right fragment boundary; the union of boundaries across carriers produces a distribution whose mode is the true breakpoint, whose spread is the CI, and whose tail quantifies recombinant history. This bridge reads the three output TSVs (candidate_breakpoints_consensus.tsv, candidate_ancestral_fragments.tsv, candidate_breakpoints_per_method.tsv) and writes the derived Phase 4 keys.",
+  "question": "Q2+Q3",
+  "group_validation_required": "NONE",
+  "source_script": "bp_pipeline_bridge.py (reads breakpoint_pipeline/01+02+03 outputs)",
+  "required": ["q2_interior_class", "q3_breakpoint_precision_class"],
+  "properties": {
+    "q3_final_left_bp":                 { "type": ["integer", "null"] },
+    "q3_final_right_bp":                { "type": ["integer", "null"] },
+    "q3_left_ci_low_bp":                { "type": ["integer", "null"] },
+    "q3_left_ci_high_bp":               { "type": ["integer", "null"] },
+    "q3_right_ci_low_bp":               { "type": ["integer", "null"] },
+    "q3_right_ci_high_bp":              { "type": ["integer", "null"] },
+    "q3_left_ci_width_kb":              { "type": ["number", "null"] },
+    "q3_right_ci_width_kb":             { "type": ["number", "null"] },
+    "q3_n_methods_agreeing_left":       { "type": "integer" },
+    "q3_n_methods_agreeing_right":      { "type": "integer" },
+    "q3_primary_source":                { "type": ["string", "null"] },
+    "q3_sources_available":             { "type": ["string", "null"] },
+    "q3_inversion_size_bp":             { "type": ["integer", "null"] },
+    "q3_breakpoint_precision_class": {
+      "type": "string",
+      "enum": ["snp_resolution", "sub_5kb", "sub_30kb", "coarse", "unknown"],
+      "description": "Derived from worst of left_ci_width_kb / right_ci_width_kb. snp_resolution: <5 kb, sub_5kb: 5-20 kb, sub_30kb: 20-100 kb, coarse: >100 kb."
+    },
+    "q2_n_fragment_carriers":           { "type": "integer" },
+    "q2_fragment_interior_recomb_fraction": {
+      "type": ["number", "null"],
+      "description": "Fraction of carriers whose fragment_length < 80% of the consensus inversion span. Carriers in this fraction had ancestral recombination inside the inversion."
+    },
+    "q2_fragment_left_distribution_shape": {
+      "type": "string",
+      "enum": ["unimodal", "right_skewed", "left_skewed", "degenerate"]
+    },
+    "q2_fragment_right_distribution_shape": {
+      "type": "string",
+      "enum": ["unimodal", "right_skewed", "left_skewed", "degenerate"]
+    },
+    "q2_fragment_left_bimodality_p":    { "type": ["number", "null"] },
+    "q2_fragment_right_bimodality_p":   { "type": ["number", "null"] },
+    "q2_interior_class": {
+      "type": "string",
+      "enum": ["clean_simple",
+               "edge_recombinants_only",
+               "bimodal_boundary_signal",
+               "deep_interior_recombinants",
+               "complex_rearrangement_out_of_scope",
+               "degenerate"],
+      "description": "Synthesis class. complex_rearrangement_out_of_scope is a terminal gate (>70% of carriers recombinant) and excludes the candidate from further interpretation. Clean_simple is the baseline; edge_recombinants_only is the expected case for most segregating inversions."
+    },
+    "q3_method_disagreement_kb":        { "type": ["number", "null"] },
+    "q3_sv_method_flagged":             { "type": ["boolean", "null"] }
+  },
+  "keys_extracted": [
+    { "key": "q3_final_left_bp",            "from": "q3_final_left_bp" },
+    { "key": "q3_final_right_bp",           "from": "q3_final_right_bp" },
+    { "key": "q3_left_ci_width_kb",         "from": "q3_left_ci_width_kb" },
+    { "key": "q3_right_ci_width_kb",        "from": "q3_right_ci_width_kb" },
+    { "key": "q3_breakpoint_precision_class", "from": "q3_breakpoint_precision_class" },
+    { "key": "q3_n_methods_agreeing_left",  "from": "q3_n_methods_agreeing_left" },
+    { "key": "q3_n_methods_agreeing_right", "from": "q3_n_methods_agreeing_right" },
+    { "key": "q2_n_fragment_carriers",      "from": "q2_n_fragment_carriers" },
+    { "key": "q2_fragment_interior_recomb_fraction", "from": "q2_fragment_interior_recomb_fraction" },
+    { "key": "q2_interior_class",           "from": "q2_interior_class" }
+  ]
+}

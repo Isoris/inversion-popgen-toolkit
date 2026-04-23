@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "bnd_sided_support.schema.json",
+  "block_type": "bnd_sided_support",
+  "description": "Single-sided BND evidence at known candidate boundaries. Complements the STEP06 BND pairing in phase_3_refine: STEP06 pairs BNDs to rescue UNKNOWN candidates; this block asks whether EXISTING PCA-discovered candidates have BND support on each side independently. A candidate with a precise CT=3to3 BND at its left boundary and no CT=5to5 at its right is currently treated by the pipeline as 'no SV support' — this block records it as 'left_only' support, which is stronger than 'none'.",
+  "question": "Q7",
+  "group_validation_required": "NONE",
+  "source_script": "bnd_sided_support.py",
+  "required": ["q7b_bnd_sided_support_class"],
+  "properties": {
+    "q7b_bnd_left_support": {
+      "type": "string",
+      "enum": ["precise", "imprecise", "absent"]
+    },
+    "q7b_bnd_right_support": {
+      "type": "string",
+      "enum": ["precise", "imprecise", "absent"]
+    },
+    "q7b_bnd_sided_support_class": {
+      "type": "string",
+      "enum": ["both_sides", "left_only", "right_only", "none"]
+    },
+    "q7b_bnd_left_ct_count": { "type": "integer" },
+    "q7b_bnd_right_ct_count": { "type": "integer" },
+    "q7b_bnd_left_best_qual": { "type": ["number", "null"] },
+    "q7b_bnd_right_best_qual": { "type": ["number", "null"] }
+  },
+  "keys_extracted": [
+    { "key": "q7b_bnd_left_support",           "from": "q7b_bnd_left_support" },
+    { "key": "q7b_bnd_right_support",          "from": "q7b_bnd_right_support" },
+    { "key": "q7b_bnd_sided_support_class",    "from": "q7b_bnd_sided_support_class" },
+    { "key": "q7b_bnd_left_ct_count",          "from": "q7b_bnd_left_ct_count" },
+    { "key": "q7b_bnd_right_ct_count",         "from": "q7b_bnd_right_ct_count" }
+  ]
+}

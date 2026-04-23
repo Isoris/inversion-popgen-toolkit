@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "synteny_v6.schema.json",
+  "block_type": "synteny_v6",
+  "description": "Cross-species conservation annotation in the Kuang 2026 style: direct between-species SV-event overlap is primary, flank gene-family coherence is secondary, tree-parsimony polarization is tertiary, and Dollo parsimony is a cross-check only. Dollo is not used as primary because it forbids re-gain after loss — brittle for real inversions. Produces six conservation classes: species_specific_polymorphism, species_specific_rearranged, shared_ancestral, ASEAN_diagnostic, unclassified_complex, untested.",
+  "question": "Q5",
+  "group_validation_required": "NONE",
+  "source_script": "cross_species_bridge_v6.py",
+  "required": ["q5_conservation_class"],
+  "properties": {
+    "q5_bs_event_overlap": { "type": "boolean" },
+    "q5_bs_event_type": {
+      "type": "string",
+      "enum": ["INVERSION", "FUSION", "FISSION", "NONE", "mixed", "NA"]
+    },
+    "q5_bs_species_pair_observed": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "q5_bs_event_n_overlaps": { "type": "integer" },
+    "q3_left_flank_coherence_score": { "type": ["number", "null"] },
+    "q3_right_flank_coherence_score": { "type": ["number", "null"] },
+    "q3_left_flank_n_families": { "type": ["integer", "null"] },
+    "q3_right_flank_n_families": { "type": ["integer", "null"] },
+    "q3_flank_coherence_class": {
+      "type": "string",
+      "enum": ["both_coherent", "left_only", "right_only", "neither", "untested"]
+    },
+    "q5_tree_polarization_attempted": { "type": "boolean" },
+    "q5_tree_polarization_direction": {
+      "type": ["string", "null"],
+      "enum": ["inverted", "reference", "ambiguous", null]
+    },
+    "q5_tree_polarization_confidence": {
+      "type": ["string", "null"],
+      "enum": ["high", "medium", "low", null]
+    },
+    "q5_dollo_state": { "type": ["string", "null"] },
+    "q5_dollo_vs_tree_concordance": {
+      "type": "string",
+      "enum": ["agree", "disagree", "dollo_not_run", "tree_not_run"]
+    },
+    "q5_conservation_class": {
+      "type": "string",
+      "enum": ["species_specific_polymorphism", "species_specific_rearranged",
+               "shared_ancestral", "ASEAN_diagnostic",
+               "unclassified_complex", "untested"]
+    }
+  },
+  "keys_extracted": [
+    { "key": "q5_bs_event_overlap", "from": "q5_bs_event_overlap" },
+    { "key": "q5_bs_event_type", "from": "q5_bs_event_type" },
+    { "key": "q5_tree_polarization_direction", "from": "q5_tree_polarization_direction" },
+    { "key": "q5_tree_polarization_confidence", "from": "q5_tree_polarization_confidence" },
+    { "key": "q5_dollo_vs_tree_concordance", "from": "q5_dollo_vs_tree_concordance" },
+    { "key": "q5_conservation_class", "from": "q5_conservation_class" }
+  ]
+}

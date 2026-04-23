@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "flank_coherence.schema.json",
+  "block_type": "flank_coherence",
+  "description": "Gene-family order coherence in candidate boundary flanks, computed against sister species by the cross_species_bridge.py script, which consumes the catfish-synteny-toolkit STEP_09c output. A flank with coherent gene order in another species confirms that the boundary is well-located; an incoherent flank on one side of a candidate suggests the boundary is mis-localized or the event is more complex than a simple inversion.",
+  "question": "Q3",
+  "group_validation_required": "NONE",
+  "source_script": "cross_species_bridge.py",
+  "required": ["q3_flank_coherence_class"],
+  "properties": {
+    "q3_left_flank_coherence_score": {
+      "type": ["number", "null"],
+      "description": "STEP_09c coherence score for the left flank, 0..1; higher = more gene-order preservation"
+    },
+    "q3_right_flank_coherence_score": {
+      "type": ["number", "null"]
+    },
+    "q3_flank_coherence_class": {
+      "type": "string",
+      "enum": ["both_coherent", "left_only", "right_only", "neither", "untested"]
+    }
+  },
+  "keys_extracted": [
+    { "key": "q3_left_flank_coherence_score",  "from": "q3_left_flank_coherence_score" },
+    { "key": "q3_right_flank_coherence_score", "from": "q3_right_flank_coherence_score" },
+    { "key": "q3_flank_coherence_class",       "from": "q3_flank_coherence_class" }
+  ]
+}

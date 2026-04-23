@@ -57,6 +57,7 @@ source(.bridge)
 
 suppressPackageStartupMessages({
   library(data.table)
+  library(modeest)
 })
 
 `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) b else a
@@ -171,35 +172,76 @@ scan_carrier_fragments <- function(X, core_idx, carrier_idx,
 # Fragment-distribution summary: KDE mode + bootstrap CI
 # =============================================================================
 summarize_fragment_side <- function(boundary_positions,
-                                      bootstrap_reps = 1000L,
-                                      ci_level = 0.95) {
+                                     bootstrap_reps = 1000L,
+                                     ci_level = 0.95) {
   boundary_positions <- boundary_positions[is.finite(boundary_positions)]
   n <- length(boundary_positions)
   if (n < BP02_PARAMS$min_carriers) {
     return(list(
       n                  = n,
       mode_bp            = NA_real_,
+      mode_hsm_bp        = NA_real_,
+      mode_kde_bp        = NA_real_,
+      mode_agreement_kb  = NA_real_,
+      mode_method        = "insufficient_n",
       ci_low             = NA_real_,
       ci_high            = NA_real_,
       ci_width_kb        = NA_real_,
       median_bp          = if (n > 0) median(boundary_positions) else NA_real_,
       mean_bp            = if (n > 0) mean(boundary_positions)   else NA_real_,
       mad_kb             = if (n > 0) mad(boundary_positions)/1000 else NA_real_,
-      reason             = sprintf("only %d carriers (need >= %d)", n, BP02_PARAMS$min_carriers)
+      reason             = sprintf("only %d carriers (need >= %d)",
+                                    n, BP02_PARAMS$min_carriers)
     ))
   }
 
-  # KDE mode estimation. Use a density() call with Silverman's rule bandwidth
-  # but computed on the main mass of the distribution (exclude extreme 10%
-  # tails for bandwidth) to avoid the recombinant tail biasing bandwidth.
+  # ---------------------------------------------------------------------------
+  # Primary estimator: half-sample mode (HSM; Bickel & Frühwirth 2006).
+  #
+  # Bandwidth-free. Recursively finds the shortest interval containing
+  # half the sample, then halves until one or two points remain. Result
+  # is the centre of the densest half of the data — appropriate for
+  # the sharp-peak-with-tail shape of fragment-boundary distributions.
+  #
+  # Properties:
+  # - Robust to recombinant tail (outliers only move result by O(1/n)
+  #   per outlier at breakdown 0.5).
+  # - No oversmoothing bias — the estimator IS the densest-interval
+  #   centre, not a smoothed-density peak.
+  # - O(n log n), comparable to KDE.
+  # ---------------------------------------------------------------------------
+  hsm_fit <- function(x) {
+    if (length(x) < 4) return(if (length(x) > 0) median(x) else NA_real_)
+    tryCatch(
+      modeest::hsm(x, tie.action = "mean"),
+      error = function(e) NA_real_
+    )
+  }
+
+  point_mode_hsm <- hsm_fit(boundary_positions)
+
+  # ---------------------------------------------------------------------------
+  # Secondary estimator: Silverman-bandwidth KDE mode.
+  #
+  # Retained for sensitivity check only. Computes bandwidth on the
+  # 5-95 percentile core mass (avoiding tail influence on bandwidth),
+  # then locates the argmax of the full-sample KDE.
+  #
+  # Agreement with HSM (reported as mode_agreement_kb) is a diagnostic:
+  # - Small disagreement (<5 kb) → both methods confirm the mode
+  # - Large disagreement (>20 kb) → KDE is likely oversmoothed; trust
+  #   HSM
+  # ---------------------------------------------------------------------------
   q_lo <- quantile(boundary_positions, 0.05)
   q_hi <- quantile(boundary_positions, 0.95)
-  core_mass <- boundary_positions[boundary_positions >= q_lo & boundary_positions <= q_hi]
-  # Silverman bandwidth on core mass
+  core_mass <- boundary_positions[boundary_positions >= q_lo &
+                                    boundary_positions <= q_hi]
   bw <- if (length(core_mass) >= 5) {
     tryCatch(bw.nrd0(core_mass), error = function(e) NA_real_)
   } else NA_real_
-  if (!is.finite(bw) || bw <= 0) bw <- max(1, sd(boundary_positions, na.rm = TRUE) / 3)
+  if (!is.finite(bw) || bw <= 0) {
+    bw <- max(1, sd(boundary_positions, na.rm = TRUE) / 3)
+  }
 
   kde_fit <- function(x) {
     dens <- tryCatch(
@@ -210,39 +252,91 @@ summarize_fragment_side <- function(boundary_positions,
     dens$x[which.max(dens$y)]
   }
 
-  point_mode <- kde_fit(boundary_positions)
+  point_mode_kde <- kde_fit(boundary_positions)
 
-  # Bootstrap CI
-  boot_modes <- numeric(bootstrap_reps)
-  for (b in seq_len(bootstrap_reps)) {
-    bs <- sample(boundary_positions, n, replace = TRUE)
-    boot_modes[b] <- kde_fit(bs)
+  # Agreement between primary and secondary
+  mode_agreement_kb <- if (is.finite(point_mode_hsm) &&
+                             is.finite(point_mode_kde)) {
+    abs(point_mode_hsm - point_mode_kde) / 1000
+  } else NA_real_
+
+  # Primary mode: prefer HSM; fall back to KDE if HSM failed;
+  # fall back to median if both failed.
+  if (is.finite(point_mode_hsm)) {
+    point_mode <- point_mode_hsm
+    mode_method <- "hsm"
+  } else if (is.finite(point_mode_kde)) {
+    point_mode <- point_mode_kde
+    mode_method <- "kde_fallback"
+  } else {
+    point_mode <- median(boundary_positions)
+    mode_method <- "median_fallback"
   }
+
+  # ---------------------------------------------------------------------------
+  # Bootstrap CI on the primary (HSM) estimator.
+  #
+  # Resample carriers with replacement, recompute HSM each time,
+  # take 2.5-97.5 percentile of the bootstrap distribution.
+  # Fixed n so CI reflects sampling variability at the observed
+  # carrier count.
+  # ---------------------------------------------------------------------------
+  boot_modes <- numeric(bootstrap_reps)
+  if (mode_method == "hsm") {
+    for (b in seq_len(bootstrap_reps)) {
+      bs <- sample(boundary_positions, n, replace = TRUE)
+      boot_modes[b] <- hsm_fit(bs)
+    }
+  } else if (mode_method == "kde_fallback") {
+    for (b in seq_len(bootstrap_reps)) {
+      bs <- sample(boundary_positions, n, replace = TRUE)
+      boot_modes[b] <- kde_fit(bs)
+    }
+  } else {
+    # median fallback: bootstrap the median
+    for (b in seq_len(bootstrap_reps)) {
+      bs <- sample(boundary_positions, n, replace = TRUE)
+      boot_modes[b] <- median(bs)
+    }
+  }
+
   boot_modes <- boot_modes[is.finite(boot_modes)]
   if (length(boot_modes) < bootstrap_reps * 0.5) {
     return(list(
-      n = n, mode_bp = point_mode,
-      ci_low = NA_real_, ci_high = NA_real_, ci_width_kb = NA_real_,
-      median_bp = median(boundary_positions),
-      mean_bp = mean(boundary_positions),
-      mad_kb = mad(boundary_positions) / 1000,
-      reason = "bootstrap unstable"
+      n                  = n,
+      mode_bp            = point_mode,
+      mode_hsm_bp        = point_mode_hsm,
+      mode_kde_bp        = point_mode_kde,
+      mode_agreement_kb  = mode_agreement_kb,
+      mode_method        = mode_method,
+      ci_low             = NA_real_,
+      ci_high            = NA_real_,
+      ci_width_kb        = NA_real_,
+      median_bp          = median(boundary_positions),
+      mean_bp            = mean(boundary_positions),
+      mad_kb             = mad(boundary_positions) / 1000,
+      reason             = "bootstrap unstable"
     ))
   }
+
   alpha <- 1 - ci_level
   ci_low  <- quantile(boot_modes, alpha / 2)
   ci_high <- quantile(boot_modes, 1 - alpha / 2)
 
   list(
-    n           = n,
-    mode_bp     = as.numeric(point_mode),
-    ci_low      = as.numeric(ci_low),
-    ci_high     = as.numeric(ci_high),
-    ci_width_kb = as.numeric((ci_high - ci_low) / 1000),
-    median_bp   = median(boundary_positions),
-    mean_bp     = mean(boundary_positions),
-    mad_kb      = mad(boundary_positions) / 1000,
-    reason      = "ok"
+    n                  = n,
+    mode_bp            = as.numeric(point_mode),
+    mode_hsm_bp        = as.numeric(point_mode_hsm),
+    mode_kde_bp        = as.numeric(point_mode_kde),
+    mode_agreement_kb  = as.numeric(mode_agreement_kb),
+    mode_method        = mode_method,
+    ci_low             = as.numeric(ci_low),
+    ci_high            = as.numeric(ci_high),
+    ci_width_kb        = as.numeric((ci_high - ci_low) / 1000),
+    median_bp          = median(boundary_positions),
+    mean_bp            = mean(boundary_positions),
+    mad_kb             = mad(boundary_positions) / 1000,
+    reason             = "ok"
   )
 }
 
