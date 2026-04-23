@@ -21,7 +21,7 @@ Detail-level reference for everything specific to DELLY's INV pipeline. Pairs wi
 
 DELLY INV is the **primary direct SV-caller evidence** for every inversion candidate the paper claims. The framing chain is:
 
-- MODULE_5A discovers inversion candidates from population-level signal — the 4-layer independence framework combining Layer A (local PCA / dosage), Layer C (GHSL within-sample haplotype divergence), and the integrative scoring that combines them. These are *statistical* candidates — regions of the genome where the population data behaves as if there is an inversion.
+- MODULE_5A discovers inversion candidates from population-level signal (local PCA, GHSL v5 within-sample haplotype divergence, 4-layer consensus). These are *statistical* candidates — regions of the genome where the population data behaves as if there is an inversion.
 - MODULE_4D INV provides *molecular* evidence — actual split reads and discordant pairs at the inferred breakpoints, classifiable by orientation as 3to3 (left) or 5to5 (right) inversion junctions.
 - MODULE_5A2 then tests whether the molecular and statistical evidence agree. Concordance is the highest-confidence class.
 
@@ -193,7 +193,7 @@ MODULE_4D INV catalog
   │   - Six classes: concordant / delly_only / manta_only / bnd_rescue_* / orphan
   │
   ├─▶ MODULE_5A   regime / candidate matching
-  │   - 50% reciprocal overlap against the multi-layer consensus candidate regions (Layers A+C)
+  │   - 50% reciprocal overlap against 4-layer consensus regions
   │   - Tags whether each population candidate has SV-caller anchor
   │
   └─▶ Manuscript Figure (per-candidate breakpoint validation panel)
@@ -225,7 +225,7 @@ For the specific cross-module wiring (cheats, framework methods, plug-map for th
 
 ### Methods — DELLY INV calling paragraph
 
-> DELLY2 v1.7.3 (Rausch *et al.*, 2012) was used for inversion discovery across all 226 *C. gariepinus* samples. Per-sample `delly call -t INV` was run on duplicate-marked BAMs against the *C. gariepinus* (Gar) subgenome reference (`fClaHyb_Gar_LG.fa`, 28 pseudochromosomes, ~964 Mb — the *gariepinus* haplotype extracted from the haplotype-resolved F₁ hybrid assembly) using the empirical exclusion BED constructed from regions with <500 callable base pairs per 50-kb bin and unconditional 50-kb chromosome-end masking. Per-sample calls were merged (`delly merge`), regenotyped against all samples, subset to the 81 NAToRA-pruned unrelated individuals, and germline-filtered (`delly filter -f germline`). The strict catalog required `FILTER = PASS`, `INFO/PRECISE = 1`, `QUAL ≥ 300`, and `INFO/PE ≥ 3`. Per-sample alt evidence was computed as the sum of discordant variant pairs and variant junction reads (`FORMAT/DV + FORMAT/RV`).
+> DELLY2 v1.7.3 (Rausch *et al.*, 2012) was used for inversion discovery across all 226 samples. Per-sample `delly call -t INV` was run on duplicate-marked BAMs against the *C. gariepinus* (Gar) subgenome reference (`fClaHyb_Gar_LG.fa`, 28 pseudochromosomes, ~964 Mb — the *gariepinus* haplotype extracted from the haplotype-resolved F₁ hybrid assembly) using the empirical exclusion BED constructed from regions with <500 callable base pairs per 50-kb bin and unconditional 50-kb chromosome-end masking. Per-sample calls were merged (`delly merge`), regenotyped against all samples, subset to the 81 NAToRA-pruned unrelated individuals, and germline-filtered (`delly filter -f germline`). The strict catalog required `FILTER = PASS`, `INFO/PRECISE = 1`, `QUAL ≥ 300`, and `INFO/PE ≥ 3`. Per-sample alt evidence was computed as the sum of discordant variant pairs and variant junction reads (`FORMAT/DV + FORMAT/RV`).
 
 ### Results — number reporting placeholder
 

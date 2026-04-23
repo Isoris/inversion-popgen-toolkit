@@ -4,7 +4,7 @@ DELLY2 inversion discovery, site merging, cohort regenotyping, germline filterin
 
 ## Why this module exists (for the inversion paper)
 
-Direct SV-caller evidence for inversions. Every candidate that MODULE_5A flags from population-level signal (local PCA, GHSL v5 within-sample haplotype divergence, three-snake consensus) should ideally have a concordant DELLY INV call with split-read support across both breakpoints. Conversely, DELLY INV calls with no MODULE_5A population signal are candidates for low-frequency inversions below the detection limit of local PCA.
+Direct SV-caller evidence for inversions. Every candidate that MODULE_5A flags from population-level signal (local PCA, GHSL v5 within-sample haplotype divergence, 4-layer consensus combining Layer A dosage and Layer C haplotype contrast) should ideally have a concordant DELLY INV call with split-read support across both breakpoints. Conversely, DELLY INV calls with no MODULE_5A population signal are candidates for low-frequency inversions below the detection limit of local PCA.
 
 The DELLY INV catalog anchors MODULE_5A2 (breakpoint validation), which cross-references every INV call against BAM-level evidence (pysam split-read orientation, INV3 vs INV5 tags) and tests concordance between DELLY and Manta (MODULE_4G) calls using Fisher / χ² / Cochran-Armitage tests.
 

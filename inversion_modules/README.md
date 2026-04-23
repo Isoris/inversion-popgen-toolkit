@@ -4,18 +4,16 @@ Consolidated deployment tree for the inversion-discovery pipeline of
 the `MS_Inversions_North_african_catfish` manuscript. Cohort: 226
 *Clarias gariepinus* broodstock individuals sampled from a commercial
 Thai hatchery that maintains broodstock for F₁ hybrid catfish seed
-production (*C. macrocephalus* ♀ × *C. gariepinus* ♂); read-level
-species identity was verified by Mash screening against both parental
-subgenomes to rule out farm mixups, mislabelling with *C. macrocephalus*
-broodstock, or contamination with morphologically cryptic *Clarias*
-species (see `Modules/MODULE_1_read_prep/helpers/MODULE_1_Methods_Revised.md`
-§1.2). Sequencing: ~9× Illumina short-read WGS. Reference: the
-*C. gariepinus* (Gar) subgenome reference (`fClaHyb_Gar_LG.fa`,
-28 pseudochromosomes, ~964 Mb) extracted from Section 1 of the
-manuscript's haplotype-resolved F₁ hybrid assembly. K clusters in
-this cohort reflect hatchery broodline structure (20+ small families),
-not interspecies or natural-population structure. All paths below
-are relative to this directory.
+production (*C. macrocephalus* ♀ × *C. gariepinus* ♂); pure-species
+identity was verified at the read level by Mash screening against both
+parental subgenomes (see
+`Modules/MODULE_1_read_prep/helpers/MODULE_1_Methods_Revised.md` §1.2).
+Sequencing: ~9× Illumina short-read WGS. Reference: the *C. gariepinus*
+(Gar) subgenome reference (`fClaHyb_Gar_LG.fa`, 28 pseudochromosomes,
+~964 Mb) extracted from Section 1 of the manuscript's haplotype-resolved
+F₁ hybrid assembly. K clusters in this cohort reflect hatchery broodline
+structure (20+ small families), not interspecies or natural-population
+structure. All paths below are relative to this directory.
 
 ## Top-level layout
 

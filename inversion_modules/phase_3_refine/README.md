@@ -59,8 +59,7 @@ by:
 STEP 01 — Extract DELLY+Manta INV calls, match to phase 2d staircase candidates
             → matched_inv_candidates.tsv
 STEP 02 — Per-sample pysam evidence extraction at each bp ± 300 bp
-            + REF/HET/INV group assignment (community-detection band
-              assignments [legacy name: Snake2] → local PCA fallback)
+            + REF/HET/INV group assignment (community-detection bands [legacy: Snake2] → local PCA fallback)
             → {inv_id}_evidence.tsv + {inv_id}_group_assignments.tsv
 STEP 03 — Fisher exact + Chi-square + Cochran–Armitage trend tests + seeds
           + WRITE existence_layer_d block per candidate (Layer D)
@@ -148,9 +147,9 @@ CANDIDATE_MAP=/path/to/inv_id_to_candidate_id.tsv \
    Flag as "SV-only, fixed" candidates.
 4. **Ambiguous groups.** STEP02 community-detection band assignments
    (legacy name: Snake2) use majority vote across overlapping windows.
-   If the community-detection track covers <50% of samples, STEP02
-   falls back to local k-means PCA (k=3 on PC1). Both are documented
-   per-candidate in `{inv_id}_group_assignments.tsv`.
+   If the community-detection track covers <50% of samples,
+   STEP02 falls back to local k-means PCA (k=3 on PC1). Both are
+   documented per-candidate in `{inv_id}_group_assignments.tsv`.
 
 ## Dependencies
 
@@ -159,8 +158,7 @@ CANDIDATE_MAP=/path/to/inv_id_to_candidate_id.tsv \
 - DELLY2 INV + BND catalogs (from MODULE_4D + MODULE_4F)
 - Manta INV PASS + raw pre-conversion catalogs (from MODULE_4H)
 - Markdup BAMs (from MODULE_4B)
-- Community-detection band assignments (legacy name: Snake 2)
-  (optional, for STEP02 group source A)
+- Community-detection band assignments (legacy name: Snake 2) (optional, for STEP02 group source A)
 - Dosage files (optional, for STEP02 group source B fallback)
 - Registry API at `registries/api/python/registry_loader.py` (optional —
   gracefully skipped if absent, script remains runnable standalone)

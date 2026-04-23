@@ -33,10 +33,9 @@ pipeline flagged as potentially harbouring an inversion polymorphism.
 Every key is scoped per-candidate.
 
 **What is a "sample"?** One of the 226 *Clarias gariepinus* broodstock
-individuals from a commercial Thai hatchery (verified as pure
-*C. gariepinus* by read-level Mash screening against both parental
-subgenome references; see `Modules/MODULE_1_read_prep/helpers/MODULE_1_Methods_Revised.md`
-§1.2). Each sample has one diploid genotype per candidate.
+individuals in the cohort (verified as pure *C. gariepinus* by Mash
+screening against both parental subgenome references). Each sample has
+one diploid genotype per candidate.
 
 **What do Q1 / Q2 / Q6 mean?** The key prefix identifies which of
 the seven characterisation questions the key informs:

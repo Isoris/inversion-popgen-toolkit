@@ -304,4 +304,4 @@ Those values would relax DUP to INV-level stringency. The use case is **sensitiv
 
 ### Q: Why doesn't this module also analyze DELLY DUP for whole-genome duplication or ploidy changes?
 
-DELLY `call -t DUP` detects tandem duplications, not whole-chromosome or whole-genome ploidy changes. This study cohort is diploid *C. gariepinus* (2n = 56, Maneechot et al. 2016); aneuploidy or polyploidy detection is not in scope. If it were, the pipeline would need `delly cnv` (depth-based) or a dedicated karyotype caller. None of the candidate inversions in this study have shown evidence of underlying ploidy changes.
+DELLY `call -t DUP` detects tandem duplications, not whole-chromosome or whole-genome ploidy changes. The cohort is diploid *C. gariepinus* (2n = 56, Maneechot et al. 2016); aneuploidy or polyploidy detection is not in scope for this study. If it were, the pipeline would need `delly cnv` (depth-based) or a dedicated karyotype caller. None of the candidate inversions in this study have shown evidence of underlying ploidy changes.

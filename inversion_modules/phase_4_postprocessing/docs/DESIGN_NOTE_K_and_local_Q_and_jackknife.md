@@ -85,60 +85,44 @@
 #
 # The question is: what's the RIGHT K for each use?
 #
-# UPFRONT — this cohort is NOT structure-matched by K. The hatchery has
-# 20+ small families as the biological structure; the K that would
-# actually match the ancestry structure is ~20. But K is used here as a
-# *scan parameter for inversion regime detection*, not as a tool for
-# describing cohort structure, and the right K for inversion detection
-# is well below the structure K. The ancestry layer routinely scans
-# K=2..12 (and occasionally up to 20) for stability checks; K=8 is the
-# default presented here for per-candidate downstream steps.
+# For (a) genome-wide Q, K should be chosen for what the statistics need.
+# This hatchery cohort has 20+ small families, so a structure-match K
+# would be ~20 — but that's the WRONG choice for the inversion-regime
+# statistics this pipeline does. The right K balances three things:
+# dosage-signal concentration (1-2 Q components at moderate K),
+# per-group sample size (need ≥25 for Fst / jackknife), and
+# composite-detection alphabet size. K = 8 hits all three:
+#   - K=5: collapses too coarsely, loses fine signal
+#   - K=8: ~28 samples per group — minimum useful regime for Fst stats
+#   - K=12: ~19 per group — starts to get noisy
+#   - K=20 (~structure-match): ~11 per group — Fst estimator variance
+#           dominates; "drop-one-group" jackknife barely moves the signal
+#           because each group is too small to matter
 #
-# Why K=8 is the default for inversion-regime scans:
+# For (b) Cheat 5 — K determines how many Q components are scanned. Higher
+# K gives more chances to find a high-Fst component. But at K=20 with
+# 11 samples per group, the Fst estimator variance dominates. K=8 is the
+# inflection point where signal starts beating noise. Do NOT go above K=12
+# for cheat 5.
 #
-#   1. An inversion usually has a dosage signal that concentrates in
-#      1-2 Q components at moderate K. At K=8 you have enough resolution
-#      that an inversion's carriers cluster into 1-2 components cleanly
-#      (the rest of the structure lives in the other 6-7). Going higher
-#      fragments the inversion signal across too many components.
+# For (c) Cheat 6 jackknife — same story. Removing one Q group at K=8
+# removes ~28 samples, big enough to see real signal changes; at K=20
+# removing ~11 samples is within noise. K=8 is appropriate.
 #
-#   2. Statistical tractability. At K=8 the average group size is ~28
-#      samples, which is the minimum useful regime for Fst / jackknife
-#      tests on a 226-sample cohort. At K=20 (approximately structure-
-#      matched), you get ~11 samples per group — Fst estimator variance
-#      dominates and "drop-one-group" jackknife barely moves the signal
-#      because each group is too small to matter.
+# For (d) instant_q local Q — K determines the alphabet size of the
+# assigned_pop label. nested_composition relies on label changes within
+# a sample. At K=8 you have 8 possible labels; a two_block composite is
+# easy to detect (2 out of 8 labels appearing, each ≥30%). At K=20 with
+# noisy local Q estimates, spurious label changes make everything look
+# fragmented → false-positive composite flags. K=8 is safer than K=20
+# for composite detection.
 #
-#   3. Composite-detection alphabet. nested_composition reads the local
-#      assigned_pop label per window per sample; at K=8 you have 8
-#      possible labels and a two_block composite (2 labels, each ≥30%)
-#      is easy to distinguish from noise. At K=20 with noisy local Q,
-#      spurious label changes make everything look fragmented →
-#      false-positive composites.
-#
-# So K=8 is a tool choice tuned for the inversion-regime job, NOT a
-# claim that the cohort has ~8 deep biological groupings. Per-use
-# notes:
-#
-#   (a) genome-wide Q: K=8 is the default downstream consumers assume,
-#       but the ancestry layer produces Q at K=2..12 (K sweep). Any
-#       downstream step that wants a different K can pull it from the
-#       K-sharded cache.
-#   (b) Cheat 5 family-Fst scan: K=8 is the sweet spot between Q
-#       component count and per-component sample size. Do not go above
-#       K=12 — estimator variance takes over.
-#   (c) Cheat 6 jackknife: uses K=8 because removing one of 8 groups
-#       removes ~28 samples, big enough to see real signal changes.
-#   (d) instant_q local Q: K=8 gives the 8-label alphabet that
-#       composite-detection is calibrated for.
-#
-# CONCLUSION: K=8 IS THE RIGHT DEFAULT FOR INVERSION-REGIME DETECTION in
-# this 226-sample cohort. It's a scan-parameter choice that balances
-# (signal concentration in 1-2 components) × (per-component sample
-# size ≥25) × (composite-detection alphabet sensible for local Q).
-# It is NOT chosen to match the hatchery's ancestry structure —
-# structure-matching would argue for K=20 or higher and would be the
-# wrong choice for this pipeline's statistics.
+# CONCLUSION: K=8 IS THE RIGHT SCAN-PARAMETER DEFAULT for this 226-sample
+# cohort. It's not a structure match — structure-matching the ~20
+# broodlines would be the wrong choice for the Fst/jackknife statistics
+# done per-candidate. K=8 is chosen for (signal concentration in 1-2
+# components) × (per-group sample size ≥25) × (8-label alphabet fit for
+# composite detection).
 #
 # WHEN TO DEVIATE:
 #
@@ -147,13 +131,12 @@
 #     it's real. If it disappears at K=12, K=8 was too coarse.
 #     Cheap: <20 candidates × 2 min each.
 #
-#   - Ancestry-structure questions (how many broodlines, which samples
-#     share broodline background) → use the full K=2..12 sweep directly,
-#     don't rely on the K=8 default. For this cohort K=12-20 is the
-#     right range to actually resolve the ~20 hatchery broodlines.
+#   - A new cohort with different biology → re-pick K based on
+#     expected_deep_groups AND samples/group ≥ 25.
 #
-#   - A new cohort with different sample size → re-pick K to keep
-#     samples/component ≥ 25; that's the binding statistical constraint.
+#   - The full multi-K approach (evaluate at K=5, 8, 12, report stable
+#     results) is principled but costs 3× more NGSadmix time + 3× the
+#     downstream analysis. Skip for the manuscript; revisit post-submission.
 #
 # IMPLEMENTATION: make K a config variable, not a hardcoded 8.
 #   Add to 00_inversion_config.sh:

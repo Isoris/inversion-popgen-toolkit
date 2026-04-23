@@ -472,8 +472,7 @@ The seven filter layers, in order:
   C01i decomposition
 
 ### Layer 8 — Population signal concordance (cross-module, MODULE_5A)
-- **Input:** seeds from STEP03 + population signal regions from
-  three-snake consensus
+- **Input:** seeds from STEP03 + population signal regions from 4-layer consensus (Layer A dosage / local PCA + Layer C GHSL haplotype contrast)
 - **Layer:** does the SV-caller-derived breakpoint match a population-
   signal region? 50% reciprocal overlap required
 - **Attrition:** SV-only calls that lack population signal are

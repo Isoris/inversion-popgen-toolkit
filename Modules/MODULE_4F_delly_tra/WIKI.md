@@ -28,7 +28,7 @@ MODULE_4F TRA has the **smallest direct contribution** to the inversion paper of
 
 **Role 2: Complex rearrangement detection.** Some real inversions are embedded inside reciprocal translocations or other complex rearrangements (e.g., inv-trans events common in cancer; rare but possible in germline). When this happens, the inversion's breakpoints will be flanked by translocation breakpoints in MODULE_4F. Detecting this allows the manuscript to flag the inversion as part of a complex event rather than a simple inversion.
 
-In the catfish hybrid context, the expected number of true reciprocal translocations is small. Catfish hybrids have a stable karyotype across the cohort (chromosomal-level rearrangements do not segregate); MODULE_4F's catalog mostly contains low-frequency private translocations and call artifacts. The high-confidence TRA records are useful as cross-checks even though they are not numerous.
+In the closed hatchery *C. gariepinus* broodstock context, the expected number of true reciprocal translocations is small. The cohort has a stable karyotype (chromosomal-level rearrangements do not segregate); MODULE_4F's catalog mostly contains low-frequency private translocations and call artifacts. The high-confidence TRA records are useful as cross-checks even though they are not numerous.
 
 ---
 
@@ -87,7 +87,7 @@ If found → reciprocal translocation. If only one record exists → either a no
 
 ### Non-reciprocal breaks
 
-Not all translocations are reciprocal. **Non-reciprocal translocations** (one segment moves to a new position without reciprocal exchange) appear as single TRA records without partners. These are typically associated with chromosome instability events (chromothripsis, breakage-fusion-bridge cycles) and are rare in germline contexts. In the catfish hybrid cohort, any non-reciprocal TRA call should be treated with extra scepticism — more likely a missed partner than a true non-reciprocal event.
+Not all translocations are reciprocal. **Non-reciprocal translocations** (one segment moves to a new position without reciprocal exchange) appear as single TRA records without partners. These are typically associated with chromosome instability events (chromothripsis, breakage-fusion-bridge cycles) and are rare in germline contexts. In this hatchery-broodstock cohort, any non-reciprocal TRA call should be treated with extra scepticism — more likely a missed partner than a true non-reciprocal event.
 
 ---
 
@@ -205,9 +205,9 @@ For the broader plug-map, see [`../SV_CALLING_FRAMEWORK_WIKI.md` § 3](../SV_CAL
 
 3. **Reciprocal partner pairing is not always trivial.** When the breakpoints are in repeat-rich regions, the assembled junction sequences from the two sides may not assemble cleanly enough for partner identification by sequence alone. Pairing relies on chromosome pair + breakpoint distance + complementary CT, which is mostly correct but can fail at SD-rich loci.
 
-4. **Catfish hybrid TRA prevalence is biologically expected to be low.** The cohort represents an intra-species hybrid (Mac × Gar) with a stable karyotype. Reciprocal translocations are not expected to segregate in the cohort. Most strict-filter TRA calls likely reflect either (a) low-frequency private events, (b) rare assembly errors interpreted as translocations, or (c) artifacts of homologous-but-distant SDs across chromosomes. Each TRA call should be evaluated individually rather than treated as a true translocation by default.
+4. **Catfish broodstock TRA prevalence is biologically expected to be low.** The cohort is closed hatchery *C. gariepinus* broodstock with a stable karyotype. Reciprocal translocations are not expected to segregate in the cohort. Most strict-filter TRA calls likely reflect either (a) low-frequency private events, (b) rare assembly errors interpreted as translocations, or (c) artifacts of homologous-but-distant SDs across chromosomes. Each TRA call should be evaluated individually rather than treated as a true translocation by default.
 
-5. **`delly filter -f germline` was designed for human cohorts.** The germline filter applies allele-frequency / Hardy-Weinberg-like criteria that may be inappropriate for the catfish cohort's structure (hatchery population, F1 hybrids violating HWE). For TRA calls specifically — where every call deserves manual inspection anyway — this is less of a concern than for DEL or DUP.
+5. **`delly filter -f germline` was designed for human cohorts.** The germline filter applies allele-frequency / Hardy-Weinberg-like criteria that may be inappropriate for the cohort's structure (closed hatchery broodstock with limited founders violating HWE). For TRA calls specifically — where every call deserves manual inspection anyway — this is less of a concern than for DEL or DUP.
 
 ---
 
@@ -223,7 +223,7 @@ For the broader plug-map, see [`../SV_CALLING_FRAMEWORK_WIKI.md` § 3](../SV_CAL
 
 ### Discussion — limitations footnote
 
-> Translocation detection at ~5× coverage is limited by the requirement that both breakpoints of a reciprocal event independently pass evidence thresholds. Single-sided BND records (one breakpoint detected, partner not detected) are common at low coverage and cannot be reliably classified as reciprocal translocations from short-read data alone. The catfish hybrid cohort is biologically expected to have a low rate of segregating reciprocal translocations, so the small TRA catalog size is consistent with biology rather than necessarily reflecting reduced sensitivity.
+> Translocation detection at ~5× coverage is limited by the requirement that both breakpoints of a reciprocal event independently pass evidence thresholds. Single-sided BND records (one breakpoint detected, partner not detected) are common at low coverage and cannot be reliably classified as reciprocal translocations from short-read data alone. This hatchery broodstock cohort is biologically expected to have a low rate of segregating reciprocal translocations, so the small TRA catalog size is consistent with biology rather than necessarily reflecting reduced sensitivity.
 
 ---
 
@@ -255,7 +255,7 @@ It means the breakpoint is intra-chromosomal — both ends of the rearrangement 
 
 ### Q: Is a single-sided TRA record (no reciprocal partner) real?
 
-At ~5× coverage, almost certainly the partner is missing due to coverage limitations rather than a genuine non-reciprocal break. Non-reciprocal translocations are biologically rare in germline and usually associated with chromosome instability syndromes. For a catfish hybrid cohort, treat single-sided TRA records as **incomplete reciprocal events** rather than as genuine non-reciprocal translocations. This means the actual number of "translocation events" is closer to (paired + single-sided/2) than to the raw record count.
+At ~5× coverage, almost certainly the partner is missing due to coverage limitations rather than a genuine non-reciprocal break. Non-reciprocal translocations are biologically rare in germline and usually associated with chromosome instability syndromes. For a closed hatchery broodstock cohort, treat single-sided TRA records as **incomplete reciprocal events** rather than as genuine non-reciprocal translocations. This means the actual number of "translocation events" is closer to (paired + single-sided/2) than to the raw record count.
 
 ### Q: How does MODULE_4F interact with MODULE_4G Manta's translocation calls?
 

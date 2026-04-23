@@ -168,11 +168,9 @@ Wiring target: RepeatMasker run + TSV → registry key extraction in C01g.
 **Q4 TE + GO enrichment — 9 keys**
 
 Require RepeatMasker TE tracks + GO annotation on the Gar subgenome
-reference (`fClaHyb_Gar_LG.fa`, the *C. gariepinus* haplotype extracted
-from Section 1's haplotype-resolved F₁ hybrid assembly). These were
-marked aspirational because TE family / GO annotation coverage on this
-reference may be incomplete compared to long-established reference
-species.
+reference. These were marked aspirational because TE family / GO
+annotation coverage on this reference may be incomplete compared to
+long-established reference species.
 
 - `q4_te_family_left`
 - `q4_te_family_right`
