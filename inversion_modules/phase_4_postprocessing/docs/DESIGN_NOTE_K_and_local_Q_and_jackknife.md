@@ -86,8 +86,12 @@
 # The question is: what's the RIGHT K for each use?
 #
 # For (a) genome-wide Q, K should match the number of deep ancestry groups
-# in the cohort. For 226 hybrid catfish from a hatchery with ~6 founder
-# lines + two parent species, K ≈ 8 is biologically justified:
+# in the cohort. For 226 pure *C. gariepinus* catfish from a hatchery with
+# ~8 broodlines, K ≈ 8 is biologically justified. [Quentin: verify the
+# actual broodline count for the MS_Inversions cohort and adjust this
+# number if it's different — the earlier draft of this doc said "~6 founder
+# lines + two parent species", which was a cohort-conflation with the F1
+# hybrid assembly paper's cohort.] At this K:
 #   - K=5: collapses lines together, loses fine family structure
 #   - K=8: ~28 samples per group on average — good for Fst stats
 #   - K=12: ~19 per group — starts to get noisy for Fst

@@ -167,9 +167,12 @@ Wiring target: RepeatMasker run + TSV → registry key extraction in C01g.
 
 **Q4 TE + GO enrichment — 9 keys**
 
-Require RepeatMasker TE tracks + GO annotation on the hybrid genome.
-These were marked aspirational because TE family / GO annotation may not
-be available for the F1 hybrid in the same way as a standard reference.
+Require RepeatMasker TE tracks + GO annotation on the *C. gariepinus*
+reference (`fClaHyb_Gar_LG.fa`, the *gariepinus* haplotype extracted
+from the haplotype-resolved F1 hybrid assembly). These were marked
+aspirational because TE family / GO annotation coverage on this
+reference may be incomplete compared to long-established reference
+species.
 
 - `q4_te_family_left`
 - `q4_te_family_right`

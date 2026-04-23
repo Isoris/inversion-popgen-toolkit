@@ -32,8 +32,9 @@ chromosome (chrom, start_bp, end_bp) that the phase-2 inv_detect
 pipeline flagged as potentially harbouring an inversion polymorphism.
 Every key is scoped per-candidate.
 
-**What is a "sample"?** One of the 226 F₁ hybrid *Clarias* fish in
-the cohort. Each sample has one diploid genotype per candidate.
+**What is a "sample"?** One of the 226 pure *Clarias gariepinus*
+hatchery broodstock fish in the cohort. Each sample has one diploid
+genotype per candidate.
 
 **What do Q1 / Q2 / Q6 mean?** The key prefix identifies which of
 the seven characterisation questions the key informs:

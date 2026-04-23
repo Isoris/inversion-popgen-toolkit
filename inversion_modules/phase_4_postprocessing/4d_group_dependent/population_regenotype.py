@@ -105,17 +105,17 @@ def genotype_posteriors(n_alt, n_ref, freq, error_rate=0.01):
       GT=1/1: expect alt reads ~ Binom(n_total, 1 - error_rate)
 
     Prior from population frequency (Hardy-Weinberg as approximation,
-    though we know F1 hybrids violate HWE — the prior is still
-    directionally correct and conservative):
+    though we know hatchery broodstock with limited founders violates
+    HWE — the prior is still directionally correct and conservative):
       P(0/0) = (1-freq)^2
       P(0/1) = 2*freq*(1-freq)
       P(1/1) = freq^2
 
-    For the F1 hybrid context where HWE doesn't hold, the prior
-    essentially captures "what fraction of the cohort carries this
-    variant" — even if the genotype frequencies don't follow HWE,
-    the prior still helps because a common variant is more likely
-    to be present in any given sample.
+    For this hatchery broodstock context where HWE doesn't strictly
+    hold, the prior essentially captures "what fraction of the cohort
+    carries this variant" — even if the genotype frequencies don't
+    follow HWE, the prior still helps because a common variant is more
+    likely to be present in any given sample.
     """
     n_total = n_alt + n_ref
 

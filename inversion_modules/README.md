@@ -1,8 +1,15 @@
 # `inversion_modules/` — pipeline deployment root
 
-Consolidated deployment tree for the catfish F₁ hybrid inversion
-pipeline (226 samples, *C. gariepinus × C. macrocephalus*). All paths
-below are relative to this directory.
+Consolidated deployment tree for the inversion-discovery pipeline of
+the `MS_Inversions_North_african_catfish` manuscript: 226 samples of
+pure *Clarias gariepinus* hatchery broodstock, ~9× Illumina short-read
+WGS across 28 linkage groups, mapped to the haplotype-resolved
+*C. gariepinus* reference (`fClaHyb_Gar_LG.fa`, 963.9 Mb; the *gariepinus*
+haplotype extracted from a haplotype-resolved F1 hybrid assembly — do
+not confuse with the F1 hybrid cohort used for the *assembly* paper).
+K clusters in this cohort reflect hatchery broodline structure, not
+hybrid/population structure. All paths below are relative to this
+directory.
 
 ## Top-level layout
 
