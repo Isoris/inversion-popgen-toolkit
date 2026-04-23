@@ -929,6 +929,55 @@ for (ci in seq_along(candidates)) {
 status_dt <- rbindlist(status_rows, fill = TRUE)
 compl_dt <- rbindlist(completion_rows, fill = TRUE)
 
+# ── Axis 5 (env-gated): append v7 final-label columns if V7_FINAL_DIR is set.
+# Helper lives in the same directory as this script; locate it robustly
+# whether this script is run via Rscript or source()'d.
+axis5_dir <- Sys.getenv("V7_FINAL_DIR", "")
+if (nzchar(axis5_dir)) {
+  if (!dir.exists(axis5_dir)) {
+    warning(sprintf(
+      "[axis5] V7_FINAL_DIR is set but does not exist: %s  — skipping axis 5.",
+      axis5_dir
+    ))
+  } else {
+    # Find this script's directory
+    .this_script <- (function() {
+      # 1) Rscript / Rscript --file path on cmdline
+      ca <- commandArgs(trailingOnly = FALSE)
+      fn <- sub("^--file=", "", grep("^--file=", ca, value = TRUE))
+      if (length(fn) > 0) return(normalizePath(fn[1], mustWork = FALSE))
+      # 2) source()'d — sys.frames carry $ofile
+      for (f in rev(sys.frames())) {
+        of <- tryCatch(f$ofile, error = function(e) NULL)
+        if (!is.null(of)) return(normalizePath(of, mustWork = FALSE))
+      }
+      NA_character_
+    })()
+
+    axis5_helper <- if (!is.na(.this_script)) {
+      file.path(dirname(.this_script), "_axis5_final_label.R")
+    } else {
+      # Last-resort: assume CWD is the script's folder
+      "_axis5_final_label.R"
+    }
+
+    if (file.exists(axis5_helper)) {
+      source(axis5_helper, local = TRUE)
+      n_before <- nrow(status_dt)
+      status_dt <- append_axis5_to_rows(status_dt, axis5_dir)
+      cat(sprintf(
+        "[axis5] appended v7 final-label columns for %d candidates (helper: %s)\n",
+        n_before, axis5_helper
+      ))
+    } else {
+      warning(sprintf(
+        "[axis5] helper not found at %s  — skipping axis 5.",
+        axis5_helper
+      ))
+    }
+  }
+}
+
 fwrite(status_dt, file.path(outdir, "candidate_status.tsv"), sep = "\t")
 fwrite(compl_dt, file.path(outdir, "candidate_completion.tsv"), sep = "\t")
 

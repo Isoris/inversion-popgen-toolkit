@@ -1,0 +1,163 @@
+# MODULE_MAP.md — how the two module trees fit together
+
+*Last updated: 2026-04-24*
+
+The repo has **two** parallel module trees with overlapping purposes.
+This document explains which is which and maps both to the manuscript
+(`MS_Inversions_North_african_catfish_v19.docx`).
+
+Renumbering is deliberately **not** proposed — too disruptive. The goal
+here is to let a new reader (or future-Quentin) navigate without
+tripping on the duplication.
+
+---
+
+## Two trees, two purposes
+
+### `Modules/` — preprocessing + caller outputs (MODULE_1..4)
+
+Wet-lab → BAM → SNP panel → per-sample SV caller VCFs. Every module is
+self-contained, SLURM-driven, and produces a well-defined artefact
+consumed by `inversion_modules/` or by the manuscript directly.
+
+### `inversion_modules/` — the inversion-discovery pipeline (phase_1..7)
+
+Takes the outputs of `Modules/` and runs the actual inversion analysis:
+discovery → breakpoint refinement → postprocessing → gene-content
+analysis. Each `phase_N_*/` directory is **one logical stage of the
+paper's §3 results**.
+
+### Why not one tree?
+
+Historical: `Modules/` was built first as general-purpose preprocessing
+for the whole lab pipeline (SNP discovery, structure, SV calling).
+`inversion_modules/` was spun up later when the inversion work grew
+beyond one module and needed its own multi-phase pipeline. The
+old-tree / new-tree split is documented here rather than merged because
+(a) `Modules/` is reused by other planned papers (pure *C. macrocephalus*
+cohort, hybrid assembly) and (b) merging would shuffle ~100 file paths.
+
+---
+
+## `Modules/` — map
+
+| Dir | Role | Manuscript section |
+|---|---|---|
+| `MODULE_1_read_prep` | Read QC, species verification (Mash vs both parental subgenomes), alignment, dedup, depth QC | §2.1 |
+| `MODULE_2A_snp_discovery` | ANGSD biSNP panel, BEAGLE GLs, PCAngsd, NGSadmix, evalAdmix, ngsRelate pruning | §2.2 |
+| `MODULE_2B_structure` | Extended K=2–20 ancestry, per-chromosome structure, kinship figures, sample registry | §2.3 |
+| `MODULE_3_heterozygosity_roh` | Per-sample H, multiscale theta, ngsF-HMM ROH, FROH | §2.4 |
+| `MODULE_4A_clair3_snp_indel` | Clair3 hard-genotype SNP/INDEL catalog (separate from 2A GL-based panel) | §2.5 |
+| `MODULE_4B_delly_del` | DELLY2 deletions | §3.1 (SV catalogs) |
+| `MODULE_4C_delly_dup` | DELLY2 duplications | §3.1 |
+| `MODULE_4D_delly_inv` | DELLY2 inversions (primary SV-caller evidence for inversions) | §3.1 |
+| `MODULE_4E_delly_bnd` | DELLY2 breakends | §3.1 |
+| `MODULE_4F_delly_tra` | DELLY2 translocations | §3.1 |
+| `MODULE_4G_manta_sv` | Manta (assembly-based) SV caller — independent second caller | §3.1 |
+| `MODULE_CONSERVATION_CORE` | Conservation/deleterious variant annotation: bcftools csq + SIFT4G + VESM | §4 (burden analyses) |
+| `MODULE_CON_conservation_deleterious` | Three-track conservation pipeline: trackA/B/C | §4 |
+| `Others/MODULE_6_founder_packs` | **Placeholder** (.gitkeep only) — downstream founder-diversity analysis | future |
+| `Others/MODULE_PAV_presence_absence` | **Placeholder** (.gitkeep only) — PA-Roary-like presence/absence tool | future |
+
+Note on numbering holes: there is no `MODULE_5*` in `Modules/`.
+MODULE_5A1/5A2/5A3/5B/5C/5D/5E all migrated into `inversion_modules/`
+under phase-named directories (see next section). The `5*` numbers
+survive in filenames and comments as provenance pointers.
+
+---
+
+## `inversion_modules/` — map
+
+Each phase is one stage in the inversion pipeline. `_archive/` under
+this root holds legacy v8.5 HPC code kept for diff reference.
+`_archive_superseded/` holds dead-end directions dropped from the
+pipeline.
+
+| Dir | Legacy name | Role | Manuscript section |
+|---|---|---|---|
+| `phase_1_inputs/` | MODULE_5A1 | Callable masks, ANGSD SAF/SFS, BEAGLE inputs | §3.2 |
+| `phase_2_discovery/` | MODULE_5A (discovery portions) | Genome scan for inversion-like regions — **5 sub-blocks (2a–2e)** | §3.3 |
+| `phase_3_refine/` | MODULE_5A2_breakpoint_validation | bp-resolution breakpoint refinement, DELLY/Manta concordance, BND rescue | §3.4 |
+| `phase_4_postprocessing/` | (new) | Per-candidate postprocessing — the spine. **5 sub-blocks (4a–4e)** | §3.5 |
+| `phase_5_followup/` | MODULE_5A_Discovery_Visualisations | Per-candidate deep analysis (dosage rasters, region-grow plots, diagnostic figures) | §3.6 |
+| `phase_6_secondary/` | MODULE_5C/5D/5E | LD / Fst / Hobs secondary analyses (still under legacy names inside) | §3.7 |
+| `phase_7_cargo/` | MODULE_6_Cargo | Gene content + per-arrangement evolution (breeding implications) | §4 |
+| `phase_qc_shelf/` | MODULE_QC_ShelfDiagnosis | Systematic QC tracks to diagnose Z-plateau authenticity | §3.3 supplement |
+| `breakpoint_pipeline/` | (inline) | 7-script dosage-signal → ancestral-fragment → consensus-merge chain, feeds phase 4's axis 5 | §3.4 |
+| `utils/` | — | Shared helpers (ancestry_bridge, sample_map, theme plate) | — |
+
+### `phase_2_discovery/` sub-blocks
+
+The five 2*x* blocks form a DAG:
+
+| Block | Role | README |
+|---|---|---|
+| `2a_local_pca/` | BEAGLE → dosage → per-chr local PCA windows | ✅ (added 2026-04-24) |
+| `2b_mds/` | lostruct distances + per-chr MDS → candidate region seeds | ✅ (added 2026-04-24) |
+| `2c_precomp/` | SV-evidence prior + window precompute + seeded regions + landscape detector | ✅ (existing, 411 lines) |
+| `2d_candidate_detection/` | Staircase detector — primary boundary track | ✅ (existing, 326 lines) |
+| `2e_ghsl/` | GHSL haplotype-contrast (Layer C in the 4-layer framework) | ✅ (existing, 175 lines) |
+
+Data flow:
+`2a` → `2b` → `2c` → `2d` + `2e` → `phase_3_refine/` → `phase_4_postprocessing/`
+
+### `phase_4_postprocessing/` sub-blocks
+
+| Block | Role |
+|---|---|
+| `4a_existence_layers/` | Catalog birth: C01d scoring + C01e blocks + C01g boundary-unification |
+| `4b_group_proposal/` | C01i decompose / multi_recomb / nested_comp / seal |
+| `4c_group_validation/` | C01f hypothesis tests + gate |
+| `4d_group_dependent/` | Q5 age + Q6 burden + cheat28/29/30 (forensic modules) |
+| `4e_final_classification/` | characterize_candidate + compute_candidate_status + axis 5 wiring (pending) |
+
+Plus `docs/`, `orchestrator/`, `patches/`, `schemas/`, `specs/`,
+`tests/` under phase_4 root.
+
+---
+
+## Quick lookup — "which module does X?"
+
+| Question | Where |
+|---|---|
+| "Where are my filtered BAMs?" | `Modules/MODULE_1_read_prep/` |
+| "Where is the SNP panel?" | `Modules/MODULE_2A_snp_discovery/` |
+| "Where is global Q (K=8)?" | `Modules/MODULE_2B_structure/` |
+| "Where are DELLY inversion calls?" | `Modules/MODULE_4D_delly_inv/` |
+| "Where is the inversion candidate catalog?" | `inversion_modules/phase_4_postprocessing/4a_existence_layers/` |
+| "Where does bp-resolution refinement happen?" | `inversion_modules/phase_3_refine/` + `inversion_modules/breakpoint_pipeline/` |
+| "Where are per-candidate figures?" | `inversion_modules/phase_5_followup/` + `phase_7_cargo/plot/` |
+| "Where is the Hobs secondary confirmation?" | `inversion_modules/phase_6_secondary/MODULE_5E_Inversion_HOBS/` |
+| "Where is the burden analysis?" | `Modules/MODULE_CONSERVATION_CORE/` + `phase_4_postprocessing/4d_group_dependent/` |
+
+---
+
+## Known numbering oddities (not fixed — documented)
+
+1. **`Modules/MODULE_5*` missing.** Migrated to `inversion_modules/`.
+   Filenames like `STEP_5A2_*.R` still carry the old number for
+   provenance.
+2. **`inversion_modules/phase_6_secondary/MODULE_5C`…`5E`.** These
+   still carry `MODULE_5*` folder names internally. Consistent with the
+   legacy naming; renaming would break several `source(...)` paths. Left
+   as-is, documented here.
+3. **`Modules/Others/` is placeholders only.** `MODULE_6_founder_packs`
+   and `MODULE_PAV_presence_absence` contain only `.gitkeep`. The real
+   work for these (if/when done) will likely land in
+   `inversion_modules/phase_7_cargo/` (founder packs) or a new
+   standalone module (PAV).
+4. **`breakpoint_pipeline/` has no `phase_N` prefix.** It sits at
+   `inversion_modules/breakpoint_pipeline/` because it feeds phase 4
+   axis 5 rather than being a phase itself. Don't renumber it.
+5. **Double-tree for phase 2 discovery**: see
+   `inversion_modules/phase_2_discovery/` vs
+   `inversion_modules/_archive/MODULE_5A2_Discovery_Core/`. The archive
+   is the frozen v7-era pre-refactor copy. Live work is in `phase_*`.
+
+---
+
+## Missing READMEs
+
+None as of 2026-04-24. Every live directory in the two module trees
+has a README. When adding new subfolders, add a short README at the
+same time.

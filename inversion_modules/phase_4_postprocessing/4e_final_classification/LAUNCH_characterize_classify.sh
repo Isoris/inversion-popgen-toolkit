@@ -81,6 +81,7 @@ echo "  Out dir:           ${OUTDIR_RUN}"
 echo "  RESULTS_REGISTRY:  ${RESULTS_REGISTRY_DIR:-(bridge missing)}"
 echo "  SAMPLE_GROUP:      ${SAMPLE_GROUP:-all_226}"
 echo "  Chroms:            ${CHROMS_CSV:-all}"
+echo "  V7_FINAL_DIR:      ${V7_FINAL_DIR:-(unset — axis 5 disabled)}"
 echo "  JobID:             ${SLURM_JOB_ID}"
 echo "  Started:           $(date)"
 echo "================================================================"
@@ -90,6 +91,10 @@ echo "--- 4e.1 characterize ---"
 
 echo ""
 echo "--- 4e.2 compute candidate status (Q1–Q7 classification) ---"
+# V7_FINAL_DIR (optional): when set + exists, compute_candidate_status.R
+# sources _axis5_final_label.R and appends axis 5 columns (v7 structural
+# class, weakest evidence component, justification) to candidate_status.tsv.
+export V7_FINAL_DIR="${V7_FINAL_DIR:-}"
 "${RSCRIPT_BIN}" "${STATUS_SCRIPT}" "${REGISTRY_DIR_RUN}" "${OUTDIR_RUN}"
 
 echo "================================================================"
