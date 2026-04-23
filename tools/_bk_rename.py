@@ -64,7 +64,7 @@ RENAME_MAP = [
 ]
 
 SCHEMA_DIR = Path("registries/schemas/structured_block_schemas")
-SPEC_FILE = Path("inversion_modules/phase_4_postprocessing/4e_final_classification/compute_candidate_status.R")
+SPEC_FILE = Path("inversion_modules/phase_4_postprocessing/4g_final_classification/compute_candidate_status.R")
 
 
 def main() -> int:

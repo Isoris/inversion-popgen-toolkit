@@ -279,8 +279,8 @@ q4_junction_class_confidence  high (assembly) / low (reference) / none
 
 ## Organisation — don't change this
 
-The `4a_existence_layers/` / `4b_group_proposal/` / `4c_group_validation/`
-/ `4d_group_dependent/` / `4e_final_classification/` directory layout
+The `4a_existence_layers/` / `4d_group_proposal/` / `4e_group_validation/`
+/ `4f_group_dependent/` / `4g_final_classification/` directory layout
 **is good**. It maps directly to the state-machine architecture
 (NONE → UNCERTAIN → SUPPORTED → VALIDATED). Keeping it role-based rather
 than question-based makes the pipeline order obvious.
@@ -294,22 +294,22 @@ question (e.g. Q7) gets evidence from multiple role-layers (4a Layer A,
 ## Where to put the new v6 code
 
 ### New in 4b
-- `interior_structure_diagnostic.py` → `4b_group_proposal/`
+- `interior_structure_diagnostic.py` → `4d_group_proposal/`
   - It's a group-dependent analysis (requires Q-groups from decompose).
   - Launched after seal step in the 4b orchestrator.
 
 ### New in 4d
 - `boundary_region_annotations.R` (v6 Kuang-style — priority F4, not yet
-  coded) → `4d_group_dependent/`
+  coded) → `4f_group_dependent/`
 - `boundary_internal_alignment.sh` (priority F5, not yet coded) →
-  `4d_group_dependent/`
-- `cross_species_bridge_v6.py` → `4d_group_dependent/`
+  `4f_group_dependent/`
+- `cross_species_bridge_v6.py` → `4f_group_dependent/`
   (replaces v5 cross_species_bridge.py)
 
 ### New in 4e
-- `assign_structural_class_v6.py` → `4e_final_classification/`
+- `assign_structural_class_v6.py` → `4g_final_classification/`
   (replaces v5 assign_structural_class_v5.py)
-- Axis 5 extension to `compute_candidate_status.R` → `4e_final_classification/`
+- Axis 5 extension to `compute_candidate_status.R` → `4g_final_classification/`
 
 ### New schemas
 - `interior_structure.schema.json` → `registries/schemas/structured_block_schemas/`
@@ -380,7 +380,7 @@ Items from the audit that this chat's bundle addresses:
   `interior_structure_diagnostic.py` was designed then superseded
   within the same chat by `bp_pipeline_bridge.py`. The v6 file is NOT
   in this bundle. If an earlier session deployed it, delete from
-  `4b_group_proposal/` per HANDOFF §4a.
+  `4d_group_proposal/` per HANDOFF §4a.
 
 **New wired keys from this bundle (per HANDOFF §6b):**
 

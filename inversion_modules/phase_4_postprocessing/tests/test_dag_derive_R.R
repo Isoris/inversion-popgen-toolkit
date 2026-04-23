@@ -40,14 +40,14 @@ repo_root <- if (!is.na(this_file)) {
   getwd()
 }
 lib_path <- file.path(repo_root, "inversion_modules",
-                      "phase_4_postprocessing", "4b_group_proposal",
+                      "phase_4_postprocessing", "4d_group_proposal",
                       "lib_recomb_combination.R")
 if (!file.exists(lib_path)) {
-  # Fallback: running from the 4b_group_proposal directory or repo root
+  # Fallback: running from the 4d_group_proposal directory or repo root
   alts <- c("lib_recomb_combination.R",
-            "../inversion_modules/phase_4_postprocessing/4b_group_proposal/lib_recomb_combination.R",
+            "../inversion_modules/phase_4_postprocessing/4d_group_proposal/lib_recomb_combination.R",
             file.path(getwd(), "inversion_modules", "phase_4_postprocessing",
-                      "4b_group_proposal", "lib_recomb_combination.R"))
+                      "4d_group_proposal", "lib_recomb_combination.R"))
   for (a in alts) if (file.exists(a)) { lib_path <- a; break }
 }
 if (!file.exists(lib_path)) stop("cannot locate lib_recomb_combination.R — cwd=", getwd())

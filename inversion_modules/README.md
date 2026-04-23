@@ -58,10 +58,10 @@ inversion_modules/
 │
 ├── phase_4_postprocessing/             per-candidate postprocessing — the spine
 │   ├── 4a_existence_layers/            ← catalog birth (C01d/C01e/C01g)
-│   ├── 4b_group_proposal/              C01i decompose / multi_recomb / nested_comp / seal
-│   ├── 4c_group_validation/            C01f hypothesis tests + gate
-│   ├── 4d_group_dependent/             Q5 age + Q6 burden + cheat28/29/30
-│   ├── 4e_final_classification/        characterize_candidate + compute_candidate_status
+│   ├── 4d_group_proposal/              C01i decompose / multi_recomb / nested_comp / seal
+│   ├── 4e_group_validation/            C01f hypothesis tests + gate
+│   ├── 4f_group_dependent/             Q5 age + Q6 burden + cheat28/29/30
+│   ├── 4g_final_classification/        characterize_candidate + compute_candidate_status
 │   ├── docs/                           PHASE4 + PHASE4B architecture + design notes
 │   ├── orchestrator/                   SLURM DAG (run_phase4b.sh)
 │   ├── patches/                        C01f registry-aware patches
@@ -73,7 +73,7 @@ inversion_modules/
 ├── phase_6_secondary/                  LD / Fst secondary analyses
 │   └── MODULE_5C_Inversion_LD/, MODULE_5D_Inversion_FST/
 │       (MODULE_5E_Inversion_HOBS archived 2026-04-24 — Hobs confirmation
-│        now lives in phase_qc_shelf/STEP_Q07b + STEP_Q07c)
+│        now lives in 4b_qc_triage/STEP_Q07b + STEP_Q07c)
 │
 └── _archive/                           legacy v8.5 HPC tree (kept for reference)
 ```

@@ -8,7 +8,7 @@
 # BREEDING_D_recombination_atlas.R
 #
 # Reads the per-candidate final_label.json files written by
-# phase_4_postprocessing/4e_final_classification/assign_structural_class_v7.py
+# phase_4_postprocessing/4g_final_classification/assign_structural_class_v7.py
 # and returns:
 #   - a data.table of (candidate_id, q_overall_structural_class, weakest_component)
 #   - a convenience filter function for selecting usable candidates

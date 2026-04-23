@@ -4,7 +4,7 @@ Per-sample genome-wide heterozygosity, multiscale local theta diversity tracks, 
 
 ## Why this module exists (for the inversion paper)
 
-Inversions suppress recombination in heterokaryotypes. The direct prediction: carriers of an inversion should show locally elevated observed heterozygosity across the inverted region relative to a Hardy-Weinberg expectation. This module produces the genome-wide heterozygosity baseline and the ngsF-HMM ROH catalog. `phase_qc_shelf/STEP_Q07b` + `STEP_Q07c` (the per-group Hobs pair that superseded MODULE_5E in April 2026) then asks, for each inversion candidate, whether the region shows the expected Hobs pattern against this baseline.
+Inversions suppress recombination in heterokaryotypes. The direct prediction: carriers of an inversion should show locally elevated observed heterozygosity across the inverted region relative to a Hardy-Weinberg expectation. This module produces the genome-wide heterozygosity baseline and the ngsF-HMM ROH catalog. `phase_4_postprocessing/4b_qc_triage/STEP_Q07b` + `STEP_Q07c` (the per-group Hobs pair that superseded MODULE_5E in April 2026) then asks, for each inversion candidate, whether the region shows the expected Hobs pattern against this baseline.
 
 The per-sample F_ROH estimates also enter MODULE_6 (founder-pack analysis) as the inbreeding-coefficient covariate for directional gradient scoring — distinguishing genuinely rare founder-lineage signal from coincidental ROH-driven allele sharing.
 

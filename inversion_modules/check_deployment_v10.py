@@ -50,13 +50,13 @@ def check_files_present(root: Path) -> list:
         "registries/schemas/structured_block_schemas/hypothesis_verdict.schema.json",
         "registries/schemas/structured_block_schemas/boundary.schema.json",
         # v10.1 phase 4b rewrite (now under phase_4_catalog/)
-        "phase_4_postprocessing/4b_group_proposal/lib_decompose_helpers.R",
-        "phase_4_postprocessing/4b_group_proposal/STEP_C01i_decompose.R",
-        "phase_4_postprocessing/4b_group_proposal/STEP_C01i_b_multi_recomb.R",
-        "phase_4_postprocessing/4b_group_proposal/STEP_C01i_d_seal.R",
-        "phase_4_postprocessing/4b_group_proposal/engine_b_smoke_test.R",
-        "phase_4_postprocessing/4b_group_proposal/nested_composition_core.py",
-        "phase_4_postprocessing/4b_group_proposal/STEP_C01i_c_nested_composition.py",
+        "phase_4_postprocessing/4d_group_proposal/lib_decompose_helpers.R",
+        "phase_4_postprocessing/4d_group_proposal/STEP_C01i_decompose.R",
+        "phase_4_postprocessing/4d_group_proposal/STEP_C01i_b_multi_recomb.R",
+        "phase_4_postprocessing/4d_group_proposal/STEP_C01i_d_seal.R",
+        "phase_4_postprocessing/4d_group_proposal/engine_b_smoke_test.R",
+        "phase_4_postprocessing/4d_group_proposal/nested_composition_core.py",
+        "phase_4_postprocessing/4d_group_proposal/STEP_C01i_c_nested_composition.py",
         "phase_4_postprocessing/schemas/internal_dynamics.schema.json",
         "phase_4_postprocessing/schemas/recombinant_map.schema.json",
         "phase_4_postprocessing/schemas/internal_ancestry_composition.schema.json",
@@ -106,8 +106,8 @@ def check_r_brackets(root: Path) -> list:
         "phase_2_discovery/2d_candidate_detection/STEP_D15_plot_zoomed_regions.R",
         "phase_2_discovery/2d_candidate_detection/STEP_D13_plot_annotated_simmat.R",
         "phase_2_discovery/2d_candidate_detection/STEP_D10_variant_consensus.R",
-        "phase_4_postprocessing/4c_group_validation/STEP_C01f_hypothesis_tests.R",
-        "phase_4_postprocessing/4c_group_validation/_PRISTINE_v9.3.4.R",
+        "phase_4_postprocessing/4e_group_validation/STEP_C01f_hypothesis_tests.R",
+        "phase_4_postprocessing/4e_group_validation/_PRISTINE_v9.3.4.R",
     )
     results = []
     for p in root.rglob("*.R"):

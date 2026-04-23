@@ -68,8 +68,8 @@ comparison and rationale.
 Each module reads:
 
 - Candidate table + karyotype / contrast group assignments from phase 4
-  (registry-backed; see `phase_4_postprocessing/4b_group_proposal/`
-  and `4c_group_validation/`).
+  (registry-backed; see `phase_4_postprocessing/4d_group_proposal/`
+  and `4e_group_validation/`).
 - Per-candidate dosage / BEAGLE / GL data from phase 5 engines where
   relevant (residual dosage for LD; raw dosage for Fst).
 

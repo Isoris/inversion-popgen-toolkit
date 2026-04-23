@@ -25,8 +25,8 @@ import tempfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-PY_SCRIPT = HERE.parent / "4b_group_proposal" / "STEP_C01i_c_nested_composition.py"
-CORE = HERE.parent / "4b_group_proposal" / "nested_composition_core.py"
+PY_SCRIPT = HERE.parent / "4d_group_proposal" / "STEP_C01i_c_nested_composition.py"
+CORE = HERE.parent / "4d_group_proposal" / "nested_composition_core.py"
 SCHEMAS = HERE.parent / "schemas"
 
 # Path to v10 registry_loader.py (needed by the wrapper). Test copies it

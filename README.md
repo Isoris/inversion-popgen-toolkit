@@ -37,7 +37,7 @@ mapping, see **[`docs/MODULE_MAP.md`](docs/MODULE_MAP.md)**.
 | [`docs/toolkit_audit.md`](docs/toolkit_audit.md) | Structural reorg plan + known gaps |
 | [`docs/kde_mode_estimation_review.md`](docs/kde_mode_estimation_review.md) | Methodological note on KDE mode estimation |
 | `inversion_modules/README.md` | Inversion-discovery pipeline root |
-| `inversion_modules/phase_qc_shelf/README.md` | QC diagnosis substrate |
+| `inversion_modules/phase_4_postprocessing/4b_qc_triage/README.md` | QC diagnosis substrate |
 
 Every module / phase has its own README. Every sub-block under
 `phase_2_discovery/` (2a–2e) and `phase_4_postprocessing/` (4a–4e) has

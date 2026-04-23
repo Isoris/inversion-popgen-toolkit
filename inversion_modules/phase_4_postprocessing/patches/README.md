@@ -73,7 +73,7 @@ See patch 03 comments for the exact call-site change.
 ## Related doc
 
 `ENGINE_B_SMOKE_TEST_INSERTS.md` — how to wire the 5-second Engine B
-self-test (`../4b_group_proposal/engine_b_smoke_test.R`) into C01a,
+self-test (`../4d_group_proposal/engine_b_smoke_test.R`) into C01a,
 cheat6, and the Python pipeline. Not a patch in the mechanical sense;
 instructions for where to add `source()` + `run_engine_b_smoke_test()`
 calls.
@@ -81,7 +81,7 @@ calls.
 ## Prerequisite
 
 Your current `STEP_C01f_hypothesis_tests.R`. Upload it to
-`4c_group_validation/` when you're ready to apply these patches. The
+`4e_group_validation/` when you're ready to apply these patches. The
 patches will need your current file's exact layout for the (B) section
 in patch 01 especially.
 

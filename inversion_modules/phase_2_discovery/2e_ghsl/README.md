@@ -126,7 +126,7 @@ default (chat 14): `10,20,30,40,50,100`.
 **Wired chat 14 (2026-04-18).** All four documented consumers read
 v6 paths and columns:
 
-- `phase_4_postprocessing/4b_group_proposal/lib_ghsl_confirmation.R`
+- `phase_4_postprocessing/4d_group_proposal/lib_ghsl_confirmation.R`
   reads v6 karyotype and annot RDS (keeps v5 fallback for transitional
   partial re-runs). Adds panel-based helper
   `ghsl_per_sample_panel_in_interval()` as an additive alternative to

@@ -1,0 +1,65 @@
+# =============================================================================
+# STEP35 patch — add within-group hierarchical ordering
+# =============================================================================
+#
+# Applies to STEP35_candidate_harmonized_heatmaps.R (the file you uploaded).
+#
+# Same problem as STEP28: line 177 does `setorder(row_info_dt, coarse_group, u)`
+# which gives near-random order inside each karyotype block.
+#
+# Fix: hierarchical clustering within each karyotype, using the same shared
+# helper as STEP28 / q08b.
+#
+# =============================================================================
+# Changes:
+# =============================================================================
+#
+# 1. Add near the top, after `source(config_file)`:
+#
+#      source(file.path(dirname(sys.frame(1)$ofile %||% "."),
+#                        "within_group_ordering.R"))
+#      WITHIN_GROUP_METHOD <- if (exists("WITHIN_GROUP_METHOD")) WITHIN_GROUP_METHOD else "hclust"
+#
+# 2. Replace lines 176-180 (the block that computes ordered_samples) with:
+#
+# -----------------------------------------------------------------------------
+# --- OLD ---------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+#   # Order: by group then by u
+#   setorder(row_info_dt, coarse_group, u)
+#   ordered_samples <- row_info_dt$sample
+#
+#   X_ordered <- t(X)[match(ordered_samples, common), , drop = FALSE]
+#   rownames(X_ordered) <- ordered_samples
+#
+# -----------------------------------------------------------------------------
+# --- NEW ---------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+#   # Group primary, hierarchical cluster within each group
+#   setorder(row_info_dt, coarse_group, u)
+#   samples_base <- row_info_dt$sample
+#
+#   ord_res <- order_samples_within_groups(
+#     samples      = samples_base,
+#     groups       = row_info_dt[match(samples_base, sample), coarse_group],
+#     dosage       = X,                         # markers × samples
+#     group_levels = c("HOMO_1", "HET", "HOMO_2"),
+#     method       = WITHIN_GROUP_METHOD,
+#     min_group_n  = 5L,
+#     top_var_n    = 500L
+#   )
+#   ordered_samples <- ord_res$ordered_samples
+#   row_info_dt <- row_info_dt[match(ordered_samples, sample)]
+#
+#   fwrite(ord_res$within_group_audit,
+#          file.path(cand_dir, "candidate_within_group_ordering.tsv"),
+#          sep = "\t")
+#
+#   X_ordered <- t(X)[match(ordered_samples, common), , drop = FALSE]
+#   rownames(X_ordered) <- ordered_samples
+#
+# =============================================================================
+# Exactly the same pattern as STEP28 — this consistency is intentional so that
+# STEP28, STEP35, and q08b all produce heatmaps with the same within-group
+# ordering, making them directly comparable.
+# =============================================================================

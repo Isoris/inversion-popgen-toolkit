@@ -15,8 +15,8 @@
 # Path corrections:
 #   OLD                                NEW                                   Rationale
 #   --------------------------------  ------------------------------------  -----------------------
-#   cheats/cheat30_gds_by_genotype.R  4d_group_dependent/cheat30_*.R        chat-9 Finding Z: 4d
-#   cheats/cheat6_ancestry_*.R        4d_group_dependent/cheat6_*.R         paths resolved
+#   cheats/cheat30_gds_by_genotype.R  4f_group_dependent/cheat30_*.R        chat-9 Finding Z: 4d
+#   cheats/cheat6_ancestry_*.R        4f_group_dependent/cheat6_*.R         paths resolved
 #   scripts/compute_age_fst_subblock  (ASPIRATIONAL — not in tarball)       chat-9 Finding W: script
 #   burden/STEP_C01f_c_burden_*       (ASPIRATIONAL — not in tarball)       missing; see SPEC_VS_REALITY.md
 #
@@ -51,7 +51,7 @@ done
 # ── Config + registry paths ──────────────────────────────────────────────────
 BASE="${BASE:-/scratch/lt200308-agbsci/Quentin_project_KEEP_2026-02-04}"
 MODULE_DIR="${BASE}/inversion-popgen-toolkit"
-PHASE4D_DIR="${MODULE_DIR}/inversion_modules/phase_4_postprocessing/4d_group_dependent"
+PHASE4D_DIR="${MODULE_DIR}/inversion_modules/phase_4_postprocessing/4f_group_dependent"
 
 # shellcheck disable=SC1091
 source "${MODULE_DIR}/00_inversion_config.sh" 2>/dev/null || true

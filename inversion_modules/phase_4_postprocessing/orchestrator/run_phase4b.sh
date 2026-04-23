@@ -97,14 +97,14 @@ submit_job() {
 }
 
 # ── Phase 4b.1: decompose ────────────────────────────────────────────────────
-CMD_DECOMP="Rscript ${MODULE_DIR}/phase_4_postprocessing/4b_group_proposal/STEP_C01i_decompose.R \
+CMD_DECOMP="Rscript ${MODULE_DIR}/phase_4_postprocessing/4d_group_proposal/STEP_C01i_decompose.R \
   --candidates ${CANDIDATES} \
   --outdir ${DECOMP_OUT} \
   --tier_max ${TIER_MAX}"
 JID_DECOMP=$(submit_job "4b1_decomp" "" "04:00:00" 4 16G "${CMD_DECOMP}")
 
 # ── Phase 4b.2: multi_recomb (depends on 4b.1) ───────────────────────────────
-CMD_RECOMB="Rscript ${MODULE_DIR}/phase_4_postprocessing/4b_group_proposal/STEP_C01i_b_multi_recomb.R \
+CMD_RECOMB="Rscript ${MODULE_DIR}/phase_4_postprocessing/4d_group_proposal/STEP_C01i_b_multi_recomb.R \
   --candidates ${CANDIDATES} \
   --decomp_dir ${DECOMP_OUT} \
   --outdir ${RECOMB_OUT} \
@@ -112,7 +112,7 @@ CMD_RECOMB="Rscript ${MODULE_DIR}/phase_4_postprocessing/4b_group_proposal/STEP_
 JID_RECOMB=$(submit_job "4b2_recomb" "${JID_DECOMP}" "03:00:00" 2 8G "${CMD_RECOMB}")
 
 # ── Phase 4b.3: nested_composition (parallel with 4b.1) ──────────────────────
-CMD_NESTED="python3 ${MODULE_DIR}/phase_4_postprocessing/4b_group_proposal/STEP_C01i_c_nested_composition.py \
+CMD_NESTED="python3 ${MODULE_DIR}/phase_4_postprocessing/4d_group_proposal/STEP_C01i_c_nested_composition.py \
   --candidates ${CANDIDATES} \
   --q_cache_dir ${Q_CACHE_DIR} \
   --outdir ${NESTED_OUT} \
@@ -120,7 +120,7 @@ CMD_NESTED="python3 ${MODULE_DIR}/phase_4_postprocessing/4b_group_proposal/STEP_
 JID_NESTED=$(submit_job "4b3_nested" "" "02:00:00" 2 8G "${CMD_NESTED}")
 
 # ── Phase 4b.4: seal (depends on 4b.1, 4b.2, 4b.3) ───────────────────────────
-CMD_SEAL="Rscript ${MODULE_DIR}/phase_4_postprocessing/4b_group_proposal/STEP_C01i_d_seal.R \
+CMD_SEAL="Rscript ${MODULE_DIR}/phase_4_postprocessing/4d_group_proposal/STEP_C01i_d_seal.R \
   --candidates ${CANDIDATES} \
   --decomp_dir ${DECOMP_OUT} \
   --recomb_dir ${RECOMB_OUT} \

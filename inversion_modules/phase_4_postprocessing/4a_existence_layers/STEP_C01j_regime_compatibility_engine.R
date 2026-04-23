@@ -71,7 +71,7 @@ suppressPackageStartupMessages({
                           "api", "R", "registry_loader.R")
 .helpers    <- file.path(.pipe_base, "inversion-popgen-toolkit",
                            "inversion_modules", "phase_4_postprocessing",
-                           "4b_group_proposal", "lib_decompose_helpers.R")
+                           "4d_group_proposal", "lib_decompose_helpers.R")
 .try_source(.reg_loader)
 .try_source(.helpers)
 

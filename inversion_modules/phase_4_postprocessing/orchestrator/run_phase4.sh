@@ -111,10 +111,10 @@ LAUNCH_C01D_PASS1="${MODULE_DIR}/phase_4_postprocessing/4a_existence_layers/LAUN
 LAUNCH_C01G="${MODULE_DIR}/phase_4_postprocessing/4a_existence_layers/LAUNCH_C01g_boundary.sh"
 # FIX 49 (chat 10): LAUNCH_C01I removed — replaced by run_phase4b.sh
 # sub-orchestrator. 4b is now a 4-script DAG, not a single launcher.
-LAUNCH_C01F="${MODULE_DIR}/phase_4_postprocessing/4c_group_validation/LAUNCH_C01f_hypothesis.sh"
-LAUNCH_C01D_PASS2="${MODULE_DIR}/phase_4_postprocessing/4e_final_classification/LAUNCH_C01d_scoring_pass2.sh"
+LAUNCH_C01F="${MODULE_DIR}/phase_4_postprocessing/4e_group_validation/LAUNCH_C01f_hypothesis.sh"
+LAUNCH_C01D_PASS2="${MODULE_DIR}/phase_4_postprocessing/4g_final_classification/LAUNCH_C01d_scoring_pass2.sh"
 LAUNCH_GROUP_CHEATS="${MODULE_DIR}/phase_4_postprocessing/orchestrator/LAUNCH_group_cheats.sh"
-LAUNCH_CHAR_CLASSIFY="${MODULE_DIR}/phase_4_postprocessing/4e_final_classification/LAUNCH_characterize_classify.sh"
+LAUNCH_CHAR_CLASSIFY="${MODULE_DIR}/phase_4_postprocessing/4g_final_classification/LAUNCH_characterize_classify.sh"
 
 # Use array notation: the launchers should accept $SLURM_ARRAY_TASK_ID
 # and map it to a chromosome. Adjust below if your launchers take --chrom.

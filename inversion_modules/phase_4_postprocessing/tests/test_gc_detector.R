@@ -37,14 +37,14 @@ if (is.na(this_file)) {
 repo_root <- if (!is.na(this_file) && nzchar(this_file))
                dirname(dirname(this_file)) else getwd()
 det_path <- file.path(repo_root, "inversion_modules",
-                      "phase_4_postprocessing", "4b_group_proposal",
+                      "phase_4_postprocessing", "4d_group_proposal",
                       "gene_conversion_detector.R")
 if (!file.exists(det_path)) {
   alts <- c("gene_conversion_detector.R",
-            "../4b_group_proposal/gene_conversion_detector.R",
-            "../inversion_modules/phase_4_postprocessing/4b_group_proposal/gene_conversion_detector.R",
+            "../4d_group_proposal/gene_conversion_detector.R",
+            "../inversion_modules/phase_4_postprocessing/4d_group_proposal/gene_conversion_detector.R",
             file.path(getwd(), "inversion_modules", "phase_4_postprocessing",
-                      "4b_group_proposal", "gene_conversion_detector.R"))
+                      "4d_group_proposal", "gene_conversion_detector.R"))
   for (a in alts) if (file.exists(a)) { det_path <- a; break }
 }
 if (!file.exists(det_path)) stop("cannot locate gene_conversion_detector.R (repo_root=", repo_root, ")")

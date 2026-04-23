@@ -21,7 +21,7 @@ phase_4_postprocessing/
 │                                            └ C01g boundary catalog
 │                                          [placeholder — upload your scripts]
 │
-├── 4b_group_proposal/                     propose groups → UNCERTAIN
+├── 4d_group_proposal/                     propose groups → UNCERTAIN
 │   ├─ STEP_C01i_decompose.R               4b.1 PCA k-means
 │   ├─ STEP_C01i_b_multi_recomb.R          4b.2 recombinant detection
 │   ├─ STEP_C01i_c_nested_composition.py   4b.3 composite detection
@@ -31,15 +31,15 @@ phase_4_postprocessing/
 │   ├─ engine_b_smoke_test.R               (5-s self-test)
 │   └─ README.md
 │
-├── 4c_group_validation/                   validate → SUPPORTED/VALIDATED/SUSPECT
+├── 4e_group_validation/                   validate → SUPPORTED/VALIDATED/SUSPECT
 │                                          [placeholder — upload your C01f]
 │                                          apply patches/01 → 02 → 03 in order
 │
-├── 4d_group_dependent/                    gated cheats (≥ SUPPORTED required)
+├── 4f_group_dependent/                    gated cheats (≥ SUPPORTED required)
 │                                            cheat6, cheat20, cheat30, Q5, Q6
 │                                          [placeholder — upload your cheats]
 │
-├── 4e_final_classification/               14-axis final tag
+├── 4g_final_classification/               14-axis final tag
 │                                            classify_inversions, characterize_candidate
 │                                          [placeholder — upload your scripts]
 │
@@ -95,7 +95,7 @@ FROM PHASE 3:   refined breakpoints + SV anchors + GHSL haplotype contrast
 └──────────────────────────────────────────────────────────────────────┘
         ▼
 ┌──────────────────────────────────────────────────────────────────────┐
-│ 4b_group_proposal/                                                   │
+│ 4d_group_proposal/                                                   │
 │   ┌─→ 4b.1 decompose ──→ 4b.2 multi_recomb ─┐                        │
 │   │                                          ├─→ 4b.4 seal           │
 │   └─→ 4b.3 nested_composition ──────────────┘                        │
@@ -107,7 +107,7 @@ FROM PHASE 3:   refined breakpoints + SV anchors + GHSL haplotype contrast
 └──────────────────────────────────────────────────────────────────────┘
         ▼
 ┌──────────────────────────────────────────────────────────────────────┐
-│ 4c_group_validation/                                                 │
+│ 4e_group_validation/                                                 │
 │   C01f: run T1-T10 hypothesis tests (Layer D)                        │
 │   Four-way jackknife classification → family_linkage                 │
 │   Respects promotion_cap from 4b                                     │
@@ -116,13 +116,13 @@ FROM PHASE 3:   refined breakpoints + SV anchors + GHSL haplotype contrast
 └──────────────────────────────────────────────────────────────────────┘
         ▼
 ┌──────────────────────────────────────────────────────────────────────┐
-│ 4d_group_dependent/  (ONLY if q6_group_validation ≥ SUPPORTED)       │
+│ 4f_group_dependent/  (ONLY if q6_group_validation ≥ SUPPORTED)       │
 │   cheat6, cheat20, cheat24, cheat30, Q5 age, Q6 burden               │
 │   Writes: age_evidence.json, burden.json, mechanism.json             │
 └──────────────────────────────────────────────────────────────────────┘
         ▼
 ┌──────────────────────────────────────────────────────────────────────┐
-│ 4e_final_classification/                                             │
+│ 4g_final_classification/                                             │
 │   classify_inversions.R: assign 14-axis tag                          │
 │   characterize_candidate.R: per-candidate summary                    │
 │   Writes: final_catalog.tsv + final_classification.json per candidate│
