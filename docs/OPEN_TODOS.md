@@ -29,13 +29,6 @@ only. Not applied.
 **Blocker.** None. Natural to bundle with T2 since both touch BREEDING /
 `compute_candidate_status.R` in the same pass.
 
-### T4. Step 6b — GDS consistency (Gap 2)
-
-**Status.** ~6-line addition in `characterize_q5()` inside
-`characterize_candidate.R`.
-
-**Blocker.** None. Lower priority per prior handoff.
-
 ---
 
 ## 🟡 HPC-blocked (wait for LANTA)
@@ -86,15 +79,6 @@ coordinated rename.
 ### T9. `reg$stats` deprecated alias
 
 3 hits in `registries/api/R/registry_loader.R`. Low priority.
-
-### T10. Root cruft — move `_*.py` dev utilities into `tools/`
-
-- `_bk_rename.py`
-- `_code_field_check.py`
-- `_rcheck.py`
-- `_schema_check.py`
-
-### T11. Expand root `README.md` (currently 2 lines)
 
 ### T12. Manuscript v19 MAPQ=60 inconsistency
 

@@ -497,6 +497,27 @@ characterize_q5 <- function(keys) {
     ev_against <- c(ev_against, "GDS-Fst correlation not significant (age proxies may disagree)")
   }
 
+  # Gap 2: cheat30 GDS between/within consistency gate.
+  # If between-arrangement GDS is meaningfully higher than within-arrangement
+  # GDS, the gds_gap is biologically supported (not noise), which corroborates
+  # the age_label regardless of direction. Near-zero or inverted separation
+  # means the gds_gap percentile shouldn't be trusted as age evidence.
+  gds_within_std <- safe_num(keys[["q5_gds_within_std"]], NA)
+  gds_within_inv <- safe_num(keys[["q5_gds_within_inv"]], NA)
+  gds_between    <- safe_num(keys[["q5_gds_between"]],    NA)
+  het_pattern    <- keys[["q5_gds_het_pattern"]] %||% NA_character_
+  if (!is.na(gds_between) && !is.na(gds_within_std) && !is.na(gds_within_inv)) {
+    bw_gap <- gds_between - max(gds_within_std, gds_within_inv)
+    if (bw_gap >= 0.05) {
+      ev_for <- c(ev_for, paste0("gds_between_within_consistent(gap=", round(bw_gap, 3), ")"))
+    } else {
+      ev_against <- c(ev_against, paste0("gds_between≈within (gap=", round(bw_gap, 3), ", age proxy may be noise)"))
+    }
+  }
+  if (!is.na(het_pattern) && nzchar(het_pattern) && het_pattern != "unknown") {
+    ev_for <- c(ev_for, paste0("het_pattern=", het_pattern))
+  }
+
   if (length(ev_against) >= 2) {
     return(list(status = "CONTRADICTED", label = age_label,
                 evidence_for = ev_for, evidence_against = ev_against,
