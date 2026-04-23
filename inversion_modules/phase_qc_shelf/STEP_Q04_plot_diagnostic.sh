@@ -21,13 +21,13 @@ CHR="${1:-}"
 
 run_one() {
   local chr="$1"
-  local out_pdf="${QC_FIGS}/diagnostic.${chr}.pdf"
+  local out_pdf="${QC_FIGS}/diagnostic.${chr}${OUT_SUFFIX:-}.pdf"
 
   local precomp="${PRECOMP_DIR}/${chr}.precomp.rds"
   [[ -f "${precomp}" ]] || precomp="${PRECOMP_DIR}/main_qcpass.${chr}.precomp.rds"
   [[ -f "${precomp}" ]] || { qc_log "SKIP ${chr}: no precomp"; return 0; }
 
-  qc_log "Q04 ${chr}: composing diagnostic figure"
+  qc_log "Q04 ${chr}: composing diagnostic figure${OUT_SUFFIX:+ ($OUT_SUFFIX)}"
 
   # Look up theta track (prefer finer scale)
   local theta_file=""
@@ -54,21 +54,36 @@ run_one() {
   # Invgt assignments (for sample class strip / coloring)
   local invgt_assign="${QC_TRACKS}/invgt_assignments.${chr}.tsv"
   [[ -f "${invgt_assign}" ]] && args+=( --invgt_assignments "${invgt_assign}" )
+  # Per-group Hobs/HoverE track from Q07c (Engine H, patched ANGSD)
+  local hobs_merged="${QC_TRACKS}/hobs_merged.${chr}.tsv.gz"
+  [[ -f "${hobs_merged}" ]] && args+=( --hobs_track "${hobs_merged}" )
   # sim_mat (separate RDS if present; otherwise embedded in precomp)
   local sim_rds_v1="${PRECOMP_DIR}/${chr}.sim_mat.rds"
   local sim_rds_v2="${PRECOMP_DIR}/main_qcpass.${chr}.sim_mat.rds"
   if   [[ -f "${sim_rds_v1}" ]]; then args+=( --sim_mat "${sim_rds_v1}" )
   elif [[ -f "${sim_rds_v2}" ]]; then args+=( --sim_mat "${sim_rds_v2}" )
   fi
+  # Reference-N BED (for dark-stipple assembly-gap layer on the ideogram)
+  # Prefer a per-chromosome BED in QC_TRACKS, then a genome-wide one.
+  local ref_n_bed=""
+  if [[ -f "${QC_TRACKS}/ref_n.${chr}.bed" ]]; then
+    ref_n_bed="${QC_TRACKS}/ref_n.${chr}.bed"
+  elif [[ -n "${REF_N_BED:-}" && -f "${REF_N_BED}" ]]; then
+    ref_n_bed="${REF_N_BED}"
+  fi
+  [[ -n "${ref_n_bed}" ]] && args+=( --ref_n_bed "${ref_n_bed}" )
+
   [[ -n "${theta_file}" ]] && args+=( --theta_track "${theta_file}" )
   [[ -n "${SHELF_START_MB}" ]] && args+=( --shelf_start_mb "${SHELF_START_MB}" )
   [[ -n "${SHELF_END_MB}"   ]] && args+=( --shelf_end_mb   "${SHELF_END_MB}"   )
   [[ -n "${BREAKPOINT1_MB:-}" ]] && args+=( --breakpoint1_mb "${BREAKPOINT1_MB}" )
   [[ -n "${BREAKPOINT2_MB:-}" ]] && args+=( --breakpoint2_mb "${BREAKPOINT2_MB}" )
   [[ -n "${SMOOTH_WIN:-}"   ]] && args+=( --smooth_win     "${SMOOTH_WIN}"     )
+  [[ -n "${SNP_DENSITY_SCALE_KB:-}" ]] && args+=( --snp_density_scale_kb "${SNP_DENSITY_SCALE_KB}" )
+  [[ "${Q04_NO_STRIPS:-}" == "1" ]] && args+=( --no_nodata_strips yes )
 
   ${RSCRIPT_BIN} --vanilla "${here}/R/q04_compose_plot.R" "${args[@]}" \
-    2> "${QC_LOGS}/q04_${chr}.log"
+    2> "${QC_LOGS}/q04_${chr}${OUT_SUFFIX:-}.log"
 
   qc_log "Q04 ${chr}: wrote ${out_pdf}"
 }

@@ -38,9 +38,16 @@ SCALES_SPEC="${2:-1x,5x,10x}"
 [[ -z "${CHR}" ]] && qc_die "Usage: $0 <CHR|all> [scales=1x,5x,10x]"
 
 resolve_summary() {
-  # Given scale string (e.g. "5x"), find the corresponding summary file
+  # Given scale string (e.g. "5x"), find the corresponding summary file.
+  # The naming convention has evolved:
+  #   v1 (legacy):        ${LOCAL_Q_DIR}/<CHR>.local_Q_summary.tsv.gz (flat)
+  #   v2 (multiscale):    ${LOCAL_Q_DIR}/scale_<Nx>/<CHR>.local_Q_summary.tsv.gz
+  #   v3 (multi-K/BEAGLE): ${LOCAL_Q_DIR}/scale_<thin|dense>/K<NN>/<CHR>.local_Q_summary.tsv.gz
+  # When caller asks for scale "1x" we look for v1/v2, and also fall back to
+  # v3 canonical K with scale=thin (most recent precompute writes). For "5x"
+  # and "10x" we look at scale_<Nx> only (multiscale aggregation output).
   local chr="$1" scale="$2"
-  # Priority order for location
+  local ks=("8" "${CANONICAL_K:-8}")
   for p in \
     "${LOCAL_Q_DIR}/scale_${scale}/${chr}.local_Q_summary.tsv.gz" \
     "${LOCAL_Q_DIR}/scale_${scale}/${chr}.local_Q_summary.tsv" \
@@ -48,8 +55,18 @@ resolve_summary() {
     "${LOCAL_Q_DIR}/${scale}/${chr}.local_Q_summary.tsv"; do
     if [[ -f "${p}" ]]; then echo "${p}"; return; fi
   done
-  # Backward-compat: for 1x only, fall back to flat cache
+  # For "1x" also try the v3 canonical precompute output
   if [[ "${scale}" == "1x" ]]; then
+    for variant in thin dense; do
+      for k in "${ks[@]}"; do
+        for p in \
+          "${LOCAL_Q_DIR}/scale_${variant}/K$(printf '%02d' ${k})/${chr}.local_Q_summary.tsv.gz" \
+          "${LOCAL_Q_DIR}/scale_${variant}/${chr}.local_Q_summary.tsv.gz"; do
+          if [[ -f "${p}" ]]; then echo "${p}"; return; fi
+        done
+      done
+    done
+    # Backward-compat: flat cache
     for p in "${LOCAL_Q_DIR}/${chr}.local_Q_summary.tsv.gz" \
              "${LOCAL_Q_DIR}/${chr}.local_Q_summary.tsv"; do
       if [[ -f "${p}" ]]; then echo "${p}"; return; fi
@@ -59,6 +76,7 @@ resolve_summary() {
 }
 resolve_samples() {
   local chr="$1" scale="$2"
+  local ks=("8" "${CANONICAL_K:-8}")
   for p in \
     "${LOCAL_Q_DIR}/scale_${scale}/${chr}.local_Q_samples.tsv.gz" \
     "${LOCAL_Q_DIR}/scale_${scale}/${chr}.local_Q_samples.tsv" \
@@ -67,6 +85,15 @@ resolve_samples() {
     if [[ -f "${p}" ]]; then echo "${p}"; return; fi
   done
   if [[ "${scale}" == "1x" ]]; then
+    for variant in thin dense; do
+      for k in "${ks[@]}"; do
+        for p in \
+          "${LOCAL_Q_DIR}/scale_${variant}/K$(printf '%02d' ${k})/${chr}.local_Q_samples.tsv.gz" \
+          "${LOCAL_Q_DIR}/scale_${variant}/${chr}.local_Q_samples.tsv.gz"; do
+          if [[ -f "${p}" ]]; then echo "${p}"; return; fi
+        done
+      done
+    done
     for p in "${LOCAL_Q_DIR}/${chr}.local_Q_samples.tsv.gz" \
              "${LOCAL_Q_DIR}/${chr}.local_Q_samples.tsv"; do
       if [[ -f "${p}" ]]; then echo "${p}"; return; fi

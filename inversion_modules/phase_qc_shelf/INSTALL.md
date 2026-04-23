@@ -3,6 +3,28 @@
 One-page walkthrough for a clean install on LANTA. Assumes `${BASE}` is the
 project root at `/scratch/lt200308-agbsci/Quentin_project_KEEP_2026-02-04/`.
 
+## 0. Upgrading an existing install (v1 → v2)
+
+If you already have the module installed from an earlier tarball, don't
+re-download and overwrite — just run the upgrade script. It is idempotent
+and preserves your `config.local.sh`:
+
+```bash
+cd ${BASE}/inversion-popgen-toolkit/inversion_modules/phase_qc_shelf
+bash UPGRADE.sh          # applies every v2 patch, safe to rerun
+# or:
+bash UPGRADE.sh --dry-run    # show what would change, apply nothing
+```
+
+Backups for every file it touches are written with suffix
+`.preUPGRADE_<timestamp>`. See `CHANGELOG.md` for the full list of fixes.
+
+After the upgrade, rerun any chromosome:
+
+```bash
+SHELF_START_MB=15 SHELF_END_MB=18 bash run_all.sh C_gar_LG28
+```
+
 ## 1. Place the module in your repo
 
 If you have a local clone of the toolkit:

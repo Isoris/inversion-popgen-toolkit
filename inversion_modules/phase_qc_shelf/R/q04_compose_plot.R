@@ -47,6 +47,7 @@ ANC_FILE   <- get_arg("--ancestry_track")
 ANC_MULTI  <- get_arg("--ancestry_multiscale", NULL)
 POPSTATS_INVGT_FILE <- get_arg("--popstats_invgt", NULL)
 INVGT_ASSIGN_FILE   <- get_arg("--invgt_assignments", NULL)
+HOBS_FILE           <- get_arg("--hobs_track", NULL)
 SIMMAT_FILE <- get_arg("--sim_mat", NULL)
 OUT        <- get_arg("--out")
 SHELF_A    <- as.numeric(get_arg("--shelf_start_mb", NA))
@@ -54,6 +55,14 @@ SHELF_B    <- as.numeric(get_arg("--shelf_end_mb",   NA))
 BP1_MB     <- as.numeric(get_arg("--breakpoint1_mb", NA))
 BP2_MB     <- as.numeric(get_arg("--breakpoint2_mb", NA))
 SMOOTH_WIN <- as.integer(get_arg("--smooth_win", "1"))
+# --no_nodata_strips disables the gray "no data here" background bands.
+# Used to render the "clean presentation" variant alongside the diagnostic.
+NO_STRIPS <- !is.null(get_arg("--no_nodata_strips", NULL))
+# --ref_n_bed: optional BED file of reference N / assembly-gap regions for
+# the current chromosome. When supplied, the ideogram gets a dark stipple
+# over those regions. Distinct from lighter stipple used for zero-SNP
+# dropouts detected from the precomp.
+REF_N_BED <- get_arg("--ref_n_bed", NULL)
 
 stopifnot(!is.null(PRECOMP), file.exists(PRECOMP))
 
@@ -85,13 +94,54 @@ resolve_bps <- function() {
 }
 BPS <- resolve_bps()
 
-# Shelf shading + breakpoint lines applied to every panel
+# =============================================================================
+# No-data regions: contiguous stretches where no SNPs exist (reference gap,
+# repeat-mask, or mappability dropout). Detected on first use from dt (the
+# precomp windows). Uses n_snps == 0 as the primary signal and extreme
+# span_kb as a secondary signal for windows that had to stretch to collect
+# the fixed SNP count.
+# =============================================================================
+.NODATA_CACHE <- NULL
+detect_nodata_regions <- function() {
+  if (!is.null(.NODATA_CACHE)) return(.NODATA_CACHE)
+  if (!exists("dt", envir = .GlobalEnv)) return(data.table())
+  w <- copy(dt)
+  w[, is_gap := FALSE]
+  if ("n_snps"  %in% names(w)) w[n_snps == 0, is_gap := TRUE]
+  if ("span_kb" %in% names(w)) {
+    span_hi <- stats::quantile(w$span_kb, 0.995, na.rm = TRUE)
+    w[span_kb > max(span_hi, 80), is_gap := TRUE]
+  }
+  if (!any(w$is_gap)) { .NODATA_CACHE <<- data.table(); return(.NODATA_CACHE) }
+  g <- w[is_gap == TRUE][order(start_bp)]
+  # Group contiguous gap windows (runs where next gap starts within 50 kb)
+  g[, run_grp := cumsum(c(TRUE, diff(start_bp) > 50e3))]
+  out <- g[, .(xmin = min(start_bp) / 1e6,
+               xmax = max(end_bp)   / 1e6),
+           by = run_grp]
+  out[, run_grp := NULL]
+  .NODATA_CACHE <<- out
+  out
+}
+
+# Shelf shading + breakpoint lines + no-data strips applied to every panel
 decorate <- function(p) {
+  nd <- if (isTRUE(NO_STRIPS)) data.table() else detect_nodata_regions()
+  # 1. No-data strips behind everything (light gray, behind the data)
+  if (nrow(nd) > 0) {
+    p <- p + geom_rect(data = nd,
+                       aes(xmin = xmin, xmax = xmax,
+                           ymin = -Inf, ymax = Inf),
+                       inherit.aes = FALSE,
+                       fill = "#888888", alpha = 0.18)
+  }
+  # 2. Shelf region shading (warm amber, slightly in front of no-data)
   if (is.finite(SHELF_A) && is.finite(SHELF_B)) {
     p <- p + annotate("rect", xmin = SHELF_A, xmax = SHELF_B,
                       ymin = -Inf, ymax = Inf,
                       fill = "#f5a524", alpha = 0.10)
   }
+  # 3. Breakpoint vertical lines on top
   if (length(BPS) > 0) {
     p <- p + geom_vline(xintercept = BPS, linetype = "dashed",
                         color = "#e0555c", linewidth = 0.35, alpha = 0.8)
@@ -147,8 +197,10 @@ placeholder <- function(label) {
 pc <- readRDS(PRECOMP)
 dt <- as.data.table(pc$dt)
 dt[, mb := (start_bp + end_bp) / 2 / 1e6]
+# Compute span_kb early so no-data detection sees it before first decorate() call
+dt[, span_kb := (end_bp - start_bp) / 1e3]
 z_col <- NULL
-for (cand in c("robust_z", "z_robust", "z", "mds_z_robust", "mds_z1_robust")) {
+for (cand in c("max_abs_z", "robust_z", "z_robust", "z", "mds_z_robust", "mds_z1_robust", "MDS1_z")) {
   if (cand %in% names(dt)) { z_col <- cand; break }
 }
 if (is.null(z_col)) stop("No Z column in precomp$dt")
@@ -162,34 +214,105 @@ common_x <- scale_x_continuous(limits = c(chrom_start_mb, chrom_end_mb),
 # =============================================================================
 # TOP STRIP 1: Ideogram
 # =============================================================================
+# Ideogram layers, drawn bottom-to-top:
+#   1. chromosome body (light rounded bar)
+#   2. zero-SNP stipple (light gray dots, 35% density) from no-data detection
+#   3. reference-N stipple (darker dots, 60% density) if --ref_n_bed supplied
+#   4. shelf highlight (red rectangle)
+#   5. breakpoint vertical lines
+#
+# Stipple is drawn as a dot grid inside the region, so it reads as "50%-ink
+# printer fill" which the eye parses as "structured absence" rather than
+# "data of this color".
+make_stipple <- function(xmin, xmax, y_lo = 0.05, y_hi = 0.95,
+                         dx = 0.05, dy = 0.15, offset = 0) {
+  if (!length(xmin) || !length(xmax)) return(data.frame(x = numeric(0), y = numeric(0)))
+  dots <- list()
+  for (i in seq_along(xmin)) {
+    xs <- seq(xmin[i] + dx / 2 + offset * dx / 2, xmax[i] - dx / 2, by = dx)
+    ys <- seq(y_lo + dy / 2, y_hi - dy / 2, by = dy)
+    if (!length(xs) || !length(ys)) next
+    # Offset alternate rows for staggered print-like pattern
+    grid_rows <- list()
+    for (j in seq_along(ys)) {
+      x_row <- if (j %% 2 == 1) xs else xs + dx / 2
+      x_row <- x_row[x_row <= xmax[i] - dx / 4]
+      if (length(x_row)) grid_rows[[j]] <- data.frame(x = x_row, y = ys[j])
+    }
+    if (length(grid_rows)) dots[[i]] <- do.call(rbind, grid_rows)
+  }
+  if (!length(dots)) return(data.frame(x = numeric(0), y = numeric(0)))
+  do.call(rbind, dots)
+}
+
+load_ref_n_regions <- function(bed_path, chrom) {
+  if (is.null(bed_path) || !file.exists(bed_path)) return(data.table(xmin = numeric(0), xmax = numeric(0)))
+  b <- tryCatch(fread(bed_path, header = FALSE, col.names = c("chrom", "start", "end")),
+                error = function(e) NULL)
+  if (is.null(b) || !nrow(b)) return(data.table(xmin = numeric(0), xmax = numeric(0)))
+  b <- b[chrom == CHROM][, .(xmin = start / 1e6, xmax = end / 1e6)]
+  b
+}
+
 ideogram <- {
   ideo_df <- data.frame(x0 = chrom_start_mb, x1 = chrom_end_mb,
                         y0 = 0, y1 = 1)
   p <- ggplot() +
-    # Base chromosome body (rounded look via tall rect with grey)
     geom_rect(data = ideo_df, aes(xmin = x0, xmax = x1, ymin = y0, ymax = y1),
               fill = "#e8ebef", color = "#555e69", linewidth = 0.3) +
-    # Faint ticks at every 2 Mb
     geom_segment(data = data.frame(x = seq(ceiling(chrom_start_mb),
                                            floor(chrom_end_mb), by = 2)),
                  aes(x = x, xend = x, y = 0.02, yend = 0.98),
                  color = "#c8cdd2", linewidth = 0.25)
+
+  # Layer 2: zero-SNP dropouts (light stipple)
+  nd_regions <- detect_nodata_regions()
+  if (nrow(nd_regions) > 0) {
+    dot_dx <- max(0.03, (chrom_end_mb - chrom_start_mb) * 0.003)
+    light_stipple <- make_stipple(nd_regions$xmin, nd_regions$xmax,
+                                  dx = dot_dx, dy = 0.2)
+    if (nrow(light_stipple) > 0) {
+      p <- p + geom_point(data = light_stipple, aes(x = x, y = y),
+                          color = "#8a92a0", size = 0.35, alpha = 0.7,
+                          shape = 19)
+    }
+  }
+
+  # Layer 3: reference-N / assembly-gap regions (dark stipple)
+  ref_n <- load_ref_n_regions(REF_N_BED, CHROM)
+  if (nrow(ref_n) > 0) {
+    dot_dx <- max(0.02, (chrom_end_mb - chrom_start_mb) * 0.002)
+    dark_stipple <- make_stipple(ref_n$xmin, ref_n$xmax,
+                                 dx = dot_dx, dy = 0.15, offset = 1)
+    if (nrow(dark_stipple) > 0) {
+      p <- p + geom_point(data = dark_stipple, aes(x = x, y = y),
+                          color = "#2c3e50", size = 0.5, alpha = 0.85,
+                          shape = 19)
+    }
+  }
+
+  # Layer 4: shelf highlight
   if (is.finite(SHELF_A) && is.finite(SHELF_B)) {
     p <- p + geom_rect(aes(xmin = SHELF_A, xmax = SHELF_B, ymin = 0, ymax = 1),
                        fill = "#e0555c", alpha = 0.55, color = "#8a2b30",
                        linewidth = 0.3)
   }
+  # Layer 5: breakpoint ticks
   if (length(BPS) > 0) {
     p <- p + geom_segment(data = data.frame(x = BPS),
                           aes(x = x, xend = x, y = -0.2, yend = 1.2),
                           color = "#e0555c", linewidth = 0.5)
   }
   p + common_x +
-    scale_y_continuous(limits = c(-0.3, 1.3), expand = c(0,0)) +
+    scale_y_continuous(limits = c(-0.3, 1.3), expand = c(0, 0)) +
     labs(title = paste0(CHROM, " — shelf diagnostic stack"),
-         subtitle = sprintf("%d local-PCA windows%s%s", nrow(dt),
-           if (is.finite(SHELF_A)) sprintf("  ·  shelf %g–%g Mb", SHELF_A, SHELF_B) else "",
-           if (SMOOTH_WIN > 1) sprintf("  ·  smooth_win=%d", SMOOTH_WIN) else "")) +
+         subtitle = sprintf("%d local-PCA windows%s%s%s",
+           nrow(dt),
+           if (is.finite(SHELF_A)) sprintf("  \u00b7  shelf %g\u2013%g Mb", SHELF_A, SHELF_B) else "",
+           if (SMOOTH_WIN > 1) sprintf("  \u00b7  smooth_win=%d", SMOOTH_WIN) else "",
+           if (nrow(nd_regions) + nrow(ref_n) > 0) sprintf("  \u00b7  %d dropout region%s",
+             nrow(nd_regions) + nrow(ref_n),
+             if (nrow(nd_regions) + nrow(ref_n) == 1) "" else "s") else "")) +
     theme_void() +
     theme(plot.title = element_text(size = 11, face = "bold"),
           plot.subtitle = element_text(size = 8, color = "#555e69"),
@@ -232,31 +355,59 @@ if (!is.null(sim_source) && is.matrix(sim_source) &&
 }
 
 # =============================================================================
-# Track 1: Z
+# Track 1: Z (robust, always non-negative for max_abs_z)
 # =============================================================================
+# max_abs_z is always >= 0. Fix y-axis to [0, 5] for cross-chromosome
+# comparability. Dashed lines at Z=2.5 (caution) and Z=3.0 (standard detection
+# threshold) give the reader an anchor.
+z_detect_thresh <- as.numeric(get_arg("--z_detect_thresh", "3.0"))
 p1 <- decorate(
   ggplot(dt, aes(mb, z)) +
-    geom_hline(yintercept = c(-2.5, 0, 2.5), linetype = "dashed",
-               color = c("#2c3e50", "#999999", "#2c3e50"), linewidth = 0.25) +
-    geom_point(size = 0.22, color = "#1f4e79", alpha = 0.55)
+    geom_hline(yintercept = 2.5, linetype = "dashed",
+               color = "#999999", linewidth = 0.25) +
+    geom_hline(yintercept = z_detect_thresh, linetype = "dashed",
+               color = "#c0504d", linewidth = 0.35) +
+    geom_point(size = 0.22, color = "#1f4e79", alpha = 0.55) +
+    scale_y_continuous(limits = c(0, 5), expand = expansion(mult = 0.02))
 ) + common_x + labs(y = "Robust Z") + base_theme +
   edge_labels("outlier", "typical", "#2c3e50", "#999999")
 
 # =============================================================================
-# Track 2: n_snps
+# Track 2: SNP density (per kb / 10kb / 50kb, configurable)
 # =============================================================================
+# n_snps is fixed by window-size config (always 100 here), so instead we show
+# true local density: SNPs per SNP_DENSITY_SCALE_KB kb. Default is per-10kb.
+# Override via --snp_density_scale_kb (1, 10, 50 typical).
+#
+# Higher values = denser SNPs = healthier variant calling in that region.
+# Drops would indicate repeat/mapping dropout.
+sd_scale_kb <- as.numeric(get_arg("--snp_density_scale_kb", "10"))
+# span_kb already computed at load time (line 192); just derive density here
+dt[, snps_per_x := n_snps * sd_scale_kb / pmax(span_kb, 1e-9)]
+
+if (SMOOTH_WIN > 1) {
+  dt[, snps_per_x_sm := rolling_median(snps_per_x, SMOOTH_WIN)]
+} else {
+  dt[, snps_per_x_sm := snps_per_x]
+}
+sd_unit <- if (sd_scale_kb == 1) "SNPs/kb"
+           else sprintf("SNPs/%gkb", sd_scale_kb)
+
 p2 <- decorate(
-  ggplot(dt, aes(mb, n_snps)) +
-    geom_point(size = 0.22, color = "#2c7a39", alpha = 0.55) +
-    geom_hline(yintercept = median(dt$n_snps, na.rm = TRUE),
+  ggplot(dt, aes(mb, snps_per_x_sm)) +
+    geom_line(color = "#ffffff", linewidth = 1.2, alpha = 0.75) +
+    geom_line(color = "#2c7a39", linewidth = 0.45) +
+    geom_hline(yintercept = median(dt$snps_per_x, na.rm = TRUE),
                linetype = "dashed", color = "#2c3e50", linewidth = 0.25)
-) + common_x + labs(y = "SNPs/win") + base_theme +
+) + common_x + labs(y = sd_unit) + base_theme +
   edge_labels("dense", "sparse")
+
+# =============================================================================
 
 # =============================================================================
 # Track 3: BEAGLE uncertainty
 # =============================================================================
-p3 <- placeholder("uncertainty (no Q02)")
+p3 <- NULL
 if (!is.null(UNC_FILE) && file.exists(UNC_FILE)) {
   unc <- fread(UNC_FILE)
   p3 <- decorate(
@@ -271,7 +422,7 @@ if (!is.null(UNC_FILE) && file.exists(UNC_FILE)) {
 # =============================================================================
 # Track 4: coverage mean + CV color
 # =============================================================================
-p4 <- placeholder("coverage (no Q03)")
+p4 <- NULL
 if (!is.null(COV_FILE) && file.exists(COV_FILE)) {
   cov <- fread(COV_FILE)
   p4 <- decorate(
@@ -292,7 +443,7 @@ if (!is.null(COV_FILE) && file.exists(COV_FILE)) {
 # =============================================================================
 # Track 5: # low-cov samples
 # =============================================================================
-p5 <- placeholder("# low-cov samples")
+p5 <- NULL
 if (!is.null(COV_FILE) && file.exists(COV_FILE)) {
   cov2 <- fread(COV_FILE)
   p5 <- decorate(
@@ -305,7 +456,7 @@ if (!is.null(COV_FILE) && file.exists(COV_FILE)) {
 # =============================================================================
 # Track 6: theta mean + CV
 # =============================================================================
-p6 <- placeholder("theta mean / CV (no Q05)")
+p6 <- NULL
 theta_summary <- NULL
 if (!is.null(THETA_FILE) && file.exists(THETA_FILE)) {
   theta_raw <- fread(THETA_FILE)
@@ -346,7 +497,7 @@ if (!is.null(THETA_FILE) && file.exists(THETA_FILE)) {
 # =============================================================================
 # Track 7: ancestry delta12 WITH regime-class strip above
 # =============================================================================
-p7 <- placeholder("ancestry Δ12 (no Q06)")
+p7 <- NULL
 anc_dt <- NULL
 if (!is.null(ANC_FILE) && file.exists(ANC_FILE)) {
   anc_dt <- fread(ANC_FILE)
@@ -441,6 +592,13 @@ p8 <- NULL; p9 <- NULL
 if (!is.null(POPSTATS_INVGT_FILE) && file.exists(POPSTATS_INVGT_FILE)) {
   ps <- fread(POPSTATS_INVGT_FILE)
   setnames(ps, tolower(names(ps)))
+  # Drop windows with too few informative sites — Engine F writes exact zeros
+  # there, which would otherwise appear as fake drop-to-baseline spikes.
+  min_sites <- as.integer(Sys.getenv("Q04_MIN_SITES", "20"))
+  n_used_col <- intersect(c("n_sites_used", "n_used", "nsites"), names(ps))[1]
+  if (!is.null(n_used_col)) {
+    ps <- ps[get(n_used_col) >= min_sites]
+  }
   start_col <- intersect(c("window_start", "start_bp", "start", "ws"), names(ps))[1]
   end_col   <- intersect(c("window_end",   "end_bp",   "end",   "we"), names(ps))[1]
   if (!is.null(start_col) && !is.null(end_col)) {
@@ -497,13 +655,74 @@ if (!is.null(POPSTATS_INVGT_FILE) && file.exists(POPSTATS_INVGT_FILE)) {
 }
 
 # =============================================================================
-# Compose
+# Track 10: Engine H — HoverE_Hom1 / HoverE_Het / HoverE_Hom2 per window
+# (Merot sliding-window Hobs/Hexp, patched ANGSD HWE)
+# At an inversion locus: HoverE_Het -> 2, HoverE_Hom1/Hom2 -> 0.
+# Outside: all three -> ~1 (HWE).
 # =============================================================================
-panels  <- list(ideogram, sim_strip, p1, p2, p3, p4, p5, p6, p7)
-heights <- c(0.5,          0.5,       1.3, 0.9, 0.9, 0.9, 0.6, 0.9, 1.2)
-if (!is.null(p7b)) { panels <- c(panels, list(p7b)); heights <- c(heights, 0.9) }
-if (!is.null(p8))  { panels <- c(panels, list(p8));  heights <- c(heights, 0.9) }
-if (!is.null(p9))  { panels <- c(panels, list(p9));  heights <- c(heights, 0.9) }
+p10 <- NULL
+if (!is.null(HOBS_FILE) && file.exists(HOBS_FILE)) {
+  hh <- fread(HOBS_FILE)
+  setnames(hh, tolower(names(hh)))
+  start_h <- intersect(c("start_bp", "start"), names(hh))[1]
+  end_h   <- intersect(c("end_bp",   "end"),   names(hh))[1]
+  if (!is.null(start_h) && !is.null(end_h)) {
+    hh[, mb := (get(start_h) + get(end_h)) / 2 / 1e6]
+    hov_cols <- grep("^hovere_", names(hh), value = TRUE)
+    if (length(hov_cols) > 0) {
+      long <- melt(hh[, c("mb", hov_cols), with = FALSE],
+                   id.vars = "mb", variable.name = "group", value.name = "hovere")
+      long[, group := sub("^hovere_", "", as.character(group))]
+      long[, group := toupper(group)]
+      grp_order <- intersect(c("HOM1", "HET", "HOM2"), unique(long$group))
+      grp_order <- c(grp_order, setdiff(unique(long$group), grp_order))
+      long[, group := factor(group, levels = grp_order)]
+      if (SMOOTH_WIN > 1) {
+        long[, hovere_sm := rolling_median(hovere, SMOOTH_WIN), by = group]
+      } else {
+        long[, hovere_sm := hovere]
+      }
+      pal <- c("HOM1" = "#1f4e79", "HET" = "#c0504d", "HOM2" = "#2c7a39")
+      p10 <- decorate(
+        ggplot(long, aes(mb, hovere_sm, color = group)) +
+          geom_hline(yintercept = 1, linetype = "dashed",
+                     color = "#2c3e50", linewidth = 0.3) +
+          geom_hline(yintercept = 2, linetype = "dotted",
+                     color = "#888888", linewidth = 0.25) +
+          geom_line(linewidth = 0.45, alpha = 0.9) +
+          scale_color_manual(values = pal, name = NULL) +
+          scale_y_continuous(breaks = c(0, 0.5, 1, 1.5, 2))
+      ) + common_x + labs(y = "Hobs/Hexp") + base_theme +
+        theme(legend.position = "right",
+              legend.key.width = unit(0.3, "cm"),
+              legend.key.height = unit(0.35, "cm"),
+              legend.text = element_text(size = 7)) +
+        edge_labels("Het excess (~2)", "Hom deficit (~0)")
+    }
+  }
+}
+
+# =============================================================================
+# Compose (skip NULL panels for cleaner layout)
+# =============================================================================
+all_panels <- list(
+  list(p = ideogram, h = 0.5),
+  list(p = sim_strip, h = 0.5),
+  list(p = p1,  h = 1.3),
+  list(p = p2,  h = 0.9),
+  list(p = p3,  h = 0.9),
+  list(p = p4,  h = 0.9),
+  list(p = p5,  h = 0.6),
+  list(p = p6,  h = 0.9),
+  list(p = p7,  h = 1.2),
+  list(p = p7b, h = 0.9),
+  list(p = p8,  h = 0.9),
+  list(p = p9,  h = 0.9),
+  list(p = p10, h = 0.9)
+)
+keep_idx <- which(sapply(all_panels, function(x) !is.null(x$p)))
+panels  <- lapply(all_panels[keep_idx], `[[`, "p")
+heights <- sapply(all_panels[keep_idx], `[[`, "h")
 
 # Ensure only the last panel has x-axis labels. Rebuild bottom panel theme.
 last_idx <- length(panels)

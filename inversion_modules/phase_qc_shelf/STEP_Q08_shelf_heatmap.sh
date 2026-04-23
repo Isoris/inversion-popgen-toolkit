@@ -50,6 +50,8 @@ run_one() {
     --out     "${out_pdf}"
     --out_dir "${out_dir}"
   )
+  [[ -n "${BP1_MB:-}" ]] && args+=( --breakpoint1_mb "${BP1_MB}" )
+  [[ -n "${BP2_MB:-}" ]] && args+=( --breakpoint2_mb "${BP2_MB}" )
   [[ -f "${invgt_assign}" ]] && args+=( --invgt_assign "${invgt_assign}" )
 
   ${RSCRIPT_BIN} --vanilla "${here}/R/q08_shelf_heatmap.R" "${args[@]}" \

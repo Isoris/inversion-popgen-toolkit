@@ -63,7 +63,10 @@ build_track() {
   local chr="$1"
   local search_dir="${MOSDEPTH_EXISTING}"
   [[ "${RUN_MOSDEPTH}" == "1" ]] && search_dir="${QC_OUT}/mosdepth"
-  [[ -d "${search_dir}" ]] || qc_die "No mosdepth dir: ${search_dir}"
+  if [[ ! -d "${search_dir}" ]]; then
+    qc_log "SKIP ${chr}: no mosdepth dir ${search_dir}"
+    return 0
+  fi
 
   # Collect all regions bed files that have this chrom
   local files=( )

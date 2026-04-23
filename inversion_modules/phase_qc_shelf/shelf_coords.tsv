@@ -1,0 +1,7 @@
+# shelf_coords.tsv — per-chromosome shelf + breakpoint coordinates
+# Format: chrom<TAB>shelf_start_mb<TAB>shelf_end_mb<TAB>bp1_mb<TAB>bp2_mb
+# Used by slurm/array_28chrom.sh and can be sourced manually in run_chrom.sh
+#
+# Add rows as new inversions are discovered. For chromosomes not listed,
+# the pipeline runs with "whole chromosome" shelf (effectively no highlight).
+C_gar_LG28	15	18	15.115	18.005

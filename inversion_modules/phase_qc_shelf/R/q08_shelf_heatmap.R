@@ -51,6 +51,8 @@ PRECOMP     <- get_arg("--precomp")
 CHROM       <- get_arg("--chrom")
 SHELF_A     <- as.numeric(get_arg("--shelf_start_mb"))
 SHELF_B     <- as.numeric(get_arg("--shelf_end_mb"))
+BP1_MB      <- as.numeric(get_arg("--breakpoint1_mb", NA))
+BP2_MB      <- as.numeric(get_arg("--breakpoint2_mb", NA))
 SAMPLE_LIST <- get_arg("--sample_list")
 INVGT_ASSIGN_FILE <- get_arg("--invgt_assign", NULL)
 OUT         <- get_arg("--out")
@@ -112,7 +114,13 @@ if (n_header_samples != n_samples) {
                          else paste0("Ind", seq_len(n_samples) - 1L)
 }
 
-target_lookup <- setNames(seq_along(shelf_row_idx), as.character(shelf_row_idx))
+# Build an environment-backed hash so missing keys return NULL cleanly
+# (named-integer vector subset with [[key]] throws "subscript out of bounds")
+target_env <- new.env(hash = TRUE, size = length(shelf_row_idx) * 2L)
+for (i in seq_along(shelf_row_idx)) {
+  assign(as.character(shelf_row_idx[i]), i, envir = target_env)
+}
+
 data_row_idx <- 0L
 hits <- 0L
 chunk_size <- 20000L
@@ -123,8 +131,8 @@ repeat {
   for (ln in lines) {
     data_row_idx <- data_row_idx + 1L
     key <- as.character(data_row_idx)
-    if (!is.null(target_lookup[[key]])) {
-      hi <- target_lookup[[key]]
+    hi <- target_env[[key]]
+    if (!is.null(hi)) {
       flds <- strsplit(ln, "\t", fixed = TRUE)[[1]]
       gl_block <- as.numeric(flds[-(1:3)])
       gl_mat <- matrix(gl_block, nrow = n_samples, byrow = TRUE)
@@ -267,17 +275,38 @@ render_ch <- function(X, positions, title, pdf_path, png_path) {
     )
   }
 
-  # Column annotation: genomic position (as numeric bar)
+  # Column annotation: genomic position (as numeric bar) + optional breakpoints
   pos_mb <- positions / 1e6
-  ha_top <- ComplexHeatmap::columnAnnotation(
+  annot_list <- list(
     pos_mb = ComplexHeatmap::anno_points(
       pos_mb, pch = 16, size = grid::unit(1, "mm"),
       gp = grid::gpar(col = "#555e69"),
       axis_param = list(gp = grid::gpar(fontsize = 6))
-    ),
-    height = grid::unit(6, "mm"),
-    annotation_name_gp = grid::gpar(fontsize = 7)
+    )
   )
+  # If breakpoints provided, add labeled mark annotation pointing at nearest windows
+  bp_keep <- c()
+  bp_labels <- character()
+  for (bp in c(BP1_MB, BP2_MB)) {
+    if (is.finite(bp)) {
+      j <- which.min(abs(pos_mb - bp))
+      if (length(j) == 1L) {
+        bp_keep <- c(bp_keep, j)
+        bp_labels <- c(bp_labels, sprintf("BP %.3f Mb", bp))
+      }
+    }
+  }
+  if (length(bp_keep) > 0) {
+    annot_list$breakpoint <- ComplexHeatmap::anno_mark(
+      at = bp_keep, labels = bp_labels, which = "column", side = "top",
+      labels_gp = grid::gpar(fontsize = 7, col = "#8a2b30"),
+      lines_gp  = grid::gpar(col = "#e0555c", lwd = 1)
+    )
+  }
+  ha_top <- do.call(ComplexHeatmap::columnAnnotation,
+                    c(annot_list,
+                      list(height = grid::unit(6, "mm"),
+                           annotation_name_gp = grid::gpar(fontsize = 7))))
 
   n_cell <- nrow(X) * ncol(X)
   w <- max(6, min(16, 3 + ncol(X) * 0.06))

@@ -58,8 +58,23 @@ run_one() {
   local precomp="${PRECOMP_DIR}/${chr}.precomp.rds"
   [[ -f "${precomp}" ]] || precomp="${PRECOMP_DIR}/main_qcpass.${chr}.precomp.rds"
   [[ -f "${precomp}" ]] || { qc_log "SKIP ${chr}: no precomp"; return 0; }
-  local localq_samples="${LOCAL_Q_DIR}/${chr}.local_Q_samples.tsv.gz"
-  [[ -f "${localq_samples}" ]] || localq_samples="${LOCAL_Q_DIR}/scale_1x/${chr}.local_Q_samples.tsv.gz"
+  # Resolve local_Q_samples across layouts: flat, scale_1x, scale_dense,
+  # scale_thin, and the v3 multi-K layout. scale_dense is preferred (higher
+  # SNP resolution) for invgt group construction.
+  local localq_samples=""
+  for cand in \
+    "${LOCAL_Q_DIR}/scale_dense/${chr}.local_Q_samples.tsv.gz" \
+    "${LOCAL_Q_DIR}/scale_thin/${chr}.local_Q_samples.tsv.gz" \
+    "${LOCAL_Q_DIR}/scale_1x/${chr}.local_Q_samples.tsv.gz" \
+    "${LOCAL_Q_DIR}/${chr}.local_Q_samples.tsv.gz" \
+    "${LOCAL_Q_DIR}/scale_dense/K08/${chr}.local_Q_samples.tsv.gz" \
+    "${LOCAL_Q_DIR}/scale_thin/K08/${chr}.local_Q_samples.tsv.gz"; do
+    if [[ -f "${cand}" ]]; then
+      localq_samples="${cand}"
+      break
+    fi
+  done
+  [[ -n "${localq_samples}" ]] || qc_log "WARN ${chr}: no local_Q_samples found, Q07 will use MDS1-only grouping"
 
   # ---- Build group sample lists via R helper ------------------------------
   local groups_dir="${QC_OUT}/popstats_groups/${chr}"
