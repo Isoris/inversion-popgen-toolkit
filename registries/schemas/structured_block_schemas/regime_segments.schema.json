@@ -1,6 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "regime_segments.schema.json",
+  "block_type": "regime_segments",
   "title": "regime_segments",
   "description": "Regime segments derived from C01j compatibility engine over a candidate interval. Each segment is a run of consecutive sliding windows with similar structural properties: group count, group thickness, separation score, persistence. Segment state ∈ {clean_inversion, structured_moderate, structured_complex, weak_signal, background_soup, transition}. Transitions between segments are boundary candidates.",
   "type": "object",

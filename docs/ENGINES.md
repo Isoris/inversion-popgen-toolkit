@@ -189,11 +189,12 @@ correction before downstream tests).
 **Status**: ??? — header says "MARKER CLASSIFICATION" but I need to read more.
 **Action**: re-read when reviewing the ancestry pipeline.
 
-### `nested_composition.py`
+### `internal_ancestry_composition.py` (formerly `nested_composition.py`)
 
-**Location**: `unified_ancestry/engines/nested_composition/nested_composition.py`
-**One-line (from header)**: Internal ancestry structure classification.
-**Status**: WIP, not currently wired into phase_qc_shelf.
+**Location**: `unified_ancestry/engines/nested_composition/internal_ancestry_composition.py`
+**One-line (from header)**: Generic interval-internal ancestry structure classifier.
+**Status**: WIRED via Phase 7 wrapper `STEP_C01i_c_nested_composition.py`.
+**Notes**: Renamed 2026-04-24 to match schema/block_type (`internal_ancestry_composition`). The engine is ALSO called directly as a CLI by `unified_ancestry/run_full_pipeline.sh` Step 4 (chromosome-level composition pass). See `docs/NESTED_VS_COMPOSITE.md` for the role split between the engine and the Phase 7 inversion-candidate wrapper.
 
 ### `candidate_classifier.py`
 

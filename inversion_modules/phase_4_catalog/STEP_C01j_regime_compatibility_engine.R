@@ -41,6 +41,20 @@
 #   regime_memberships.tsv.gz    -- per-sample per-window: group assignment
 #   regime_transitions.tsv       -- boundary positions + transition type
 #   regime_state_labels.tsv      -- final per-position state label
+#
+# =============================================================================
+# REGISTRY_CONTRACT
+#   BLOCKS_WRITTEN:
+#     - regime_segments: registries/schemas/structured_block_schemas/regime_segments.schema.json
+#       keys: q2_regime_n_segments, q2_regime_dominant_state,
+#             q2_regime_has_recomb, q2_regime_n_samples_changed
+#       status: WIRED
+#       note: Per-candidate write_block_safe call, added chat-13
+#             (2026-04-17). Also writes the per-window
+#             regime_memberships.tsv.gz (chromosome-wide, not per-candidate)
+#             as a standalone file consumed by STEP_C01i_b_multi_recomb,
+#             06_regime_stream_graph, and STEP_C01k_annotated_simmat.
+#   KEYS_IN: none
 # =============================================================================
 
 suppressPackageStartupMessages({

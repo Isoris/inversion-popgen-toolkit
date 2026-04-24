@@ -53,6 +53,13 @@
     { "key": "q5_tree_polarization_direction", "from": "q5_tree_polarization_direction" },
     { "key": "q5_tree_polarization_confidence", "from": "q5_tree_polarization_confidence" },
     { "key": "q5_dollo_vs_tree_concordance", "from": "q5_dollo_vs_tree_concordance" },
-    { "key": "q5_conservation_class", "from": "q5_conservation_class" }
+    { "key": "q5_conservation_class", "from": "q5_conservation_class" },
+
+    { "_comment_flank_block": "Flank-coherence keys folded in from the former flank_coherence.schema.json (archived 2026-04-24). cross_species_bridge_v6.py already emits these in its data_direct payload — adding them here closes the PRODUCES_BUT_NOT_WIRED gap without a writer change." },
+    { "key": "q3_left_flank_coherence_score",  "from": "q3_left_flank_coherence_score" },
+    { "key": "q3_right_flank_coherence_score", "from": "q3_right_flank_coherence_score" },
+    { "key": "q3_left_flank_n_families",       "from": "q3_left_flank_n_families" },
+    { "key": "q3_right_flank_n_families",      "from": "q3_right_flank_n_families" },
+    { "key": "q3_flank_coherence_class",       "from": "q3_flank_coherence_class" }
   ]
 }

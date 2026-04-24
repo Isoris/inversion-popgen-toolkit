@@ -41,6 +41,22 @@
 #   plots/                                — segment boxplots, entropy maps
 #
 # =============================================================================
+# REGISTRY_CONTRACT
+#   BLOCKS_WRITTEN:
+#     - local_structure_segments: registries/schemas/structured_block_schemas/local_structure_segments.schema.json
+#       keys: q2_local_struct_core_delta12,
+#             q2_local_struct_lflank_delta12,
+#             q2_local_struct_rflank_delta12,
+#             q2_boundary_sharpness_left,
+#             q2_boundary_sharpness_right,
+#             q2_boundary_sharpness_overall
+#       status: WIRED
+#       note: Per-candidate write_block_safe call, added chat-13
+#             (2026-04-17). Schema keys use dotted-path 'from' fields
+#             (boundary_sharpness.left, etc.) — the nested block layout
+#             at L499-508 of this file matches that exactly.
+#   KEYS_IN: none
+# =============================================================================
 
 suppressPackageStartupMessages({
   library(data.table)

@@ -26,6 +26,42 @@
 #   - lib_decompose_helpers.R for shared utilities
 #   - flashlight_v2/patches/patch_C01i_decomposition_sv_prior.R for cheats 1/2/3
 #   - inspired by superseded/STEP_C01i_multi_inversion_decomposition.R structure
+#
+# =============================================================================
+# REGISTRY_CONTRACT
+#   BLOCKS_WRITTEN:
+#     - internal_dynamics: registries/schemas/structured_block_schemas/internal_dynamics.schema.json
+#       keys: q2_pca_decomp_status, q2_pca_decomp_skip_reason,
+#             q2_pca_seed_source, q2_n_seed_class_conflicts,
+#             q2_pca_cluster_silhouette, q2_pca_cluster_separation_flag,
+#             q2_bic_gap_k3_vs_k2, q2_het_phase_support_fraction,
+#             q2_n_het_phase_supported, q2_pca_seed_mode,
+#             q2_n_seed_HOM_REF, q2_n_seed_HET, q2_n_seed_HOM_INV,
+#             q2_n_samples_sv_pca_discordant,
+#             q2_n_hetDEL_breakpoint_reclass, q2_pca_k_used,
+#             q6_n_HOM_REF_prelim, q6_n_HET_prelim, q6_n_HOM_INV_prelim,
+#             q1_decompose_k_used
+#       keys_na: q1_decompose_ancestry_div_hom_ref_vs_hom_inv
+#       status: WIRED
+#       note: Writes three variants of the block — 'seeded_ok' (full
+#             payload, emits all keys above) and two 'no_seeding' stubs
+#             (seed_loader returned nothing OR seeded_kmeans fell back
+#             to unsupervised). Stubs carry a minimal subset: decomp_status,
+#             decomp_reason, seed_source, n_seed_conflict — other keys
+#             resolve to NA for those candidates.
+#             q1_decompose_k_used is a dual-write shim alongside
+#             q2_pca_k_used (same underlying field, different q-axis
+#             interpretation — q2 asks 'how did decompose cluster
+#             samples?', q1 asks 'how many bands does the block have?').
+#             Folded in from the superseded band_composition schema
+#             2026-04-24 per Quentin's option (a). Explicit 'decompose_'
+#             prefix makes the provenance visible in keys.tsv.
+#             q1_decompose_ancestry_div_hom_ref_vs_hom_inv is NA until
+#             decompose is extended to pull Engine B local-Q and compute
+#             the L1 distance between HOM_REF and HOM_INV mean Q vectors —
+#             see _archive_superseded/bk_schemas_pre_canonical/band_composition_folded_into_internal_dynamics_2026-04-24/README.md
+#             for the computation sketch.
+#   KEYS_IN: none
 # =============================================================================
 
 suppressPackageStartupMessages({
@@ -557,7 +593,19 @@ for (ci in seq_len(nrow(cand_dt))) {
     per_sample = per_sample,
     # Don't include the full per-window × per-sample matrix in JSON
     # — too big. Save it as an RDS file alongside.
-    per_window_class_file = "per_window_class.rds"
+    per_window_class_file = "per_window_class.rds",
+
+    # ── band_composition fold (2026-04-24 chat C) ───────────────────────
+    # Folded from the superseded band_composition.schema.json. Left as
+    # NA_real_ until the instant_q join is added: join this script's
+    # class_assignment (HOM_REF/HET/HOM_INV) with Engine B's per-window
+    # local-Q vectors inside the candidate interval, average Q per class,
+    # take L1(mean_Q_HOM_REF, mean_Q_HOM_INV). High = two homozygous
+    # classes come from different ancestral subpopulations (family-driven,
+    # not a real inversion). See
+    # _archive_superseded/bk_schemas_pre_canonical/band_composition_folded_into_internal_dynamics_2026-04-24/README.md
+    # for the computation sketch.
+    ancestry_div_hom_ref_vs_hom_inv = NA_real_
   )
 
   # Save the big per-window matrix separately

@@ -55,6 +55,21 @@ SYNTHESIS:
                                     untested
 
 =============================================================================
+REGISTRY_CONTRACT
+  BLOCKS_WRITTEN:
+    - synteny_v6: registries/schemas/structured_block_schemas/synteny_v6.schema.json
+      keys: q5_bs_event_overlap, q5_bs_event_type,
+            q5_tree_polarization_direction, q5_tree_polarization_confidence,
+            q5_dollo_vs_tree_concordance, q5_conservation_class,
+            q3_left_flank_coherence_score, q3_right_flank_coherence_score,
+            q3_left_flank_n_families, q3_right_flank_n_families,
+            q3_flank_coherence_class
+      status: WIRED
+      note: Flank-coherence keys folded in from superseded
+            flank_coherence.schema.json (archived 2026-04-24). Writer
+            unchanged; schema's keys_extracted list extended.
+  KEYS_IN: none
+=============================================================================
 """
 import argparse
 import csv

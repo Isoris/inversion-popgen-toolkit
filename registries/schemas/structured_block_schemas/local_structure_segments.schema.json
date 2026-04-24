@@ -1,6 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "local_structure_segments.schema.json",
+  "block_type": "local_structure_segments",
   "title": "local_structure_segments",
   "description": "Per-candidate local structure metrics from C01l. Five segments (left_flank, inv_left_half, inv_core, inv_right_half, right_flank) each characterized by per-sample delta12, entropy, ENA computed from local k-means membership proportions. The contrast between core and flanks is the boundary-sharpness signal: sharp boundary = core.delta12 >> flank.delta12.",
   "type": "object",

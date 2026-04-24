@@ -49,7 +49,13 @@ export MODULE_5B_ENGINES_DIR="${BASE}/Modules/MODULE_5B_inversion_followup/engin
 # ── Cross-module Python / R scripts (v12.2) ─────────────────────────────────
 # Ancestry-driven candidate analysis/classification moved to MODULE_5A:
 export SNP_Q_SUPPORT_PY="${BASE}/Modules/MODULE_5A_inversion_discovery/analysis/snp_q_support.py"
-export NESTED_COMPOSITION_PY="${BASE}/Modules/MODULE_5A_inversion_discovery/analysis/nested_composition.py"
+# Ancestry composition engine: single source of truth at the repo path below.
+# (Previously pointed at MODULE_5A_inversion_discovery which no longer carries
+#  this file; dedup pass 2026-04-24, see docs/NESTED_VS_COMPOSITE.md.)
+# The engine file is also imported as a library by
+# inversion_modules/phase_7_karyotype_groups/proposal/STEP_C01i_c_nested_composition.py
+# via ANCESTRY_ENGINE_DIR — this variable is the CLI-standalone path.
+export NESTED_COMPOSITION_PY="${BASE}/unified_ancestry/engines/nested_composition/internal_ancestry_composition.py"
 export CANDIDATE_CLASSIFIER_PY="${BASE}/Modules/MODULE_5A_inversion_discovery/classification/candidate_classifier.py"
 # Inversion followup utilities / figures moved to MODULE_5B:
 export EXPORT_MODULE5B_PY="${BASE}/Modules/MODULE_5B_inversion_followup/utils/export_module5b.py"

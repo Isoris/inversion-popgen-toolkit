@@ -24,6 +24,42 @@
 #   Rscript PHASE_01C_block_detect.R <precomp_dir> <outdir> \
 #     [--mode hatchery|wild] [--gaps gaps.bed] [--agp scaffold.agp] \
 #     [--chrom C_gar_LG28] [--local_range 80]
+#
+# =============================================================================
+# REGISTRY_CONTRACT
+#   BLOCKS_WRITTEN:
+#     - block_detect: registries/schemas/structured_block_schemas/block_detect.schema.json
+#       keys: (none — not currently written from this script)
+#       status: BLOCKED_ON_NO_CANDIDATE_JOIN
+#       note: PHASE_01C produces per-chromosome blocks (block_registry_<chr>.tsv.gz)
+#             BEFORE candidate_ids exist. The schema asks for per-candidate
+#             fields; candidates are created by C01d downstream. Proper wiring
+#             belongs in C01d (or a new C00b attribution step), where the join
+#             block_id → candidate_id is available (iv_dt carries block_id as
+#             interval_id, see C01d L174).
+#
+#             Secondary blocker: even if the join existed, 5 of the 9 schema
+#             fields aren't emitted by this script. block_registry_<chr>.tsv.gz
+#             columns are: chrom, block_id, start_bp, end_bp, start_mb, end_mb,
+#             start_global_window_id, end_global_window_id, n_windows, mean_sim,
+#             has_3bands (see script L566-574). Schema fields NOT computed here:
+#               - confidence_score       (no composite score exists per block)
+#               - inner_boundary_left_bp  (blue-cross inner edges live in the
+#                                          boundary_catalog output, not the
+#                                          block_registry)
+#               - inner_boundary_right_bp (same)
+#               - mean_outside_similarity (not computed — would need to scan
+#                                          local_sim outside block windows)
+#               - contrast_ratio          (not computed)
+#
+#             Two ways forward, in order of preference:
+#               (a) extend this script to compute the 5 missing fields and
+#                   add them to block_reg_rows; then add a register_block_detect
+#                   helper that C01d calls per-candidate after looking up the
+#                   block row by interval_id.
+#               (b) drop the 5 missing fields from the schema (weaker — the
+#                   inner_boundary fields are the real scientific value here).
+#   KEYS_IN: none
 # =============================================================================
 
 suppressPackageStartupMessages({

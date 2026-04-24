@@ -34,7 +34,7 @@ TARGETS = {
     },
     "internal_ancestry_composition.schema.json": {
         "sources": ["inversion_modules/phase_7_karyotype_groups/proposal/STEP_C01i_c_nested_composition.py",
-                    "inversion_modules/phase_7_karyotype_groups/proposal/nested_composition_core.py"],
+                    "unified_ancestry/engines/nested_composition/internal_ancestry_composition.py"],
         "block_type": "internal_ancestry_composition",
     },
 }

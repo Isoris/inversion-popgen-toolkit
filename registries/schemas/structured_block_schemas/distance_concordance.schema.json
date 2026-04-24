@@ -1,6 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "distance_concordance.schema.json",
+  "block_type": "distance_concordance",
   "title": "distance_concordance",
   "description": "Multi-scale sample-pair concordance from C01m. For a candidate (chrom-wide computation subset to interval), reports for each tested distance d ∈ {80, 160, 320, 640 windows (configurable)} how persistent the sample-pair co-grouping is. Biologically, inversion-carrier pairs maintain co-grouping at all distances (recombination suppressed); family-LD pairs decay. The persistence profile is diagnostic of inversion vs family structure.",
   "type": "object",

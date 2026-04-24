@@ -128,13 +128,18 @@ These scripts define R functions and exit. The orchestrator calls them with `Rsc
 
 Script runs, writes output files (RDS, TSV, etc.), but never calls `write_block` / `add_evidence`. Keys declared by the schema are not populated.
 
-| Schema | Q | Keys | Declared source_script | Found scripts |
+**2026-04-24 (chat C) resolution pass:**
+- `band_composition` — FOLDED into `internal_dynamics`. Archived at `_archive_superseded/bk_schemas_pre_canonical/band_composition_folded_into_internal_dynamics_2026-04-24/`. `q1_k_used` dual-written alongside `q2_pca_k_used`; `q1_ancestry_div_hom_ref_vs_hom_inv` declared NA pending instant_q join inside decompose.
+- `flank_coherence` — FOLDED into `synteny_v6`. Archived at `_archive_superseded/bk_schemas_pre_canonical/flank_coherence_folded_into_synteny_v6_2026-04-24/`. `cross_species_bridge_v6.py` already emitted the fields; schema's `keys_extracted` list extended to pick them up.
+- `block_detect`, `existence_layer_b`, `existence_layer_c` — remain BLOCKED with documented reasons. Each has a `REGISTRY_CONTRACT` header in its source script explaining the architectural blocker (producers run before candidate_ids exist). See `docs/SCRIPT_CONTRACT.md`.
+
+| Schema | Q | Keys | Declared source_script | Status |
 |---|---|---|---|---|
-| `band_composition` | Q1 | 2 | C01i + unified_ancestry/instant_q | `inversion_modules/phase_7_karyotype_groups/proposal/STEP_C01i_decompose.R` |
-| `block_detect` | Q1, Q3 | 6 | PHASE_01C block_detect | `inversion_modules/phase_2_discovery/2c_precomp/PHASE_01C_block_detect.R` |
-| `existence_layer_b` | Q7 | 6 | C00 build_flashlight + MODULE_4H_ALL_Manta + MODULE_4_DELLY_INV | `inversion_modules/phase_2_discovery/2c_precomp/STEP_C00_build_sv_prior.R` |
-| `existence_layer_c` | Q7 | 7 | C04 GHSL v5 (within-sample haplotype divergence) + STEP_C01c triangle insulation | `inversion_modules/phase_2_discovery/2e_ghsl/STEP_C04_snake3_ghsl_v6.R`<br>`inversion_modules/phase_2_discovery/2e_ghsl/STEP_C04b_snake3_ghsl_classify.R` |
-| `flank_coherence` | Q3 | 3 | cross_species_bridge.py | `inversion_modules/phase_8_evidence_biology/q5_age_and_origin/cross_species_bridge_v6.py` |
+| `band_composition` | Q1 | 2 | C01i + unified_ancestry/instant_q | **FOLDED → internal_dynamics (2026-04-24)** |
+| `block_detect` | Q1, Q3 | 6 | PHASE_01C block_detect | BLOCKED_ON_NO_CANDIDATE_JOIN + 5 missing producer fields |
+| `existence_layer_b` | Q7 | 6 | C00 build_flashlight + MODULE_4H_ALL_Manta + MODULE_4_DELLY_INV | BLOCKED_ON_NO_CANDIDATE_JOIN |
+| `existence_layer_c` | Q7 | 7 | C04 GHSL v5 (within-sample haplotype divergence) + STEP_C01c triangle insulation | BLOCKED_ON_NO_CANDIDATE_JOIN |
+| `flank_coherence` | Q3 | 3 | cross_species_bridge.py | **FOLDED → synteny_v6 (2026-04-24)** |
 
 ## NO_SCRIPT_DECLARED — schema is orphan / forward-declared
 

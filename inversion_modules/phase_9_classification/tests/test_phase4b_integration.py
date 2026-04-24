@@ -30,7 +30,10 @@ HERE = Path(__file__).resolve().parent
 # and sideways into phase_7.
 PROPOSAL_DIR = HERE.parent.parent / "phase_7_karyotype_groups" / "proposal"
 PY_SCRIPT = PROPOSAL_DIR / "STEP_C01i_c_nested_composition.py"
-CORE = PROPOSAL_DIR / "nested_composition_core.py"
+# 2026-04-24 (chat C): nested_composition_core.py was deduped into the engine
+# at unified_ancestry/engines/nested_composition/internal_ancestry_composition.py.
+# No test in this file references the engine directly; the PY_SCRIPT path above
+# covers the wrapper.
 # pass 15: schemas consolidated into registries/schemas/structured_block_schemas/
 SCHEMAS = HERE.parent.parent.parent / "registries" / "schemas" / "structured_block_schemas"
 

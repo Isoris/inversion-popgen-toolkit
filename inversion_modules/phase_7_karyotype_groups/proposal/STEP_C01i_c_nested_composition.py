@@ -2,11 +2,12 @@
 """
 STEP_C01i_c_nested_composition.py — Phase 4b.3 of v10.1 Phase 4b rewrite
 
-Thin wrapper around nested_composition_core (the vendored MODULE_2B helper).
-Runs the composition analysis and writes results as Tier-2 blocks via the
-v10 registry library. Produces the internal_ancestry_composition.json block
-and derives composite_flag ∈ {clean, maybe_composite, likely_composite,
-unknown_no_engine_b}.
+Inversion-pipeline wrapper around the ancestry-composition engine at
+unified_ancestry/engines/nested_composition/internal_ancestry_composition.py.
+Runs the composition analysis on candidate inversion intervals and writes
+results as Tier-2 blocks via the v10 registry library. Produces the
+internal_ancestry_composition.json block and derives composite_flag ∈
+{clean, maybe_composite, likely_composite, unknown_no_engine_b}.
 
 This is the script that catches "same interval, different sample groups"
 cases — it reads Engine B's per-window ancestry labels and measures whether
@@ -23,8 +24,9 @@ BEHAVIOR:
   - If q_cache_dir is absent or empty: write stub block with
     composite_flag = "unknown_no_engine_b", exit 0. Downstream treats this
     as clean for validation-gating purposes but records the missing info.
-  - Otherwise: for each candidate, call nested_composition_core on the
-    interval, then derive composite_flag from structure_breakdown.
+  - Otherwise: for each candidate, call the engine's
+    analyze_parent_composition() on the interval, then derive composite_flag
+    from structure_breakdown.
 
 OUTPUTS:
   per candidate: internal_ancestry_composition.json Tier-2 block
@@ -37,6 +39,47 @@ counts):
   clean             ≥80% of samples are homogeneous OR dominant_plus_secondary
   likely_composite  >20% two_block_composite OR >20% multi_block_fragmented
   maybe_composite   everything in between
+
+=============================================================================
+ROLE SPLIT (2026-04-24 dedup pass, see docs/NESTED_VS_COMPOSITE.md)
+=============================================================================
+This script is the INVERSION-PIPELINE WRAPPER. It imports the generic
+ancestry-composition engine from:
+    unified_ancestry/engines/nested_composition/internal_ancestry_composition.py
+and layers the inversion-specific composite_flag interpretation on top.
+
+Two roles, deliberately kept distinct:
+  - Engine (unified_ancestry/...): given any parent interval + ancestry
+    labels, score internal composition. Knows nothing about inversions.
+  - This wrapper: feed C01d inversion candidates to the engine, tag
+    composite ones, write a Tier-2 registry block per candidate.
+
+Word choice note: the file is still called "nested_composition" for
+back-compat with the existing pipeline scripts. Biologically, a positive
+signal here means INTERNAL COMPOSITE, NOT (by itself) nested inversion.
+Nested inversion is a STRONGER claim requiring SV + breakpoint cross-check.
+
+=============================================================================
+REGISTRY_CONTRACT
+  BLOCKS_WRITTEN:
+    - internal_ancestry_composition: registries/schemas/structured_block_schemas/internal_ancestry_composition.schema.json
+      keys: q1_composite_flag, q1_ancestry_dominant_pattern,
+            q2_pct_samples_two_block_ancestry,
+            q2_pct_samples_multi_block_ancestry,
+            q2_pct_samples_homogeneous_ancestry,
+            q2_pct_samples_gradient_ancestry,
+            q2_pct_samples_diffuse_ancestry,
+            q2_mean_ancestry_fragmentation,
+            q2_mean_ancestry_entropy_within_sample,
+            q2_mean_ancestry_switches_per_sample,
+            q2_ancestry_K_used, q2_ancestry_n_samples_analyzed
+      status: WIRED
+      note: Writes per-candidate blocks via reg.evidence.write_block.
+            When Engine B Q cache is absent, emits stub blocks with
+            composite_flag='unknown_no_engine_b' (pct fields null) so
+            downstream validators can distinguish "no data" from "clean".
+  KEYS_IN: none
+=============================================================================
 """
 from __future__ import annotations
 
@@ -48,9 +91,36 @@ from collections import Counter
 from pathlib import Path
 from typing import Dict, List, Optional
 
-# Vendor path: nested_composition_core.py is next to this script
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE))
+
+# -----------------------------------------------------------------------------
+# Locate the ancestry-composition engine (single source of truth for the
+# classify_structure / block_analysis / analyze_parent_composition functions).
+# Previously vendored as nested_composition_core.py in this directory; deduped
+# 2026-04-24 (chat C), see docs/NESTED_VS_COMPOSITE.md.
+# -----------------------------------------------------------------------------
+ENGINE_DIR = None
+for candidate in [
+    # deployed layout — repo root sibling
+    HERE.parent.parent.parent / "unified_ancestry" / "engines" / "nested_composition",
+    # if repo root is two levels up (older layout)
+    HERE.parent.parent / "unified_ancestry" / "engines" / "nested_composition",
+    # env-var override
+    Path(os.environ.get("ANCESTRY_ENGINE_DIR", "")) if os.environ.get("ANCESTRY_ENGINE_DIR") else None,
+]:
+    if candidate is not None and (candidate / "internal_ancestry_composition.py").exists():
+        ENGINE_DIR = candidate
+        break
+
+if ENGINE_DIR is None:
+    print(
+        "[C01i_c] FATAL: cannot find unified_ancestry/engines/nested_composition/"
+        "internal_ancestry_composition.py. Set ANCESTRY_ENGINE_DIR to override.",
+        file=sys.stderr,
+    )
+    sys.exit(2)
+
+sys.path.insert(0, str(ENGINE_DIR))
 
 # Registry library path
 REGISTRIES_API = HERE.parent.parent.parent / "phase4_v10" / "registries" / "api" / "python"
@@ -74,11 +144,12 @@ try:
 except ImportError:
     load_registry = None
 
-from nested_composition_core import (
+from internal_ancestry_composition import (  # engine: single source of truth
     classify_structure,
     block_analysis,
     load_q_samples,
     load_parents,
+    analyze_parent_composition,
 )
 
 
@@ -139,112 +210,41 @@ def derive_composite_flag(structure_counts: Counter, n_samples: int) -> Dict:
 
 
 # =============================================================================
-# Per-parent analysis (rewrite of main() from nested_composition_core, but
-# returning structured output for one parent and emitting registry blocks)
+# Per-parent analysis — inversion-pipeline wrapper around the generic engine
 # =============================================================================
-import math
-from collections import defaultdict
-
+# The engine function analyze_parent_composition (in
+# unified_ancestry/engines/nested_composition/internal_ancestry_composition.py)
+# does the heavy lifting: per-sample label-sequence classification, blocks,
+# entropy, fragmentation. This wrapper layers the inversion-specific
+# composite_flag interpretation on top.
+#
+# Previously this function duplicated the engine's logic inline (and the
+# engine itself was vendored as nested_composition_core.py). Dedup pass
+# 2026-04-24 — see docs/NESTED_VS_COMPOSITE.md.
 
 def analyze_parent(parent: Dict, q_rows: List[Dict],
                      K: int = 8) -> Optional[Dict]:
-    """Run composition analysis on one parent; return block data dict."""
-    pid = parent["parent_id"]
-    chrom = parent["chrom"]
-    pstart = parent["start"]
-    pend = parent["end"]
+    """Wrap the engine output with inversion-pipeline interpretation.
 
-    # Filter windows overlapping the parent region
-    overlap = [r for r in q_rows
-               if int(r.get("start_bp", 0)) < pend
-               and int(r.get("end_bp", 0)) > pstart]
-    if not overlap:
+    Returns the engine's dict plus composite_flag, composite_rationale, and
+    per-class percentages. None if the engine has nothing to report.
+    """
+    result = analyze_parent_composition(parent, q_rows, K=K)
+    if result is None:
         return None
 
-    # Group by sample, sort by position
-    by_sample = defaultdict(list)
-    for row in overlap:
-        sid = row.get("sample_id", row.get("sample_idx", ""))
-        by_sample[sid].append(row)
+    struct_counts = Counter(result["structure_counts"])
+    flag_info = derive_composite_flag(struct_counts, result["n_samples_analyzed"])
 
-    per_sample = []
-    for sid, rows in by_sample.items():
-        rows.sort(key=lambda r: int(r.get("start_bp", 0)))
-        labels = [str(r.get("assigned_pop", "")) for r in rows]
-        n_sub = len(rows)
-        if n_sub < 3:
-            continue
-        blocks, switches = block_analysis(labels)
-        label_counts = Counter(labels)
-        mc = label_counts.most_common()
-        dom_label = mc[0][0]
-        dom_frac = mc[0][1] / n_sub
-        probs = [c / n_sub for c in label_counts.values()]
-        H = -sum(p * math.log(p + 1e-15) for p in probs)
-        frag = switches / max(1, n_sub - 1)
-        struct = classify_structure(labels)
-        sorted_blocks = sorted(blocks, key=lambda x: -x[1])
-        largest = sorted_blocks[0][1] if sorted_blocks else 0
-        second = sorted_blocks[1][1] if len(sorted_blocks) > 1 else 0
-
-        mean_d12 = sum(float(r.get("delta12", 0)) for r in rows) / n_sub
-        mean_H = sum(float(r.get("entropy", 0)) for r in rows) / n_sub
-        mean_ena = sum(float(r.get("ena", 0)) for r in rows) / n_sub
-
-        per_sample.append({
-            "sample_id": sid,
-            "n_windows": n_sub,
-            "n_labels_unique": len(label_counts),
-            "dominant_label": dom_label,
-            "dominant_fraction": round(dom_frac, 4),
-            "n_blocks": len(blocks),
-            "n_switches": switches,
-            "largest_block": largest,
-            "second_block": second,
-            "fragmentation_score": round(frag, 4),
-            "internal_entropy": round(H, 4),
-            "structure_type": struct,
-            "mean_delta12": round(mean_d12, 4),
-            "mean_entropy": round(mean_H, 4),
-            "mean_ena": round(mean_ena, 4),
-        })
-
-    if not per_sample:
-        return None
-
-    # Aggregate
-    struct_counts = Counter(r["structure_type"] for r in per_sample)
-    struct_breakdown = "; ".join(f"{k}:{v}" for k, v in struct_counts.most_common())
-    mean_frag = sum(r["fragmentation_score"] for r in per_sample) / len(per_sample)
-    mean_int_H = sum(r["internal_entropy"] for r in per_sample) / len(per_sample)
-    mean_switches = sum(r["n_switches"] for r in per_sample) / len(per_sample)
-
-    flag_info = derive_composite_flag(struct_counts, len(per_sample))
-
-    return {
-        "parent_id": pid,
-        "chrom": chrom,
-        "start_bp": pstart,
-        "end_bp": pend,
-        "K_used": K,
-        "n_samples_analyzed": len(per_sample),
-        "n_windows_in_parent": len({int(r["start_bp"]) for r in overlap}),
-        "dominant_structure_type": struct_counts.most_common(1)[0][0],
-        "dominant_structure_count": struct_counts.most_common(1)[0][1],
-        "structure_breakdown": struct_breakdown,
-        "structure_counts": dict(struct_counts),
-        "mean_fragmentation": round(mean_frag, 4),
-        "mean_internal_entropy": round(mean_int_H, 4),
-        "mean_switches": round(mean_switches, 2),
-        "composite_flag": flag_info["composite_flag"],
-        "composite_rationale": flag_info["rationale"],
-        "pct_homogeneous_like": flag_info["pct_homogeneous_like"],
-        "pct_two_block_composite": flag_info["pct_two_block_composite"],
-        "pct_multi_block_fragmented": flag_info["pct_multi_block_fragmented"],
-        "pct_continuous_gradient": flag_info["pct_continuous_gradient"],
-        "pct_diffuse_mixed": flag_info["pct_diffuse_mixed"],
-        "per_sample": per_sample,
-    }
+    # Attach interpretation fields on top of the engine output
+    result["composite_flag"] = flag_info["composite_flag"]
+    result["composite_rationale"] = flag_info["rationale"]
+    result["pct_homogeneous_like"] = flag_info.get("pct_homogeneous_like")
+    result["pct_two_block_composite"] = flag_info.get("pct_two_block_composite")
+    result["pct_multi_block_fragmented"] = flag_info.get("pct_multi_block_fragmented")
+    result["pct_continuous_gradient"] = flag_info.get("pct_continuous_gradient")
+    result["pct_diffuse_mixed"] = flag_info.get("pct_diffuse_mixed")
+    return result
 
 
 # =============================================================================

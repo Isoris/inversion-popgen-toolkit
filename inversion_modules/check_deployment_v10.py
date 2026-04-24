@@ -55,7 +55,9 @@ def check_files_present(root: Path) -> list:
         "inversion_modules/phase_7_karyotype_groups/proposal/STEP_C01i_b_multi_recomb.R",
         "inversion_modules/phase_7_karyotype_groups/proposal/STEP_C01i_d_seal.R",
         "inversion_modules/phase_7_karyotype_groups/proposal/engine_b_smoke_test.R",
-        "inversion_modules/phase_7_karyotype_groups/proposal/nested_composition_core.py",
+        # 2026-04-24 (chat C): nested_composition_core.py was deduped — the
+        # Phase 7 wrapper now imports from the canonical engine below.
+        "unified_ancestry/engines/nested_composition/internal_ancestry_composition.py",
         "inversion_modules/phase_7_karyotype_groups/proposal/STEP_C01i_c_nested_composition.py",
         # pass 15: structured-block schemas consolidated into registries/schemas/
         "registries/schemas/structured_block_schemas/internal_dynamics.schema.json",

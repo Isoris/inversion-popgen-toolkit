@@ -1,6 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "regime_sample_dag.schema.json",
+  "block_type": "regime_sample_dag",
   "title": "regime_sample_dag",
   "description": "Per-sample directed-graph summary of regime membership across the windows overlapping a candidate interval. Produced by lib_recomb_combination.R::derive_R_from_regime (DAG formulation, chat-12). For each sample, the per-window regime labels from C01j regime_memberships are collapsed by rle(); each distinct run becomes a node with a window-count weight, and each transition between consecutive runs becomes an edge. The deviation_fraction scalar (1 − dominant_run_windows / total_windows) is the primary per-sample recombinant-signal statistic: a sample whose interval is mostly one regime but contains a non-trivial stretch of a different regime has a non-zero deviation_fraction, and when that stretch is long enough in bp it fires R. Cohort-level aggregates feed C01d Layer C (inversion-vs-family / complex-system scoring) via keys_extracted.",
   "type": "object",

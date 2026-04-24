@@ -17,6 +17,38 @@
 #     recorded in the per-sample record for auditability, not used for
 #     classification.
 #
+# =============================================================================
+# REGISTRY_CONTRACT
+#   BLOCKS_WRITTEN:
+#     - recombinant_map: registries/schemas/structured_block_schemas/recombinant_map.schema.json
+#       keys: q2_n_recombinant_samples, q2_n_recombinant_gc_samples,
+#             q2_n_recombinant_dco_samples,
+#             q2_n_regime_ghsl_disputed_samples,
+#             q2_n_ghsl_split_only_samples,
+#             q2_recomb_posterior_source,
+#             q2_recomb_gate_rule_version,
+#             q2_recomb_min_regime_dev_fraction,
+#             q2_recomb_min_regime_dev_bp,
+#             q2_recomb_dco_threshold_bp
+#       status: WIRED
+#       note: Per-candidate write_block_safe call at L410. The gate_params
+#             sub-object (L399-403) carries the three dotted-path 'from'
+#             fields the schema expects (gate_params.min_deviation_fraction,
+#             .min_deviation_bp, .min_dco_bp).
+#     - regime_sample_dag: registries/schemas/structured_block_schemas/regime_sample_dag.schema.json
+#       keys: q2_dag_fraction_samples_R_fired,
+#             q2_dag_fraction_samples_deviating,
+#             q2_dag_dominant_regime_cohort,
+#             q2_dag_dominant_regime_support,
+#             q2_dag_n_samples_R_fired
+#       status: WIRED
+#       note: Per-candidate write_block_safe call at L645. Cohort fields
+#             under dotted path cohort.* come from lib_recomb_combination.R.
+#             per_sample is trimmed to 12 columns before write to dodge a
+#             JSON round-trip issue with list-columns (see L635-638).
+#   KEYS_IN: none
+# =============================================================================
+#
 # NEW GATE (chat-12):
 #   R AND G            → RECOMBINANT, HIGH
 #   R AND !G           → RECOMBINANT, MEDIUM (regime_only_ghsl_insufficient)

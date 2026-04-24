@@ -63,6 +63,35 @@
 #   Rscript STEP_C00_build_sv_prior.R --chr C_gar_LG01
 #
 # Launcher (SLURM) handles env propagation and logging — see launchers/.
+#
+# =============================================================================
+# REGISTRY_CONTRACT
+#   BLOCKS_WRITTEN:
+#     - existence_layer_b: registries/schemas/structured_block_schemas/existence_layer_b.schema.json
+#       keys: (none — not currently written from this script)
+#       status: BLOCKED_ON_NO_CANDIDATE_JOIN
+#       note: C00 runs BEFORE C01d creates candidates (see this script L1243-
+#             1245 explicit comment). C00's outputs (sv_prior_<chr>.rds) are
+#             per-chromosome SV catalogs; per-candidate existence_layer_b
+#             writes need to happen in a consumer that has candidate_ids.
+#
+#             iv_dt in C01d already carries two SV summary fields:
+#             n_sv_hits, sv_overlap_pct (see C01d L249-250). These could
+#             drift-map to the schema's n_sv_calls (n_sv_hits ≡ n_sv_calls),
+#             but the remaining 5 keys (n_delly_inv_calls, n_manta_inv_calls,
+#             sv_concordance_class, bp1_concordance_kb, bp2_concordance_kb)
+#             need a fresh per-candidate join against sv_prior_<chr>.rds$inv_calls.
+#
+#             Adjacent data: STEP_B05_delly_manta_concordance.py computes
+#             concordance_class on the unified SV table (per SV call, not
+#             per candidate). Per-candidate attribution could piggyback on
+#             that output once the join step exists.
+#
+#             Way forward: a new STEP_C00b_attribute_sv_per_candidate.R that
+#             reads sv_prior_<chr>.rds + candidates.tsv and emits an
+#             existence_layer_b block per candidate.
+#   KEYS_IN: none
+# =============================================================================
 # =============================================================================
 
 suppressPackageStartupMessages({

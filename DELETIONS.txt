@@ -1,0 +1,19 @@
+Files to DELETE from your working tree (deduped, folded, or superseded).
+
+Run from the repo root:
+
+  rm inversion_modules/phase_7_karyotype_groups/proposal/nested_composition_core.py
+  rm inversion_modules/phase_2_discovery/_archive/analysis/nested_composition.py
+  rm unified_ancestry/engines/nested_composition/nested_composition.py
+  rm registries/schemas/structured_block_schemas/flank_coherence.schema.json
+  rm registries/schemas/structured_block_schemas/band_composition.schema.json
+  rm registries/schemas/structured_block_schemas/frequency.schema.json
+  rm registries/schemas/structured_block_schemas/frequency.v2.schema.json
+
+Notes:
+- nested_composition.py — renamed to internal_ancestry_composition.py in this drop.
+- flank_coherence + band_composition schemas — archived copies included under
+  _archive_superseded/bk_schemas_pre_canonical/ in this drop.
+- frequency v1/v2 — already archived under
+  _archive_superseded/bk_schemas_pre_canonical/frequency_reconciled_2026-04-24/
+  by chat B; just remove the live duplicates.

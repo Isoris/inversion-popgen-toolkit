@@ -115,6 +115,81 @@
 #   register_* returns integer key count (for the caller's "[reg] N keys" message).
 #   store_*    returns invisible(NULL); writes an RDS under
 #              <outdir>/registry_helpers/<cid>[_side]/<tag>.rds.
+#
+# =============================================================================
+# REGISTRY_CONTRACT
+#   BLOCKS_WRITTEN:
+#     - boundary: registries/schemas/structured_block_schemas/boundary.schema.json
+#       keys: q3_5prime_bp, q3_5prime_hardness, q3_5prime_sharpness,
+#             q3_5prime_type, q3_5prime_verdict, q3_5prime_n_cheats,
+#             q3_5prime_is_fossil,
+#             q3_3prime_bp, q3_3prime_hardness, q3_3prime_sharpness,
+#             q3_3prime_type, q3_3prime_verdict, q3_3prime_n_cheats,
+#             q3_3prime_is_fossil,
+#             q3_left_bp, q3_left_hardness, q3_left_sharpness,
+#             q3_left_type, q3_left_verdict, q3_left_n_cheats,
+#             q3_left_is_fossil,
+#             q3_right_bp, q3_right_hardness, q3_right_sharpness,
+#             q3_right_type, q3_right_verdict, q3_right_n_cheats,
+#             q3_right_is_fossil
+#       keys_na: q3_5prime_clip_count, q3_5prime_depth_anomaly,
+#                q3_3prime_clip_count, q3_3prime_depth_anomaly,
+#                q3_left_clip_count, q3_left_depth_anomaly,
+#                q3_right_clip_count, q3_right_depth_anomaly
+#       status: WIRED
+#       note: Template schema — helper does the {side} substitution manually
+#             (TODO §7 loader bug). Dual-write shim emits both canonical
+#             (5prime/3prime) and legacy (left/right) keys per
+#             RKH_EMIT_LEGACY_SIDE_KEYS. clip_count, depth_anomaly keys
+#             held back pending TODO §2/§3 semantic decisions — they are
+#             keys the helper resolves but writes as NA.
+#     - existence_layer_a: registries/schemas/structured_block_schemas/existence_layer_a.schema.json
+#       keys: q1_composite_score, q1_dim_positive,
+#             q1_d01_block_strength, q1_d02_block_shape,
+#             q1_d03_nn_persistence, q1_d04_decay_flatness,
+#             q1_d05_interior_quality, q1_d06_consensus,
+#             q1_d07_sv_breakpoint, q1_d08_peel_or_hyp,
+#             q1_d09_pca_clusters, q1_d10_partition,
+#             q1_d11_boundary_concordance, q1_d12_snake_concordance,
+#             q1_shape_class, q1_landscape_category, q1_n_children,
+#             q1_span_kb, q7_tier, q7_composite_score, q7_dim_positive,
+#             q7_cheat25_status
+#       keys_na: q7_fdr_q_value
+#       status: WIRED
+#       note: q7_fdr_q_value is NA — BH adjustment over all candidates is
+#             a post-pass, not C01d's job. See helper TODO §5.
+#     - morphology: registries/schemas/structured_block_schemas/morphology.schema.json
+#       keys: q1_span_kb, q1_interior_homogeneity, q1_patchiness_score,
+#             q1_stripe_count, q1_n_children, q1_size_class
+#       keys_na: q1_aspect_ratio, q1_architecture, q1_sample_grouping,
+#                q1_spatial_consistency
+#       status: WIRED
+#       note: architecture is schema-required → block will be marked
+#             validation_status=incomplete until a writer appears for the
+#             4 NA fields. See helper TODOs §A1-§A4.
+#     - hypothesis_verdict: registries/schemas/structured_block_schemas/hypothesis_verdict.schema.json
+#       keys: q7_verdict, q7_verdict_confidence, q7_t1_ratio, q7_t2_eff_k,
+#             q7_t3_retention, q7_t8_clair3_concordance,
+#             q7_t9_jackknife_status, q7_t9_max_delta,
+#             q7_t10_theta_concordance, q3_extended_suppression,
+#             q3_suppression_extent_kb, q3_fst_decay_rate,
+#             q6_group_validation, q6_family_linkage
+#       status: WIRED
+#       note: q6_family_linkage collides with frequency block's
+#             q6_family_linkage (different writer, different semantics,
+#             last-write-wins) — see helper TODO §6.
+#     - frequency: registries/schemas/structured_block_schemas/frequency.v3.schema.json
+#       keys: q6_freq_inv, q6_freq_class, q6_n_total, q6_n_HOM_REF,
+#             q6_n_HOM_STD, q6_n_HET, q6_n_HOM_INV, q6_n_Recombinant,
+#             q6_expected_het_hwe, q6_hwe_chi2, q6_hwe_p, q6_hwe_verdict,
+#             q6_genotype_balance, q6_family_linkage,
+#             q6_jackknife_max_delta, q6_jackknife_n_contributing,
+#             q6_polymorphism_class
+#       status: WIRED
+#       note: Option A architecture — seal writes partial block then C01f
+#             updates family_linkage/polymorphism_class after jackknife.
+#             computed_from records provenance.
+#   KEYS_IN: none
 # =============================================================================
 
 suppressPackageStartupMessages({

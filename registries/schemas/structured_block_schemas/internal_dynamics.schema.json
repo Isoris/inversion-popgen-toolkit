@@ -153,11 +153,12 @@
       ],
       "minimum": 0
     },
-    "flashlight_mode": {
+    "sv_prior_mode": {
       "type": [
         "string",
         "null"
-      ]
+      ],
+      "description": "Which seed-loader branch produced the seeds: e.g. 'sv_prior+step03', 'step03', 'sv_prior', 'sv_prior_legacy'. Renamed 2026-04-24 from 'flashlight_mode' to match decompose's writer vocabulary."
     },
     "n_seed_HOM_REF": {
       "type": [
@@ -281,6 +282,13 @@
         "null"
       ],
       "description": "RDS filename (alongside the block JSON) carrying the per-window x per-sample class matrix. Too big for JSON. Example: 'per_window_class.rds'."
+    },
+    "ancestry_div_hom_ref_vs_hom_inv": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "L1 distance between mean Q vectors of the HOM_REF and HOM_INV classes at this candidate locus. Folded in from the superseded band_composition schema (2026-04-24). Computed by joining decompose's per-sample class assignment with Engine B's per-window local-Q vectors inside the candidate interval, averaging Q per class, then taking sum(|q_ref - q_inv|) across K. High values indicate the two homozygous classes come from different ancestral subpopulations (family-driven signal, not a genuine inversion). Null until the decompose writer is extended to pull instant_q Q; the key is declared here now so downstream readers can code against the canonical location."
     }
   },
   "keys_extracted": [
@@ -322,7 +330,7 @@
     },
     {
       "key": "q2_pca_seed_mode",
-      "from": "flashlight_mode"
+      "from": "sv_prior_mode"
     },
     {
       "key": "q2_n_seed_HOM_REF",
@@ -359,6 +367,17 @@
     {
       "key": "q6_n_HOM_INV_prelim",
       "from": "n_HOM_INV_prelim"
+    },
+    {
+      "_comment_band_composition_fold": "Folded in from the superseded band_composition.schema.json (archived 2026-04-24). The standalone schema had only 2 keys and shared this block's writer; promoting them here closes the PRODUCES_BUT_NOT_WIRED gap. Names carry a 'decompose_' prefix so readers can see at a glance that the fact is sourced from STEP_C01i_decompose.R — distinguishes from q2_pca_k_used (same underlying field, different q-axis interpretation) and from any future ancestry-divergence computed by a different script."
+    },
+    {
+      "key": "q1_decompose_k_used",
+      "from": "k_used"
+    },
+    {
+      "key": "q1_decompose_ancestry_div_hom_ref_vs_hom_inv",
+      "from": "ancestry_div_hom_ref_vs_hom_inv"
     }
   ]
 }

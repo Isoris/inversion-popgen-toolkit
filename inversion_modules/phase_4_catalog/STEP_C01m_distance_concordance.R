@@ -41,6 +41,20 @@
 #   plots/<chr>_D6_sample_decay_heatmap.pdf    — sample × distance decay
 #
 # =============================================================================
+# REGISTRY_CONTRACT
+#   BLOCKS_WRITTEN:
+#     - distance_concordance: registries/schemas/structured_block_schemas/distance_concordance.schema.json
+#       keys: q2_distance_conc_inv_vs_fam_score,
+#             q2_distance_conc_n_persistent,
+#             q2_distance_conc_n_decaying
+#       status: WIRED
+#       note: Per-candidate write_block_safe call, added chat-13
+#             (2026-04-17). q2_distance_conc_n_persistent maps from the
+#             persistent_carriers array; the registry loader's vector-leaf
+#             handling takes length() automatically so the resulting
+#             flat key value is a count (BG fix, chat-13).
+#   KEYS_IN: none
+# =============================================================================
 
 suppressPackageStartupMessages({
   library(data.table)
