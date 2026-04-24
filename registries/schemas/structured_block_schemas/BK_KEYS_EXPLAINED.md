@@ -55,7 +55,7 @@ JSONs.
 
 ## Block 1: `internal_dynamics`
 
-**Writer.** `inversion_modules/phase_4_postprocessing/4d_group_proposal/STEP_C01i_decompose.R`
+**Writer.** `inversion_modules/phase_7_karyotype_groups/proposal/STEP_C01i_decompose.R`
 
 **Inputs.**
 - PCA local-window embeddings (per-candidate, ~20 kb windows)
@@ -267,7 +267,7 @@ the three blocks plus GHSL into the `sample_registry` groups table).
 
 ## Block 2: `recombinant_map`
 
-**Writer.** `inversion_modules/phase_4_postprocessing/4d_group_proposal/STEP_C01i_b_multi_recomb.R`
+**Writer.** `inversion_modules/phase_7_karyotype_groups/proposal/STEP_C01i_b_multi_recomb.R`
 
 **Inputs.**
 - The DAG-derived per-sample regime-deviation signal R, produced by
@@ -431,7 +431,7 @@ cohorts that do NOT become RECOMBINANT in the final group registration.
 
 ## Block 3: `internal_ancestry_composition`
 
-**Writer.** `inversion_modules/phase_4_postprocessing/4d_group_proposal/STEP_C01i_c_nested_composition.py`
+**Writer.** `inversion_modules/phase_7_karyotype_groups/proposal/STEP_C01i_c_nested_composition.py`
 
 **Inputs.**
 - Engine B per-window per-sample ancestry labels from the local-Q

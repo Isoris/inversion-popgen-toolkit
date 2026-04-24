@@ -25,16 +25,16 @@ SCHEMA_DIR = Path("registries/schemas/structured_block_schemas")
 # Each schema -> (source file, function/context hint for grepping the right block)
 TARGETS = {
     "internal_dynamics.schema.json": {
-        "sources": ["inversion_modules/phase_4_postprocessing/4d_group_proposal/STEP_C01i_decompose.R"],
+        "sources": ["inversion_modules/phase_7_karyotype_groups/proposal/STEP_C01i_decompose.R"],
         "block_type": "internal_dynamics",
     },
     "recombinant_map.schema.json": {
-        "sources": ["inversion_modules/phase_4_postprocessing/4d_group_proposal/STEP_C01i_b_multi_recomb.R"],
+        "sources": ["inversion_modules/phase_7_karyotype_groups/proposal/STEP_C01i_b_multi_recomb.R"],
         "block_type": "recombinant_map",
     },
     "internal_ancestry_composition.schema.json": {
-        "sources": ["inversion_modules/phase_4_postprocessing/4d_group_proposal/STEP_C01i_c_nested_composition.py",
-                    "inversion_modules/phase_4_postprocessing/4d_group_proposal/nested_composition_core.py"],
+        "sources": ["inversion_modules/phase_7_karyotype_groups/proposal/STEP_C01i_c_nested_composition.py",
+                    "inversion_modules/phase_7_karyotype_groups/proposal/nested_composition_core.py"],
         "block_type": "internal_ancestry_composition",
     },
 }

@@ -22,7 +22,7 @@ set -euo pipefail
 # --- Paths (edit these if you're in a different layout) ---------------------
 BUNDLE="${PWD}/toolkit_update_2026-04-20"
 LIVE_TOOLKIT="${PWD}/inversion-popgen-toolkit"
-LIVE_MODULE="${PWD}/inversion-popgen-toolkit/inversion_modules/phase_4_postprocessing/4b_qc_triage"
+LIVE_MODULE="${PWD}/inversion-popgen-toolkit/inversion_modules/phase_5_qc_triage"
 
 # --- Flags ------------------------------------------------------------------
 APPLY=false

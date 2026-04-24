@@ -77,20 +77,25 @@ pipeline.
 |---|---|---|---|
 | `phase_1_inputs/` | MODULE_5A1 | Callable masks, ANGSD SAF/SFS, BEAGLE inputs | §3.2 |
 | `phase_2_discovery/` | MODULE_5A (discovery portions) | Genome scan for inversion-like regions — **5 sub-blocks (2a–2e)** | §3.3 |
-| `phase_3_refine/` | MODULE_5A2_breakpoint_validation | Bring SV-caller evidence into the registry for phase 4c's VALIDATED gate | §3.4 |
-| `phase_4_postprocessing/` | (new) | Per-candidate postprocessing — the spine. **7 sub-blocks (4a–4g)** | §3.5 |
-| `phase_5_followup/` | MODULE_5A_Discovery_Visualisations | Per-candidate deep analysis (dosage rasters, region-grow plots, diagnostic figures) | §3.6 |
-| `phase_6_secondary/` | MODULE_5C/5D | LD / Fst secondary analyses (5E archived 2026-04-24; still under legacy names inside) | §3.7 |
-| `phase_7_cargo/` | MODULE_6_Cargo | Gene content + per-arrangement evolution (breeding implications) | §4 |
+| `phase_3_refine/` | MODULE_5A2_breakpoint_validation | Bring SV-caller evidence into the registry for phase_7/validation's VALIDATED gate | §3.4 |
+| `phase_4_catalog/` | (old 4a_existence_layers) | Catalog birth: C01d scoring + C01e blocks + C01g boundary-unification | §3.5 |
+| `phase_5_qc_triage/` | (old 4b_qc_triage, formerly phase_qc_shelf) | Data-quality QC per candidate; emits soft `q_qc_shelf_flag` | §3.5 |
+| `phase_6_breakpoint_refinement/` | (old 4c_breakpoint_refinement, formerly breakpoint_pipeline) | bp-resolution refinement → `candidate_breakpoints_consensus.tsv` | §3.5 |
+| `phase_7_karyotype_groups/` | (old 4d_group_proposal + 4e_group_validation) | `proposal/` (C01i) + `validation/` (C01f); emits SUPPORTED/VALIDATED/SUSPECT gate | §3.5 |
+| `phase_8_evidence_biology/` | (old 4f_group_dependent) | Mechanism (Q4) + age/origin (Q5) + existence audit (Q7) + bp_bridge | §3.5 |
+| `phase_9_classification/` | (old 4g_final_classification) | characterize_candidate + compute_candidate_status + axis 5 + 7-Q tier | §3.5 |
+| `phase_10_followup/` | MODULE_5A_Discovery_Visualisations | Per-candidate deep analysis (dosage rasters, region-grow plots, diagnostic figures) | §3.6 |
+| `phase_11_secondary/` | MODULE_5C/5D | LD / Fst secondary analyses (5E archived 2026-04-24; still under legacy names inside) | §3.7 |
+| `phase_12_cargo/` | MODULE_6_Cargo | Gene content + per-arrangement evolution (breeding implications) | §4 |
 | `utils/` | — | Shared helpers (ancestry_bridge, sample_map, theme plate) | — |
 
-> **Layout note 2026-04-24 (pass 12).** `phase_qc_shelf/` moved into
-> `phase_4_postprocessing/4b_qc_triage/`, and `breakpoint_pipeline/`
-> moved into `phase_4_postprocessing/4c_breakpoint_refinement/`. The
-> data-dependency chain 4a → 4b triage → 4c refine → 4d group proposal
-> → 4e validate → 4f cheats → 4g classify is now enforced by folder
-> ordering, not by convention. See `PHASE4_RENUMBER_PROPOSAL.md` for
-> the rationale.
+> **Layout note 2026-04-24 (pass 15).** `phase_4_postprocessing/` was
+> flattened into 6 dedicated top-level phases (phase_4_catalog through
+> phase_9_classification) to surface the catalog → QC → breakpoint →
+> group_proposal → group_validation → evidence_biology → classification
+> chain. Downstream phases (followup/secondary/cargo) shifted to 10/11/12.
+> See `TWELVE_PHASE_RENAME_PROPOSAL.md` for the rationale and
+> `SESSION_AUDIT_2026-04-24_chat-3-end.md` for prior-state history.
 
 ### `phase_2_discovery/` sub-blocks
 
@@ -105,7 +110,7 @@ The five 2*x* blocks form a DAG:
 | `2e_ghsl/` | GHSL haplotype-contrast (Layer C in the 4-layer framework) | ✅ (existing, 175 lines) |
 
 Data flow:
-`2a` → `2b` → `2c` → `2d` + `2e` → `phase_3_refine/` → `phase_4_postprocessing/`
+`2a` → `2b` → `2c` → `2d` + `2e` → `phase_3_refine/` → `phase_4_catalog/` → … → `phase_9_classification/`
 
 ### `phase_3_refine/` scripts
 
@@ -128,23 +133,27 @@ evidence Layer it **feeds** (Layer A/B/C/D in the 4-layer framework):
 No `STEP_C*` script exists in phase 3 because Layer C (GHSL) is
 produced in `phase_2_discovery/2e_ghsl/`, not here.
 
-### `phase_4_postprocessing/` sub-blocks
+### `phase_4_catalog/` → `phase_9_classification/` (post pass 15)
 
-The seven blocks form a strict sequential DAG: each stage consumes
-the output of the previous and writes into the shared registries.
+After pass 15, the old `phase_4_postprocessing/` umbrella no longer
+exists; the seven-block DAG is now six top-level phases (4→9) with
+each phase's README giving its own role and producer/consumer contract.
+The strict sequential DAG is preserved — each stage still consumes the
+output of the previous and writes into the shared registries:
 
-| Block | Role |
+| Phase | Role |
 |---|---|
-| `4a_existence_layers/` | Catalog birth: C01d scoring + C01e blocks + C01g boundary-unification |
-| `4b_qc_triage/` | Data-quality QC per candidate: SNP density, BEAGLE uncertainty, coverage CV, per-group Hobs; emits `q_qc_shelf_flag` (clean / low_snp / high_uncertain / coverage_artifact / messy). Soft gate — messy candidates still pass through. Formerly `phase_qc_shelf/`. |
-| `4c_breakpoint_refinement/` | bp-resolution breakpoint refinement via dosage signal + per-carrier ancestral fragment distribution → `candidate_breakpoints_consensus.tsv` with `final_left_bp`, `final_right_bp`, CI bounds. Formerly `breakpoint_pipeline/`. |
-| `4d_group_proposal/` | C01i decompose / multi_recomb / nested_comp / seal |
-| `4e_group_validation/` | C01f hypothesis tests + gate; reads Layer D from phase_3 for VALIDATED promotion |
-| `4f_group_dependent/` | Q5 age + Q6 burden + cheat28/29/30 (forensic modules) |
-| `4g_final_classification/` | characterize_candidate + compute_candidate_status + axis 5 (wired via `V7_FINAL_DIR` env); reads q_qc_shelf_* flags from 4b |
+| `phase_4_catalog/` | Catalog birth: C01d scoring + C01e blocks + C01g boundary-unification |
+| `phase_5_qc_triage/` | Data-quality QC per candidate: SNP density, BEAGLE uncertainty, coverage CV, per-group Hobs; emits `q_qc_shelf_flag` (clean / low_snp / high_uncertain / coverage_artifact / messy). Soft gate — messy candidates still pass through. |
+| `phase_6_breakpoint_refinement/` | bp-resolution breakpoint refinement via dosage signal + per-carrier ancestral fragment distribution → `candidate_breakpoints_consensus.tsv` with `final_left_bp`, `final_right_bp`, CI bounds. |
+| `phase_7_karyotype_groups/proposal/` | C01i decompose / multi_recomb / nested_comp / seal (writes UNCERTAIN) |
+| `phase_7_karyotype_groups/validation/` | C01f hypothesis tests + gate; reads Layer D from phase_3 for VALIDATED promotion |
+| `phase_8_evidence_biology/` | Q4 mechanism + Q5 age/origin + Q7 existence audit + bp_bridge (scripts grouped by question in `q4_mechanism/`, `q5_age_and_origin/`, `q7_existence_audit/`, `bp_bridge/`) |
+| `phase_9_classification/` | characterize_candidate + compute_candidate_status + axis 5 (wired via `V7_FINAL_DIR` env) + q_qc_shelf_* reader; final tier + 7-question characterization |
 
-Plus `docs/`, `orchestrator/`, `patches/`, `schemas/`, `specs/`,
-`tests/` under phase_4 root.
+Cross-phase material lives in `registries/schemas/` (structured-block
+schemas + specs) and at the repo-level `docs/` (architecture notes,
+design rationale).
 
 ---
 
@@ -156,11 +165,11 @@ Plus `docs/`, `orchestrator/`, `patches/`, `schemas/`, `specs/`,
 | "Where is the SNP panel?" | `Modules/MODULE_2A_snp_discovery/` |
 | "Where is global Q (K=8)?" | `Modules/MODULE_2B_structure/` |
 | "Where are DELLY inversion calls?" | `Modules/MODULE_4D_delly_inv/` |
-| "Where is the inversion candidate catalog?" | `inversion_modules/phase_4_postprocessing/4a_existence_layers/` |
-| "Where does bp-resolution refinement happen?" | `inversion_modules/phase_3_refine/` + `inversion_modules/phase_4_postprocessing/4c_breakpoint_refinement/` |
-| "Where are per-candidate figures?" | `inversion_modules/phase_5_followup/` + `phase_7_cargo/plot/` |
-| "Where is the Hobs secondary confirmation?" | `inversion_modules/phase_4_postprocessing/4b_qc_triage/STEP_Q07b_hobs_per_group.sh` + `STEP_Q07c_hobs_windower.sh` (per-group Hobs; MODULE_5E archived 2026-04-24) |
-| "Where is the burden analysis?" | `Modules/MODULE_CONSERVATION_CORE/` + `phase_4_postprocessing/4f_group_dependent/` |
+| "Where is the inversion candidate catalog?" | `inversion_modules/phase_4_catalog/` |
+| "Where does bp-resolution refinement happen?" | `inversion_modules/phase_3_refine/` + `inversion_modules/phase_6_breakpoint_refinement/` |
+| "Where are per-candidate figures?" | `inversion_modules/phase_10_followup/` + `phase_12_cargo/plot/` |
+| "Where is the Hobs secondary confirmation?" | `inversion_modules/phase_5_qc_triage/STEP_Q07b_hobs_per_group.sh` + `STEP_Q07c_hobs_windower.sh` (per-group Hobs; MODULE_5E archived 2026-04-24) |
+| "Where is the burden analysis?" | `Modules/MODULE_CONSERVATION_CORE/` + `phase_8_evidence_biology/` |
 
 ---
 
@@ -169,7 +178,7 @@ Plus `docs/`, `orchestrator/`, `patches/`, `schemas/`, `specs/`,
 1. **`Modules/MODULE_5*` missing.** Migrated to `inversion_modules/`.
    Filenames like `STEP_5A2_*.R` still carry the old number for
    provenance.
-2. **`inversion_modules/phase_6_secondary/MODULE_5C` and `MODULE_5D`.**
+2. **`inversion_modules/phase_11_secondary/MODULE_5C` and `MODULE_5D`.**
    Still carry `MODULE_5*` folder names internally. Consistent with the
    legacy naming; renaming would break several self-relative paths in
    their SLURM launchers. Tracked for the HPC-coordinated Cat 3
@@ -177,13 +186,13 @@ Plus `docs/`, `orchestrator/`, `patches/`, `schemas/`, `specs/`,
    `MODULE_5E_Inversion_HOBS` was archived on 2026-04-24 to
    `_archive_superseded/MODULE_5E_Inversion_HOBS_superseded_by_Q07b/`
    — Hobs confirmation is now done per-karyotype-group by
-   `phase_4_postprocessing/4b_qc_triage/STEP_Q07b + STEP_Q07c`.
+   `phase_5_qc_triage/STEP_Q07b + STEP_Q07c`.
 3. **`Modules/Others/` is placeholders only.** `MODULE_6_founder_packs`
    and `MODULE_PAV_presence_absence` contain only `.gitkeep`. The real
    work for these (if/when done) will likely land in
-   `inversion_modules/phase_7_cargo/` (founder packs) or a new
+   `inversion_modules/phase_12_cargo/` (founder packs) or a new
    standalone module (PAV).
-4. **`4c_breakpoint_refinement/` was `breakpoint_pipeline/` until pass 12 (2026-04-24).** The standalone module was folded into phase_4 as a sub-block so the data-dependency sequence 4a → 4b → 4c → 4d → 4e → 4f → 4g is visible in the tree rather than implicit. Same for `4b_qc_triage/` (was `phase_qc_shelf/`).
+4. **Phase restructuring history.** (a) Pass 12 (2026-04-24) folded the standalone `breakpoint_pipeline/` and `phase_qc_shelf/` modules into `phase_4_postprocessing/` as sub-blocks 4c and 4b respectively. (b) Pass 15 (2026-04-24) then flattened the entire `phase_4_postprocessing/` umbrella into 6 dedicated top-level phases (phase_4_catalog through phase_9_classification) and shifted downstream phases (followup/secondary/cargo) to 10/11/12. The data-dependency chain is now enforced by folder numbering.
 5. **Double-tree for phase 2 discovery**: see
    `inversion_modules/phase_2_discovery/` vs
    `inversion_modules/_archive/MODULE_5A2_Discovery_Core/`. The archive

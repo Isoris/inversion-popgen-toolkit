@@ -199,7 +199,7 @@ correction before downstream tests).
 
 **Location**: `unified_ancestry/engines/candidate_classifier/candidate_classifier.py`
 **One-line (from header)**: Classify inversion candidates from ???.
-**Status**: ??? — sounds like it could be important for phase_4_postprocessing.
+**Status**: ??? — sounds like it could be important for phase_9_classification.
 
 ### `export_module5b.py`
 

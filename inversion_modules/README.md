@@ -56,24 +56,42 @@ inversion_modules/
 │                                       DELLY/Manta concordance, BND signal
 │                                       (flat layout — was MODULE_5A2_breakpoint_validation/)
 │
-├── phase_4_postprocessing/             per-candidate postprocessing — the spine
-│   ├── 4a_existence_layers/            ← catalog birth (C01d/C01e/C01g)
-│   ├── 4d_group_proposal/              C01i decompose / multi_recomb / nested_comp / seal
-│   ├── 4e_group_validation/            C01f hypothesis tests + gate
-│   ├── 4f_group_dependent/             Q5 age + Q6 burden + cheat28/29/30
-│   ├── 4g_final_classification/        characterize_candidate + compute_candidate_status
-│   ├── docs/                           PHASE4 + PHASE4B architecture + design notes
-│   ├── orchestrator/                   SLURM DAG (run_phase4b.sh)
-│   ├── patches/                        C01f registry-aware patches
-│   ├── schemas/                        4 Tier-2 block schemas
-│   ├── specs/                          evidence registry specs
-│   └── tests/                          5 test suites (all pass)
+├── phase_4_catalog/                    catalog birth (C01d/C01e/C01g)
 │
-├── phase_5_followup/                   per-candidate deep analysis
-├── phase_6_secondary/                  LD / Fst secondary analyses
+├── phase_5_qc_triage/                  Q01–Q10 shelf QC (per-candidate
+│                                       data-quality flag)
+│
+├── phase_6_breakpoint_refinement/      dosage signal + ancestral fragments
+│                                       → bp-resolution breakpoints + CI
+│
+├── phase_7_karyotype_groups/           Hom1/Het/Hom2 per candidate
+│   ├── proposal/                       C01i decompose / multi_recomb /
+│   │                                   nested_comp / seal (+ orchestrator/
+│   │                                   run_phase4b.sh, docs/)
+│   └── validation/                     C01f hypothesis tests + SUPPORTED/
+│                                       VALIDATED/SUSPECT gate
+│
+├── phase_8_evidence_biology/           mechanism + age + cross-species
+│   ├── q4_mechanism/                   cheat27/28/29/29b (SD/NAHR, tandem
+│   │                                   repeats, junction forensics)
+│   ├── q5_age_and_origin/              cheat30 (GDS) + cross_species_bridge
+│   ├── q7_existence_audit/             cheat6 jackknife + bnd_sided_support
+│   │                                   + breakpoint_evidence_audit
+│   ├── bp_bridge/                      bp_pipeline_bridge (reads phase_6)
+│   ├── orchestrator/                   LAUNCH_group_cheats.sh
+│   └── run_evidence_biology.sh
+│
+├── phase_9_classification/             tier assignment + 7-question
+│                                       characterization
+│   ├── orchestrator/run_phase4.sh      full-chain SLURM DAG (phases 4→9)
+│   ├── patches/                        C01f registry-aware patches
+│   └── tests/                          7 test suites (all pass)
+│
+├── phase_10_followup/                  per-candidate deep analysis
+├── phase_11_secondary/                 LD / Fst secondary analyses
 │   └── MODULE_5C_Inversion_LD/, MODULE_5D_Inversion_FST/
 │       (MODULE_5E_Inversion_HOBS archived 2026-04-24 — Hobs confirmation
-│        now lives in 4b_qc_triage/STEP_Q07b + STEP_Q07c)
+│        now lives in phase_5_qc_triage/STEP_Q07b + STEP_Q07c)
 │
 └── _archive/                           legacy v8.5 HPC tree (kept for reference)
 ```
@@ -107,27 +125,44 @@ phase_3_refine/       breakpoint validation (bp resolution)
                       DELLY/Manta concordance + BND signal
                            │
                            ▼
-phase_4_postprocessing/  per-candidate postprocessing — the main pipeline
-  4a  C01d scoring (★ CATALOG BIRTH), C01e figures, C01g boundaries
-      group_validation: NONE
-  4b  C01i decompose + multi_recomb + nested_comp + seal
-      writes: UNCERTAIN
-  4c  C01f hypothesis tests + gate
-      → SUPPORTED / VALIDATED / SUSPECT
-  4d  Q5 age + Q6 burden + cheat28/29/30
-      reads: ≥ SUPPORTED
-  4e  classify_inversions + characterize_candidate
-      reads: everything
+phase_4_catalog/      C01d scoring (★ CATALOG BIRTH), C01e figures,
+                      C01g boundaries.  group_validation: NONE
                            │
                            ▼
-phase_5_followup/     per-candidate deep analysis (MODULE_5B successor)
-phase_6_secondary/    LD / Fst / HOBS secondary analyses
+phase_5_qc_triage/    Q01–Q10 per-candidate QC shelf (data-quality flag)
+                           │
+                           ▼
+phase_6_breakpoint_refinement/
+                      dosage signal + ancestral fragments + consensus
+                      → bp-resolution breakpoints + CI
+                           │
+                           ▼
+phase_7_karyotype_groups/
+  proposal/           C01i decompose + multi_recomb + nested_comp + seal
+                      writes: UNCERTAIN
+  validation/         C01f hypothesis tests + gate
+                      → SUPPORTED / VALIDATED / SUSPECT
+                           │
+                           ▼
+phase_8_evidence_biology/
+                      mechanism (Q4) + age (Q5) + existence audit (Q7)
+                      + bp_bridge.  reads: ≥ SUPPORTED where gated
+                           │
+                           ▼
+phase_9_classification/
+                      C01d pass-2 + characterize_candidate + classify
+                      + final tier / 7-question characterization
+                           │
+                           ▼
+phase_10_followup/    per-candidate deep analysis (MODULE_5B successor)
+phase_11_secondary/   LD / Fst / HOBS secondary analyses
+phase_12_cargo/       gene content + breeding implications
 ```
 
 ## Catalog birth — where candidates become first-class objects
 
-`phase_4/4a/STEP_C01d_candidate_scoring` is the pipeline's pivot. At
-the moment it runs:
+`phase_4_catalog/STEP_C01d_candidate_scoring` is the pipeline's pivot.
+At the moment it runs:
 
 1. Reads the primary boundary track (staircase blocks from
    `phase_2/2d_candidate_detection/`, bridge-converted to
@@ -138,7 +173,7 @@ the moment it runs:
    - `--boundary_dir` → `boundary_catalog_unified.tsv.gz` from C01g
      (built from 5 boundary sources)
    - `--hyp_dir` → hypothesis verdicts from C01f (when available — a
-     second C01d pass after 4c)
+     second pass at `phase_9_classification/LAUNCH_C01d_scoring_pass2.sh`)
 3. Computes 12 scoring dimensions D1–D12, assigns Tier 1/2/3/4
 4. Writes `candidate_scores.tsv.gz` — **the catalog**
 
@@ -195,7 +230,7 @@ SUSPECT     phase 4c — pca_family_confounded only
 
 The four-way jackknife semantics (v10.1.1) treats
 `single_family_fragile` as REAL (family-restricted polymorphism), not
-SUSPECT. See `phase_4_postprocessing/docs/DESIGN_NOTE_K_and_local_Q_and_jackknife.md`.
+SUSPECT. See `docs/DESIGN_NOTE_K_and_local_Q_and_jackknife.md`.
 
 ## The 4-layer independence framework
 
@@ -218,7 +253,7 @@ python3 check_deployment_v10.py
 
 Reports on files present, JSON schemas parsing, R bracket balance,
 Python syntax, schema cross-references, registry loader smoke, and
-runs the 5 test suites in `phase_4_postprocessing/tests/`.
+runs the 7 test suites in `phase_9_classification/tests/`.
 
 The `registries/` API + schema directory lives at the repo root
 (`inversion-popgen-toolkit/registries/`), not inside this tree — the
@@ -265,13 +300,13 @@ this configuration. The 5 tests all pass.
   tracker
 - `phase_2_discovery/2d_candidate_detection/README.md` — staircase
   detector
-- `phase_4_postprocessing/docs/PHASE4_ARCHITECTURE.md` — the phase 4
-  design (sections + flow)
-- `phase_4_postprocessing/docs/PHASE4B_REWRITE_ARCHITECTURE.md` — the
-  four-script 4b subsystem
-- `phase_4_postprocessing/docs/DESIGN_NOTE_K_and_local_Q_and_jackknife.md`
+- `docs/PHASE4_ARCHITECTURE.md` — the phase 4 → 9 chain design
+  (sections + flow; pre-pass-15 naming, still the authoritative spec)
+- `phase_7_karyotype_groups/proposal/docs/PHASE4B_REWRITE_ARCHITECTURE.md`
+  — the four-script C01i decomposition subsystem
+- `docs/DESIGN_NOTE_K_and_local_Q_and_jackknife.md`
   — why K=8, what local_Q is, four-way jackknife semantics
-- `phase_4_postprocessing/4a_existence_layers/README.md` — catalog
+- `phase_4_catalog/README.md` — catalog
   birth (C01d/C01e/C01g contract)
 - `_archive_superseded/fuzzy_merge_abandoned/README.md` — what the
   retired merge was, why it was dropped

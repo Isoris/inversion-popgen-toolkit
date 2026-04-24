@@ -1,5 +1,13 @@
 # Toolkit audit — where to merge, combine, simplify
 
+> **Status 2026-04-24 (post pass 15):** this document predates the
+> 12-phase flatten (pass 15). Sub-block references like `4a_existence_layers/`,
+> `4d_group_proposal/`, `4f_group_dependent/`, `4g_final_classification/`
+> describe the pre-pass-15 tree. For current naming see
+> `docs/MODULE_MAP.md` and `inversion_modules/README.md`. The
+> structural recommendations (merges, schema dedup, etc.) still stand;
+> only the folder paths have moved.
+
 **Scope:** the whole `inversion-popgen-toolkit` as of the Git clone
 on this HPC-offline weekend (2026-04-23). Audit is structural (reorganise
 to reduce surface area) not logical (keep all logic intact).

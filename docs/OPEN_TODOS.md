@@ -13,7 +13,7 @@ Session-artifact narrative stripped; kept only actionable items.
 **Status.** `BREEDING_A_broodstock_compatibility.R`,
 `BREEDING_C_founder_haplotype_tracker.R`,
 `BREEDING_D_recombination_atlas.R` all exist in
-`inversion_modules/phase_7_cargo/extra_plots/breeding/`. The prior
+`inversion_modules/phase_12_cargo/extra_plots/breeding/`. The prior
 session planned an ~8-line snippet per script that reads
 `candidate_status.tsv` and filters to supported balanced inversions
 only. Not applied.

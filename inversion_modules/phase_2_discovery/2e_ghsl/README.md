@@ -126,7 +126,7 @@ default (chat 14): `10,20,30,40,50,100`.
 **Wired chat 14 (2026-04-18).** All four documented consumers read
 v6 paths and columns:
 
-- `phase_4_postprocessing/4d_group_proposal/lib_ghsl_confirmation.R`
+- `phase_7_karyotype_groups/proposal/lib_ghsl_confirmation.R`
   reads v6 karyotype and annot RDS (keeps v5 fallback for transitional
   partial re-runs). Adds panel-based helper
   `ghsl_per_sample_panel_in_interval()` as an additive alternative to
@@ -135,7 +135,7 @@ v6 paths and columns:
 - `phase_2_discovery/2d_candidate_detection/run_all.R` reads v6 annot
   RDS with v6-native column names; v5 fallback retained for mixed-run
   cases.
-- `phase_4_postprocessing/4a_existence_layers/STEP_C01d_candidate_scoring_wired_25_v934_registry.R`
+- `phase_4_catalog/STEP_C01d_candidate_scoring_wired_25_v934_registry.R`
   reads `iv$ghsl_v6_score_max`.
 - `phase_2_discovery/2d_candidate_detection/STEP_D05_ghsl_stability.R`
   (unused stub) — header updated to reference v6.

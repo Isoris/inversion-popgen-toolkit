@@ -3,7 +3,7 @@
 # fix_output_paths_2026-04-20.sh
 # -----------------------------------------------------------------------------
 # Relocates phase_qc_shelf outputs from the misplaced top-level folder
-# ($BASE/inversion_modules/phase_4_postprocessing/4b_qc_triage/results/) to the correct location
+# ($BASE/inversion_modules/phase_5_qc_triage/results/) to the correct location
 # ($BASE/inversion_localpca_v7/phase_qc_shelf_results/) and fixes the default
 # in 00_config.sh so future runs land in the right place.
 #
@@ -22,10 +22,10 @@
 set -euo pipefail
 
 BASE="/scratch/lt200308-agbsci/Quentin_project_KEEP_2026-02-04"
-LIVE_CONFIG="${BASE}/inversion-popgen-toolkit/inversion_modules/phase_4_postprocessing/4b_qc_triage/00_config.sh"
+LIVE_CONFIG="${BASE}/inversion-popgen-toolkit/inversion_modules/phase_5_qc_triage/00_config.sh"
 BUNDLE_CONFIG="${BASE}/toolkit_update_2026-04-20/modules/phase_qc_shelf/00_config.sh"
 
-OLD_RESULTS="${BASE}/inversion_modules/phase_4_postprocessing/4b_qc_triage/results"
+OLD_RESULTS="${BASE}/inversion_modules/phase_5_qc_triage/results"
 NEW_RESULTS="${BASE}/inversion_localpca_v7/phase_qc_shelf_results"
 OLD_MISTAKE_DIR="${BASE}/inversion_modules"
 
@@ -56,7 +56,7 @@ say "================================================================"
 say ""
 say "--- Step 1: Patch QC_OUT default in 00_config.sh ---"
 
-OLD_LINE=': "${QC_OUT:=${BASE}/inversion_modules/phase_4_postprocessing/4b_qc_triage/results}"'
+OLD_LINE=': "${QC_OUT:=${BASE}/inversion_modules/phase_5_qc_triage/results}"'
 NEW_LINE=': "${QC_OUT:=${BASE}/inversion_localpca_v7/phase_qc_shelf_results}"'
 
 for target in "$LIVE_CONFIG" "$BUNDLE_CONFIG"; do

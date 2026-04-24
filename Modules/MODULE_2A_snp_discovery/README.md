@@ -6,7 +6,7 @@ Callable-site masking, ANGSD biSNP discovery, distance-thinned panels, BEAGLE GL
 
 Every ancestry-flavored inversion signal is anchored to this module's biallelic SNP panel. ANGSD calls biSNPs from genotype likelihoods at cohort scale — the only statistically appropriate way to work with low-coverage data without hard genotype calls. The thinned panel produced here feeds NGSadmix for global ancestry Q, and Engine B / instant_q for per-window local Q. The downstream inversion-discovery pipeline (`inversion_modules/phase_2_discovery/`) computes against those Q estimates through its 4-layer evidence framework (Layer A dosage / local PCA, Layer C GHSL haplotype contrast, integrative scoring) — without this module's panel, there is nothing to compute against.
 
-NAToRA first-degree pruning (A07) also produces the 81-unrelated subset used for Hardy-Weinberg-sensitive tests including per-group Hobs confirmation (4b_qc_triage STEP_Q07b + Q07c, previously MODULE_5E) and inversion genotype-frequency tests.
+NAToRA first-degree pruning (A07) also produces the 81-unrelated subset used for Hardy-Weinberg-sensitive tests including per-group Hobs confirmation (phase_5_qc_triage STEP_Q07b + Q07c, previously MODULE_5E) and inversion genotype-frequency tests.
 
 Note: ANGSD biSNPs are **not** the same catalog as Clair3 SNPs (MODULE_4A). ANGSD works in GL space for population-level Q/Fst; Clair3 produces per-sample hard genotypes for per-sample analyses. Both are needed, for different downstream consumers.
 

@@ -449,7 +449,7 @@ if (8 %in% run_phases) {
   #
   # Before this fix, C04's per-window annot.rds shards existed but were
   # read by nobody in the main C01d pipeline — they were consumed only
-  # by two phase_5_followup supplementary-figure scripts. D10 in C01d
+  # by two phase_10_followup supplementary-figure scripts. D10 in C01d
   # read partition_stability from D05's sim_mat clustering, never from
   # C04. The 2c_precomp README's "Layer C = GHSL" 4-layer independence
   # framework was aspirational on the scoring path.

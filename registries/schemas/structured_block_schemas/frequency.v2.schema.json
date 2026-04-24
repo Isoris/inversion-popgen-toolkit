@@ -1,0 +1,54 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "frequency.v2.schema.json",
+  "block_type": "frequency",
+  "version": "v2_phase4b_rewrite_jackknife_semantics",
+  "description": "Population frequency + family linkage summary. v2 expands family_linkage from the binary {single_family, multi_family} axis to a four-class axis reflecting the actual cheat6 jackknife verdicts, so that family-specific polymorphisms (real but restricted inversions) are distinguished from pca-family-confounded candidates (not-real, groups are wrong).",
+  "question": "Q6",
+  "group_validation_required": "SUPPORTED",
+  "source_script": "C01i_d_seal + C01f",
+  "required": ["freq_inv", "n_total", "class_counts"],
+  "properties": {
+    "freq_inv":     { "type": "number" },
+    "freq_class":   { "type": "string", "enum": ["rare", "low", "common", "major"] },
+    "n_total":      { "type": "integer" },
+    "class_counts": {
+      "type": "object",
+      "properties": {
+        "HOM_REF":     { "type": "integer" },
+        "HET":         { "type": "integer" },
+        "HOM_INV":     { "type": "integer" },
+        "RECOMBINANT": { "type": "integer" }
+      }
+    },
+    "hwe_chi2":     { "type": "number" },
+    "hwe_p":        { "type": "number" },
+    "hwe_verdict":  { "type": "string", "enum": ["consistent", "het_excess", "het_deficit", "underpowered"] },
+    "genotype_balance": { "type": "string", "enum": ["hwe_consistent", "het_excess", "het_deficit"] },
+    "family_linkage": {
+      "type": "string",
+      "enum": ["multi_family", "few_family", "single_family",
+               "pca_family_confounded", "unknown"],
+      "description": "Four meaningful classes + unknown, derived from cheat6 jackknife verdict: multi_family = robust, segregates in many families (robust_multi_family or multi_family_contributing); few_family = 2-3 families drive it; single_family = family-specific polymorphism (real but restricted); pca_family_confounded = jackknife shows PCA groups track ancestry not arrangement (the SUSPECT case); unknown = jackknife not run or inconclusive"
+    },
+    "jackknife_max_delta": { "type": "number" },
+    "jackknife_n_contributing": { "type": "integer", "description": "number of ancestry groups whose removal drops the signal" },
+    "polymorphism_class": {
+      "type": "string",
+      "enum": ["cohort_wide", "family_restricted", "lineage_restricted", "unclassified"],
+      "description": "Derived from family_linkage: multi_family → cohort_wide; few_family → lineage_restricted; single_family → family_restricted; pca_family_confounded / unknown → unclassified"
+    }
+  },
+  "keys_extracted": [
+    { "key": "q6_freq_inv",            "from": "freq_inv" },
+    { "key": "q6_freq_class",          "from": "freq_class" },
+    { "key": "q6_n_total",             "from": "n_total" },
+    { "key": "q6_hwe_chi2",            "from": "hwe_chi2" },
+    { "key": "q6_hwe_p",               "from": "hwe_p" },
+    { "key": "q6_hwe_verdict",         "from": "hwe_verdict" },
+    { "key": "q6_genotype_balance",    "from": "genotype_balance" },
+    { "key": "q6_family_linkage",      "from": "family_linkage" },
+    { "key": "q6_jackknife_max_delta", "from": "jackknife_max_delta" },
+    { "key": "q6_polymorphism_class",  "from": "polymorphism_class" }
+  ]
+}

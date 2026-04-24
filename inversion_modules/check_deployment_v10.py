@@ -18,8 +18,8 @@ Exits 0 if everything is green, non-zero with a clear list of what's wrong.
 Typical runtime: 5-10 seconds.
 
 Usage:
-    cd inversion_modules/
-    python3 check_deployment_v10.py
+    cd inversion-popgen-toolkit/
+    python3 inversion_modules/check_deployment_v10.py --root .
     # or with explicit root
     python3 check_deployment_v10.py --root /path/to/inversion-popgen-toolkit
 """
@@ -49,27 +49,29 @@ def check_files_present(root: Path) -> list:
         "registries/schemas/structured_block_schemas/existence_layer_d.schema.json",
         "registries/schemas/structured_block_schemas/hypothesis_verdict.schema.json",
         "registries/schemas/structured_block_schemas/boundary.schema.json",
-        # v10.1 phase 4b rewrite (now under phase_4_catalog/)
-        "phase_4_postprocessing/4d_group_proposal/lib_decompose_helpers.R",
-        "phase_4_postprocessing/4d_group_proposal/STEP_C01i_decompose.R",
-        "phase_4_postprocessing/4d_group_proposal/STEP_C01i_b_multi_recomb.R",
-        "phase_4_postprocessing/4d_group_proposal/STEP_C01i_d_seal.R",
-        "phase_4_postprocessing/4d_group_proposal/engine_b_smoke_test.R",
-        "phase_4_postprocessing/4d_group_proposal/nested_composition_core.py",
-        "phase_4_postprocessing/4d_group_proposal/STEP_C01i_c_nested_composition.py",
-        "phase_4_postprocessing/schemas/internal_dynamics.schema.json",
-        "phase_4_postprocessing/schemas/recombinant_map.schema.json",
-        "phase_4_postprocessing/schemas/internal_ancestry_composition.schema.json",
-        "phase_4_postprocessing/schemas/frequency.v2.schema.json",
-        "phase_4_postprocessing/patches/02_C01f_promotion_cap.R",
-        "phase_4_postprocessing/patches/03_C01f_jackknife_semantics.R",
-        "phase_4_postprocessing/patches/ENGINE_B_SMOKE_TEST_INSERTS.md",
-        "phase_4_postprocessing/orchestrator/run_phase4b.sh",
-        "phase_4_postprocessing/tests/test_c01i_d_seal_resolution.py",
-        "phase_4_postprocessing/tests/test_phase4b_integration.py",
-        "phase_4_postprocessing/tests/test_jackknife_semantics.py",
-        "phase_4_postprocessing/docs/PHASE4B_REWRITE_ARCHITECTURE.md",
-        "phase_4_postprocessing/docs/DESIGN_NOTE_K_and_local_Q_and_jackknife.md",
+        # v10.1 phase 4b rewrite (now under phase_7_karyotype_groups/proposal/)
+        "inversion_modules/phase_7_karyotype_groups/proposal/lib_decompose_helpers.R",
+        "inversion_modules/phase_7_karyotype_groups/proposal/STEP_C01i_decompose.R",
+        "inversion_modules/phase_7_karyotype_groups/proposal/STEP_C01i_b_multi_recomb.R",
+        "inversion_modules/phase_7_karyotype_groups/proposal/STEP_C01i_d_seal.R",
+        "inversion_modules/phase_7_karyotype_groups/proposal/engine_b_smoke_test.R",
+        "inversion_modules/phase_7_karyotype_groups/proposal/nested_composition_core.py",
+        "inversion_modules/phase_7_karyotype_groups/proposal/STEP_C01i_c_nested_composition.py",
+        # pass 15: structured-block schemas consolidated into registries/schemas/
+        "registries/schemas/structured_block_schemas/internal_dynamics.schema.json",
+        "registries/schemas/structured_block_schemas/recombinant_map.schema.json",
+        "registries/schemas/structured_block_schemas/internal_ancestry_composition.schema.json",
+        "registries/schemas/structured_block_schemas/frequency.v2.schema.json",
+        # pass 15: phase_4 patches/ tests/ docs/ orchestrator/ relocated
+        "inversion_modules/phase_9_classification/patches/02_C01f_promotion_cap.R",
+        "inversion_modules/phase_9_classification/patches/03_C01f_jackknife_semantics.R",
+        "inversion_modules/phase_9_classification/patches/ENGINE_B_SMOKE_TEST_INSERTS.md",
+        "inversion_modules/phase_7_karyotype_groups/proposal/orchestrator/run_phase4b.sh",
+        "inversion_modules/phase_9_classification/tests/test_c01i_d_seal_resolution.py",
+        "inversion_modules/phase_9_classification/tests/test_phase4b_integration.py",
+        "inversion_modules/phase_9_classification/tests/test_jackknife_semantics.py",
+        "inversion_modules/phase_7_karyotype_groups/proposal/docs/PHASE4B_REWRITE_ARCHITECTURE.md",
+        "docs/DESIGN_NOTE_K_and_local_Q_and_jackknife.md",
     ]
     return [(p, (root / p).exists()) for p in expected]
 
@@ -106,8 +108,8 @@ def check_r_brackets(root: Path) -> list:
         "phase_2_discovery/2d_candidate_detection/STEP_D15_plot_zoomed_regions.R",
         "phase_2_discovery/2d_candidate_detection/STEP_D13_plot_annotated_simmat.R",
         "phase_2_discovery/2d_candidate_detection/STEP_D10_variant_consensus.R",
-        "phase_4_postprocessing/4e_group_validation/STEP_C01f_hypothesis_tests.R",
-        "phase_4_postprocessing/4e_group_validation/_PRISTINE_v9.3.4.R",
+        "phase_7_karyotype_groups/validation/STEP_C01f_hypothesis_tests.R",
+        "phase_7_karyotype_groups/validation/_PRISTINE_v9.3.4.R",
     )
     results = []
     for p in root.rglob("*.R"):

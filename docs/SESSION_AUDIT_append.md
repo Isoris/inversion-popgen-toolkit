@@ -267,7 +267,7 @@ candidate for flagship.
 5. **v9→v10 alias cleanup (D.3 simplify 1)** — 15 alias keys still in
    build_key_spec for backwards compat. v9 writers gone. Not urgent.
 
-6. **phase_7_cargo consumer wiring** — BREEDING_A/C/D scripts need
+6. **phase_12_cargo consumer wiring** — BREEDING_A/C/D scripts need
    `final_label.json` as input. Mechanical connection. Ship with
    main wiring session.
 

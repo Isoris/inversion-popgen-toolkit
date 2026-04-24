@@ -312,11 +312,11 @@ Don't ship v6's interior diagnostic. Use what already exists.
 
 ## Phase 7 cargo observation
 
-The uploaded `phase_7_cargo` tar is a **separate module** (MODULE_6_Cargo
+The uploaded `phase_12_cargo` tar is a **separate module** (MODULE_6_Cargo
 per the INTEGRATION_NOTES) for burden scoring, gene annotation, breeding
 plots, and population-level variant tables. Not directly Phase 4 work.
 I note it exists and that v6 structural-class assigner should eventually
-feed into `phase_7_cargo` via `results_registry` — but that's the wiring
+feed into `phase_12_cargo` via `results_registry` — but that's the wiring
 session user wants, not this design doc.
 
 Breeding scripts (`BREEDING_A/C/D`) are downstream consumers of the

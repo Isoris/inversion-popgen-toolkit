@@ -68,9 +68,23 @@ PHASE2_DIR="${CODEBASE}/inversion_modules/phase_2_discovery"
 [[ -d "$PHASE2_DIR" ]] || PHASE2_DIR="${CODEBASE}/phase_2_discovery"
 PHASE3_DIR="${CODEBASE}/inversion_modules/phase_3_refine"
 [[ -d "$PHASE3_DIR" ]] || PHASE3_DIR="${CODEBASE}/phase_3_refine"
-PHASE4_DIR="${CODEBASE}/inversion_modules/phase_4_postprocessing"
-[[ -d "$PHASE4_DIR" ]] || PHASE4_DIR="${CODEBASE}/phase_4_postprocessing"
-export PHASE2_DIR PHASE3_DIR PHASE4_DIR
+# pass 15: phase_4_postprocessing flattened into 6 dedicated phases (4..9).
+# PHASE4_DIR kept as a back-compat alias pointing at phase_4_catalog (was the
+# old 4a_existence_layers sub-block) — downstream code should migrate to the
+# specific PHASE{4..9}_DIR as needed.
+PHASE4_DIR="${CODEBASE}/inversion_modules/phase_4_catalog"
+[[ -d "$PHASE4_DIR" ]] || PHASE4_DIR="${CODEBASE}/phase_4_catalog"
+PHASE5_DIR="${CODEBASE}/inversion_modules/phase_5_qc_triage"
+[[ -d "$PHASE5_DIR" ]] || PHASE5_DIR="${CODEBASE}/phase_5_qc_triage"
+PHASE6_DIR="${CODEBASE}/inversion_modules/phase_6_breakpoint_refinement"
+[[ -d "$PHASE6_DIR" ]] || PHASE6_DIR="${CODEBASE}/phase_6_breakpoint_refinement"
+PHASE7_DIR="${CODEBASE}/inversion_modules/phase_7_karyotype_groups"
+[[ -d "$PHASE7_DIR" ]] || PHASE7_DIR="${CODEBASE}/phase_7_karyotype_groups"
+PHASE8_DIR="${CODEBASE}/inversion_modules/phase_8_evidence_biology"
+[[ -d "$PHASE8_DIR" ]] || PHASE8_DIR="${CODEBASE}/phase_8_evidence_biology"
+PHASE9_DIR="${CODEBASE}/inversion_modules/phase_9_classification"
+[[ -d "$PHASE9_DIR" ]] || PHASE9_DIR="${CODEBASE}/phase_9_classification"
+export PHASE2_DIR PHASE3_DIR PHASE4_DIR PHASE5_DIR PHASE6_DIR PHASE7_DIR PHASE8_DIR PHASE9_DIR
 
 # ── Rscript binary ──────────────────────────────────────────────────────────
 RSCRIPT_BIN="${RSCRIPT_BIN:-/lustrefs/disk/project/lt200308-agbsci/13-programs/mambaforge/envs/assembly/bin/Rscript}"
