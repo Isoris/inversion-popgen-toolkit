@@ -2,8 +2,38 @@
 
 # =============================================================================
 # STEP_C01d_candidate_scoring.R  (v9.3.4 — Engine B popgen stream + Cheat 25)
+# =============================================================================
+# PIPELINE POSITION (phase_4_catalog)
+# =============================================================================
+#   phase_2_discovery/2d_candidate_detection  → scoring_table_<chr>.tsv
+#   phase_2_discovery/2c_precomp              → <chr>.precomp.rds (STEP_C01a)
+#                                              seeded_regions_summary    (STEP_C01b_1)
+#                  │
+#                  ▼
+#   STEP_C01g_boundary_catalog   → boundary_catalog_unified.tsv.gz
+#                  │                                    (runs before C01d in
+#                  ▼                                     the canonical flow)
+# → STEP_C01d_candidate_scoring  ← THIS SCRIPT (catalog birth)
+#                  │                 writes candidate_scores.tsv.gz
+#                  │                 = THE CATALOG for all downstream phases
+#                  ▼
+#   STEP_C01e_candidate_figures          (per-Tier-1/2 diagnostic PDFs)
+#   STEP_C01j_regime_compatibility       (regime_segments block)
+#   STEP_C01l_local_structure_segments   (local_structure_segments block)
+#   STEP_C01m_distance_concordance       (distance_concordance block)
+#                  │
+#                  ▼
+#   phase_5_qc_triage → phase_6_breakpoint_refinement → phase_7..9
 #
-# TIERED EVIDENCE FRAMEWORK for inversion candidate scoring.
+# The C01 letter-step convention runs through multiple phases (C01a/b live in
+# phase_2, C01d/e/g/j/l/m in phase_4, C01f in phase_7, C01i in phase_7, C01k
+# in phase_9). This is historical from pre-pass-15 when all these steps lived
+# under a single "phase_4_postprocessing" umbrella. The letters preserve the
+# original ordering.
+#
+# =============================================================================
+# ROLE — TIERED EVIDENCE FRAMEWORK for inversion candidate scoring
+# =============================================================================
 #
 # v9.3.4 changes:
 #   - Sources load_bridge.R for Engine B access.
@@ -33,7 +63,47 @@
 #                                                  count is 12 per the mapping
 #                                                  below, D1–D12.]
 #
-# Dimension mapping (12 dimensions after v9.3.2):
+# =============================================================================
+# INPUT CONTRACT (positional + flags)
+# =============================================================================
+# Positional:
+#   args[1] = detector_dir — dir containing scoring_table_<chr>.tsv(.gz)
+#                            (from phase_2/2d_candidate_detection)
+#   args[2] = outdir       — where to write candidate_scores.tsv.gz +
+#                            per-candidate folders + plots/
+#
+# Optional flags (input evidence streams):
+#   --precomp_dir PATH      phase_2/2c_precomp/ C01a RDS cache — required for
+#                            Engine B popgen annotation (Fst, θπ, θW, D)
+#   --cores_dir PATH        phase_2/2c_precomp/STEP_C01b_1 seeded regions
+#                            (populates D2 band + D5 sub-regime dims)
+#   --boundary_dir PATH     this folder's STEP_C01g output — populates D11
+#                            boundary concordance. Optional but the most
+#                            important single dim for Tier assignment.
+#   --hyp_dir PATH          phase_7/validation/STEP_C01f_hypothesis_tests
+#                            verdicts — populates D8 peel-or-hypothesis.
+#                            Only available if C01f has run (2-pass mode).
+#
+# DEPRECATED FLAGS (still accepted for back-compat; emit warning):
+#   --sv_prior_dir — ignored; D7 reads SV info from scoring_table directly
+#
+# =============================================================================
+# OUTPUTS
+# =============================================================================
+#   candidate_scores.tsv.gz          — one row per candidate, 12 scoring dims
+#                                       + Tier (1/2/3/4) + popgen annotation
+#   <outdir>/plots/                  — per-chromosome overview plots
+#   Registry blocks (via registry_key_helpers.R):
+#     - boundary_refined      (per-candidate refined left/right bp + CI)
+#     - Layer A block keys    (q1_layer_a_*)
+#
+# The `candidate_scores.tsv.gz` file is THE CATALOG. All downstream phases
+# (5→9) join on candidate_id. This script is the catalog's single point
+# of truth.
+#
+# =============================================================================
+# DIMENSION MAPPING (D1..D12 — 12 dimensions as of v9.3.2)
+# =============================================================================
 #   D1  Block strength    — contrast × squareness × sharpness (from 08_bloc_scoring)
 #   D2  Block shape       — shape_class + occupancy + homogeneity (from 08 + 04)
 #   D3  NN persistence    — survives_nn40/nn80 + nn_birth (from 02 + 09)
@@ -125,7 +195,10 @@ while (i <= length(args)) {
   else if (a == "--cores_dir" && i < length(args))  { cores_dir <- args[i+1]; i <- i+2L }
   else if (a == "--boundary_dir" && i < length(args)) { boundary_dir <- args[i+1]; i <- i+2L }
   else if (a == "--sv_prior_dir" && i < length(args)) {
-    # accepted but ignored — D7 uses scoring_table SV columns instead
+    message("[C01d] WARNING: --sv_prior_dir is deprecated and ignored. ",
+            "D7 (sv_breakpoint) reads sv_overlap_pct / n_sv_hits from the ",
+            "staircase scoring_table directly (populated by ",
+            "phase_2/2d/STEP_D06_sv_overlap.R). You can drop this flag.")
     i <- i+2L
   }
   else { i <- i+1L }

@@ -2,9 +2,29 @@
 
 # =============================================================================
 # STEP_C01l_local_structure_segments.R
+# =============================================================================
+# PIPELINE POSITION (phase_4_catalog)
+# =============================================================================
+#   STEP_C01g_boundary_catalog
+#                  │
+#                  ▼
+#   STEP_C01d_candidate_scoring  → candidate_scores.tsv.gz (the catalog)
+#                  │
+#                  ├──> STEP_C01e_candidate_figures
+#                  ├──> STEP_C01j_regime_compatibility
+# →                ├──> STEP_C01l_local_structure_segments  ← THIS SCRIPT
+#                  └──> STEP_C01m_distance_concordance
+#                  │       (runs in parallel with C01e/j/m after catalog birth)
+#                  ▼
+#   phase_5_qc_triage → phase_6..9
 #
-# LOCAL STRUCTURE QUANTIFICATION FOR INVERSION SEGMENTS
+# Writes registry block: local_structure_segments
+#   consumed by phase_9/characterize_candidate.R for Q2 (boundary classification)
+#   and Q4 (inversion-core vs flank intensity contrast).
 #
+# =============================================================================
+# ROLE — LOCAL STRUCTURE QUANTIFICATION FOR INVERSION SEGMENTS
+# =============================================================================
 # For each confirmed inversion candidate, quantifies the local ancestry/
 # structure intensity across 5 spatial segments:
 #   1. Left flank (outside inversion, upstream)

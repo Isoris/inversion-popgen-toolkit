@@ -2,9 +2,28 @@
 
 # =============================================================================
 # STEP_C01e_candidate_figures.R  (v8.4)
+# =============================================================================
+# PIPELINE POSITION (phase_4_catalog)
+# =============================================================================
+#   STEP_C01g_boundary_catalog   (boundary input, optional)
+#                  │
+#                  ▼
+#   STEP_C01d_candidate_scoring  → candidate_scores.tsv.gz (the catalog)
+#                  │
+#                  ├──> STEP_C01j_regime_compatibility     (regime blocks)
+#                  ├──> STEP_C01l_local_structure_segments (segment blocks)
+#                  ├──> STEP_C01m_distance_concordance     (distance blocks)
+#                  │
+#                  ▼
+# → STEP_C01e_candidate_figures  ← THIS SCRIPT
+#                                   consumes the catalog + precomp data,
+#                                   produces per-candidate manuscript PDFs.
+#                                   Purely diagnostic output — does NOT
+#                                   write any registry block.
 #
-# PER-CANDIDATE DEEP-DIVE FIGURES for manuscript.
-#
+# =============================================================================
+# ROLE — PER-CANDIDATE DEEP-DIVE FIGURES for manuscript
+# =============================================================================
 # For each Tier 1/2 candidate, generates a multi-panel figure with:
 #   A: Chromosome overview ideogram with candidate highlighted
 #   B: Regional PCA (samples colored by inferred karyotype REF/HET/INV)

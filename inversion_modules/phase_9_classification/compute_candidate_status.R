@@ -213,7 +213,9 @@ build_key_spec <- function() {
   )
 
   # ── Q4: HOW DID IT FORM? (47 keys) ──
-  # Produced primarily by: 4d cheat27/28/29, Q4 mechanism classifier
+  # Produced by phase_8_evidence_biology/q4_mechanism/:
+  #   sd_substrate/ (minimap2 + BISER2 + concordance), cheat28, cheat29,
+  #   STEP_01_assembled_junction
   q4 <- c(
     "q4_has_inverted_sd", "q4_sd_left_start", "q4_sd_left_end",
     "q4_sd_right_start", "q4_sd_right_end", "q4_sd_length",

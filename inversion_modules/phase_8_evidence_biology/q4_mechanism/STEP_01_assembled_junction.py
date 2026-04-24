@@ -1,9 +1,27 @@
 #!/usr/bin/env python3
 """
-cheat29b_assembled_junction.py — assembled-junction forensics
+STEP_01_assembled_junction.py — assembled-junction forensics (STEP 1 of 4)
 
 =============================================================================
-ROLE
+PIPELINE POSITION
+=============================================================================
+→ STEP 1  assembled-junction forensics       (q4_mechanism)  ← THIS SCRIPT
+  STEP 2  single-sided BND support           (q7_existence_audit)
+  STEP 3A cross-species synteny bridge       (cross_species)
+  STEP 3B bp-pipeline bridge                 (bp_bridge)
+  STEP 4  structural-class assignment        (phase_9)
+
+Renamed from cheat29b_assembled_junction.py in pass 18 (2026-04-24) for
+step-number visibility. Dispatched by run_evidence_biology.sh as the
+first cohort-level evidence step.
+
+This script runs BEFORE STEP 3B and STEP 4. Its output block
+(mechanism_assembled.json) is consumed by STEP 4 via its
+--evidence_blocks_dir, and by STEP_03A? No — STEP_03A is orthogonal. STEP 4
+is this script's only downstream consumer.
+
+=============================================================================
+ROLE (original docstring preserved below)
 =============================================================================
 Extracts junction evidence from ASSEMBLED contigs (DELLY CONSENSUS, Manta
 PRECISE ALT) rather than from reference-genome context at the estimated
@@ -20,7 +38,7 @@ Why this is different from cheat29:
     → If boundary_bp is off by kilobases (common at 9x for NAHR-like events),
       the result describes genomic context, not the rearrangement junction.
 
-  cheat29b does:
+  THIS SCRIPT (STEP 1) does:
     parse DELLY BND records with CT=3to3/5to5 that fall in the candidate's
     boundary zone → read INFO/CONSENSUS (assembled contig spanning the
     breakpoint, from split reads)
@@ -30,7 +48,7 @@ Why this is different from cheat29:
     → This IS the rearrangement junction.
 
 The two complement each other:
-- When a PRECISE record is available, cheat29b is the real answer.
+- When a PRECISE record is available, STEP 1 is the real answer.
 - When no PRECISE record is available, cheat29 (reference fallback) is all
   we have, and the output is flagged with ref_ prefix.
 
@@ -484,7 +502,7 @@ def main():
         block = {
             "block_type": "mechanism_assembled",
             "candidate_id": cid,
-            "source_script": "cheat29b_assembled_junction.py",
+            "source_script": "STEP_01_assembled_junction.py",
             "data": data,
         }
         if not args.dry_run:
@@ -497,7 +515,7 @@ def main():
                         candidate_id=cid,
                         block_type="mechanism_assembled",
                         data=data,
-                        source_script="cheat29b_assembled_junction.py",
+                        source_script="STEP_01_assembled_junction.py",
                     )
                 except Exception as e:
                     print(f"[cheat29b] {cid}: registry write failed: {e}",

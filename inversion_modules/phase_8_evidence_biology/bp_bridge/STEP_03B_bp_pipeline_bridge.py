@@ -1,47 +1,91 @@
 #!/usr/bin/env python3
 """
-bp_pipeline_bridge.py — reads user's existing breakpoint_pipeline outputs
-and writes derived keys to the registry.
+STEP_03B_bp_pipeline_bridge.py — phase_6 breakpoint-pipeline → registry bridge
+
+=============================================================================
+PIPELINE POSITION
+=============================================================================
+  phase_6_breakpoint_refinement/run_pipeline.sh  (produces 3 TSVs)
+                               │
+                               ▼
+  phase_8_evidence_biology/run_evidence_biology.sh
+    STEP 1  assembled-junction forensics       (q4_mechanism)
+    STEP 2  single-sided BND support           (q7_existence_audit)
+    STEP 3A cross-species synteny bridge       (cross_species)
+  → STEP 3B bp-pipeline bridge                 (bp_bridge)  ← THIS SCRIPT
+    STEP 4  structural-class assignment        (phase_9)
+                               │
+                               ▼
+  phase_9/STEP_04_assign_structural_class.py  reads fragment_distribution.json
+                                               (specifically q2_interior_class
+                                               for suffix modifiers + terminal
+                                               gating)
+
+Renamed from bp_pipeline_bridge.py in pass 18 (2026-04-24) — the "3b" step
+number previously lived only as a shell echo label; now it's in the
+filename so the DAG position is visible from `ls`.
 
 =============================================================================
 ROLE
 =============================================================================
-The user's breakpoint_pipeline (/followup/breakpoint_pipeline/) already
+The user's breakpoint_pipeline (phase_6_breakpoint_refinement/) already
 produces the primary breakpoint signal: per-carrier ancestral fragments,
 KDE-mode breakpoints with bootstrap CIs, and a 7-method consensus merge.
+Phase_6 writes these as TSVs on disk — NOT as registry blocks. This bridge
+promotes them into a registry-format Tier-2 block so downstream (STEP 4)
+can read them uniformly alongside other evidence blocks.
 
-This bridge reads the three output TSVs and writes derived Phase 4 keys
-to the registry so the v6 structural-class assigner can consume them.
+Without this bridge, STEP 4 would report q2_interior_class=degenerate for
+every candidate because the signal never reached the registry. The three
+TSVs would have to be parsed separately by every downstream consumer.
 
-**Supersedes my earlier proposal** of a separate interior-structure
-diagnostic, which was re-deriving a coarser version of the same signal
-the user had already designed. This script is the wiring the user asked
-for.
+Architectural note: in a cleaner design, phase_6's run_pipeline.sh would
+call write_block() directly and this bridge would be unnecessary. That's
+a deferred refactor — see bp_bridge/README.md "Known issues / TODO".
 
 =============================================================================
-INPUTS — three TSVs produced by breakpoint_pipeline
+INPUTS — three TSVs produced by phase_6_breakpoint_refinement/
 =============================================================================
+All three produced by phase_6_breakpoint_refinement/run_pipeline.sh.
+One row per candidate (consensus + per-method) or per (candidate, carrier
+sample) for fragments.
+
   --consensus_tsv    candidate_breakpoints_consensus.tsv
-                      One row per candidate. Contains final_left_bp,
-                      final_right_bp, CI bounds, n_methods_agreeing,
-                      sources_available, primary_source,
-                      inversion_size_bp, refined_vs_input_shift.
+                      Produced by phase_6/03_consensus_merge.R.
+                      Columns: candidate_id, chrom,
+                               final_left_bp, final_right_bp,
+                               left_ci_low, left_ci_high,
+                               right_ci_low, right_ci_high,
+                               left_ci_width_kb, right_ci_width_kb,
+                               n_methods_agreeing_left, n_methods_agreeing_right,
+                               primary_source_left, primary_source_right,
+                               sources_available, inversion_size_bp,
+                               refined_vs_input_shift.
 
   --fragments_tsv    candidate_ancestral_fragments.tsv
-                      One row per (candidate, sample) for each carrier.
-                      Contains frag_start_bp, frag_end_bp, frag_length_bp,
-                      extended_left_snps, extended_right_snps,
-                      left_cor_at_boundary, right_cor_at_boundary.
+                      Produced by phase_6/02_ancestral_fragments.R.
+                      Columns: candidate_id, sample_id,
+                               frag_start_bp, frag_end_bp, frag_length_bp,
+                               extended_left_snps, extended_right_snps,
+                               left_cor_at_boundary, right_cor_at_boundary.
+                      Used for interior-structure signal (recombinant
+                      fraction + fragment-distribution shape).
 
-  --per_method_tsv   candidate_breakpoints_per_method.tsv
-                      One row per (candidate, method, side). Contains
-                      method name, side, breakpoint_bp, weight, CI,
-                      distance_to_consensus_kb, within_agreement_band.
+  --per_method_tsv   candidate_breakpoints_per_method.tsv  (optional)
+                      Produced by phase_6/03_consensus_merge.R.
+                      Columns: candidate_id, method, side, breakpoint_bp,
+                               weight, ci_low, ci_high,
+                               distance_to_consensus_kb,
+                               within_agreement_band.
+                      Used only for method-disagreement diagnostic keys.
 
 =============================================================================
-DERIVED KEYS WRITTEN (per candidate)
+DERIVED KEYS WRITTEN (per candidate → fragment_distribution.schema.json)
 =============================================================================
-BREAKPOINT CONSENSUS (from consensus_tsv):
+Written as a single fragment_distribution Tier-2 block per candidate,
+which the schema's keys_extracted directive then promotes to flat keys.
+
+BREAKPOINT CONSENSUS (source: consensus_tsv):
   q3_final_left_bp                     int
   q3_final_right_bp                    int
   q3_left_ci_low_bp                    int
@@ -56,27 +100,64 @@ BREAKPOINT CONSENSUS (from consensus_tsv):
                                         sub_30kb | coarse
   q3_primary_source                    method name
   q3_sources_available                 comma-separated list
+  q3_inversion_size_bp                 int
 
-FRAGMENT DISTRIBUTION (from fragments_tsv — the interior signal):
+FRAGMENT DISTRIBUTION — interior signal (source: fragments_tsv):
   q2_n_fragment_carriers               int
   q2_fragment_interior_recomb_fraction float in [0,1]
   q2_fragment_left_distribution_shape  unimodal | right_skewed | bimodal |
                                         broad | degenerate
   q2_fragment_right_distribution_shape analogous
+  q2_fragment_left_bimodality_p        float (Hartigan-like proxy, NOT a
+                                        real dip test — see comment in
+                                        interior_class())
+  q2_fragment_right_bimodality_p       float
   q2_interior_class                    clean_simple |
                                         edge_recombinants_only |
                                         bimodal_boundary_signal |
                                         deep_interior_recombinants |
                                         complex_rearrangement_out_of_scope
 
-CONSENSUS QC (from per_method_tsv):
+CONSENSUS QC (source: per_method_tsv, optional):
   q3_method_disagreement_kb            largest distance_to_consensus among
                                         methods in agreement band
   q3_sv_method_flagged                 bool — was SV method (weight 0.5)
                                         outside agreement band?
 
 =============================================================================
-"""
+DOWNSTREAM CONSUMERS
+=============================================================================
+STEP_04_assign_structural_class.py reads:
+  - q2_interior_class             → terminal gate
+                                    (complex_rearrangement_out_of_scope)
+                                    + suffix modifiers
+                                    (_with_deep_recombinants,
+                                     _with_partial_interior_recombination)
+  - q3_breakpoint_precision_class → (advisory — used in justification text)
+
+characterize_candidate.R consumes q2_* keys for characterize_q2() and
+q3_* keys for characterize_q3().
+
+REGISTRY_CONTRACT:
+  BLOCKS_WRITTEN:
+    - fragment_distribution:
+        registries/schemas/structured_block_schemas/fragment_distribution.schema.json
+      keys: q3_final_left_bp, q3_final_right_bp, q3_left_ci_low_bp,
+            q3_left_ci_high_bp, q3_right_ci_low_bp, q3_right_ci_high_bp,
+            q3_left_ci_width_kb, q3_right_ci_width_kb,
+            q3_n_methods_agreeing_left, q3_n_methods_agreeing_right,
+            q3_breakpoint_precision_class, q3_primary_source,
+            q3_sources_available, q3_inversion_size_bp,
+            q3_method_disagreement_kb, q3_sv_method_flagged,
+            q2_n_fragment_carriers, q2_fragment_interior_recomb_fraction,
+            q2_fragment_left_distribution_shape,
+            q2_fragment_right_distribution_shape,
+            q2_fragment_left_bimodality_p, q2_fragment_right_bimodality_p,
+            q2_interior_class
+      status: WIRED
+  KEYS_IN:
+    - (none from registry — reads phase_6 TSVs directly)
+============================================================================="""
 import argparse
 import csv
 import json
@@ -434,7 +515,7 @@ def main():
             (cand_out / "fragment_distribution.json").write_text(json.dumps({
                 "block_type": "fragment_distribution",
                 "candidate_id": cid,
-                "source_script": "bp_pipeline_bridge.py",
+                "source_script": "STEP_03B_bp_pipeline_bridge.py",
                 "data": data,
             }, indent=2, default=str))
             if reg is not None:
@@ -443,7 +524,7 @@ def main():
                         candidate_id=cid,
                         block_type="fragment_distribution",
                         data=data,
-                        source_script="bp_pipeline_bridge.py",
+                        source_script="STEP_03B_bp_pipeline_bridge.py",
                     )
                 except Exception as e:
                     print(f"[bp_bridge] {cid}: registry write failed: {e}",

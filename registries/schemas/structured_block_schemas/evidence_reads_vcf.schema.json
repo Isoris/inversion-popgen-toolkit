@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "evidence_reads_vcf.schema.json",
+  "schema_type": "row_table",
+  "description": "VCF-derived aggregate evidence sidecar for Q7 existence audit. One row per (candidate × sample × bp_side × caller × support_type). SV callers (DELLY / Manta) expose per-sample alt-read COUNTS via FORMAT fields (DV, RV, PR, SR) but do not export read names in the standard filter+regenotype workflow. This sidecar preserves those counts for join against the BAM ledger (evidence_reads_bam.tsv.gz) by (candidate_id, sample_id, bp_side). Produced by STEP_03_per_read_evidence.py.",
+  "question": "Q7",
+  "source_script": "STEP_03_per_read_evidence.py",
+  "output_path_template": "<outdir>/<candidate_id>/per_read_evidence/evidence_reads_vcf.tsv.gz",
+  "columns": [
+    { "name": "candidate_id",  "type": "string",  "description": "Candidate identifier." },
+    { "name": "chrom",         "type": "string" },
+    { "name": "sample_id",     "type": "string" },
+    { "name": "group",         "type": "string",  "enum": ["INV", "HET", "REF", "unknown"] },
+    { "name": "bp_side",       "type": "string",  "enum": ["left", "right"], "description": "Which candidate breakpoint the VCF record sits near." },
+    { "name": "caller",        "type": "string",  "enum": ["delly", "manta"] },
+    { "name": "support_type",  "type": "string",  "enum": ["DV", "RV", "PR_alt", "SR_alt"], "description": "DV=DELLY discordant pairs; RV=DELLY split reads; PR_alt=Manta alt paired-read count; SR_alt=Manta alt split-read count." },
+    { "name": "n_reads",       "type": "integer", "description": "Count reported by the caller for this sample at this record." },
+    { "name": "genotype",      "type": "string",  "enum": ["0/0", "0/1", "1/1", "./.", "."], "description": "GT field." },
+    { "name": "record_pos",    "type": "integer", "description": "POS of the VCF record that supplied this count." }
+  ]
+}

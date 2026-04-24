@@ -2,8 +2,29 @@
 
 # =============================================================================
 # STEP_C01j_regime_compatibility_engine.R  (v8.4)
+# =============================================================================
+# PIPELINE POSITION (phase_4_catalog)
+# =============================================================================
+#   STEP_C01g_boundary_catalog
+#                  │
+#                  ▼
+#   STEP_C01d_candidate_scoring  → candidate_scores.tsv.gz (the catalog)
+#                  │
+#                  ├──> STEP_C01e_candidate_figures
+# →                ├──> STEP_C01j_regime_compatibility  ← THIS SCRIPT
+#                  ├──> STEP_C01l_local_structure_segments
+#                  └──> STEP_C01m_distance_concordance
+#                  │       (runs in parallel with C01e/l/m after catalog birth)
+#                  ▼
+#   phase_5_qc_triage → phase_6..9
 #
-# COMPATIBILITY-BASED REGIME ENGINE
+# Writes registry block: regime_segments
+#   consumed by phase_9/characterize_candidate.R for Q2 (boundaries)
+#   and by downstream recombinant-zone audits.
+#
+# =============================================================================
+# ROLE — COMPATIBILITY-BASED REGIME ENGINE
+# =============================================================================
 #
 # Inspired by hifiasm's site-vector compatibility grouping, adapted for
 # population-level inversion detection in a hatchery family soup.

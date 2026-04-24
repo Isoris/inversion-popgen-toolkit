@@ -2,11 +2,37 @@
 
 # =============================================================================
 # STEP_C01g_boundary_catalog.R  (v9.3.4 — Engine B Fst for Cheat 4)
+# =============================================================================
+# PIPELINE POSITION (phase_4_catalog)
+# =============================================================================
+#   phase_2_discovery/01c_landscape      → boundary_catalog_<chr>.tsv.gz
+#   phase_2_discovery/2d_candidate_det   → scoring_table_<chr>.tsv
+#   phase_2_discovery/2c_precomp         → seeded_regions_summary_<chr>
+#                                       → sv_prior_<chr>.rds (from C00)
+#                  │
+#                  ▼
+# → STEP_C01g_boundary_catalog   ← THIS SCRIPT (runs first in phase_4)
+#                  │                writes boundary_catalog_unified.tsv.gz
+#                  ▼                         = input to C01d D11 dimension
+#   STEP_C01d_candidate_scoring  (catalog birth; reads our output via --boundary_dir)
+#                  │
+#                  ▼
+#   {C01e, C01j, C01l, C01m}     (parallel per-candidate analyses)
+#                  │
+#                  ▼
+#   phase_5_qc_triage → phase_6..9
 #
-# UNIFIED BOUNDARY CATALOG — collects boundaries from ALL pipeline sources,
-# merges by proximity, runs cheats 4/10/11 on each, produces concordance.
+# =============================================================================
+# ROLE — UNIFIED BOUNDARY CATALOG
+# =============================================================================
+# Collects boundaries from ALL pipeline sources, merges by proximity, runs
+# cheats 4/10/11 on each, produces concordance. Output feeds C01d's D11
+# scoring dimension (boundary concordance) — one of the most important
+# single dimensions for Tier assignment.
 #
-# FIVE BOUNDARY SOURCES:
+# =============================================================================
+# INPUT CONTRACT — FIVE BOUNDARY SOURCES
+# =============================================================================
 #   1. PHASE_01C block_detect → boundary_catalog_<chr>.tsv.gz
 #      (clear_hard / clear_soft / diffuse / inner_hard_* / inner_soft_*)
 #      Also: blue_cross_verdicts (assembly errors, internal transitions)
@@ -32,7 +58,31 @@
 #   Cheat 10: Read depth anomaly at boundary (requires BAM/mosdepth)
 #   Cheat 11: Clipped read pileup (requires BAM)
 #
-# OUTPUT:
+# =============================================================================
+# CLI FLAGS
+# =============================================================================
+# Required:
+#   --precomp PATH       phase_2/2c_precomp/ RDS cache
+#
+# Optional (boundary sources + annotations):
+#   --landscape PATH     01C block_detect output dir
+#   --staircase PATH     phase_2/2d staircase output dir
+#   --cores PATH         phase_2/2c C01b_1 seeded regions dir
+#   --sv_prior PATH      phase_2/2c C00 SV prior dir (sv_prior_<chr>.rds)
+#   --samples PATH       samples file for Engine B popgen
+#   --bam_manifest PATH  BAM manifest (sample→BAM path) for cheat 10/11
+#   --mosdepth_dir PATH  mosdepth per-base dir (for cheat 10)
+#   --repeatmasker PATH  RepeatMasker .out or .gff for boundary-context annotation
+#   --chrom NAME         restrict to a single chromosome
+#   --outdir PATH        where to write outputs
+#
+# DEPRECATED FLAGS (still accepted for back-compat; emit warning):
+#   --ref_fasta          never read; safe to drop
+#   --scores             fed Cheat 17 fossil detection, archived 2026-04-17
+#
+# =============================================================================
+# OUTPUTS
+# =============================================================================
 #   boundary_catalog_unified.tsv.gz  — one row per boundary, all sources merged
 #   boundary_concordance.tsv.gz      — per-boundary cheat concordance + verdict
 #   boundary_summary.tsv             — counts by type and concordance level
@@ -103,9 +153,19 @@ while (i <= length(args)) {
   else if (a == "--samples" && i < length(args))    { samples_file <- args[i+1]; i <- i+2 }
   else if (a == "--bam_manifest" && i < length(args)) { bam_manifest <- args[i+1]; i <- i+2 }
   else if (a == "--mosdepth_dir" && i < length(args)) { mosdepth_dir <- args[i+1]; i <- i+2 }
-  else if (a == "--ref_fasta" && i < length(args))    { i <- i+2 }  # accepted but unused
+  else if (a == "--ref_fasta" && i < length(args))    {
+    message("[C01g] WARNING: --ref_fasta is deprecated and ignored. ",
+            "It was parsed but never read. You can drop this flag.")
+    i <- i+2
+  }
   else if (a == "--repeatmasker" && i < length(args)) { repeatmasker_file <- args[i+1]; i <- i+2 }
-  else if (a == "--scores" && i < length(args))       { i <- i+2 }  # accepted but unused (fossil detection archived)
+  else if (a == "--scores" && i < length(args))       {
+    message("[C01g] WARNING: --scores is deprecated and ignored. ",
+            "It fed the Cheat 17 fossil detection that was archived on ",
+            "2026-04-17 — see _archive_superseded/cheat17_fossil_detection/. ",
+            "You can drop this flag.")
+    i <- i+2
+  }
   else { i <- i+1 }
 }
 

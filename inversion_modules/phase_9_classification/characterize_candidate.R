@@ -56,22 +56,26 @@ has_key <- function(keys, k) {
 # sourced directly" and "sourced via run_characterize.R" cases.
 # ofile is only available when this file was sourced via source(); guard
 # with tryCatch so a direct Rscript invocation doesn't blow up.
+#
+# NOTE (2026-04-24, pass 16): the gate moved to phase_9_classification/
+# (co-located with this file). Old phase_7 paths kept as deprecated
+# fallback — remove when confirmed no external caller depends on them.
 .char_ofile <- tryCatch(sys.frame(1)$ofile, error = function(e) NULL)
 .char_ofile <- if (is.null(.char_ofile) || !is.character(.char_ofile) ||
                    !nzchar(.char_ofile)) "" else .char_ofile
 .gate_file_candidates <- c(
+  Sys.getenv("GROUP_VALIDATION_GATE", ""),
   if (nzchar(.char_ofile))
-    file.path(dirname(.char_ofile), "..", "phase_7_karyotype_groups",
-              "validation", "group_validation_gate.R")
+    file.path(dirname(.char_ofile), "group_validation_gate.R")  # co-located (primary)
   else character(),
-  "../phase_7_karyotype_groups/validation/group_validation_gate.R",
-  "phase_7_karyotype_groups/validation/group_validation_gate.R",
-  Sys.getenv("GROUP_VALIDATION_GATE", "")
+  "group_validation_gate.R",
+  "phase_9_classification/group_validation_gate.R"
 )
 .gate_sourced <- FALSE
+.gate_source_path <- NA_character_
 for (.gf in .gate_file_candidates) {
   if (nzchar(.gf) && file.exists(.gf)) {
-    tryCatch({ source(.gf); .gate_sourced <- TRUE; break },
+    tryCatch({ source(.gf); .gate_sourced <- TRUE; .gate_source_path <- .gf; break },
              error = function(e) NULL)
   }
 }

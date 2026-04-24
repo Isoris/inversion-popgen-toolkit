@@ -1,6 +1,20 @@
 #!/usr/bin/env python3
 """
-bnd_sided_support.py — single-sided BND support at known candidates
+STEP_02_bnd_sided_support.py — single-sided BND support (STEP 2 of 4)
+
+=============================================================================
+PIPELINE POSITION
+=============================================================================
+  STEP 1  assembled-junction forensics       (q4_mechanism)
+→ STEP 2  single-sided BND support           (q7_existence_audit)  ← THIS SCRIPT
+  STEP 3A cross-species synteny bridge       (cross_species)
+  STEP 3B bp-pipeline bridge                 (bp_bridge)
+  STEP 4  structural-class assignment        (phase_9)
+
+Renamed from bnd_sided_support.py in pass 18 (2026-04-24). Dispatched
+by run_evidence_biology.sh after STEP 1. Output block is
+bnd_sided_support.json; STEP 4 loads it (currently for future tier-
+upgrade logic — the keys are extracted but not yet rules-consumed in v7).
 
 =============================================================================
 ROLE
@@ -291,7 +305,7 @@ def main():
         block = {
             "block_type": "bnd_sided_support",
             "candidate_id": cid,
-            "source_script": "bnd_sided_support.py",
+            "source_script": "STEP_02_bnd_sided_support.py",
             "data": data,
         }
         if not args.dry_run:
@@ -304,7 +318,7 @@ def main():
                         candidate_id=cid,
                         block_type="bnd_sided_support",
                         data=data,
-                        source_script="bnd_sided_support.py",
+                        source_script="STEP_02_bnd_sided_support.py",
                     )
                 except Exception as e:
                     print(f"[bnd_sided] {cid}: registry write failed: {e}",

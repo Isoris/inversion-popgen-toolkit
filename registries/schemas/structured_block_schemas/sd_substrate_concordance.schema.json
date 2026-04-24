@@ -1,0 +1,79 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "sd_substrate_concordance.schema.json",
+  "block_type": "sd_substrate_concordance",
+  "description": "Combined verdict from sd_substrate_minimap2 (Angle A, trusted) and sd_substrate_biser2 (Angle B, cross-check). Per-side concordance + candidate-level confidence. When angles disagree, minimap2 wins for the primary call but disagreement is preserved. Backward-compat mirrors into mechanism.schema.json (q4_sd_concordance, q4_mechanism_confidence) for STEP_04_assign_structural_class.py.",
+  "question": "Q4",
+  "group_validation_required": "NONE",
+  "source_script": "sd_substrate_concordance.R",
+  "required": [
+    "q4_sd_concordance_overall",
+    "q4_sd_confidence_overall"
+  ],
+  "properties": {
+    "q4_sd_concordance_left": {
+      "type": "string",
+      "description": "Per-side concordance for the LEFT breakpoint. Values: agree_nahr, agree_nhej, agree_nahr_weak, minimap2_stronger_nahr, disagree_biser2_missing, disagree_minimap2_missing, minimap2_only_nahr, minimap2_only_nhej, minimap2_only_weak, biser2_only_nahr, biser2_only_nhej, complex_flagged, no_data."
+    },
+    "q4_sd_concordance_right": {
+      "type": "string",
+      "description": "Per-side concordance for the RIGHT breakpoint. Same enum as left."
+    },
+    "q4_sd_concordance_overall": {
+      "type": "string",
+      "description": "Candidate-level verdict combining left + right. agree_nahr | agree_nhej | agree_nahr_weak | disagree | *_only | complex_flagged | mixed | no_data."
+    },
+    "q4_sd_confidence_left": {
+      "type": "string",
+      "enum": ["high", "medium", "low"]
+    },
+    "q4_sd_confidence_right": {
+      "type": "string",
+      "enum": ["high", "medium", "low"]
+    },
+    "q4_sd_confidence_overall": {
+      "type": "string",
+      "enum": ["high", "medium", "low"],
+      "description": "Worst of left + right."
+    },
+    "q4_sd_primary_call_source": {
+      "type": "string",
+      "enum": ["minimap2", "biser2", "none"],
+      "description": "Which angle drove the call. minimap2 wins when both present; biser2 only when Angle A is missing."
+    },
+    "q4_sd_primary_call": {
+      "type": "string",
+      "enum": ["NAHR", "NHEJ", "COMPLEX", "UNCERTAIN"],
+      "description": "Final NAHR/NHEJ call for this candidate."
+    },
+    "q4_sd_concordance": {
+      "type": "string",
+      "description": "Backward-compat mirror of q4_sd_concordance_overall for mechanism.schema.json consumers."
+    },
+    "q4_mechanism_confidence": {
+      "type": "string",
+      "enum": ["high", "medium", "low"],
+      "description": "Backward-compat mirror of q4_sd_confidence_overall."
+    },
+    "q4_sd_source_minimap2_block": {
+      "type": "string",
+      "description": "Path to sd_substrate_minimap2.json that fed this verdict (null if Angle A not run)."
+    },
+    "q4_sd_source_biser2_block": {
+      "type": "string",
+      "description": "Path to sd_substrate_biser2.json that fed this verdict (null if Angle B not run)."
+    }
+  },
+  "keys_extracted": [
+    { "key": "q4_sd_concordance_left",      "from": "q4_sd_concordance_left" },
+    { "key": "q4_sd_concordance_right",     "from": "q4_sd_concordance_right" },
+    { "key": "q4_sd_concordance_overall",   "from": "q4_sd_concordance_overall" },
+    { "key": "q4_sd_confidence_left",       "from": "q4_sd_confidence_left" },
+    { "key": "q4_sd_confidence_right",      "from": "q4_sd_confidence_right" },
+    { "key": "q4_sd_confidence_overall",    "from": "q4_sd_confidence_overall" },
+    { "key": "q4_sd_primary_call_source",   "from": "q4_sd_primary_call_source" },
+    { "key": "q4_sd_primary_call",          "from": "q4_sd_primary_call" },
+    { "key": "q4_sd_concordance",           "from": "q4_sd_concordance" },
+    { "key": "q4_mechanism_confidence",     "from": "q4_mechanism_confidence" }
+  ]
+}

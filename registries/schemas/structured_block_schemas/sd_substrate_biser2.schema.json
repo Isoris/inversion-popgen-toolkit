@@ -1,0 +1,69 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "sd_substrate_biser2.schema.json",
+  "block_type": "sd_substrate_biser2",
+  "description": "Angle B of NAHR substrate detection. Catalog lookup into pre-computed BISER2 segmental duplication output. Finds SD pairs with one copy straddling each of the candidate's two breakpoints. Cross-check against minimap2 (sd_substrate_minimap2). Pure interval overlap — no external binary required.",
+  "question": "Q4",
+  "group_validation_required": "NONE",
+  "source_script": "sd_substrate_biser2.R",
+  "required": [
+    "q4b_biser2_ran",
+    "q4b_biser2_nahr_class"
+  ],
+  "properties": {
+    "q4b_biser2_ran": {
+      "type": "boolean",
+      "description": "True if BISER2 catalog was parseable and processed."
+    },
+    "q4b_biser2_flank_bp": {
+      "type": "integer",
+      "description": "Flank window used for the straddle test."
+    },
+    "q4b_biser2_n_flanking_sds": {
+      "type": "integer",
+      "description": "Number of SD pairs where one copy is in the left flank zone and the other in the right flank zone (either assignment)."
+    },
+    "q4b_biser2_n_inverted": {
+      "type": "integer",
+      "description": "Inverted subset of flanking SDs (NAHR substrate candidates)."
+    },
+    "q4b_biser2_n_direct": {
+      "type": "integer",
+      "description": "Direct-orientation subset of flanking SDs (not NAHR substrate; often tandem duplication context)."
+    },
+    "q4b_biser2_best_inv_length": {
+      "type": "integer",
+      "description": "Longest SD (bp) of the inverted subset, or null if none."
+    },
+    "q4b_biser2_best_inv_identity": {
+      "type": "number",
+      "description": "Identity (%) of that longest inverted SD."
+    },
+    "q4b_biser2_nahr_class": {
+      "type": "string",
+      "enum": ["strong", "weak", "subthreshold", "direct_only", "none"],
+      "description": "strong = ≥1000 bp at ≥90% identity. weak = ≥500 bp at ≥85%. subthreshold = inverted but below thresholds. direct_only = only direct SDs present. none = no straddling SDs."
+    },
+    "q4b_biser2_catalog_path": {
+      "type": "string",
+      "description": "Path to the BISER2 catalog TSV used for this call (for audit)."
+    },
+    "q4b_biser2_flanking_tsv_path": {
+      "type": "string",
+      "description": "Path to flanking_sds.tsv written by this script."
+    },
+    "q4b_biser2_flanking_bed_path": {
+      "type": "string",
+      "description": "Path to flanking_sds.bed (BED9 with red/green itemRgb by orientation)."
+    }
+  },
+  "keys_extracted": [
+    { "key": "q4b_biser2_ran",                "from": "q4b_biser2_ran" },
+    { "key": "q4b_biser2_n_flanking_sds",     "from": "q4b_biser2_n_flanking_sds" },
+    { "key": "q4b_biser2_n_inverted",         "from": "q4b_biser2_n_inverted" },
+    { "key": "q4b_biser2_n_direct",           "from": "q4b_biser2_n_direct" },
+    { "key": "q4b_biser2_best_inv_length",    "from": "q4b_biser2_best_inv_length" },
+    { "key": "q4b_biser2_best_inv_identity",  "from": "q4b_biser2_best_inv_identity" },
+    { "key": "q4b_biser2_nahr_class",         "from": "q4b_biser2_nahr_class" }
+  ]
+}

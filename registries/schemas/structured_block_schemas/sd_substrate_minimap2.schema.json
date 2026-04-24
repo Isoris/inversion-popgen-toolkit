@@ -1,0 +1,88 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "sd_substrate_minimap2.schema.json",
+  "block_type": "sd_substrate_minimap2",
+  "description": "Angle A of NAHR substrate detection. minimap2 self-alignment on ±50 kb flanks around the candidate's two breakpoints. TRUSTED angle for NAHR call; BISER2 catalog lookup (sd_substrate_biser2) is a cross-check. Emits sorted BAM + strand-colored BED for IGV inspection. Flag set: -ax asm10 -X --eqx --secondary=yes -N 50 -p 0.1.",
+  "question": "Q4",
+  "group_validation_required": "NONE",
+  "source_script": "sd_substrate_minimap2.R",
+  "required": [
+    "q4a_mm2_ran",
+    "q4a_mm2_mechanism_left",
+    "q4a_mm2_mechanism_right"
+  ],
+  "properties": {
+    "q4a_mm2_ran": {
+      "type": "boolean",
+      "description": "True if minimap2 completed without error for this candidate."
+    },
+    "q4a_mm2_preset_used": {
+      "type": "string",
+      "enum": ["asm5", "asm10", "asm20", "map-hifi", "other"],
+      "description": "minimap2 preset selected via -ax. Default asm10."
+    },
+    "q4a_mm2_flank_bp": {
+      "type": "integer",
+      "description": "Flank window size extracted around each breakpoint."
+    },
+    "q4a_mm2_mechanism_left": {
+      "type": "string",
+      "enum": ["NAHR_CANDIDATE", "NAHR_POSSIBLE", "COMPLEX_ARCHITECTURE", "NHEJ_CANDIDATE"],
+      "description": "Mechanism call for the LEFT breakpoint. NAHR_CANDIDATE = ≥500 bp inverted hit at ≥85% identity. NAHR_POSSIBLE = ≥100 bp. COMPLEX = shorter hits only. NHEJ_CANDIDATE = no inverted hits at all."
+    },
+    "q4a_mm2_mechanism_right": {
+      "type": "string",
+      "enum": ["NAHR_CANDIDATE", "NAHR_POSSIBLE", "COMPLEX_ARCHITECTURE", "NHEJ_CANDIDATE"],
+      "description": "Mechanism call for the RIGHT breakpoint. Same enum as left."
+    },
+    "q4a_mm2_best_inv_length_left": {
+      "type": "integer",
+      "description": "Alignment length (bp) of the best inverted hit at the left breakpoint."
+    },
+    "q4a_mm2_best_inv_length_right": {
+      "type": "integer",
+      "description": "Alignment length (bp) of the best inverted hit at the right breakpoint."
+    },
+    "q4a_mm2_best_inv_identity_left": {
+      "type": "number",
+      "description": "Identity (%) of the best inverted hit at the left breakpoint."
+    },
+    "q4a_mm2_best_inv_identity_right": {
+      "type": "number",
+      "description": "Identity (%) of the best inverted hit at the right breakpoint."
+    },
+    "q4a_mm2_n_inverted_hits": {
+      "type": "integer",
+      "description": "Total inverted alignments across both flanks after post-filter."
+    },
+    "q4a_mm2_n_direct_hits": {
+      "type": "integer",
+      "description": "Total direct alignments across both flanks after post-filter."
+    },
+    "q4a_mm2_bam_path": {
+      "type": "string",
+      "description": "Absolute path to self_align.bam (sorted + indexed). Load in IGV for inspection."
+    },
+    "q4a_mm2_bed_path": {
+      "type": "string",
+      "description": "Absolute path to inverted_hits.bed (BED9 with red/green itemRgb by strand)."
+    },
+    "q4a_mm2_cmd_log": {
+      "type": "string",
+      "description": "Absolute path to self_align.cmd.txt containing exact minimap2 + samtools invocation."
+    }
+  },
+  "keys_extracted": [
+    { "key": "q4a_mm2_ran",                     "from": "q4a_mm2_ran" },
+    { "key": "q4a_mm2_preset_used",             "from": "q4a_mm2_preset_used" },
+    { "key": "q4a_mm2_mechanism_left",          "from": "q4a_mm2_mechanism_left" },
+    { "key": "q4a_mm2_mechanism_right",         "from": "q4a_mm2_mechanism_right" },
+    { "key": "q4a_mm2_best_inv_length_left",    "from": "q4a_mm2_best_inv_length_left" },
+    { "key": "q4a_mm2_best_inv_length_right",   "from": "q4a_mm2_best_inv_length_right" },
+    { "key": "q4a_mm2_best_inv_identity_left",  "from": "q4a_mm2_best_inv_identity_left" },
+    { "key": "q4a_mm2_best_inv_identity_right", "from": "q4a_mm2_best_inv_identity_right" },
+    { "key": "q4a_mm2_n_inverted_hits",         "from": "q4a_mm2_n_inverted_hits" },
+    { "key": "q4a_mm2_n_direct_hits",           "from": "q4a_mm2_n_direct_hits" },
+    { "key": "q4a_mm2_bam_path",                "from": "q4a_mm2_bam_path" }
+  ]
+}

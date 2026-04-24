@@ -2,9 +2,29 @@
 
 # =============================================================================
 # STEP_C01m_distance_concordance.R
+# =============================================================================
+# PIPELINE POSITION (phase_4_catalog)
+# =============================================================================
+#   STEP_C01g_boundary_catalog
+#                  │
+#                  ▼
+#   STEP_C01d_candidate_scoring  → candidate_scores.tsv.gz (the catalog)
+#                  │
+#                  ├──> STEP_C01e_candidate_figures
+#                  ├──> STEP_C01j_regime_compatibility
+#                  ├──> STEP_C01l_local_structure_segments
+# →                └──> STEP_C01m_distance_concordance  ← THIS SCRIPT
+#                  │       (runs in parallel with C01e/j/l after catalog birth)
+#                  ▼
+#   phase_5_qc_triage → phase_6..9
 #
-# MULTI-SCALE SAMPLE CONCORDANCE ANALYSIS
+# Writes registry block: distance_concordance
+#   consumed by phase_9 characterization and by the family-LD-vs-inversion
+#   discrimination used throughout Q3/Q6.
 #
+# =============================================================================
+# ROLE — MULTI-SCALE SAMPLE CONCORDANCE ANALYSIS
+# =============================================================================
 # For each chromosome, computes sample × sample co-grouping matrices at
 # multiple genomic distances (d = 80, 160, 320, 640 windows). Reveals
 # which sample pairs maintain group co-membership across distance:

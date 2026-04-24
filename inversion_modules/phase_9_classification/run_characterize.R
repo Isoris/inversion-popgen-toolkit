@@ -93,13 +93,14 @@ script_dir <- get_script_dir()
 
 # Candidate paths for gate.R (most-specific first). GROUP_VALIDATION_GATE
 # env var takes priority for explicit override.
+# Pass 16 (2026-04-24): gate moved to phase_9_classification/ (co-located
+# with its callers). Pass 20 (2026-04-24): phase_7 fallback + deprecation
+# stub deleted now that both live callers are migrated.
 gate_candidates <- c(
   Sys.getenv("GROUP_VALIDATION_GATE", ""),
-  file.path(script_dir, "..", "phase_7_karyotype_groups", "validation",
-            "group_validation_gate.R"),
-  "../phase_7_karyotype_groups/validation/group_validation_gate.R",
-  "phase_7_karyotype_groups/validation/group_validation_gate.R",
-  file.path(script_dir, "group_validation_gate.R")   # co-located fallback
+  file.path(script_dir, "group_validation_gate.R"),   # co-located (primary)
+  "group_validation_gate.R",
+  "phase_9_classification/group_validation_gate.R"
 )
 gate_file <- NA_character_
 for (p in gate_candidates) {
