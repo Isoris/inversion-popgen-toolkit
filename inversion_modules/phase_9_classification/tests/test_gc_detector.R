@@ -331,5 +331,137 @@ CHECK("T10: HOM_INV + REF-tract → direction = REF_in_INV_context",
       res10$tracts$direction == "REF_in_INV_context")
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Polarity fix (CODE_REVIEW_TO_FIGURE_OUT.md §7) — added 2026-04-24 chat D.
+#
+# The OLD fixed-threshold flagger assumed HOM_REF samples always sit at
+# dosage ≈ 0 at diagnostic SNPs. That's true when ANGSD's major allele is
+# the REF-arrangement-typical allele, which happens when the REF arrangement
+# is the common one. In a balanced cohort (e.g. LG28 at 60/106/60), some
+# diagnostic SNPs come out REVERSE-polarity — the REF-arrangement-typical
+# allele gets called MINOR, so HOM_REF samples sit at dosage ≈ 2 and HOM_INV
+# samples at dosage ≈ 0. The OLD code would flag every HOM_REF sample as
+# "INV-looking" at every reverse-polarity SNP → false positives.
+#
+# Test 11: a cohort with ALL diagnostic SNPs at reverse polarity, NO real
+#           tracts in any sample. The new detector should report zero
+#           tracts. (The old detector would report every HOM_REF sample
+#           having a tract across all 10 SNPs — caught by max_flagged_snps,
+#           so it'd be a fail-open rather than a full blow-up, but on a
+#           run where some REF samples had an accidental tolerance-tol gap
+#           the old detector would claim many fake tracts.)
+# Test 12: mixed polarity — half the SNPs forward, half reverse. A real
+#           3-SNP tract planted on one sample at forward-polarity SNPs. The
+#           new detector should find the one real tract and not flag the
+#           reverse-polarity SNPs that look like "opposite arrangement" in
+#           absolute dosage but actually match the sample's baseline class.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Helper: mk_mat_reverse treats R → 2 and I → 0 everywhere.
+mk_mat_reverse <- function(code_by_sample, snp_positions) {
+  mat <- mk_mat(code_by_sample, snp_positions)
+  # Flip R/I dosages: 0 ↔ 2. H (1) and NA stay.
+  mat <- ifelse(!is.na(mat) & mat == 0, 2,
+          ifelse(!is.na(mat) & mat == 2, 0, mat))
+  rownames(mat) <- names(code_by_sample)
+  mat
+}
+
+# Helper: mk_mat_mixed — per-SNP polarity vector of "+" / "-" chars.
+mk_mat_mixed <- function(code_by_sample, polarity, snp_positions) {
+  stopifnot(length(polarity) == length(snp_positions))
+  mat <- mk_mat(code_by_sample, snp_positions)
+  flip_cols <- which(polarity == "-")
+  for (j in flip_cols) {
+    col <- mat[, j]
+    col[!is.na(col) & col == 0] <- -1  # temp marker
+    col[!is.na(col) & col == 2] <- 0
+    col[!is.na(col) & col == -1] <- 2
+    mat[, j] <- col
+  }
+  mat
+}
+
+section("Test 11: all-reverse-polarity cohort, no real tracts")
+# 10 SNPs, all reverse polarity. TR is HOM_REF with no tract (all consistent
+# with the reverse-polarity REF baseline = dosage 2 everywhere).
+codes11 <- c(
+  TR = "RRRRRRRRRR",
+  R1 = "RRRRRRRRRR", R2 = "RRRRRRRRRR",
+  R3 = "RRRRRRRRRR", R4 = "RRRRRRRRRR",
+  I1 = "IIIIIIIIII", I2 = "IIIIIIIIII",
+  I3 = "IIIIIIIIII", I4 = "IIIIIIIIII", I5 = "IIIIIIIIII"
+)
+mat11 <- mk_mat_reverse(codes11, snp_pos)
+cls11 <- setNames(c("HOM_REF", rep("HOM_REF", 4), rep("HOM_INV", 5)),
+                  names(codes11))
+res11 <- detect_cohort_gene_conversion_v2(mat11, snp_pos, cls11,
+                                          candidate_id = "cand_test11")
+CHECK("T11: reverse-polarity + no real tracts → total_tracts == 0",
+      res11$total_tracts == 0L)
+CHECK("T11: reverse-polarity + no real tracts → total_samples_with_gc == 0",
+      res11$total_samples_with_gc == 0L)
+# The diagnostic-SNP set should still be non-empty — these ARE diagnostic
+# SNPs, just reverse-polarity. |AF_REF - AF_INV| = |1.0 - 0.0| = 1.0 >= 0.5.
+CHECK("T11: diagnostic mask still catches reverse-polarity SNPs",
+      res11$snp_qc$n_snps_pass_qc_diagnostic == 10L)
+
+section("Test 12: mixed polarity, one real 3-SNP tract at forward SNPs")
+# Polarity per SNP: alternating + / - across the 10 positions.
+#   SNPs at idx 1,3,5,7,9 are forward (+): R → 0, I → 2
+#   SNPs at idx 2,4,6,8,10 are reverse (-): R → 2, I → 0
+# Plant a 3-SNP tract in TR at SNP 3, 5, 7 (all forward): TR is HOM_REF
+# baseline, so the tract looks INV-like = dosage 2 at those positions.
+polarity12 <- c("+", "-", "+", "-", "+", "-", "+", "-", "+", "-")
+codes12 <- c(
+  TR = "RRIRIRIRR.",       # positions 3,5,7 = I-coded before polarity flip
+  R1 = "RRRRRRRRR.", R2 = "RRRRRRRRR.",
+  R3 = "RRRRRRRRR.", R4 = "RRRRRRRRR.",
+  I1 = "IIIIIIIIII", I2 = "IIIIIIIIII",
+  I3 = "IIIIIIIIII", I4 = "IIIIIIIIII", I5 = "IIIIIIIIII"
+)
+mat12 <- mk_mat_mixed(codes12, polarity12, snp_pos)
+cls12 <- setNames(c("HOM_REF", rep("HOM_REF", 4), rep("HOM_INV", 5)),
+                  names(codes12))
+res12 <- detect_cohort_gene_conversion_v2(mat12, snp_pos, cls12,
+                                          candidate_id = "cand_test12")
+# TR's tract-pattern on the forward SNPs (idx 3, 5, 7): dosage = 2 where REF
+# baseline predicts 0 → flagged. The reverse-polarity SNPs TR carries
+# (idx 1, 2, 4, 6, 8, 10 — all at "R" code, flipped to dosage 2 at reverse
+# sites) should be CONSISTENT with TR's HOM_REF baseline under the polarity-
+# aware rule, not flagged.
+# So expected: exactly one tract on TR, spanning SNPs 3–7 with two
+# tolerated/consistent SNPs inside (idx 4, 6 — reverse polarity, REF-
+# consistent = "consistent" state). Because consistent states BREAK a tract
+# in the walk logic, the tract as detected may be shorter than 5 SNPs — it
+# will break at the first consistent SNP. The test asserts only that there
+# IS a tract on TR and no spurious tracts elsewhere.
+CHECK("T12: mixed polarity — exactly 1 tract across cohort",
+      res12$total_tracts == 1L)
+CHECK("T12: mixed polarity — the one tract is on TR",
+      nrow(res12$tracts) == 1L && res12$tracts$sample_id == "TR")
+CHECK("T12: mixed polarity — no spurious tracts on R1..R4 or I*",
+      res12$total_samples_with_gc == 1L)
+# Diagnostic mask: every SNP is diagnostic, regardless of polarity.
+CHECK("T12: diagnostic mask catches all 10 SNPs regardless of polarity",
+      res12$snp_qc$n_snps_pass_qc_diagnostic == 10L)
+
+section("Test 13: diagnostic_snps block is populated with positions")
+# Re-use res1 from Test 1. Verify diagnostic_snps block is present with
+# positions_bp matching the 10 SNP positions (all diagnostic in T1).
+CHECK("T13: diagnostic_snps present in result",
+      !is.null(res$diagnostic_snps))
+CHECK("T13: diagnostic_snps$positions_bp is an integer vector",
+      is.integer(res$diagnostic_snps$positions_bp) ||
+      is.numeric(res$diagnostic_snps$positions_bp))
+CHECK("T13: diagnostic_snps$n matches length of positions_bp",
+      res$diagnostic_snps$n == length(res$diagnostic_snps$positions_bp))
+CHECK("T13: per_sample_summary has n_diagnostic_scanned column",
+      "n_diagnostic_scanned" %in% names(res$per_sample_summary))
+# TR has a 3-SNP tract so n_scanned should be 10 (all SNPs consistent or flag,
+# none skipped) — verify the denominator is populated sensibly.
+CHECK("T13: TR's n_diagnostic_scanned == 10 (full coverage at diagnostic SNPs)",
+      res$per_sample_summary[sample_id == "TR"]$n_diagnostic_scanned == 10L)
+
+# ─────────────────────────────────────────────────────────────────────────────
 cat("\n=== RESULTS: ", n_pass, " passed, ", n_fail, " failed ===\n", sep = "")
 if (n_fail > 0L) quit(status = 1L) else cat("ALL TESTS PASSED\n")

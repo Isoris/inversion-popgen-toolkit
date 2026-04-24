@@ -1,6 +1,57 @@
 #!/usr/bin/env Rscript
 # =============================================================================
-# lib_step03_seed_loader.R — Tier 1 seeding from STEP03 + sv_prior
+# lib_step03_seed_loader.R — Tier 1 k-means seeding for C01i decompose
+# =============================================================================
+#
+# WHAT "SEED" MEANS IN THIS FILE
+# ------------------------------
+# "Seed" here is a k-MEANS CENTROID SEED. C01i_decompose runs k-means (k=3)
+# on per-sample PC1 values across the candidate inversion to cluster samples
+# into HOM_REF / HET / HOM_INV groups. k-means needs initial centroids.
+# Random initialization produces unstable / arbitrary class labels. This
+# loader supplies principled initial centroids by pre-assigning confident
+# samples to each of the three classes from external priors. k-means then
+# starts from the means of those pre-assigned subsets.
+#
+# IT IS NOT: a random seed, a PRNG seed, the "seed" from the seed-extender
+#            in GHSL, or a genomic seed region. It is the anchor sample set
+#            that tells k-means "start HOM_REF cluster here, HET there,
+#            HOM_INV there."
+#
+# The companion function that actually consumes the seed set lives in
+# STEP_C01i_decompose.R::seeded_kmeans() — see that function for the exact
+# centroid-init math.
+#
+# THE TWO SEED SOURCES
+# --------------------
+# This loader combines TWO INDEPENDENT PRIORS, each of which can pre-assign
+# samples to HOM_REF / HET / HOM_INV classes based on different evidence:
+#
+#   1) sv_prior  (Cheat 1) — derived from SV-caller dosage signal.
+#      Pre-computed upstream; passed in as the `sv_prior_seeds` arg. This
+#      is the already-existing pathway.
+#
+#   2) STEP03    — short for the producer script
+#          inversion_modules/phase_3_refine/STEP_D03_statistical_tests_and_seeds.py
+#      Runs Fisher's exact test + Cochran-Armitage trend test on SV support
+#      counts per arrangement class, emits per-candidate TSVs at
+#          <step03_seeds_dir>/<inv_id>_seeds.tsv
+#      with columns (sample_id, assigned_class, p_value, n_supporting_snps).
+#      Samples surviving p ≤ 0.05 AND n_supporting_snps ≥ 5 are proposed as
+#      seeds for that class. This is the INDEPENDENT statistical-evidence
+#      pathway added by chat 9.
+#
+# The two sources ask different questions:
+#   sv_prior: "Does this sample's dosage pattern LOOK LIKE a
+#              REF/HET/INV carrier across the candidate?"
+#   STEP03:   "Does this sample's per-SV-call support COUNT AS significant
+#              for a REF/HET/INV assignment under Fisher/Armitage?"
+# Both converging on the same class for a sample is strong evidence.
+# Disagreement means neither is trustworthy enough to anchor k-means →
+# drop that sample from the seed set (conservative).
+#
+# =============================================================================
+# DESIGN HISTORY (chat-9 / chat-13)
 # =============================================================================
 # Implements chat-9 design §Tier 1 (Finding S closure):
 #
@@ -30,6 +81,7 @@
 #   "Remove the unsupervised k-means fallback. If neither seed source is
 #    available for a candidate, emit decomp_status = 'no_seeding' and skip."
 #
+# =============================================================================
 # USAGE in STEP_C01i_decompose.R (inline patch):
 #
 #   source("lib_step03_seed_loader.R")
@@ -41,8 +93,23 @@
 #   if (seeds$status == "no_seeding") {
 #     cat("[C01i_decompose]   SKIP: ", seeds$reason, "\n"); next
 #   }
-#   # seeds$seeds is a list(HOM_REF, HET, HOM_INV) of sample IDs for kmeans
+#   # seeds$seeds is a list(HOM_REF, HET, HOM_INV) of sample IDs — used as
+#   # the anchor set for the three k-means centroids.
 #   km <- seeded_kmeans(mean_pc1, seeds$seeds, k = opt$k_decomp)
+#
+# =============================================================================
+# GLOSSARY (quick reference)
+# =============================================================================
+#   seed             = sample pre-assigned to a class, used as centroid anchor
+#                      for the k=3 k-means that decomposes the cohort into
+#                      HOM_REF / HET / HOM_INV
+#   sv_prior         = seed source #1: Cheat 1 dosage-pattern prior
+#   STEP03           = seed source #2: Fisher+Armitage statistical test run
+#                      by STEP_D03_statistical_tests_and_seeds.py
+#   agreement        = both sources assign the same class to a sample → keep
+#   conflict         = sources assign different classes → DROP (both)
+#   no_seeding       = fewer than min_seeds_per_class (default 2) samples
+#                      survive in ANY of the three classes → skip candidate
 # =============================================================================
 
 suppressPackageStartupMessages({
@@ -52,9 +119,11 @@ suppressPackageStartupMessages({
 `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) b else a
 
 # =============================================================================
-# Load STEP03 seed file for a candidate
+# Load STEP03 seed file for a candidate (source #2 of the two seed sources)
 # =============================================================================
-# STEP03 writes one TSV per inversion candidate at:
+# STEP03 = inversion_modules/phase_3_refine/STEP_D03_statistical_tests_and_seeds.py
+# That script runs Fisher's exact test + Cochran-Armitage trend test per
+# candidate and emits one TSV per inversion at:
 #   <step03_seeds_dir>/<inv_id>_seeds.tsv
 #
 # Expected columns:
@@ -63,10 +132,11 @@ suppressPackageStartupMessages({
 #
 # Filters samples where p_value <= 0.05 AND n_supporting_snps >= min_snps
 # (default 5). Anything below this is considered unreliable and dropped
-# from the seed set.
+# from the seed set — such samples will not anchor any k-means centroid.
 #
 # Returns a named list(HOM_REF, HET, HOM_INV) of sample_id character vectors.
-# Returns NULL if the file doesn't exist.
+# Returns NULL if the file doesn't exist (→ caller falls back to sv_prior
+# alone, or if that's also absent, no_seeding and the candidate is skipped).
 # =============================================================================
 load_step03_seeds <- function(inv_id, step03_seeds_dir,
                                  p_value_thresh = 0.05,
@@ -114,24 +184,39 @@ load_step03_seeds <- function(inv_id, step03_seeds_dir,
 # =============================================================================
 # Combine sv_prior + STEP03 seeds with priority and disagreement rules
 # =============================================================================
-# chat-9 §Tier 1: "Union the agreeing subsets; drop the disagreeing ones
-# from the seed set rather than forcing a pick. Priority: sv_prior >
-# STEP03 if they conflict."
+# "Tier 1 seeds" = the final sample→class assignments that will anchor the
+# three k-means centroids in C01i_decompose::seeded_kmeans(). "Tier 1"
+# distinguishes this from any downstream tier that further refines the
+# k-means output (e.g. Tier 2 validation in C01f).
 #
-# Concretely:
-#   - For each sample present in both sources:
-#       - both assign same class → keep in seed set for that class
-#       - different classes → DROP from seed set entirely (don't use as seed)
-#   - For samples only in one source: keep with that source's class
-#   - Final seeds = union of agreeing samples + single-source samples
+# chat-9 §Tier 1 rule: "Union the agreeing subsets; drop the disagreeing
+# ones from the seed set rather than forcing a pick. Priority: sv_prior >
+# STEP03 if they conflict."  See top-of-file NOTE re: chat-13 finding AY
+# — genuine conflict drops both sources, priority-pick applies only in
+# agreement cases.
+#
+# Concretely, for each sample:
+#   - in BOTH sources with SAME class  → keep in seed set for that class
+#   - in BOTH sources with DIFFERENT class → DROP from seed set entirely
+#     (conservative: if the two sources disagree, neither can be trusted
+#      to anchor k-means for this sample)
+#   - in ONLY ONE source → keep with that source's class
+# Final seed list per class = union(agreeing samples, single-source samples).
 #
 # Returns list:
 #   status ∈ {"ok", "sv_prior_only", "step03_only", "no_seeding"}
-#   reason   — character string if no_seeding
-#   seeds    — list(HOM_REF, HET, HOM_INV) — only populated if status != no_seeding
-#   n_agree  — count of samples where both sources agreed
-#   n_conflict — count of samples where sources disagreed (dropped)
-#   source   — character summary
+#     ok            — both sources available, seeds populated from the
+#                     combined set, all three classes have ≥ min_seeds_per_class
+#     sv_prior_only — only sv_prior available, passed through
+#     step03_only   — only STEP03 available, passed through
+#     no_seeding    — neither available OR combined set too sparse after
+#                     conflict drops → caller MUST skip the candidate
+#                     (unsupervised k-means fallback was removed per chat-9)
+#   reason     — character string if no_seeding, else NA
+#   seeds      — list(HOM_REF, HET, HOM_INV) of sample_ids, NULL if no_seeding
+#   n_agree    — count of samples where BOTH sources agreed on class
+#   n_conflict — count of samples where sources DISAGREED (dropped)
+#   source     — character label, useful for logging
 # =============================================================================
 combine_tier1_seeds <- function(chr, cid, start_bp, end_bp,
                                    sv_prior_seeds = NULL,

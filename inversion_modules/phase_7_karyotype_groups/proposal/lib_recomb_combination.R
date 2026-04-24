@@ -493,8 +493,8 @@ combine_sample_recomb <- function(r_row, g_row,
 #   r_dt: data.table from derive_R_from_regime (sample_id, R_fired, ...)
 #   g_dt: data.table from ghsl_per_sample_in_interval (sample_id, ghsl_call)
 #   g_resolution: "sufficient" / "insufficient" / "no_annot"
-#   gc_summary: data.table from detect_cohort_gene_conversion()$summary
-#               (sample_id, n_tracts, flank_dosage, detector)
+#   gc_summary: data.table from detect_cohort_gene_conversion_v2()$per_sample_summary
+#               (sample_id, n_tracts, baseline_class, flank_dosage, detector)
 #   aux_dt: optional data.table(sample_id, s2_phase_switches,
 #             s3_sv_prior_hemi)
 # =============================================================================

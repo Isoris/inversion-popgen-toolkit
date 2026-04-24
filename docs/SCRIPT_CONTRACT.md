@@ -40,6 +40,10 @@ REGISTRY_CONTRACT
              keys_extracted>
       status: WIRED | PRODUCES_BUT_NOT_WIRED | BLOCKED_ON_<reason>
       [note: <free text, optional>]
+  KEYS_WRITTEN:                  # optional; only for flat add_evidence writes
+    - <flat_key_name>
+      status: WIRED | OVERWRITTEN_BY_<script> | BLOCKED_ON_<reason>
+      [note: <free text, optional>]
   KEYS_IN:
     - <key>: <which script writes it, if known; or "— (from iv_dt)" etc.>
     [or "none" when the script reads no registry keys]
@@ -65,6 +69,40 @@ REGISTRY_CONTRACT
       upstream producer doesn't compute.
     - `BLOCKED_ON_MISSING_UPSTREAM_COMPUTATION` — a required computation
       doesn't live anywhere in the codebase yet.
+
+When the script writes via a helper and the helper file carries the
+`BLOCKS_WRITTEN` contract for that schema (see
+`utils/registry_key_helpers.R`), declare **`BLOCKS_WRITTEN: none`** in the
+caller and add a free-form `note_on_blocks:` explaining which helper owns
+the write. Declaring the same block again at the caller would trigger
+a multi-claimant warning and obscure which site actually touches the
+registry.
+
+### KEYS_WRITTEN semantics
+
+For scripts that write **flat keys** via `reg$evidence$add_evidence(cid, key, value)`
+— i.e. without going through a block schema. The registry accepts these as
+top-level evidence entries, bypassing the schema's `keys_extracted` machinery.
+Typical use: quick diagnostic flags, validation verdicts, or cross-script
+signals that don't warrant their own schema.
+
+Each entry is a bare `- <flat_key_name>` line (no colon, no schema path),
+followed by optional indented `status:` and `note:` sub-fields.
+
+- `status`:
+  - `WIRED` — script currently writes the key via `add_evidence`.
+  - `OVERWRITTEN_BY_<script>` — this is an initial/placeholder write; a
+    downstream script later writes the same key (often through a block
+    schema) as part of a synthesis/promotion step. The scanner requires the
+    `note:` field to acknowledge the overlap when the key also appears in
+    some block's `keys_extracted` (words to include: "overwritten", "collide",
+    "collision", "last-write-wins", "race", "placeholder").
+  - `BLOCKED_ON_<reason>` — same reason tags as BLOCKS_WRITTEN.
+
+Collision check: the scanner warns if a `KEYS_WRITTEN` key is also listed in
+some WIRED `BLOCKS_WRITTEN` entry's `keys:` list — unless the note field
+acknowledges it. That warning catches cases where two scripts are writing
+the same flat key without a deliberate last-write-wins decision.
 
 ### KEYS_IN semantics
 
@@ -111,21 +149,55 @@ REGISTRY_CONTRACT
   KEYS_IN: none
 ```
 
+## Example — caller with flat add_evidence writes
+
+Pattern for scripts that delegate their block write to a helper (whose own
+contract covers the block) but also emit a handful of flat keys via
+`reg$evidence$add_evidence`:
+
+```
+REGISTRY_CONTRACT
+  BLOCKS_WRITTEN: none
+    note_on_blocks:
+      frequency block write is delegated to register_C01i_frequency_block
+      in utils/registry_key_helpers.R; the helper's REGISTRY_CONTRACT
+      owns the frequency schema claim.
+  KEYS_WRITTEN:
+    - q6_group_validation
+      status: OVERWRITTEN_BY_C01f
+      note: Initial UNCERTAIN write (with quality_flag). C01f's
+            hypothesis_verdict block keys_extracted rule re-emits the
+            same flat key after the promotion step — last-write-wins.
+    - q2_decomp_quality_flags
+      status: WIRED
+      note: Flat-only (no schema).
+    - q6_validation_promotion_cap
+      status: WIRED
+      note: Flat-only; conditional write.
+  KEYS_IN: none
+```
+
 ## Scanner
 
 `tools/scan_script_contracts.py` walks a directory tree and:
 
 1. For every `.R` / `.py` / `.sh` file, looks for a `REGISTRY_CONTRACT` block
    in the first 200 lines.
-2. Parses out each `BLOCKS_WRITTEN` entry.
+2. Parses out each `BLOCKS_WRITTEN` entry and (optionally) each
+   `KEYS_WRITTEN` entry.
 3. For each `(block_type, schema_path)` pair:
    - Verifies the schema file exists.
    - Parses `keys_extracted` from the schema.
    - Checks the contract's `keys:` list is a subset of the schema's
      extracted keys (or empty, for blocked/not-wired statuses).
    - Flags any orphan schema-declared keys not claimed by any contract.
-4. Reports summary by status (WIRED / PRODUCES_BUT_NOT_WIRED / BLOCKED_ON_*).
-5. Non-zero exit if any WIRED contract names a key that isn't in its
+4. For each `KEYS_WRITTEN` flat-key entry:
+   - Checks the status is recognized (`WIRED`, `OVERWRITTEN_BY_*`,
+     `BLOCKED_ON_*`).
+   - Warns if the same flat key is also claimed by a WIRED block writer
+     unless the `note:` field acknowledges the overlap.
+5. Reports summary by status for both BLOCKS_WRITTEN and KEYS_WRITTEN.
+6. Non-zero exit if any WIRED contract names a key that isn't in its
    schema's `keys_extracted` (drift from writer to schema).
 
 ## Adoption

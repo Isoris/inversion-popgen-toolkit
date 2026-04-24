@@ -42,6 +42,46 @@
 #   --outdir       fallback for this script's outputs
 #   --tier_max     default 3
 # =============================================================================
+# REGISTRY_CONTRACT
+#   BLOCKS_WRITTEN: none
+#     note_on_blocks:
+#       This script writes the `frequency` block but via the helper
+#       `register_C01i_frequency_block` (utils/registry_key_helpers.R,
+#       L865). The helper file holds the WIRED BLOCKS_WRITTEN contract
+#       for the frequency schema. Seal is a CALLER, not the write site,
+#       so declaring frequency here would trigger a multi-claimant
+#       warning. See the helper's REGISTRY_CONTRACT block for the 17
+#       q6_* keys and the Option A split (seal writes the partial block;
+#       C01f later updates family_linkage/polymorphism_class via
+#       update_C01f_frequency_linkage).
+#   KEYS_WRITTEN:
+#     - q6_group_validation
+#       status: OVERWRITTEN_BY_C01f
+#       note: Flat add_evidence write at L385 with initial value UNCERTAIN
+#             (or UNCERTAIN+composite_cap when composite_flag=likely_composite).
+#             hypothesis_verdict.schema.json has a keys_extracted rule
+#             mapping group_validation_after -> q6_group_validation, so
+#             C01f's hypothesis_verdict block write re-emits the same
+#             flat key after the validation promotion step. Last-write-wins
+#             semantics; this is intentional (seal's cap propagates to
+#             C01f via reg$evidence$get_evidence at
+#             STEP_C01f_hypothesis_tests.R L2339).
+#     - q2_decomp_quality_flags
+#       status: WIRED
+#       note: Flat add_evidence write at L398. Comma-joined list of
+#             validation flags (composite_cap, low_silhouette, weak_k3_fit,
+#             low_phase, normal). Not in any structured schema — pure
+#             diagnostic/provenance. Downstream may read via
+#             reg$evidence$get_evidence to gate promotion.
+#     - q6_validation_promotion_cap
+#       status: WIRED
+#       note: Flat add_evidence write at L403; conditional (only when
+#             valid$promotion_cap is non-NA). Not in any structured
+#             schema — signals to C01f the maximum promotion level it
+#             may apply to q6_group_validation during hypothesis-test
+#             synthesis. C01f reads and honors this.
+#   KEYS_IN: none
+# =============================================================================
 
 suppressPackageStartupMessages({
   library(data.table)

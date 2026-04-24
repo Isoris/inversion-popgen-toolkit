@@ -84,15 +84,27 @@
 #     params                 = list(…thresholds used…)
 #   )
 #
-# CALLED FROM: STEP_C01i_b_multi_recomb.R (or a dedicated driver) with:
+# CALLED FROM: RUN_gene_conversion_detector.R (driver wired 2026-04-24 chat D;
+# before that this detector was orphaned — built + tested but never called
+# from production). The driver's per-candidate loop invokes:
+#
 #   detect_cohort_gene_conversion_v2(dosage_mat, snp_pos, snp_info,
 #                                    baseline_class_by_sample,
 #                                    candidate_id = cid, …)
-# where dosage_mat is samples × SNPs, snp_pos is a bp vector of length
-# ncol(dosage_mat), snp_info is an optional data.table with per-SNP QC
-# columns (call_rate, het_fraction, maf, depth_z), and
-# baseline_class_by_sample is a named character vector with values in
-# {HOM_REF, HET, HOM_INV, AMBIGUOUS}.
+#
+# where dosage_mat is samples × SNPs (sliced from the per-chromosome
+# DOSAGE_DIR files to the candidate interval), snp_pos is the parallel
+# bp vector from <chr>.sites.tsv.gz, snp_info is an optional data.table
+# with per-SNP QC columns (call_rate, het_fraction, maf, depth_z; not
+# currently populated by the driver — relying on detector's fallback
+# computation from dosage_mat alone), and baseline_class_by_sample is a
+# named character vector with values in {HOM_REF, HET, HOM_INV, AMBIGUOUS}
+# pulled from STEP_C01i_decompose's per_window_class.rds. Output is
+# written both as JSON (for STEP_C01i_b_multi_recomb's load_gc_for_cid
+# to consume via --gc_dir) and as a registry block (so the three flat
+# keys q2_gc_total_tracts, q2_gc_total_samples_with_gc,
+# q2_gc_n_snps_pass_qc_diagnostic surface via the schema's
+# keys_extracted rule).
 # =============================================================================
 
 suppressPackageStartupMessages({
@@ -178,24 +190,37 @@ snp_qc_mask <- function(dosage_mat, snp_info = NULL,
 # =============================================================================
 # Step 2: diagnostic-SNP mask
 # =============================================================================
+# =============================================================================
 # For each QC-clean SNP, compute AF in HOM_REF and HOM_INV samples (using
 # baseline_class_by_sample). Mark the SNP DIAGNOSTIC iff
 # |AF_REF − AF_INV| ≥ min_delta_af. Returns a logical vector (same length
 # as ncol(dosage_mat)); non-QC SNPs and SNPs without enough baseline-class
 # samples return FALSE.
+#
+# Attributes on the returned mask (added 2026-04-24 chat D for the polarity
+# fix in review §7):
+#   attr(., "af_ref")  — per-SNP AF in HOM_REF samples, length ncol(dosage_mat).
+#   attr(., "af_inv")  — per-SNP AF in HOM_INV samples, length ncol(dosage_mat).
+# scan_one_sample consumes these to do the polarity-aware flagging (sample's
+# dosage closer to the OTHER group's per-SNP mean than to its OWN). External
+# callers that don't need the attributes just use the vector as before.
 # =============================================================================
 diagnostic_snp_mask <- function(dosage_mat, baseline_class_by_sample,
                                    qc_mask, min_delta_af = 0.5,
                                    min_per_class = 3L) {
   sids <- rownames(dosage_mat)
   if (is.null(sids)) stop("[gc_detector] dosage_mat needs rownames")
+  nS <- ncol(dosage_mat)
 
   cls <- baseline_class_by_sample[sids]
   ref_idx <- which(cls == "HOM_REF")
   inv_idx <- which(cls == "HOM_INV")
 
   if (length(ref_idx) < min_per_class || length(inv_idx) < min_per_class) {
-    return(rep(FALSE, ncol(dosage_mat)))
+    out <- rep(FALSE, nS)
+    attr(out, "af_ref") <- rep(NA_real_, nS)
+    attr(out, "af_inv") <- rep(NA_real_, nS)
+    return(out)
   }
 
   af_ref <- colMeans(dosage_mat[ref_idx, , drop = FALSE], na.rm = TRUE) / 2
@@ -203,7 +228,10 @@ diagnostic_snp_mask <- function(dosage_mat, baseline_class_by_sample,
 
   diag_delta <- abs(af_ref - af_inv)
   diag_delta[is.nan(diag_delta) | is.na(diag_delta)] <- 0
-  qc_mask & (diag_delta >= min_delta_af)
+  mask <- qc_mask & (diag_delta >= min_delta_af)
+  attr(mask, "af_ref") <- af_ref
+  attr(mask, "af_inv") <- af_inv
+  mask
 }
 
 # =============================================================================
@@ -231,7 +259,26 @@ scan_one_sample <- function(sid, dosage_row, snp_pos, diag_mask,
                                min_run       = 2L,
                                max_tolerance = 1L,
                                max_span_bp   = 20000L,
-                               max_flagged_snps = 10L) {
+                               max_flagged_snps = 10L,
+                               af_ref        = NULL,
+                               af_inv        = NULL) {
+
+  # af_ref / af_inv: per-SNP allele-freq vectors (length = length(snp_pos)),
+  # typically pulled off diag_mask via attr(diag_mask, "af_ref") /
+  # attr(., "af_inv"). When both are provided, the scan uses POLARITY-AWARE
+  # flagging: at each diagnostic SNP i, a sample is flagged iff its dosage
+  # is closer to the OTHER arrangement's per-SNP group mean than to its OWN.
+  # This is the fix for CODE_REVIEW_TO_FIGURE_OUT.md §7 — the previous
+  # fixed-threshold rule (dosage >= 1.5 → flag for HOM_REF, dosage <= 0.5 →
+  # flag for HOM_INV) assumed HOM_REF always sits at low dosage, which is
+  # only true when ANGSD's major/minor call aligns with arrangement polarity.
+  # In a balanced cohort a non-trivial fraction of diagnostic SNPs have
+  # reverse polarity (HOM_REF at dosage ≈ 2) and the old rule produced false
+  # positives at every such SNP.
+  #
+  # When af_ref / af_inv are NULL (no attrs, legacy caller), we fall back to
+  # the old fixed-threshold rule with a one-line warning so the back-compat
+  # path is auditable. Any new caller should pass them.
 
   empty <- data.table(
     sample_id = character(), tract_start_bp = integer(),
@@ -243,15 +290,18 @@ scan_one_sample <- function(sid, dosage_row, snp_pos, diag_mask,
     direction = character()
   )
 
+  # Return shape: list(tracts = data.table, n_scanned = integer).
+  empty_return <- list(tracts = empty, n_scanned = 0L)
+
   # HET samples: ambiguous per-haplotype at 9x — skip.
   # AMBIGUOUS / unknown: also skip.
   if (is.na(baseline_class) || !(baseline_class %in% c("HOM_REF", "HOM_INV"))) {
-    return(empty)
+    return(empty_return)
   }
 
   # Restrict to diagnostic-QC-clean SNPs, in genomic order
   idx <- which(diag_mask)
-  if (length(idx) < min_run) return(empty)
+  if (length(idx) < min_run) return(empty_return)
   ord <- order(snp_pos[idx])
   idx <- idx[ord]
   d   <- dosage_row[idx]
@@ -259,20 +309,63 @@ scan_one_sample <- function(sid, dosage_row, snp_pos, diag_mask,
 
   # Classify each position for this sample
   state <- character(length(idx))
-  if (baseline_class == "HOM_REF") {
-    state[!is.na(d) & d <= 0.5]                <- "consistent"   # REF-looking
-    state[!is.na(d) & d >= 1.5]                <- "flag"         # INV-looking
-    state[!is.na(d) & d >  0.5 & d <  1.5]     <- "skip"         # HET-looking
-    state[is.na(d)]                            <- "skip"         # missing
-  } else {  # HOM_INV
-    state[!is.na(d) & d >= 1.5]                <- "consistent"
-    state[!is.na(d) & d <= 0.5]                <- "flag"
-    state[!is.na(d) & d >  0.5 & d <  1.5]     <- "skip"
-    state[is.na(d)]                            <- "skip"
+
+  use_polarity_aware <- !is.null(af_ref) && !is.null(af_inv)
+  if (use_polarity_aware) {
+    # Per-SNP group means at the diagnostic-SNP subset (dosage scale, 0..2)
+    mean_ref <- 2 * af_ref[idx]
+    mean_inv <- 2 * af_inv[idx]
+    # For each SNP, the sample's "own" mean is the one for its baseline class.
+    own_mean   <- if (baseline_class == "HOM_REF") mean_ref else mean_inv
+    other_mean <- if (baseline_class == "HOM_REF") mean_inv else mean_ref
+
+    # Distance to each mean
+    d_own   <- abs(d - own_mean)
+    d_other <- abs(d - other_mean)
+
+    # Required separation in distance terms: the two means differ by at
+    # least min_delta_af * 2 (≥ 1.0 by default). A sample lies closer to
+    # OTHER than to OWN when d_other < d_own, and we also require the
+    # sample to be "meaningfully" on the other side — i.e. closer to OTHER
+    # than halfway between the two means. This latter gate avoids flagging
+    # samples with dosage exactly between the two (e.g. 1.0 at an SNP
+    # where mean_ref=0.1, mean_inv=1.9 — an intermediate value is not a
+    # confident "other-arrangement" signal).
+    half <- abs(own_mean - other_mean) / 2
+    flag_mask       <- !is.na(d) & d_other < d_own & d_own >= half
+    consistent_mask <- !is.na(d) & d_own   < d_other & d_other >= half
+    skip_mask       <- !is.na(d) & !flag_mask & !consistent_mask
+    state[flag_mask]       <- "flag"
+    state[consistent_mask] <- "consistent"
+    state[skip_mask]       <- "skip"
+    state[is.na(d)]        <- "skip"
+  } else {
+    # Legacy fixed-threshold fallback (fired when no af_ref/af_inv passed).
+    # Emits a single warning per call to keep this auditable but non-noisy.
+    warning("[gc_detector] scan_one_sample called without af_ref/af_inv — ",
+            "falling back to fixed-polarity flagging. This is the pre-chat-D ",
+            "behavior and is incorrect at reverse-polarity diagnostic SNPs ",
+            "(review §7). Pass af_ref/af_inv from attr(diag_mask, ...).")
+    if (baseline_class == "HOM_REF") {
+      state[!is.na(d) & d <= 0.5]                <- "consistent"
+      state[!is.na(d) & d >= 1.5]                <- "flag"
+      state[!is.na(d) & d >  0.5 & d <  1.5]     <- "skip"
+      state[is.na(d)]                            <- "skip"
+    } else {
+      state[!is.na(d) & d >= 1.5]                <- "consistent"
+      state[!is.na(d) & d <= 0.5]                <- "flag"
+      state[!is.na(d) & d >  0.5 & d <  1.5]     <- "skip"
+      state[is.na(d)]                            <- "skip"
+    }
   }
 
+  # Count scanned diagnostic positions for this sample (non-skip).
+  n_scanned <- as.integer(sum(state %in% c("consistent", "flag")))
+
   # Sanity: if no flags, no tracts.
-  if (!any(state == "flag")) return(empty)
+  if (!any(state == "flag")) {
+    return(list(tracts = empty, n_scanned = n_scanned))
+  }
 
   # Walk: find maximal tracts that
   #   - start on a "flag"
@@ -350,7 +443,8 @@ scan_one_sample <- function(sid, dosage_row, snp_pos, diag_mask,
     i <- last_flag_i + 1L
   }
 
-  if (length(tracts) == 0L) empty else rbindlist(tracts)
+  tracts_dt <- if (length(tracts) == 0L) empty else rbindlist(tracts)
+  list(tracts = tracts_dt, n_scanned = n_scanned)
 }
 
 # =============================================================================
@@ -390,32 +484,49 @@ detect_cohort_gene_conversion_v2 <- function(dosage_mat, snp_pos,
   qc_drops <- attr(qc_mask, "drop_counts")
   n_pass_qc <- sum(qc_mask, na.rm = TRUE)
 
-  # Step 2: diagnostic mask
+  # Step 2: diagnostic mask (carries af_ref/af_inv as attributes since
+  # chat D — see diagnostic_snp_mask header)
   diag_mask <- diagnostic_snp_mask(dosage_mat, baseline_class_by_sample,
                                    qc_mask, min_delta_af = min_delta_af,
                                    min_per_class = min_per_class)
   n_pass_qc_diag   <- sum(diag_mask, na.rm = TRUE)
   n_dropped_nondiag<- n_pass_qc - n_pass_qc_diag
+  af_ref_v <- attr(diag_mask, "af_ref")
+  af_inv_v <- attr(diag_mask, "af_inv")
+
+  # Capture the positions behind the diagnostic mask, in genomic order.
+  # Added 2026-04-24 (chat D) for auditability — schema now exposes a
+  # diagnostic_snps block field so downstream consumers can see WHICH
+  # positions drove the call, not just how many there were.
+  diag_idx       <- which(diag_mask)
+  diag_pos_ordered <- sort(as.integer(snp_pos[diag_idx]))
 
   # Steps 3–7: per-sample scan
   summary_rows <- vector("list", length(sids))
   tract_rows   <- vector("list", length(sids))
+  per_sample_n_scanned <- integer(length(sids))
+  names(per_sample_n_scanned) <- sids
   for (i in seq_along(sids)) {
     sid <- sids[i]
     cls <- baseline_class_by_sample[sid]
     if (is.null(cls) || is.na(cls)) cls <- NA_character_
-    tr <- scan_one_sample(
+    sr <- scan_one_sample(
       sid, dosage_mat[i, ], snp_pos, diag_mask, cls,
       min_run = min_run, max_tolerance = max_tolerance,
-      max_span_bp = max_span_bp, max_flagged_snps = max_flagged_snps
+      max_span_bp = max_span_bp, max_flagged_snps = max_flagged_snps,
+      af_ref = af_ref_v, af_inv = af_inv_v
     )
+    # scan_one_sample returns list(tracts, n_scanned) as of 2026-04-24.
+    tr <- sr$tracts
+    per_sample_n_scanned[sid] <- sr$n_scanned
     tract_rows[[i]]   <- tr
     summary_rows[[i]] <- data.table(
-      sample_id      = sid,
-      n_tracts       = nrow(tr),
-      baseline_class = cls,
-      flank_dosage   = NA_real_,
-      detector       = "per_snp_runlength_v1"
+      sample_id              = sid,
+      n_tracts               = nrow(tr),
+      baseline_class         = cls,
+      n_diagnostic_scanned   = as.integer(sr$n_scanned),
+      flank_dosage           = NA_real_,
+      detector               = "per_snp_runlength_v1"
     )
   }
 
@@ -433,6 +544,31 @@ detect_cohort_gene_conversion_v2 <- function(dosage_mat, snp_pos,
     n_dropped_non_diagnostic   = as.integer(n_dropped_nondiag)
   )
 
+  # Per-sample scanned-count summary stats for the aggregates in keys.tsv.
+  scanned_stats <- if (length(per_sample_n_scanned) > 0L) {
+    list(
+      n_samples_scannable      = as.integer(sum(per_sample_n_scanned > 0L)),
+      mean_n_scanned_per_sample = round(mean(per_sample_n_scanned), 2),
+      min_n_scanned_per_sample  = as.integer(min(per_sample_n_scanned)),
+      max_n_scanned_per_sample  = as.integer(max(per_sample_n_scanned))
+    )
+  } else {
+    list(n_samples_scannable = 0L, mean_n_scanned_per_sample = NA_real_,
+         min_n_scanned_per_sample = NA_integer_,
+         max_n_scanned_per_sample = NA_integer_)
+  }
+
+  diagnostic_snps_block <- list(
+    # Scalar aggregates (also lifted into keys_extracted)
+    n                         = as.integer(n_pass_qc_diag),
+    n_samples_scannable       = scanned_stats$n_samples_scannable,
+    mean_n_scanned_per_sample = scanned_stats$mean_n_scanned_per_sample,
+    min_n_scanned_per_sample  = scanned_stats$min_n_scanned_per_sample,
+    max_n_scanned_per_sample  = scanned_stats$max_n_scanned_per_sample,
+    # Full position vector (integer bp, genomic order)
+    positions_bp              = diag_pos_ordered
+  )
+
   list(
     candidate_id           = candidate_id,
     per_sample_summary     = summary,
@@ -440,6 +576,7 @@ detect_cohort_gene_conversion_v2 <- function(dosage_mat, snp_pos,
     total_tracts           = as.integer(nrow(tracts)),
     total_samples_with_gc  = as.integer(sum(summary$n_tracts > 0L)),
     snp_qc                 = snp_qc_block,
+    diagnostic_snps        = diagnostic_snps_block,
     params                 = list(
       min_run          = as.integer(min_run),
       max_tolerance    = as.integer(max_tolerance),
@@ -455,33 +592,14 @@ detect_cohort_gene_conversion_v2 <- function(dosage_mat, snp_pos,
 }
 
 # =============================================================================
-# Back-compat shim
+# Legacy shim removed 2026-04-24 (chat D)
 # =============================================================================
-# Old callers used detect_cohort_gene_conversion(dosage_mat, snp_pos, ...).
-# Without baseline_class_by_sample we cannot run the per-SNP detector, so
-# the shim emits a warning and returns an empty block with the legacy-shape
-# summary columns populated. Call sites that want real output must migrate
-# to detect_cohort_gene_conversion_v2().
+# detect_cohort_gene_conversion() (windowed-binning, no baseline_class)
+# was a no-op warning stub kept for back-compat. A cohort-wide grep found
+# zero live callers at the time of removal. The only off-file reference
+# was a stale comment in lib_recomb_combination.R (fixed in the same
+# pass). If you land here looking for the old function, the migration
+# is: call detect_cohort_gene_conversion_v2() instead and pass a
+# baseline_class_by_sample named character vector (values
+# HOM_REF / HET / HOM_INV / AMBIGUOUS).
 # =============================================================================
-detect_cohort_gene_conversion <- function(dosage_mat, snp_pos,
-                                              window_snps = 40L,
-                                              step_snps = 10L,
-                                              max_tract_bins = 5L,
-                                              min_magnitude = 0.5) {
-  warning("[gc_detector] detect_cohort_gene_conversion() is the LEGACY shim; ",
-          "the per-SNP detector requires baseline_class_by_sample. ",
-          "Migrate to detect_cohort_gene_conversion_v2().")
-  sids <- rownames(dosage_mat) %||% character(0)
-  list(
-    summary = data.table(
-      sample_id    = sids,
-      n_tracts     = rep(0L, length(sids)),
-      flank_dosage = rep(NA_real_, length(sids)),
-      detector     = rep("legacy_shim_noop", length(sids))
-    ),
-    tracts_by_sample = setNames(
-      lapply(sids, function(x) data.table()),
-      sids
-    )
-  )
-}

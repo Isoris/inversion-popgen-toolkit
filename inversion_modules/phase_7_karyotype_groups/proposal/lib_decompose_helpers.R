@@ -314,4 +314,179 @@ read_block_safe <- function(reg, candidate_id, block_type) {
   reg$evidence$read_block(candidate_id, block_type)
 }
 
+# ─────────────────────────────────────────────────────────────────────────────
+# compute_ancestry_div_hom_ref_vs_hom_inv — instant_q join for band_composition
+#   fold (2026-04-24 chat C/D).
+#
+# For one candidate interval and decompose's per-sample class assignment,
+# average the Engine B per-window Q vectors first per sample (across windows
+# overlapping the interval) then per class (HOM_REF / HOM_INV), and return
+# L1(mean_Q_HOM_REF, mean_Q_HOM_INV).
+#
+# High values → the two homozygous classes come from different ancestral
+# subpopulations; candidate may be a family-driven false positive rather
+# than a true inversion (see
+#   _archive_superseded/bk_schemas_pre_canonical/
+#   band_composition_folded_into_internal_dynamics_2026-04-24/README.md).
+#
+# Returns NA_real_ on ANY failure (missing file, no overlap, no samples
+# in a needed class, parse trouble, etc). The key becomes NA in the
+# internal_dynamics block, never breaks decompose.
+#
+# Arguments:
+#   q_cache_dir       — directory containing Engine B per-sample local-Q
+#                       caches. Typical layout: either
+#                         <q_cache_dir>/<chrom>.local_Q_samples.tsv.gz
+#                       or
+#                         <q_cache_dir>/K<K>/<chrom>.local_Q_samples.tsv.gz
+#                       or
+#                         <q_cache_dir>/K<K>/<chrom>.<sample_set>.local_Q_samples.tsv.gz
+#                       The function globs for all of these shapes and
+#                       takes the first hit.
+#   chrom             — chromosome name exactly as written in the filename.
+#   start_bp, end_bp  — candidate interval in bp (integer).
+#   class_assignment  — named character vector; names are sample_ids,
+#                       values are one of "HOM_REF" / "HET" / "HOM_INV".
+#                       (HET is ignored for this computation.)
+#
+# Returns: single numeric (L1 distance) or NA_real_.
+#
+# Implementation notes:
+#   - Expects columns `start_bp`, `end_bp`, `sample_id`, and `Q1..QK`
+#     (any K) in the cache file. See unified_ancestry/src/instant_q.cpp
+#     write_samples() for the canonical schema.
+#   - Overlap rule: window.start < end_bp AND window.end > start_bp
+#     (mirrors the Python reference in
+#     unified_ancestry/engines/nested_composition/internal_ancestry_composition.py
+#     L204-206).
+#   - Per-sample averaging is an unweighted mean over overlapping windows.
+#     If a sample has no overlapping windows, it's dropped from its class.
+#   - Per-class averaging is an unweighted mean over surviving samples.
+#     If a class ends up empty (no samples with data), returns NA_real_.
+# ─────────────────────────────────────────────────────────────────────────────
+compute_ancestry_div_hom_ref_vs_hom_inv <- function(q_cache_dir, chrom,
+                                                    start_bp, end_bp,
+                                                    class_assignment,
+                                                    verbose = FALSE) {
+  if (is.null(q_cache_dir) || is.na(q_cache_dir) || q_cache_dir == "") {
+    return(NA_real_)
+  }
+  if (!dir.exists(q_cache_dir)) {
+    if (verbose) message("[ancestry_div] q_cache_dir not found: ", q_cache_dir)
+    return(NA_real_)
+  }
+
+  # ── File discovery ────────────────────────────────────────────────────────
+  # Try (in order): flat <chrom>.local_Q_samples.tsv.gz; K<K>/<chrom>.*; any
+  # K<K>/<chrom>.<anything>.local_Q_samples.tsv.gz. Glob all K* subdirs.
+  candidates <- c(
+    file.path(q_cache_dir, paste0(chrom, ".local_Q_samples.tsv.gz")),
+    file.path(q_cache_dir, paste0(chrom, ".local_Q_samples.tsv")),
+    Sys.glob(file.path(q_cache_dir, "K*",
+                        paste0(chrom, ".local_Q_samples.tsv.gz"))),
+    Sys.glob(file.path(q_cache_dir, "K*",
+                        paste0(chrom, ".local_Q_samples.tsv"))),
+    Sys.glob(file.path(q_cache_dir, "K*",
+                        paste0(chrom, ".*.local_Q_samples.tsv.gz"))),
+    Sys.glob(file.path(q_cache_dir, "K*",
+                        paste0(chrom, ".*.local_Q_samples.tsv")))
+  )
+  candidates <- candidates[file.exists(candidates)]
+  if (length(candidates) == 0) {
+    if (verbose) message("[ancestry_div] no local_Q file for ", chrom,
+                         " under ", q_cache_dir)
+    return(NA_real_)
+  }
+  q_path <- candidates[1]
+  if (length(candidates) > 1 && verbose) {
+    message("[ancestry_div] multiple local_Q files for ", chrom,
+            "; using ", q_path)
+  }
+
+  # ── Read ──────────────────────────────────────────────────────────────────
+  dt <- tryCatch(
+    data.table::fread(q_path, sep = "\t", header = TRUE,
+                      showProgress = FALSE),
+    error = function(e) {
+      message("[ancestry_div] fread failed for ", q_path, ": ",
+              conditionMessage(e))
+      NULL
+    }
+  )
+  if (is.null(dt) || nrow(dt) == 0) return(NA_real_)
+
+  # ── Schema validation ─────────────────────────────────────────────────────
+  needed <- c("start_bp", "end_bp", "sample_id")
+  missing_cols <- setdiff(needed, names(dt))
+  if (length(missing_cols) > 0) {
+    message("[ancestry_div] ", q_path, " missing columns: ",
+            paste(missing_cols, collapse = ", "))
+    return(NA_real_)
+  }
+  q_cols <- grep("^Q[0-9]+$", names(dt), value = TRUE)
+  if (length(q_cols) < 2) {
+    message("[ancestry_div] ", q_path, " has fewer than 2 Q columns — ",
+            "expected Q1..QK; found: ", paste(q_cols, collapse = ", "))
+    return(NA_real_)
+  }
+  # Sort Q columns numerically so Q10 comes after Q9, not between Q1 and Q2
+  q_cols <- q_cols[order(as.integer(sub("^Q", "", q_cols)))]
+
+  # ── Filter to candidate interval ──────────────────────────────────────────
+  # Python overlap rule: window.start < parent.end && window.end > parent.start.
+  # data.table uses non-standard evaluation on column names; rename the
+  # function args first so the i-expression is unambiguous.
+  cand_start <- start_bp
+  cand_end   <- end_bp
+  over <- dt[start_bp < cand_end & end_bp > cand_start]
+  if (nrow(over) == 0) {
+    if (verbose) message("[ancestry_div] no windows overlap ", chrom, ":",
+                         cand_start, "-", cand_end, " in ", q_path)
+    return(NA_real_)
+  }
+
+  # ── Filter to samples in HOM_REF ∪ HOM_INV ────────────────────────────────
+  # (We don't need HET for this divergence.)
+  targets <- names(class_assignment)[class_assignment %in%
+                                       c("HOM_REF", "HOM_INV")]
+  if (length(targets) == 0) return(NA_real_)
+  over <- over[sample_id %in% targets]
+  if (nrow(over) == 0) {
+    if (verbose) message("[ancestry_div] no target samples have overlapping ",
+                         "windows for ", chrom, ":", cand_start, "-", cand_end)
+    return(NA_real_)
+  }
+
+  # ── Per-sample mean Q (across overlapping windows) ────────────────────────
+  # data.table's lapply(.SD, mean) is the right tool here.
+  per_sample <- over[, lapply(.SD, function(x) mean(as.numeric(x), na.rm = TRUE)),
+                     by = sample_id, .SDcols = q_cols]
+
+  # Tag with class. Do the named-vector lookup in base R first, then assign,
+  # to avoid any NSE confusion between the `class_assignment` argument (a
+  # named character vector) and a potential column of the same name.
+  cls_for_rows <- unname(class_assignment[per_sample$sample_id])
+  per_sample[, class_label := cls_for_rows]
+
+  # ── Per-class mean Q ──────────────────────────────────────────────────────
+  ref_q <- per_sample[class_label == "HOM_REF",
+                       lapply(.SD, mean, na.rm = TRUE), .SDcols = q_cols]
+  inv_q <- per_sample[class_label == "HOM_INV",
+                       lapply(.SD, mean, na.rm = TRUE), .SDcols = q_cols]
+  if (nrow(ref_q) == 0 || nrow(inv_q) == 0) return(NA_real_)
+
+  ref_vec <- unlist(ref_q, use.names = FALSE)
+  inv_vec <- unlist(inv_q, use.names = FALSE)
+  if (length(ref_vec) != length(inv_vec) ||
+      any(is.na(ref_vec)) || any(is.na(inv_vec))) {
+    return(NA_real_)
+  }
+
+  # ── L1 distance ──────────────────────────────────────────────────────────
+  # Sum of absolute differences across K components. Range [0, 2] for
+  # probability simplices; 0 = identical ancestry composition, 2 = fully
+  # disjoint.
+  round(sum(abs(ref_vec - inv_vec)), 4)
+}
+
 message("[lib_decompose_helpers] loaded (full-reg mode; no JSON fallback)")

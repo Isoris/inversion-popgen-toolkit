@@ -432,6 +432,44 @@ process_candidate <- function(cid, chr, c_start, c_end) {
   markers_tsv <- file.path(cand_raw_dir, "dosage_informative_markers.tsv.gz")
   fwrite(markers_dt, markers_tsv, sep = "\t", compress = "gzip")
 
+  # Sidecar RDS with the same informative-SNP info in machine-friendly form
+  # (added 2026-04-24 chat D). Lets downstream consumers (GC detector, the
+  # audit path that cross-checks phase-6 vs GC-detector diagnostic masks per
+  # CODE_REVIEW_TO_FIGURE_OUT.md §5, etc.) read the informative-SNP set
+  # directly without re-parsing the TSV. Also carries the per-informative-
+  # SNP group means, which the polarity-aware version of the GC detector
+  # scan (review §7) needs in order to compare each sample's dosage at SNP i
+  # against the per-SNP group means rather than against fixed 0.5/1.5
+  # thresholds.
+  markers_rds <- file.path(cand_raw_dir, "dosage_informative_markers.rds")
+  saveRDS(list(
+    candidate_id          = cid,
+    chrom                 = chr,
+    scan_start_bp         = as.integer(scan_start),
+    scan_end_bp           = as.integer(scan_end),
+    delta_min             = as.numeric(BP01_PARAMS$delta_min),
+    n_markers_in_scan     = as.integer(nrow(X)),
+    n_informative         = as.integer(im$n_informative),
+    # Indices into the scan-region marker order (1-based, same as marker_idx
+    # column in the TSV). Use sites_reg$pos[informative_marker_idx] to
+    # recover positions.
+    informative_marker_idx = as.integer(info_idx),
+    # Parallel bp-position vector for the informative set, ascending
+    informative_pos_bp    = as.integer(sites_reg$pos[info_idx]),
+    # Per-informative-SNP group means — the same values the polarity-aware
+    # comparison needs. Indexed 1:1 with informative_marker_idx.
+    h1_mean_informative   = as.numeric(im$h1_mean[info_idx]),
+    h2_mean_informative   = as.numeric(im$h2_mean[info_idx]),
+    het_mean_informative  = as.numeric(im$het_mean[info_idx]),
+    delta_informative     = as.numeric(im$delta[info_idx]),
+    # Convenience: sign of delta per informative SNP. +1 means "HOMO_2 > HOMO_1"
+    # (so HOMO_1-class samples expected low dosage here); -1 means the other
+    # polarity (HOMO_1-class samples expected high dosage here). Review §7's
+    # polarity bug is specifically about detectors that assume this is always
+    # +1. Saving it so the fix can read it straight.
+    polarity_informative  = as.integer(sign(im$delta[info_idx]))
+  ), markers_rds)
+
   if (im$n_informative < BP01_PARAMS$min_core_size) {
     message("[01_dosage_signal]   insufficient informative markers; writing status block")
     reg$evidence$write_block(cid, "dosage_blocks", list(
@@ -439,7 +477,8 @@ process_candidate <- function(cid, chr, c_start, c_end) {
       reason = im$reason,
       n_informative = im$n_informative,
       delta_min = BP01_PARAMS$delta_min,
-      markers_tsv_path = markers_tsv
+      markers_tsv_path = markers_tsv,
+      markers_rds_path = markers_rds
     ))
     return(invisible(NULL))
   }
@@ -455,7 +494,8 @@ process_candidate <- function(cid, chr, c_start, c_end) {
     reg$evidence$write_block(cid, "dosage_blocks", list(
       status = "no_core_block",
       reason = cb$reason,
-      markers_tsv_path = markers_tsv
+      markers_tsv_path = markers_tsv,
+      markers_rds_path = markers_rds
     ))
     return(invisible(NULL))
   }
@@ -471,7 +511,8 @@ process_candidate <- function(cid, chr, c_start, c_end) {
     message("[01_dosage_signal]   extension failed")
     reg$evidence$write_block(cid, "dosage_blocks", list(
       status = "extension_failed",
-      markers_tsv_path = markers_tsv
+      markers_tsv_path = markers_tsv,
+      markers_rds_path = markers_rds
     ))
     return(invisible(NULL))
   }
@@ -508,7 +549,8 @@ process_candidate <- function(cid, chr, c_start, c_end) {
     shift_right_kb         = round((sites_reg$pos[ext$new_right] - c_end)   / 1000, 2),
     extended_span_bp       = as.integer(sites_reg$pos[ext$new_right] -
                                           sites_reg$pos[ext$new_left]),
-    markers_tsv_path       = markers_tsv
+    markers_tsv_path       = markers_tsv,
+    markers_rds_path       = markers_rds
   )
   reg$evidence$write_block(cid, "dosage_blocks", block_data)
 

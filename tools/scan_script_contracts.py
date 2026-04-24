@@ -64,6 +64,9 @@ BLOCK_ENTRY_RE = re.compile(
 )
 # Continuation lines under a BLOCKS_WRITTEN entry
 FIELD_RE = re.compile(r"^\s*[#*]*\s*(keys|keys_na|status|note):\s*(?P<val>.*)$")
+# Entry start line for KEYS_WRITTEN: "- <key_name>"
+#   (bare list item — no trailing colon, no schema path)
+KEY_ENTRY_RE = re.compile(r"^\s*[#*]*\s*-\s+(?P<key>[A-Za-z_][\w]*)\s*$")
 
 # Accept these status markers
 STATUS_OK = {"WIRED", "PRODUCES_BUT_NOT_WIRED"}
@@ -112,6 +115,7 @@ def parse_contract(lines: list[str], start: int, path: Path) -> dict | None:
         "path": path,
         "blocks": [ { "block_type", "schema_path", "keys": [...],
                        "keys_na": [...], "status", "note" }, ... ],
+        "keys_written": [ { "key", "status", "note" }, ... ],
         "keys_in": ["none"] or list,
         "parse_errors": [ ... ]
       }
@@ -119,12 +123,27 @@ def parse_contract(lines: list[str], start: int, path: Path) -> dict | None:
     Stops at the first blank line that follows a non-blank in-contract line
     (so the block ends wherever the script's header block naturally does).
     Also stops at divider lines of ==== or ---- of length >= 30.
+
+    Sections:
+      BLOCKS_WRITTEN   — list of block_type:schema_path entries (each with
+                         its own keys/keys_na/status/note sub-fields).
+      KEYS_WRITTEN     — list of flat keys written via add_evidence (i.e.
+                         not inside any block schema). Each list item is
+                         a bare `- key_name` followed by optional
+                         status:/note: sub-fields. Used by scripts that
+                         call reg$evidence$add_evidence(cid, key, value)
+                         directly rather than write_block.
+      KEYS_IN          — list of keys this script reads (rarely populated).
     """
     errors: list[str] = []
     blocks: list[dict] = []
     keys_in: list[str] = []
-    mode = "HEADER"         # initial state
-    current: dict | None = None
+    keys_written: list[dict] = []
+    mode = "HEADER"         # initial state (blank-line tracking)
+    section = None          # which major section we're inside:
+                            #   "BLOCKS_WRITTEN" or "KEYS_WRITTEN" or None
+    current: dict | None = None        # open BLOCKS_WRITTEN entry
+    current_key: dict | None = None    # open KEYS_WRITTEN entry
 
     # Strip leading comment markers from each line
     def strip_comment(s: str) -> str:
@@ -132,6 +151,12 @@ def parse_contract(lines: list[str], start: int, path: Path) -> dict | None:
         # common comment prefixes: '#', '# ', '//', '/*', '*', '"""'
         s = re.sub(r"^\s*(#|//|/\*|\*)\s?", "", s)
         return s
+
+    def close_current_key():
+        nonlocal current_key
+        if current_key is not None:
+            keys_written.append(current_key)
+            current_key = None
 
     # Track the indent of the REGISTRY_CONTRACT keyword for sub-field parsing
     i = start + 1
@@ -154,6 +179,8 @@ def parse_contract(lines: list[str], start: int, path: Path) -> dict | None:
 
         # Major section markers
         if s.startswith("BLOCKS_WRITTEN"):
+            close_current_key()
+            section = "BLOCKS_WRITTEN"
             # Support "BLOCKS_WRITTEN: none" as an explicit declaration
             # that this is a compute engine or utility with no registry
             # writes — the file is allowed to have a contract block so
@@ -174,7 +201,30 @@ def parse_contract(lines: list[str], start: int, path: Path) -> dict | None:
                 current = None
             i += 1
             continue
+        if s.startswith("KEYS_WRITTEN"):
+            # New in 2026-04-24 (chat D): flat-key section for scripts that
+            # call reg$evidence$add_evidence directly rather than writing
+            # through a block schema. Entries are bare "- key_name" lines
+            # optionally followed by indented status: / note: sub-fields.
+            if current is not None:
+                blocks.append(current)
+                current = None
+            close_current_key()
+            section = "KEYS_WRITTEN"
+            rest = s[len("KEYS_WRITTEN"):].lstrip(":").strip()
+            if rest.lower() in {"none", "(none)", "()"}:
+                # Explicit empty declaration — harmless; just note section
+                # was seen.
+                pass
+            i += 1
+            continue
         if s.startswith("KEYS_IN"):
+            # Closing open entries if any
+            if current is not None:
+                blocks.append(current)
+                current = None
+            close_current_key()
+            section = None
             # Inline or next-line value
             rest = s[len("KEYS_IN"):].lstrip(":").strip()
             if rest:
@@ -197,9 +247,11 @@ def parse_contract(lines: list[str], start: int, path: Path) -> dict | None:
                 break
             continue
 
-        # Entry start line: "- <block>: <schema>"
+        # Entry start line: "- <block>: <schema>" (BLOCKS_WRITTEN items)
         m = BLOCK_ENTRY_RE.match(stripped)
         if m:
+            close_current_key()
+            section = "BLOCKS_WRITTEN"
             if current is not None:
                 blocks.append(current)
             current = {
@@ -213,17 +265,62 @@ def parse_contract(lines: list[str], start: int, path: Path) -> dict | None:
             i += 1
             continue
 
+        # Entry start line for KEYS_WRITTEN: "- <key_name>" (no colon)
+        mk = KEY_ENTRY_RE.match(stripped)
+        if mk and section == "KEYS_WRITTEN":
+            close_current_key()
+            current_key = {
+                "key": mk.group("key"),
+                "status": None,
+                "note": None,
+            }
+            i += 1
+            continue
+
         # Sub-field lines (keys / keys_na / status / note)
         mf = FIELD_RE.match(stripped)
         if mf:
+            field = mf.group(1)
+            val = mf.group(2).strip()
+
+            # Multi-line-continuation collector for note: values.
+            # Mirrors the keys: continuation rules but joins with " "
+            # instead of splitting on commas.
+            def collect_note_continuation(start_idx: int, seed_val: str) -> tuple[str, int]:
+                collected = [seed_val]
+                j = start_idx + 1
+                while j < len(lines):
+                    cont_raw = lines[j]
+                    if re.match(r"^\s*[#*/]*\s*[=\-]{20,}\s*$", cont_raw):
+                        break
+                    cont = strip_comment(cont_raw).rstrip()
+                    if cont == "" or cont.strip() == "":
+                        break
+                    if BLOCK_ENTRY_RE.match(cont) or FIELD_RE.match(cont) or KEY_ENTRY_RE.match(cont):
+                        break
+                    if cont.strip().startswith(("BLOCKS_WRITTEN", "KEYS_WRITTEN", "KEYS_IN")):
+                        break
+                    collected.append(cont.strip())
+                    j += 1
+                return (" ".join(collected).strip(), j)
+
+            # Route status: / note: to the correct open entry depending on section
+            if field in ("status", "note") and section == "KEYS_WRITTEN" and current_key is not None:
+                if field == "note":
+                    note_val, next_i = collect_note_continuation(i, val)
+                    current_key["note"] = note_val
+                    i = next_i
+                    continue
+                current_key[field] = val
+                i += 1
+                continue
+
             if current is None:
                 errors.append(
                     f"{path}:{i+1}: sub-field '{mf.group(1)}' with no open entry"
                 )
                 i += 1
                 continue
-            field = mf.group(1)
-            val = mf.group(2).strip()
             # Handle multi-line keys: / keys_na: wrapped values
             if field in ("keys", "keys_na"):
                 # Collect continuation lines that start with whitespace only
@@ -239,7 +336,7 @@ def parse_contract(lines: list[str], start: int, path: Path) -> dict | None:
                     # if this line looks like a new field/entry, stop
                     if BLOCK_ENTRY_RE.match(cont) or FIELD_RE.match(cont):
                         break
-                    if cont.strip().startswith(("BLOCKS_WRITTEN", "KEYS_IN")):
+                    if cont.strip().startswith(("BLOCKS_WRITTEN", "KEYS_WRITTEN", "KEYS_IN")):
                         break
                     collected.append(cont.strip())
                     j += 1
@@ -257,11 +354,11 @@ def parse_contract(lines: list[str], start: int, path: Path) -> dict | None:
                 i += 1
                 continue
             elif field == "note":
-                # capture note — can continue on subsequent lines with
-                # consistent indent, but we'll settle for the single-line
-                # value for now (the scanner doesn't validate note content)
-                current["note"] = val
-                i += 1
+                # Multi-line note support (2026-04-24): collect continuation
+                # lines the same way keys: does.
+                note_val, next_i = collect_note_continuation(i, val)
+                current["note"] = note_val
+                i = next_i
                 continue
 
         # Line that isn't recognized but doesn't end the block: skip
@@ -269,14 +366,16 @@ def parse_contract(lines: list[str], start: int, path: Path) -> dict | None:
 
     if current is not None:
         blocks.append(current)
+    close_current_key()
 
-    if not blocks:
-        errors.append(f"{path}: REGISTRY_CONTRACT block found but no BLOCKS_WRITTEN entries parsed")
+    if not blocks and not keys_written:
+        errors.append(f"{path}: REGISTRY_CONTRACT block found but no BLOCKS_WRITTEN or KEYS_WRITTEN entries parsed")
 
     return {
         "path": path,
         "blocks": blocks,
         "keys_in": keys_in,
+        "keys_written": keys_written,
         "parse_errors": errors,
     }
 
@@ -452,6 +551,65 @@ def main() -> int:
             )
 
     # -------------------------------------------------------------------------
+    # Check 4: KEYS_WRITTEN flat-key claims
+    #   - warn if a flat key is also claimed by a WIRED block writer (a flat
+    #     add_evidence write racing a block-schema keys_extracted rule is
+    #     almost always the q6_family_linkage / q6_group_validation pattern
+    #     where the note: field should explicitly acknowledge the overlap)
+    #   - status should be WIRED or OVERWRITTEN_BY_<script>
+    # -------------------------------------------------------------------------
+    # Flatten all WIRED block-schema keys into a lookup: key -> [(block_type, path)]
+    schema_key_owners: dict[str, list[tuple[str, Path]]] = defaultdict(list)
+    for bt, entries in by_block.items():
+        for path, entry, _schema_keys in entries:
+            status = (entry.get("status") or "").upper()
+            if status != "WIRED":
+                continue
+            for k in entry.get("keys") or []:
+                schema_key_owners[k].append((bt, path))
+
+    flat_key_claimants: dict[str, list[Path]] = defaultdict(list)
+    total_keys_written = 0
+    for res in parsed:
+        for entry in res.get("keys_written") or []:
+            k = entry["key"]
+            total_keys_written += 1
+            flat_key_claimants[k].append(res["path"])
+            status = (entry.get("status") or "").upper()
+            note = entry.get("note") or ""
+            # Status sanity check
+            if status and status != "WIRED" \
+                    and not status.startswith("OVERWRITTEN_BY_") \
+                    and not status.startswith("BLOCKED_ON_"):
+                warnings.append(
+                    f"{res['path']}: flat key {k}: unknown status "
+                    f"'{entry['status']}' (expected WIRED, "
+                    f"OVERWRITTEN_BY_<script>, or BLOCKED_ON_*)"
+                )
+            # Collision with a block-schema keys_extracted entry
+            if k in schema_key_owners:
+                owners = schema_key_owners[k]
+                # Only warn if the note doesn't already acknowledge it
+                ack_hints = ("overwritten", "collide", "collision", "last-write-wins",
+                             "race", "placeholder")
+                acknowledged = any(h in note.lower() for h in ack_hints)
+                if not acknowledged:
+                    warnings.append(
+                        f"{res['path']}: flat key {k} (KEYS_WRITTEN) also "
+                        f"claimed by block writers {owners}; "
+                        f"note: field should acknowledge this "
+                        f"(e.g. 'overwritten by <script>' or "
+                        f"'last-write-wins with <block>')"
+                    )
+    # Duplicate flat-key claimants across files
+    for k, paths in sorted(flat_key_claimants.items()):
+        if len(paths) > 1:
+            warnings.append(
+                f"flat key {k} claimed under KEYS_WRITTEN by multiple "
+                f"scripts: {[str(p) for p in paths]}"
+            )
+
+    # -------------------------------------------------------------------------
     # Report
     # -------------------------------------------------------------------------
     print(f"[scan] scripts with REGISTRY_CONTRACT: {len(parsed)}")
@@ -465,6 +623,15 @@ def main() -> int:
     print(f"[scan] BLOCKS_WRITTEN entries by status:")
     for s, n in sorted(by_status.items()):
         print(f"         {s:30s} {n:4d}")
+
+    if total_keys_written > 0:
+        flat_by_status: dict[str, int] = defaultdict(int)
+        for res in parsed:
+            for entry in res.get("keys_written") or []:
+                flat_by_status[(entry.get("status") or "UNSPECIFIED").upper()] += 1
+        print(f"[scan] KEYS_WRITTEN entries by status:")
+        for s, n in sorted(flat_by_status.items()):
+            print(f"         {s:30s} {n:4d}")
 
     if args.verbose:
         print(f"\n[scan] schemas covered by ≥1 contract:")

@@ -1,6 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "gene_conversion_tracts.schema.json",
+  "block_type": "gene_conversion_tracts",
   "title": "gene_conversion_tracts",
   "description": "Per-candidate catalog of short intra-inversion arrangement-discordant tracts — stretches of ~2–10 consecutive diagnostic SNPs where one sample looks like the OTHER arrangement (a HOM_REF sample reading INV-like, or vice versa) then reverts to its baseline. The block name is kept as 'gene_conversion_tracts' for pipeline backward compatibility, but the signal is properly an IBS-with-other-arrangement signature: we observe that a short stretch LOOKS LIKE the opposite arrangement's diagnostic genotypes, but we cannot infer the causal mechanism from sequence data alone. Candidate causes: gene conversion (the classical interpretation; Harris 1993 reported GC tracts of 18–774 bp with 3–26 bp boundary mismatches), short double crossover, mapping artefact at paralogy, or simply coincidental IBS at a handful of diagnostic sites. The detector's job is to surface the tract; interpreting cause is downstream. Produced by gene_conversion_detector.R (PER-SNP run-length detector on diagnostic QC-clean SNPs — chat-12 rewrite; replaces earlier windowed-binning draft whose lower detection limit (~60 kb) was larger than the biology of GC tracts (typically 50 bp – ~800 bp; Harris 1993 upper bound ~5 kb is atypical). Recorded per sample as annotation; does NOT gate the RECOMBINANT call (recombinants are called by C01j compatibility groups at window scale).",
   "type": "object",
@@ -18,6 +19,8 @@
           "n_tracts":      { "type": "integer", "minimum": 0 },
           "baseline_class":{ "type": ["string", "null"],
                              "description": "Tier-1 decompose class used as the reference arrangement for flagging (HOM_REF / HET / HOM_INV / AMBIGUOUS). HET samples are skipped (ambiguous per-haplotype at 9x), so they will have n_tracts=0 and baseline_class='HET'." },
+          "n_diagnostic_scanned": { "type": "integer", "minimum": 0,
+                             "description": "Count of diagnostic SNPs this sample had usable data at — positions where the sample's dosage was non-NA and fell into either the 'consistent' or 'flag' bin (i.e., not HET-looking and not missing). This is the per-sample denominator for tract-call opportunities. A low value here relative to snp_qc.n_snps_pass_qc_diagnostic signals a sample with high missingness or many HET-looking dosages at diagnostic positions, which reduces the detector's effective power on that sample. HET samples (baseline_class='HET') are skipped entirely and report 0." },
           "flank_dosage":  { "type": ["number", "null"],
                              "description": "Legacy field retained for backward compatibility; not populated by the per-SNP detector. Present as null to keep readers that expect the column happy." },
           "detector":      { "type": "string",
@@ -108,11 +111,31 @@
         "min_call_rate":     { "type": "number" },
         "depth_z_abs":       { "type": "number" }
       }
+    },
+
+    "diagnostic_snps": {
+      "type": "object",
+      "description": "Audit of the diagnostic-SNP set used by the detector for this candidate. Added 2026-04-24 (chat D) — prior to this field the positions behind the call were discarded after the scan, making it impossible to verify which SNPs actually drove the tract detection. Now captures both the scalar aggregates (n, per-sample coverage distribution) and the full integer position vector. The vector ordering is genomic (ascending bp).",
+      "properties": {
+        "n":                          { "type": "integer", "minimum": 0,
+                                         "description": "Number of SNPs that are both QC-clean and diagnostic (|AF_HOM_REF − AF_HOM_INV| >= params.min_delta_af). Same value as snp_qc.n_snps_pass_qc_diagnostic; duplicated here so diagnostic_snps is self-contained as an audit object." },
+        "n_samples_scannable":        { "type": "integer", "minimum": 0,
+                                         "description": "Count of samples with non-zero usable data at diagnostic positions (i.e. per_sample_summary rows where n_diagnostic_scanned > 0). Excludes HET samples (skipped entirely) and any samples with 100% missing or 100% HET-looking dosages at diagnostic positions." },
+        "mean_n_scanned_per_sample":  { "type": ["number", "null"],
+                                         "description": "Arithmetic mean of per_sample_summary.n_diagnostic_scanned across ALL samples in the cohort (including skipped HET samples, for which it is 0). A big gap between this and n signals systemic data loss on the scan." },
+        "min_n_scanned_per_sample":   { "type": ["integer", "null"] },
+        "max_n_scanned_per_sample":   { "type": ["integer", "null"] },
+        "positions_bp":               { "type": "array",
+                                         "items": { "type": "integer" },
+                                         "description": "Full integer vector of diagnostic-SNP positions, ascending bp. Length equals n. Use this to reproduce the detector's input set exactly, to audit vertical-stripe explanations in the heatmap (positions here = the columns the scanner actually considered), and for cross-module reuse (e.g. the phase-6 informative-marker set vs this diagnostic set on the same candidate — see CODE_REVIEW_TO_FIGURE_OUT.md §5 for the alignment check that this field makes possible)." }
+      }
     }
   },
   "keys_extracted": [
-    { "key": "q2_gc_total_tracts",              "from": "total_tracts" },
-    { "key": "q2_gc_total_samples_with_gc",     "from": "total_samples_with_gc" },
-    { "key": "q2_gc_n_snps_pass_qc_diagnostic", "from": "snp_qc.n_snps_pass_qc_diagnostic" }
+    { "key": "q2_gc_total_tracts",                       "from": "total_tracts" },
+    { "key": "q2_gc_total_samples_with_gc",              "from": "total_samples_with_gc" },
+    { "key": "q2_gc_n_snps_pass_qc_diagnostic",          "from": "snp_qc.n_snps_pass_qc_diagnostic" },
+    { "key": "q2_gc_n_samples_scannable",                "from": "diagnostic_snps.n_samples_scannable" },
+    { "key": "q2_gc_mean_n_diagnostic_scanned_per_sample","from": "diagnostic_snps.mean_n_scanned_per_sample" }
   ]
 }

@@ -40,8 +40,8 @@
 #             q2_n_samples_sv_pca_discordant,
 #             q2_n_hetDEL_breakpoint_reclass, q2_pca_k_used,
 #             q6_n_HOM_REF_prelim, q6_n_HET_prelim, q6_n_HOM_INV_prelim,
-#             q1_decompose_k_used
-#       keys_na: q1_decompose_ancestry_div_hom_ref_vs_hom_inv
+#             q1_decompose_k_used,
+#             q1_decompose_ancestry_div_hom_ref_vs_hom_inv
 #       status: WIRED
 #       note: Writes three variants of the block — 'seeded_ok' (full
 #             payload, emits all keys above) and two 'no_seeding' stubs
@@ -56,11 +56,12 @@
 #             Folded in from the superseded band_composition schema
 #             2026-04-24 per Quentin's option (a). Explicit 'decompose_'
 #             prefix makes the provenance visible in keys.tsv.
-#             q1_decompose_ancestry_div_hom_ref_vs_hom_inv is NA until
-#             decompose is extended to pull Engine B local-Q and compute
-#             the L1 distance between HOM_REF and HOM_INV mean Q vectors —
-#             see _archive_superseded/bk_schemas_pre_canonical/band_composition_folded_into_internal_dynamics_2026-04-24/README.md
-#             for the computation sketch.
+#             q1_decompose_ancestry_div_hom_ref_vs_hom_inv is computed
+#             via lib_decompose_helpers.R::compute_ancestry_div_hom_ref_vs_hom_inv
+#             using --local_q_dir (Engine B local-Q cache). Stays NA if
+#             --local_q_dir is unset, the per-chromosome cache is missing,
+#             no windows overlap the candidate interval, or either
+#             HOM_REF/HOM_INV class is empty after filtering.
 #   KEYS_IN: none
 # =============================================================================
 
@@ -90,7 +91,21 @@ option_list <- list(
                             "has been removed (chat-12, per chat-9 design).")),
   make_option("--min_seeds_per_class", type = "integer", default = 2L,
               help = paste0("Minimum samples per (HOM_REF/HET/HOM_INV) class ",
-                            "in the combined seed set (default 2)."))
+                            "in the combined seed set (default 2).")),
+  make_option("--local_q_dir", type = "character", default = NA_character_,
+              help = paste0("Directory containing Engine B per-sample ",
+                            "local-Q caches (typically ",
+                            "${BASE}/unified_ancestry/cache/ or a K<K>/ ",
+                            "sub-tree). If set, decompose joins its per-",
+                            "sample class assignments against the per-window ",
+                            "Q vectors and emits ",
+                            "q1_decompose_ancestry_div_hom_ref_vs_hom_inv ",
+                            "(L1 distance between HOM_REF and HOM_INV mean Q). ",
+                            "If unset or the per-chromosome cache is missing, ",
+                            "the key stays NA. See ",
+                            "lib_decompose_helpers.R::",
+                            "compute_ancestry_div_hom_ref_vs_hom_inv ",
+                            "for file-discovery rules."))
 )
 opt <- parse_args(OptionParser(option_list = option_list))
 
@@ -595,17 +610,32 @@ for (ci in seq_len(nrow(cand_dt))) {
     # — too big. Save it as an RDS file alongside.
     per_window_class_file = "per_window_class.rds",
 
-    # ── band_composition fold (2026-04-24 chat C) ───────────────────────
-    # Folded from the superseded band_composition.schema.json. Left as
-    # NA_real_ until the instant_q join is added: join this script's
-    # class_assignment (HOM_REF/HET/HOM_INV) with Engine B's per-window
-    # local-Q vectors inside the candidate interval, average Q per class,
-    # take L1(mean_Q_HOM_REF, mean_Q_HOM_INV). High = two homozygous
-    # classes come from different ancestral subpopulations (family-driven,
-    # not a real inversion). See
-    # _archive_superseded/bk_schemas_pre_canonical/band_composition_folded_into_internal_dynamics_2026-04-24/README.md
-    # for the computation sketch.
-    ancestry_div_hom_ref_vs_hom_inv = NA_real_
+    # ── band_composition fold (2026-04-24 chat C; wired chat D) ─────────
+    # Folded from the superseded band_composition.schema.json. The helper
+    # `compute_ancestry_div_hom_ref_vs_hom_inv` in lib_decompose_helpers.R
+    # joins this script's class_assignment (HOM_REF/HET/HOM_INV) with
+    # Engine B's per-window local-Q vectors inside the candidate interval,
+    # averages Q per sample (across overlapping windows) and then per class,
+    # and returns L1(mean_Q_HOM_REF, mean_Q_HOM_INV). High = the two
+    # homozygous classes come from different ancestral subpopulations
+    # (family-driven, not a real inversion).
+    #
+    # Returns NA_real_ if --local_q_dir is unset, the per-chromosome cache
+    # file isn't found, no windows overlap the interval, or either class
+    # is empty after filtering. See the helper header for the full
+    # file-discovery rule (tries <dir>/<chr>.*, <dir>/K*/<chr>.*, and
+    # <dir>/K*/<chr>.<set>.* patterns).
+    #
+    # See _archive_superseded/bk_schemas_pre_canonical/
+    # band_composition_folded_into_internal_dynamics_2026-04-24/README.md
+    # for the original specification.
+    ancestry_div_hom_ref_vs_hom_inv = compute_ancestry_div_hom_ref_vs_hom_inv(
+      q_cache_dir       = opt$local_q_dir,
+      chrom             = chr,
+      start_bp          = as.integer(s),
+      end_bp            = as.integer(e),
+      class_assignment  = class_assignment
+    )
   )
 
   # Save the big per-window matrix separately

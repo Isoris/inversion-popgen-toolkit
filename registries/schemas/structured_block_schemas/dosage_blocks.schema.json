@@ -50,7 +50,8 @@
     "shift_right_kb":        { "type": ["number", "null"] },
     "extended_span_bp":      { "type": ["integer", "null"], "minimum": 0 },
     "n_informative":         { "type": ["integer", "null"], "minimum": 0 },
-    "markers_tsv_path":      { "type": ["string", "null"], "description": "Path to the per-marker TSV under evidence_registry/.../raw/" }
+    "markers_tsv_path":      { "type": ["string", "null"], "description": "Path to the per-marker TSV under evidence_registry/.../raw/" },
+    "markers_rds_path":      { "type": ["string", "null"], "description": "Path to the per-marker RDS sidecar under evidence_registry/.../raw/. Carries n_informative, informative_marker_idx, informative_pos_bp, per-informative-SNP group means (h1_mean_informative, h2_mean_informative, het_mean_informative, delta_informative), and polarity_informative. Added 2026-04-24 (chat D). Downstream consumers that want the informative-SNP set without re-parsing the TSV should prefer this RDS." }
   },
   "keys_extracted": [
     { "key": "q3_dosage_status",          "from": "status" },

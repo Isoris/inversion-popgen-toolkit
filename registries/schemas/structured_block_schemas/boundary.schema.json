@@ -1,6 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "boundary.schema.json",
+  "block_type": "boundary",
   "block_type_template": "boundary_{5prime|3prime}",
   "description": "Per-boundary evidence: position, hardness, sharpness, boundary type, supporting cheats, and verdict. Written twice per candidate (boundary_5prime, boundary_3prime). Sharpness is real Hudson Fst/Hobs step from Cheat 4 when Engine B is available, otherwise sim_mat proxy. NAMING: 5prime/3prime are relative to the project reference assembly orientation (bp1 = lower coordinate = 5prime; bp2 = higher coordinate = 3prime). This is NOT relative to NCBI or any external reference. Legacy consumers reading q3_left_*/q3_right_* keys are supported via a dual-write shim in utils/registry_key_helpers.R (flag RKH_EMIT_LEGACY_SIDE_KEYS).",
   "question": "Q3",
