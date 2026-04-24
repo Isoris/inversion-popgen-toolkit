@@ -661,6 +661,80 @@ characterize_q7 <- function(keys) {
 
 
 # =============================================================================
+# Q_QC_SHELF: DATA-QUALITY TRIAGE (pass 13)
+# =============================================================================
+# Reads q_qc_shelf_* keys appended by _qc_shelf_reader.R (env-gated by
+# QC_SHELF_EVIDENCE_DIR in compute_candidate_status.R). This is a SOFT flag
+# — it never caps tier or group validation; it just labels the shelf's
+# data quality so downstream consumers can de-prioritize messy candidates
+# without dropping them from the catalog.
+#
+# Status semantics:
+#   ANSWERED   — ran and got a definitive flag (clean / coverage_artifact /
+#                high_uncertain / low_snp / messy)
+#   MEASURED   — ran but came back "unknown" (thresholds couldn't decide)
+#   EMPTY      — 4b_qc_triage did not run for this candidate
+# =============================================================================
+characterize_q_qc_shelf <- function(keys) {
+  ran <- safe_bool(keys[["q_qc_shelf_ran"]])
+
+  if (!ran) {
+    return(list(status = "EMPTY", label = NA,
+                evidence_for = NULL, evidence_against = NULL,
+                reason = "4b_qc_triage did not run for this candidate"))
+  }
+
+  flag <- keys[["q_qc_shelf_flag"]] %||% "unknown"
+  fst_fold <- safe_num(keys[["q_qc_shelf_fst_enrichment_fold"]], NA)
+  hovere_het <- safe_num(keys[["q_qc_shelf_hovere_het_inside"]], NA)
+  snp_r <- safe_num(keys[["q_qc_shelf_snp_ratio"]], NA)
+  unc_r <- safe_num(keys[["q_qc_shelf_uncertain_ratio"]], NA)
+  cov_r <- safe_num(keys[["q_qc_shelf_coverage_ratio"]], NA)
+
+  ev_for <- character()
+  ev_against <- character()
+
+  # Positive biological signals
+  if (is.finite(fst_fold) && fst_fold >= 2) {
+    ev_for <- c(ev_for, paste0("Fst_enrichment=", round(fst_fold, 2), "x"))
+  }
+  if (is.finite(hovere_het) && hovere_het >= 1.3) {
+    ev_for <- c(ev_for, paste0("HoverE_HET=", round(hovere_het, 2),
+                                " (heterokaryotype signature)"))
+  }
+
+  # Artifact signals
+  if (is.finite(snp_r) && snp_r <= 0.5) {
+    ev_against <- c(ev_against, paste0("SNP_ratio=", round(snp_r, 2),
+                                        " (shelf ≤ 50% of ref)"))
+  }
+  if (is.finite(unc_r) && unc_r >= 2) {
+    ev_against <- c(ev_against, paste0("BEAGLE_uncertain_ratio=", round(unc_r, 2),
+                                        " (shelf ≥ 2× ref)"))
+  }
+  if (is.finite(cov_r) && cov_r <= 0.6) {
+    ev_against <- c(ev_against, paste0("coverage_ratio=", round(cov_r, 2),
+                                        " (shelf ≤ 60% of ref)"))
+  }
+
+  # Status + label come directly from the flag
+  if (flag == "unknown") {
+    return(list(status = "MEASURED", label = "unknown",
+                evidence_for = ev_for, evidence_against = ev_against,
+                reason = "4b_qc_triage ran but thresholds could not decide"))
+  }
+
+  status <- "ANSWERED"
+  list(status = status, label = flag,
+       evidence_for = ev_for, evidence_against = ev_against,
+       reason = paste0("flag=", flag,
+                       if (flag == "clean") " (shelf passes data-quality triage)"
+                       else if (flag == "messy") " (multiple artifact signals)"
+                       else ""))
+}
+
+
+# =============================================================================
 # MASTER FUNCTION: characterize one candidate
 # =============================================================================
 characterize_candidate <- function(keys) {
@@ -698,13 +772,25 @@ characterize_candidate <- function(keys) {
     results[[q]] <- result
   }
 
-  # Count statuses
-  statuses <- sapply(results, function(r) r$status)
-  n_answered <- sum(statuses == "ANSWERED")
-  n_partial <- sum(statuses == "PARTIAL")
-  n_measured <- sum(statuses == "MEASURED")
-  n_contradicted <- sum(statuses == "CONTRADICTED")
-  n_empty <- sum(statuses == "EMPTY")
+  # ── Step 1b: Q_QC_SHELF — soft triage, NO group gate ──
+  # Data-quality flag is evaluated regardless of group validation. A messy
+  # shelf is messy whether or not the groups are well-proposed.
+  results[["Q_QC_SHELF"]] <- characterize_q_qc_shelf(keys)
+
+  # Count statuses — ONLY over Q1–Q7 (Q_QC_SHELF is a soft flag, not one
+  # of the seven scientific questions; including it would dilute the
+  # completion-% interpretation).
+  q17_statuses <- sapply(results[paste0("Q", 1:7)], function(r) r$status)
+  n_answered <- sum(q17_statuses == "ANSWERED")
+  n_partial <- sum(q17_statuses == "PARTIAL")
+  n_measured <- sum(q17_statuses == "MEASURED")
+  n_contradicted <- sum(q17_statuses == "CONTRADICTED")
+  n_empty <- sum(q17_statuses == "EMPTY")
+
+  # Q_QC_SHELF reported separately
+  qcs <- results[["Q_QC_SHELF"]]
+  qcs_note <- if (qcs$status == "EMPTY") "qc_shelf=not_run"
+              else sprintf("qc_shelf=%s", qcs$label %||% "unknown")
 
   list(
     per_question = results,
@@ -716,13 +802,15 @@ characterize_candidate <- function(keys) {
       contradicted = n_contradicted,
       empty = n_empty,
       group_level = group_val$level,
+      qc_shelf_flag = qcs$label %||% NA_character_,
+      qc_shelf_status = qcs$status,
       characterization_string = paste0(
         n_answered, "/7 ANSWERED, ",
         n_partial, " PARTIAL, ",
         n_measured, " MEASURED, ",
         n_contradicted, " CONTRADICTED, ",
         n_empty, " EMPTY",
-        " [groups=", group_val$level, "]"
+        " [groups=", group_val$level, "; ", qcs_note, "]"
       )
     )
   )

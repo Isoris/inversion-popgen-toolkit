@@ -82,6 +82,7 @@ echo "  RESULTS_REGISTRY:  ${RESULTS_REGISTRY_DIR:-(bridge missing)}"
 echo "  SAMPLE_GROUP:      ${SAMPLE_GROUP:-all_226}"
 echo "  Chroms:            ${CHROMS_CSV:-all}"
 echo "  V7_FINAL_DIR:      ${V7_FINAL_DIR:-(unset — axis 5 disabled)}"
+echo "  QC_SHELF_EVIDENCE_DIR: ${QC_SHELF_EVIDENCE_DIR:-(unset — q_qc_shelf disabled)}"
 echo "  JobID:             ${SLURM_JOB_ID}"
 echo "  Started:           $(date)"
 echo "================================================================"
@@ -95,6 +96,13 @@ echo "--- 4e.2 compute candidate status (Q1–Q7 classification) ---"
 # sources _axis5_final_label.R and appends axis 5 columns (v7 structural
 # class, weakest evidence component, justification) to candidate_status.tsv.
 export V7_FINAL_DIR="${V7_FINAL_DIR:-}"
+# QC_SHELF_EVIDENCE_DIR (optional, pass 13): when set + exists,
+# compute_candidate_status.R sources _qc_shelf_reader.R and appends
+# q_qc_shelf_* columns (flag + ratios + Fst/HoverE) to candidate_status.tsv.
+# Point this at the directory containing summary_*.json files produced by
+# 4b_qc_triage/STEP_Q10_register.sh (typically the evidence_registry's
+# per-candidate evidence bundle root).
+export QC_SHELF_EVIDENCE_DIR="${QC_SHELF_EVIDENCE_DIR:-}"
 "${RSCRIPT_BIN}" "${STATUS_SCRIPT}" "${REGISTRY_DIR_RUN}" "${OUTDIR_RUN}"
 
 echo "================================================================"

@@ -435,12 +435,45 @@ build_key_spec <- function() {
 
   all_keys  <- c(q1, q2, q3, q4, q5, q6, q7)
   all_aspir <- c(q1_aspir, q2_aspir, q3_aspir, q4_aspir, q5_aspir, q6_aspir, q7_aspir)
+
+  # ── Q_QC_SHELF: data-quality QC flags from phase_4b_qc_triage (pass 13) ──
+  # SOFT flag (candidates keep their tier regardless) produced by the
+  # phase_4_postprocessing/4b_qc_triage/ module. Reads from the evidence
+  # registry (method="phase_qc_shelf") + per-candidate summary.json that
+  # Q10 writes. Integration is non-gating: a "messy" candidate still
+  # characterizes, it's just labeled messy so downstream consumers can
+  # de-prioritize. See docs/PHASE4_RENUMBER_PROPOSAL.md for rationale.
+  q_qc_shelf <- c(
+    "q_qc_shelf_ran",                    # logical: did 4b_qc_triage run for this cid?
+    "q_qc_shelf_flag",                   # categorical: clean | low_snp | high_uncertain | coverage_artifact | messy | unknown
+    "q_qc_shelf_snp_ratio",              # numeric: shelf SNP density / ref SNP density
+    "q_qc_shelf_uncertain_ratio",        # numeric: shelf BEAGLE uncertainty / ref uncertainty
+    "q_qc_shelf_coverage_ratio",         # numeric: shelf mean coverage / ref mean coverage
+    "q_qc_shelf_coverage_cv_ratio",      # numeric: shelf cov CV / ref cov CV
+    "q_qc_shelf_z_flatness",             # numeric: SD(z[shelf]) / |mean(z[shelf])|
+    "q_qc_shelf_fst_hom1_hom2_inside",   # numeric: mean Fst Hom1-vs-Hom2 inside shelf
+    "q_qc_shelf_fst_hom1_hom2_outside",  # numeric: mean Fst Hom1-vs-Hom2 outside shelf
+    "q_qc_shelf_fst_enrichment_fold",    # numeric: inside/outside ratio
+    "q_qc_shelf_hovere_het_inside",      # numeric: HoverE ratio for HET group inside shelf
+    "q_qc_shelf_hovere_hom1_inside",     # numeric: HoverE for HOM1 inside shelf
+    "q_qc_shelf_hovere_hom2_inside"      # numeric: HoverE for HOM2 inside shelf
+  )
+  # ALL q_qc_shelf keys are currently aspirational — phase_4b_qc_triage
+  # pipeline runs on a per-candidate basis and the bridge from
+  # phase_4a/candidate_summary.tsv is shipped (pass 11), but the full
+  # cohort hasn't been run yet. The reader below tolerates absence
+  # (returns NA + q_qc_shelf_ran=FALSE) without blocking.
+  q_qc_shelf_aspir <- q_qc_shelf
+
+  all_keys  <- c(all_keys, q_qc_shelf)
+  all_aspir <- c(all_aspir, q_qc_shelf_aspir)
   # De-dup aspirational (a key may appear in multiple lists if miscategorised;
   # we take the safer "aspirational if listed anywhere as aspirational").
   all_aspir <- intersect(unique(all_aspir), all_keys)
 
   list(
     Q1 = q1, Q2 = q2, Q3 = q3, Q4 = q4, Q5 = q5, Q6 = q6, Q7 = q7,
+    Q_QC_SHELF = q_qc_shelf,
     Q1_aspir = intersect(q1_aspir, q1),
     Q2_aspir = intersect(q2_aspir, q2),
     Q3_aspir = intersect(q3_aspir, q3),
@@ -448,11 +481,12 @@ build_key_spec <- function() {
     Q5_aspir = intersect(q5_aspir, q5),
     Q6_aspir = intersect(q6_aspir, q6),
     Q7_aspir = intersect(q7_aspir, q7),
+    Q_QC_SHELF_aspir = intersect(q_qc_shelf_aspir, q_qc_shelf),
     all_keys = all_keys,
     all_aspir = all_aspir,
     counts = c(Q1 = length(q1), Q2 = length(q2), Q3 = length(q3),
                Q4 = length(q4), Q5 = length(q5), Q6 = length(q6),
-               Q7 = length(q7)),
+               Q7 = length(q7), Q_QC_SHELF = length(q_qc_shelf)),
     counts_wired = c(
       Q1 = length(q1) - length(intersect(q1_aspir, q1)),
       Q2 = length(q2) - length(intersect(q2_aspir, q2)),
@@ -460,7 +494,8 @@ build_key_spec <- function() {
       Q4 = length(q4) - length(intersect(q4_aspir, q4)),
       Q5 = length(q5) - length(intersect(q5_aspir, q5)),
       Q6 = length(q6) - length(intersect(q6_aspir, q6)),
-      Q7 = length(q7) - length(intersect(q7_aspir, q7))
+      Q7 = length(q7) - length(intersect(q7_aspir, q7)),
+      Q_QC_SHELF = length(q_qc_shelf) - length(intersect(q_qc_shelf_aspir, q_qc_shelf))
     )
   )
 }
@@ -973,6 +1008,52 @@ if (nzchar(axis5_dir)) {
       warning(sprintf(
         "[axis5] helper not found at %s  — skipping axis 5.",
         axis5_helper
+      ))
+    }
+  }
+}
+
+# ── Q_QC_SHELF (pass 13, env-gated): append q_qc_shelf_* columns if
+# QC_SHELF_EVIDENCE_DIR is set. Parallel to axis 5 — same env-gate pattern,
+# same script-location resolution, additive columns only.
+qc_shelf_dir <- Sys.getenv("QC_SHELF_EVIDENCE_DIR", "")
+if (nzchar(qc_shelf_dir)) {
+  if (!dir.exists(qc_shelf_dir)) {
+    warning(sprintf(
+      "[qc_shelf] QC_SHELF_EVIDENCE_DIR is set but does not exist: %s  — skipping qc_shelf reader.",
+      qc_shelf_dir
+    ))
+  } else {
+    # Find this script's directory (same idiom as axis 5 above)
+    .this_script_qcs <- (function() {
+      ca <- commandArgs(trailingOnly = FALSE)
+      fn <- sub("^--file=", "", grep("^--file=", ca, value = TRUE))
+      if (length(fn) > 0) return(normalizePath(fn[1], mustWork = FALSE))
+      for (f in rev(sys.frames())) {
+        of <- tryCatch(f$ofile, error = function(e) NULL)
+        if (!is.null(of)) return(normalizePath(of, mustWork = FALSE))
+      }
+      NA_character_
+    })()
+
+    qc_shelf_helper <- if (!is.na(.this_script_qcs)) {
+      file.path(dirname(.this_script_qcs), "_qc_shelf_reader.R")
+    } else {
+      "_qc_shelf_reader.R"
+    }
+
+    if (file.exists(qc_shelf_helper)) {
+      source(qc_shelf_helper, local = TRUE)
+      n_before <- nrow(status_dt)
+      status_dt <- append_qc_shelf_to_rows(status_dt, qc_shelf_dir)
+      cat(sprintf(
+        "[qc_shelf] appended q_qc_shelf_* columns for %d candidates (helper: %s)\n",
+        n_before, qc_shelf_helper
+      ))
+    } else {
+      warning(sprintf(
+        "[qc_shelf] helper not found at %s  — skipping qc_shelf reader.",
+        qc_shelf_helper
       ))
     }
   }
