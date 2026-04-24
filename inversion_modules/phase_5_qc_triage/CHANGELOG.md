@@ -1,4 +1,15 @@
-# CHANGELOG — phase_qc_shelf
+# CHANGELOG — phase_5_qc_triage
+
+(Module history: `phase_qc_shelf/` → `phase_4_postprocessing/4b_qc_triage/` (pass 12, 2026-04-24) → `phase_5_qc_triage/` (pass 15, 2026-04-24). This CHANGELOG retains entries from all three name eras.)
+
+## Pass 11 task 2 finalization — 2026-04-24 (post pass 15)
+
+- README rewritten to reflect the 2-mode structure: `run_chrom.sh` for single-candidate exploration, `run_all_28chrom.sh --resume` for genome-wide production. Legacy `run_all.sh` flagged as superseded.
+- Added "`q_qc_shelf_*` key family" section documenting the 13 soft-flag keys appended to the final candidate catalog via pass 13's reader wiring (`phase_9_classification/_qc_shelf_reader.R`).
+- Layout section expanded to show all 16 STEP_Q* scripts including Q06_precompute, Q07b, Q07c, Q09, Q09b, Q10 — previously missing.
+- Wiring diagram (phase_4_catalog → bridge → shelf_coords.tsv → Q10 → phase_9) moved into `docs/MODULE_MAP.md` under a new phase_5_qc_triage sub-section so MODULE_MAP is discoverable on its own without jumping here first.
+
+No code change. README + docs only.
 
 ## v3.1 — 2026-04-20 (Engine H / Merot Hobs integration)
 

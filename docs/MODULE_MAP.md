@@ -20,12 +20,14 @@ Wet-lab → BAM → SNP panel → per-sample SV caller VCFs. Every module is
 self-contained, SLURM-driven, and produces a well-defined artefact
 consumed by `inversion_modules/` or by the manuscript directly.
 
-### `inversion_modules/` — the inversion-discovery pipeline (phase_1..7)
+### `inversion_modules/` — the inversion-discovery pipeline (phase_1..12)
 
 Takes the outputs of `Modules/` and runs the actual inversion analysis:
-discovery → breakpoint refinement → postprocessing → gene-content
-analysis. Each `phase_N_*/` directory is **one logical stage of the
-paper's §3 results**.
+inputs → discovery → breakpoint refinement → catalog → QC triage →
+breakpoint refinement → karyotype groups → evidence biology →
+classification → per-candidate followup → secondary confirmation →
+gene-content cargo. Each `phase_N_*/` directory is **one logical stage
+of the paper's §3 results**.
 
 ### Why not one tree?
 
@@ -154,6 +156,60 @@ output of the previous and writes into the shared registries:
 Cross-phase material lives in `registries/schemas/` (structured-block
 schemas + specs) and at the repo-level `docs/` (architecture notes,
 design rationale).
+
+### `phase_5_qc_triage/` — the two modes + the `q_qc_shelf_*` wiring
+
+`phase_5_qc_triage/` ships two drivers covering two distinct operating
+modes (as of pass 15). Which one to use depends on what you're doing:
+
+| Driver | When to use | Output |
+|---|---|---|
+| `run_chrom.sh CHROM` | Single candidate, explicit shelf/breakpoint coords (exploration, debugging, figure reproduction) | `${QC_OUT}/CHROM/` with full Q01→Q09 diagnostic set |
+| `run_all_28chrom.sh --resume` | Genome-wide production run, SLURM-array-dispatched, with resume semantics | Registry-populated per-candidate `summary.json` (Q10) for all 28 chroms |
+| `run_all.sh` | Legacy — Q01→Q08 only, no registry, no Q09/Q10. Prefer `run_chrom.sh`. | (legacy outputs) |
+
+**Mode 2 pipeline:**
+
+```
+phase_4_catalog/candidate_summary.tsv
+         │
+         ▼  (scripts/bridge_from_phase4.sh)
+phase_5_qc_triage/shelf_coords.tsv
+         │
+         ▼  (run_all_28chrom.sh → slurm/array_28chrom.sh)
+phase_5_qc_triage/results/<CHROM>/.../Q10 summary.json  (one per candidate)
+         │
+         ▼  (QC_SHELF_EVIDENCE_DIR env var)
+phase_9_classification/_qc_shelf_reader.R → compute_candidate_status.R
+         │
+         ▼
+final candidate catalog (13 q_qc_shelf_* columns appended)
+```
+
+**The `q_qc_shelf_*` key family** (13 keys, all soft flags):
+
+| Key | Semantic |
+|---|---|
+| `q_qc_shelf_ran` | logical — did phase_5 run for this cid |
+| `q_qc_shelf_flag` | clean / low_snp / high_uncertain / coverage_artifact / messy / unknown |
+| `q_qc_shelf_fst_enrichment_fold` | supporting biological signal (Fst shelf / flanking) |
+| `q_qc_shelf_hovere_het_inside` | HoverE in heterokaryotypes — inversion signature |
+| `q_qc_shelf_snp_ratio` | SNP density ratio (shelf / flanking) |
+| `q_qc_shelf_uncertain_ratio` | BEAGLE uncertainty ratio (shelf / flanking) |
+| `q_qc_shelf_coverage_ratio` | coverage ratio (shelf / flanking) |
+| (6 more threshold-decision keys) | see `compute_candidate_status.R::build_key_spec()` |
+
+All keys are **soft flags** — they never cap tier, never block
+characterization, never gate validation. They're diagnostic columns
+downstream readers can de-prioritize on. A messy candidate still gets
+the full Q1–Q7 characterization; the flag rides along as
+`[qc_shelf=<flag>]` in the characterization summary string (pass 13).
+
+Threshold overrides via env vars (`QC_SHELF_FST_THRESH`, etc.) so
+tuning doesn't require code edits.
+
+See `inversion_modules/phase_5_qc_triage/README.md` for the full
+Q-step reference table and interpretation guide.
 
 ---
 
