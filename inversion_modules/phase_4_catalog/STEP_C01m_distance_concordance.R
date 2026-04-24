@@ -778,8 +778,7 @@ for (rds_file in rds_files) {
           candidate_id    = as.character(cid2),
           block_type      = "distance_concordance",
           data            = dc_block,
-          source_script   = "STEP_C01m_distance_concordance.R",
-          outdir_fallback = cand_outdir_m
+          source_script   = "STEP_C01m_distance_concordance.R"
         )
       }
     }

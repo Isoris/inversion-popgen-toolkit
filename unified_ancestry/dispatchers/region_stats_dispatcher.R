@@ -75,18 +75,16 @@ configure_dispatcher <- function(config_file = NULL, ...) {
     .disp_env$reg <- get("reg", envir = .GlobalEnv)
     message("[dispatcher] Using registry from global env")
   } else {
-    # Search order: respect explicit env override, then look for the FULL
-    # loader in canonical/fallback paths, then the old FLAT loader.
+    # Full-reg only (2026-04-24 migration). Flat sample_registry.R fallback
+    # removed; v10 full loader is mandatory. Search order: explicit env
+    # override first, then canonical v10 paths.
     reg_r <- Sys.getenv("SAMPLE_REGISTRY_R", "")
     loader_flavor <- "none"
 
     if (nzchar(reg_r) && file.exists(reg_r)) {
-      # Explicit override wins; assume caller knows the flavor. We'll
-      # detect post-source whether it's full (has samples$) or flat.
       loader_flavor <- "override"
     } else {
       base <- Sys.getenv("BASE", "")
-      # Full-loader candidates
       full_cands <- c(
         file.path(.disp_env$registry_dir %||% ".", "..", "registries",
                   "api", "R", "registry_loader.R"),
@@ -98,33 +96,13 @@ configure_dispatcher <- function(config_file = NULL, ...) {
       for (p in full_cands) {
         if (file.exists(p)) { reg_r <- p; loader_flavor <- "full"; break }
       }
-
-      # Flat-loader fallback (chat-11 behavior preserved)
-      if (!nzchar(reg_r)) {
-        flat_cands <- c(
-          file.path(.disp_env$registry_dir %||% ".", "..",
-                    "inversion_codebase_v8.5", "utils", "sample_registry.R"),
-          file.path(base, "utils", "sample_registry.R"),
-          "utils/sample_registry.R"
-        )
-        for (p in flat_cands) {
-          if (file.exists(p)) { reg_r <- p; loader_flavor <- "flat"; break }
-        }
-      }
     }
 
     if (nzchar(reg_r) && file.exists(reg_r)) {
       tryCatch({
         source(reg_r, local = TRUE)
-        if (loader_flavor == "full") {
-          # Full loader auto-resolves registries_root via $REGISTRIES / $BASE
-          .disp_env$reg <- load_registry()
-        } else {
-          # Flat loader takes the sample-registry dir directly
-          .disp_env$reg <- load_registry(.disp_env$registry_dir)
-          message("[dispatcher] NOTE: using FLAT registry fallback. ",
-                  "Full API (reg$samples, reg$intervals, reg$results) unavailable.")
-        }
+        # Full loader auto-resolves registries_root via $REGISTRIES / $BASE
+        .disp_env$reg <- load_registry()
         n_groups <- tryCatch(nrow(.disp_env$reg$list_groups()),
                              error = function(e) NA_integer_)
         message("[dispatcher] Registry loaded (", loader_flavor,

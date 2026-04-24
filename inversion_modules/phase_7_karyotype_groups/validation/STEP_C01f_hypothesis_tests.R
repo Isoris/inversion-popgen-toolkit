@@ -2538,6 +2538,24 @@ tryCatch({
       if (exists("store_C01f_results", mode = "function")) {
         store_C01f_results(vd, cid, outdir)
       }
+      # ── NEW: update frequency block family_linkage + polymorphism_class ──
+      #    Option A architecture: seal writes the frequency block initial
+      #    state; C01f updates the two fields that depend on the jackknife
+      #    run. Helper reads the existing block via reg$evidence$read_block,
+      #    overwrites the two fields (and derived polymorphism_class), and
+      #    writes it back. If seal didn't run, writes a minimal block.
+      if (exists("update_C01f_frequency_linkage", mode = "function")) {
+        tryCatch(
+          update_C01f_frequency_linkage(vd, cid, outdir),
+          error = function(e) {
+            message("[C01f]   frequency block update failed for ", cid,
+                    ": ", conditionMessage(e))
+          }
+        )
+      }
+      if (exists("store_C01f_frequency_update", mode = "function")) {
+        store_C01f_frequency_update(vd, cid, outdir)
+      }
     }
     message("[C01f] Registered ", n_keys_total, " evidence keys across ", nrow(verd_dt), " candidates")
   }

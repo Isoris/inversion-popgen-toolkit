@@ -242,8 +242,14 @@ load_clair3_phase <- function(chr, sample_id, start_bp, end_bp, clair3_dir) {
 # Registry helpers (thin wrappers; heavy lifting in registry_loader.R)
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Load reg if available — each script calls this at top. Returns NULL if
-# registry library is not sourceable.
+# Load reg — v10 ONLY. If the v10 registry can't be sourced, return NULL and
+# let the caller fail loudly. The v9 sample_registry.R fallback was removed in
+# the full-reg migration (chat B continuation, 2026-04-24). Rationale:
+# * v9 → v10 migration is complete; no production scripts still depend on v9.
+# * The fallback produced a list whose shape (legacy_v9 = TRUE) was never
+#   actually branched on in downstream code, so the branch was dead weight.
+# * Mixing v9 and v10 objects in the same session was a rare but real source
+#   of silent key drops when write_block was NULL.
 try_load_registry <- function() {
   for (p in c(
     "registries/api/R/registry_loader.R",
@@ -262,85 +268,50 @@ try_load_registry <- function() {
       })
     }
   }
-  # Also try the older v9 sample_registry.R directly for group ops
-  for (p in c("utils/sample_registry.R", "../utils/sample_registry.R",
-              file.path(Sys.getenv("BASE", ""),
-                        "inversion_codebase_v8.5/utils/sample_registry.R"))) {
-    if (file.exists(p)) {
-      tryCatch({
-        source(p)
-        if (exists("load_registry", mode = "function")) {
-          # v9-style returns a list with $add_group, $get_group, etc.
-          # Wrap it to match the v10 reg$samples$* / reg$evidence$* shape.
-          r <- load_registry()
-          return(list(
-            samples  = list(
-              add_group   = r$add_group,
-              get_group   = r$get_group,
-              has_group   = r$has_group,
-              list_groups = r$list_groups
-            ),
-            evidence = list(
-              add_evidence    = r$add_evidence,
-              get_evidence    = r$get_evidence,
-              has_evidence    = r$has_evidence,
-              write_block     = NULL  # v9 doesn't have this
-            ),
-            legacy_v9 = TRUE
-          ))
-        }
-      }, error = function(e) NULL)
-    }
-  }
   NULL
 }
 
-# Write a Tier-2 block using either v10 or a legacy fallback (JSON dump).
+# ─────────────────────────────────────────────────────────────────────────────
+# Block write/read — REGISTRY-ONLY (full-reg migration, 2026-04-24)
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# Both write_block_safe and read_block_safe are thin wrappers around
+# reg$evidence$write_block / reg$evidence$read_block. No fallback.
+#
+# Earlier migration stages retained an `outdir_fallback` parameter for
+# backward-compat with call sites still passing it; after the call-site
+# cleanup pass (2026-04-24), all 8 call sites have been updated to drop
+# the argument, and the parameter has been removed from the signatures.
+#
+# If a new caller appears passing `outdir_fallback = ...`, R will raise
+# "unused argument" — which is the right behavior. The fallback is gone;
+# callers that think they need it should instead ensure registry_bridge.R
+# is sourced.
+
 write_block_safe <- function(reg, candidate_id, block_type, data,
-                               source_script, outdir_fallback = NULL) {
-  # Try the v10 library path first
-  if (!is.null(reg) && !is.null(reg$evidence$write_block)) {
-    Sys.setenv(CURRENT_SCRIPT = source_script)
-    return(reg$evidence$write_block(
-      candidate_id = candidate_id,
-      block_type = block_type,
-      data = data
-    ))
+                               source_script) {
+  if (is.null(reg) || is.null(reg$evidence) ||
+      is.null(reg$evidence$write_block)) {
+    stop("[lib] write_block_safe: reg$evidence$write_block unavailable. ",
+         "The v10 registry is now mandatory (full-reg migration). ",
+         "Ensure utils/registry_bridge.R is sourced before calling this.")
   }
-  # Legacy fallback: write to outdir
-  if (!is.null(outdir_fallback) && dir.exists(outdir_fallback)) {
-    json_path <- file.path(outdir_fallback, paste0(block_type, ".json"))
-    if (requireNamespace("jsonlite", quietly = TRUE)) {
-      jsonlite::write_json(
-        list(block_type = block_type, candidate_id = candidate_id,
-             source_script = source_script,
-             computed_at = format(Sys.time(), "%Y-%m-%dT%H:%M:%S"),
-             data = data),
-        json_path, auto_unbox = TRUE, pretty = TRUE, null = "null", na = "null"
-      )
-      message("[lib] block written (legacy fallback): ", json_path)
-      return(list(path = json_path, status = "legacy_fallback"))
-    }
-  }
-  message("[lib] WARNING: block ", block_type, " for ", candidate_id,
-          " not written (no registry, no fallback)")
-  NULL
+  Sys.setenv(CURRENT_SCRIPT = source_script)
+  reg$evidence$write_block(
+    candidate_id = candidate_id,
+    block_type   = block_type,
+    data         = data
+  )
 }
 
-# Read a previously-written block (v10 or legacy path)
-read_block_safe <- function(reg, candidate_id, block_type,
-                              outdir_fallback = NULL) {
-  if (!is.null(reg) && !is.null(reg$evidence$read_block)) {
-    b <- reg$evidence$read_block(candidate_id, block_type)
-    if (!is.null(b)) return(b)
+read_block_safe <- function(reg, candidate_id, block_type) {
+  if (is.null(reg) || is.null(reg$evidence) ||
+      is.null(reg$evidence$read_block)) {
+    stop("[lib] read_block_safe: reg$evidence$read_block unavailable. ",
+         "The v10 registry is now mandatory (full-reg migration). ",
+         "Ensure utils/registry_bridge.R is sourced before calling this.")
   }
-  if (!is.null(outdir_fallback) && dir.exists(outdir_fallback)) {
-    json_path <- file.path(outdir_fallback, paste0(block_type, ".json"))
-    if (file.exists(json_path) && requireNamespace("jsonlite", quietly = TRUE)) {
-      return(jsonlite::fromJSON(json_path, simplifyVector = FALSE))
-    }
-  }
-  NULL
+  reg$evidence$read_block(candidate_id, block_type)
 }
 
-message("[lib_decompose_helpers] loaded")
+message("[lib_decompose_helpers] loaded (full-reg mode; no JSON fallback)")

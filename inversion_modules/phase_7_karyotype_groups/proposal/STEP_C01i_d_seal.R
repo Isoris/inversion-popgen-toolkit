@@ -405,21 +405,40 @@ for (ci in seq_len(nrow(cand_dt))) {
                                            script = "STEP_C01i_d_seal.R"),
                error = function(e) NULL)
     }
-    # ── Initial family_linkage / polymorphism_class (C01f overwrites
-    #    after jackknife). Writing these at seal time ensures the
-    #    frequency block always has the fields populated, even when
-    #    C01f has not yet run (e.g. first-pass catalog snapshots).
-    #    Values here are the audit's "unclassified" defaults; jackknife
-    #    in C01f replaces them with concrete classifications per
-    #    `patches/C01f_jackknife_semantics_patch.R`. ──
-    tryCatch(reg$evidence$add_evidence(cid, "q6_family_linkage",
-                                         value = "unknown",
-                                         script = "STEP_C01i_d_seal.R"),
-             error = function(e) NULL)
-    tryCatch(reg$evidence$add_evidence(cid, "q6_polymorphism_class",
-                                         value = "unclassified",
-                                         script = "STEP_C01i_d_seal.R"),
-             error = function(e) NULL)
+    # ── family_linkage / polymorphism_class placeholders:
+    #    REMOVED 2026-04-24. The register_C01i_frequency_block call below
+    #    now writes both fields inside the frequency block, and the v3
+    #    schema's keys_extracted emits q6_family_linkage and
+    #    q6_polymorphism_class as flat keys. The old add_evidence placeholder
+    #    writes were redundant duplicates (last-write-wins, so harmless but
+    #    unnecessary). C01f later overwrites the two fields via
+    #    update_C01f_frequency_linkage after the jackknife runs.
+
+    # ── NEW: frequency block write (Option A architecture, v3 schema) ──
+    #    register_C01i_frequency_block lives in utils/registry_key_helpers.R.
+    #    Source the helpers if not already loaded (same guard pattern used
+    #    by STEP_C01d/STEP_C01f). The helper computes HWE locally from
+    #    class counts, derives freq_class from freq_inv, and writes the
+    #    frequency block with placeholder family_linkage/polymorphism_class.
+    #    C01f later overwrites those two fields via update_C01f_frequency_linkage.
+    for (.hf in c("utils/registry_key_helpers.R", "../utils/registry_key_helpers.R",
+                  file.path(Sys.getenv("BASE", ""),
+                            "inversion-popgen-toolkit/utils/registry_key_helpers.R"))) {
+      if (file.exists(.hf)) { source(.hf); break }
+    }
+    if (exists("register_C01i_frequency_block", mode = "function")) {
+      tryCatch(
+        register_C01i_frequency_block(
+          list(n_HOM_REF = n_ref, n_HET = n_het, n_HOM_INV = n_inv,
+               n_RECOMBINANT = n_rec, n_total = n_tot, freq_inv = freq_inv),
+          cid, opt$outdir
+        ),
+        error = function(e) {
+          message("[seal]   frequency block write failed for ", cid, ": ",
+                  conditionMessage(e))
+        }
+      )
+    }
   }
 
   # Record for summary

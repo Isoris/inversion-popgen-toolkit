@@ -70,7 +70,7 @@ load_registry <- function(registries_root = NULL, create_if_missing = TRUE) {
       if (dir.exists(cand)) {
         registries_root <- cand
       } else {
-        # v9 fallback: use sample_registry at top of BASE
+        # Secondary path: some deployments put the registry directly under BASE
         registries_root <- file.path(base, "sample_registry_v10_fallback")
       }
     }
@@ -440,36 +440,32 @@ load_samples_api <- function(sample_dir) {
     )
   }
 
-  # Try to source the full sample_registry.R; if unavailable, emit shim.
+  # Full-reg migration (2026-04-24): the v8.5 sample_registry.R fallback
+  # path and the silent no-op shim were removed. The v10 api/R/sample_registry.R
+  # is now mandatory; if it can't be sourced, fail loudly rather than silently
+  # returning empty tables.
   src_candidates <- c(
     file.path(sample_dir, "..", "..", "api", "R", "sample_registry.R"),
     "utils/sample_registry.R",
     "../utils/sample_registry.R",
     file.path(Sys.getenv("BASE", ""),
-              "inversion-popgen-toolkit/registries/api/R/sample_registry.R"),
-    file.path(Sys.getenv("BASE", ""),
-              "inversion_codebase_v8.5/utils/sample_registry.R")
+              "inversion-popgen-toolkit/registries/api/R/sample_registry.R")
   )
   for (sp in src_candidates) {
     if (file.exists(sp)) {
       source(sp)
       if (exists("load_registry", mode = "function")) {
-        full <- load_registry(sample_dir)   # the OLD sample_registry.R entry point
+        full <- load_registry(sample_dir)
         return(build_extended(full))
       }
     }
   }
 
-  # Shim: no-op implementations with warnings
-  warning("[registry_loader] sample_registry.R not found — using shim")
-  shim_full <- list(
-    get_master   = function() data.table(),
-    get_group    = function(gid) character(0),
-    add_group    = function(...) invisible(FALSE),
-    has_group    = function(gid) FALSE,
-    list_groups  = function() data.table()
-  )
-  build_extended(shim_full)
+  # No fallback — fail rather than silently return empty data.
+  stop("[registry_loader] sample_registry.R not found. Searched: ",
+       paste(src_candidates, collapse = ", "),
+       ". The full v10 registry is now mandatory (full-reg migration). ",
+       "Install registries/api/R/sample_registry.R or set BASE correctly.")
 }
 
 # =============================================================================

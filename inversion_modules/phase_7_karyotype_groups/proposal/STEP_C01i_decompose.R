@@ -386,8 +386,7 @@ for (ci in seq_len(nrow(cand_dt))) {
       candidate_id = cid,
       block_type   = "internal_dynamics",
       data         = block_data,
-      source_script= "STEP_C01i_decompose.R",
-      outdir_fallback = cand_outdirs[ci]
+      source_script= "STEP_C01i_decompose.R"
     )
     next
   }
@@ -427,8 +426,7 @@ for (ci in seq_len(nrow(cand_dt))) {
       candidate_id = cid,
       block_type   = "internal_dynamics",
       data         = block_data,
-      source_script= "STEP_C01i_decompose.R",
-      outdir_fallback = cand_outdirs[ci]
+      source_script= "STEP_C01i_decompose.R"
     )
     next
   }
@@ -580,8 +578,7 @@ for (ci in seq_len(nrow(cand_dt))) {
     candidate_id = cid,
     block_type = "internal_dynamics",
     data = block_data,
-    source_script = "STEP_C01i_decompose.R",
-    outdir_fallback = cand_outdirs[ci]
+    source_script = "STEP_C01i_decompose.R"
   )
 }
 

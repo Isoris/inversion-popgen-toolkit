@@ -412,8 +412,7 @@ for (ci in seq_len(nrow(cand_dt))) {
     candidate_id   = cid,
     block_type     = "recombinant_map",
     data           = block_data,
-    source_script  = "STEP_C01i_b_multi_recomb.R",
-    outdir_fallback= cand_outdir
+    source_script  = "STEP_C01i_b_multi_recomb.R"
   )
 
   # ──────────────────────────────────────────────────────────────────────
@@ -648,8 +647,7 @@ for (ci in seq_len(nrow(cand_dt))) {
     candidate_id    = cid,
     block_type      = "regime_sample_dag",
     data            = dag_block,
-    source_script   = "STEP_C01i_b_multi_recomb.R",
-    outdir_fallback = cand_outdir
+    source_script   = "STEP_C01i_b_multi_recomb.R"
   )
 }
 

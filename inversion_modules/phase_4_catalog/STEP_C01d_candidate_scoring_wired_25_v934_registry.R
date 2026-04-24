@@ -450,7 +450,17 @@ score_candidates <- function(iv_dt, hyp_verd) {
       snake_overlap = snake_overlap_status,
       boundary_verdict_left = boundary_verdict_left,
       boundary_verdict_right = boundary_verdict_right,
-      n_boundary_cheats = n_boundary_cheats
+      n_boundary_cheats = n_boundary_cheats,
+      # Morphology pass-through (for register_C01d_keys -> morphology schema).
+      # Added 2026-04-24 (chat B continuation). These come from iv (input
+      # interval from precomp/landscape) and are carried here so the
+      # morphology block write in register_C01d_keys can populate them
+      # without needing a second data source.
+      homogeneity = safe_num(iv$homogeneity, NA_real_),
+      patchiness = safe_num(iv$patchiness, NA_real_),
+      stripe_count = safe_num(iv$stripe_count, NA_integer_),
+      n_children = safe_num(iv$n_children, NA_integer_),
+      occupancy = safe_num(iv$occupancy, NA_real_)
     )
   }
   rbindlist(scores, fill = TRUE)

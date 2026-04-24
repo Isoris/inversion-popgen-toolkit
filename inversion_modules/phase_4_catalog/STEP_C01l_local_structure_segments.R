@@ -516,8 +516,7 @@ for (ci in seq_len(nrow(cand_dt))) {
         candidate_id    = as.character(cand_id),
         block_type      = "local_structure_segments",
         data            = lss_block,
-        source_script   = "STEP_C01l_local_structure_segments.R",
-        outdir_fallback = cand_outdir
+        source_script   = "STEP_C01l_local_structure_segments.R"
       )
     }
   }

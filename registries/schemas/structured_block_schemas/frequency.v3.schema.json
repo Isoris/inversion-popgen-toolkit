@@ -1,0 +1,113 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "frequency.v3.schema.json",
+  "block_type": "frequency",
+  "version": "v3_reconciled_v1_docs_v2_semantics_2026_04_24",
+  "description": "Population frequency summary: inverted-allele frequency, class counts, HWE test, family linkage, polymorphism class. Gated by SUPPORTED validation because the numbers are only meaningful if the group assignments are trustworthy. Distinct from internal_dynamics — this block is about the POPULATION, that block is about WITHIN-sample mosaicism. v3 RECONCILIATION: merges v1 documentation (expected_counts_hwe, note_on_hatchery_hwe, richer descriptions, explicit HWE method notes) with v2 semantics (5-value family_linkage axis, jackknife_max_delta/n_contributing, polymorphism_class). Also fixes three bugs: (1) family_linkage enum now includes 'uncertain' which C01f emits at line 553; (2) jackknife_n_contributing added to keys_extracted (was declared as property but not extracted in v2); (3) freq_class widened to 5-class to match characterize_candidate.R's derivation (previous 4-class enum would have rejected 'intermediate' and 'nearly_fixed'). Written first by STEP_C01i_d_seal (partial: freq + counts + HWE + placeholder family_linkage), then updated by STEP_C01f_hypothesis_tests (family_linkage from jackknife + derived polymorphism_class).",
+  "question": "Q6",
+  "group_validation_required": "SUPPORTED",
+  "source_script": "C01i_d_seal (partial write) + C01f (family_linkage + polymorphism_class update)",
+  "required": ["freq_inv", "n_total", "class_counts", "hwe_chi2", "hwe_p"],
+  "properties": {
+    "freq_inv": {
+      "type": "number",
+      "description": "Inverted-allele frequency = (2*n_HOM_INV + n_HET) / (2*n_total). Recombinants excluded from denominator; they are neither HOM_REF nor HOM_INV alleles in the strict sense."
+    },
+    "freq_class": {
+      "type": "string",
+      "enum": ["rare", "low", "intermediate", "high", "nearly_fixed"],
+      "description": "Derived from freq_inv. Thresholds: rare <5%, low 5-15%, intermediate 15-50%, high 50-85%, nearly_fixed >=85%. Matches characterize_candidate.R's classification thresholds."
+    },
+    "n_total": {
+      "type": "integer",
+      "description": "Count of classified samples (HOM_REF + HET + HOM_INV + RECOMBINANT)."
+    },
+    "class_counts": {
+      "type": "object",
+      "description": "Per-class sample counts. In v3, these are also emitted as flat keys (q6_n_HOM_REF, q6_n_HET, q6_n_HOM_INV, q6_n_Recombinant) so consumers can read without parsing the nested object.",
+      "properties": {
+        "HOM_REF":     { "type": "integer" },
+        "HET":         { "type": "integer" },
+        "HOM_INV":     { "type": "integer" },
+        "RECOMBINANT": { "type": "integer" }
+      }
+    },
+    "expected_counts_hwe": {
+      "type": "object",
+      "description": "Expected HOM_REF / HET / HOM_INV counts under HWE at observed freq_inv. Useful for supplementary tables showing observed-vs-expected without reviewers having to recompute.",
+      "properties": {
+        "HOM_REF":  { "type": "number" },
+        "HET":      { "type": "number" },
+        "HOM_INV":  { "type": "number" }
+      }
+    },
+    "hwe_method": {
+      "type": "string",
+      "enum": ["chi_squared", "exact"],
+      "description": "HWE test method. v3 default is chi_squared (2 df). exact reserved for future use with small n or extreme frequencies."
+    },
+    "hwe_chi2": {
+      "type": "number",
+      "description": "Chi-squared statistic (2 df) from observed vs expected-under-HWE class counts."
+    },
+    "hwe_p": { "type": "number" },
+    "hwe_verdict": {
+      "type": "string",
+      "enum": ["consistent", "het_excess", "het_deficit", "underpowered"],
+      "description": "consistent if p >= 0.05; het_excess / het_deficit if p < 0.05 based on sign of (observed_het - expected_het); underpowered when n_total < 30 or any expected cell < 5."
+    },
+    "genotype_balance": {
+      "type": "string",
+      "enum": ["hwe_consistent", "het_excess", "het_deficit"],
+      "description": "Classification axis for downstream, mirrors hwe_verdict but without the underpowered case — forces a direction call."
+    },
+    "family_linkage": {
+      "type": "string",
+      "enum": ["multi_family", "few_family", "single_family",
+               "pca_family_confounded", "uncertain", "unknown"],
+      "description": "Six-class axis derived from cheat6 jackknife verdict in C01f: multi_family = robust, segregates in many families (robust_multi_family or multi_family_contributing); few_family = 2-3 families drive the signal (few_family_contributing); single_family = family-specific polymorphism, real but restricted (single_family_fragile); pca_family_confounded = PCA groups track ancestry not arrangement (the SUSPECT case, fragile or pca_family_driven); uncertain = verdict missing but jackknife delta high (fallback branch); unknown = jackknife not run or inconclusive (seal placeholder before C01f overwrites). FIX in v3: 'uncertain' was emitted by C01f at L553 but missing from v2 enum; added here."
+    },
+    "jackknife_max_delta": {
+      "type": "number",
+      "description": "Max |delta| across ancestry-group jackknife iterations. Sister field to q7_t9_max_delta. Populated by C01f after T9 runs."
+    },
+    "jackknife_n_contributing": {
+      "type": "integer",
+      "description": "Number of ancestry groups whose removal drops the inversion signal (delta > threshold). FIX in v3: added to keys_extracted — was declared as property but never extracted as a flat key in v2."
+    },
+    "polymorphism_class": {
+      "type": "string",
+      "enum": ["cohort_wide", "family_restricted", "lineage_restricted", "unclassified"],
+      "description": "Derived from family_linkage: multi_family -> cohort_wide; few_family -> lineage_restricted; single_family -> family_restricted; pca_family_confounded / uncertain / unknown -> unclassified. v3 NOTE: derivation is performed in utils/registry_key_helpers.R::update_C01f_frequency_linkage (helper-side), not in STEP_C01f_hypothesis_tests.R source. This keeps C01f untouched while still producing the derived value at block-write time."
+    },
+    "computed_from": {
+      "type": "string",
+      "enum": ["C01i_d_seal_initial", "C01f_updated", "C01i_d_seal_only"],
+      "description": "Provenance: which writer last touched this block. C01i_d_seal_initial = just written by seal with placeholder family_linkage; C01f_updated = C01f has overwritten family_linkage + polymorphism_class; C01i_d_seal_only = seal ran but C01f has not."
+    },
+    "note_on_hatchery_hwe": {
+      "type": "string",
+      "description": "F1 hybrid hatchery samples systematically violate HWE at neutral loci due to population admixture. A het_excess is EXPECTED; het_deficit is the more informative deviation (suggests assortative mating or selection against heterozygotes)."
+    }
+  },
+  "keys_extracted": [
+    { "key": "q6_freq_inv",                 "from": "freq_inv" },
+    { "key": "q6_freq_class",               "from": "freq_class" },
+    { "key": "q6_n_total",                  "from": "n_total" },
+    { "key": "q6_n_HOM_REF",                "from": "class_counts.HOM_REF" },
+    { "key": "q6_n_HOM_STD",                "from": "class_counts.HOM_REF" },
+    { "key": "q6_n_HET",                    "from": "class_counts.HET" },
+    { "key": "q6_n_HOM_INV",                "from": "class_counts.HOM_INV" },
+    { "key": "q6_n_Recombinant",            "from": "class_counts.RECOMBINANT" },
+    { "key": "q6_expected_het_hwe",         "from": "expected_counts_hwe.HET" },
+    { "key": "q6_hwe_chi2",                 "from": "hwe_chi2" },
+    { "key": "q6_hwe_p",                    "from": "hwe_p" },
+    { "key": "q6_hwe_verdict",              "from": "hwe_verdict" },
+    { "key": "q6_genotype_balance",         "from": "genotype_balance" },
+    { "key": "q6_family_linkage",           "from": "family_linkage" },
+    { "key": "q6_jackknife_max_delta",      "from": "jackknife_max_delta" },
+    { "key": "q6_jackknife_n_contributing", "from": "jackknife_n_contributing" },
+    { "key": "q6_polymorphism_class",       "from": "polymorphism_class" }
+  ],
+  "note_on_reconciliation": "v3 = v1 documentation (expected_counts_hwe, note_on_hatchery_hwe, richer HWE descriptions) + v2 semantics (5-value family_linkage, jackknife fields, polymorphism_class) + three bug fixes (uncertain in enum, jackknife_n_contributing extracted, freq_class 5-class to match consumer). v1 and v2 archived to _archive_superseded/bk_schemas_pre_canonical/. The helper-side derivation of polymorphism_class is documented on the field itself and is NOT a writer modification — C01f source is unchanged."
+}

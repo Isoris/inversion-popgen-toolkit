@@ -61,7 +61,7 @@ def check_files_present(root: Path) -> list:
         "registries/schemas/structured_block_schemas/internal_dynamics.schema.json",
         "registries/schemas/structured_block_schemas/recombinant_map.schema.json",
         "registries/schemas/structured_block_schemas/internal_ancestry_composition.schema.json",
-        "registries/schemas/structured_block_schemas/frequency.v2.schema.json",
+        "registries/schemas/structured_block_schemas/frequency.v3.schema.json",
         # pass 15: phase_4 patches/ tests/ docs/ orchestrator/ relocated
         "inversion_modules/phase_9_classification/patches/02_C01f_promotion_cap.R",
         "inversion_modules/phase_9_classification/patches/03_C01f_jackknife_semantics.R",

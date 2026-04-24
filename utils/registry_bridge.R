@@ -227,42 +227,29 @@ if (exists(".LOAD_BRIDGE_DONE", envir = .GlobalEnv) &&
     if (file.exists(p)) { .reg_file <- p; .reg_flavor <- "full"; break }
   }
 
-  # Fallback: old flat loader (only if the full one couldn't be found)
-  if (is.null(.reg_file)) {
-    .flat_candidates <- c(
-      file.path(.bridge_dir, "sample_registry.R"),
-      file.path(BASE, "utils/sample_registry.R"),
-      file.path(BASE, "inversion_modules/utils/sample_registry.R"),
-      file.path(BASE, "inversion_codebase_v8.5/utils/sample_registry.R"),
-      "utils/sample_registry.R"
-    )
-    for (p in .flat_candidates) {
-      if (file.exists(p)) { .reg_file <- p; .reg_flavor <- "flat"; break }
-    }
-  }
-
+  # Full-reg migration (2026-04-24): the v9 flat `sample_registry.R` fallback
+  # was removed. The full v10 loader is now mandatory. If none of the
+  # candidate paths above resolved, fail loudly — a silent fallback to the
+  # flat loader was producing `reg` objects missing `$intervals`, `$results`,
+  # `$query`, and `$evidence$write_block`, which caused silent key-drops
+  # downstream.
   if (!is.null(.reg_file)) {
     # Guard against picking up an out-of-date sourced environment
     if (exists("load_registry", mode = "function", envir = .GlobalEnv)) {
       rm("load_registry", envir = .GlobalEnv)
     }
     source(.reg_file, local = FALSE)
-    if (.reg_flavor == "full") {
-      # The full loader resolves its own registries_root via $REGISTRIES / $BASE.
-      # Let BRIDGE_PATHS$REGISTRIES_ROOT take precedence if set (non-empty).
-      .rroot <- BRIDGE_PATHS$REGISTRIES_ROOT
-      if (is.null(.rroot) || !nzchar(.rroot)) .rroot <- NULL
-      reg <- load_registry(registries_root = .rroot)
-    } else {
-      # Old flat loader takes the sample-registry dir directly
-      reg <- load_registry(BRIDGE_PATHS$REGISTRY_DIR)
-      message("[load_bridge] WARNING: using FLAT registry fallback. ",
-              "reg$samples / reg$intervals / reg$results will be missing. ",
-              "Install registries/api/R/registry_loader.R to get the full API.")
-    }
+    # The full loader resolves its own registries_root via $REGISTRIES / $BASE.
+    # Let BRIDGE_PATHS$REGISTRIES_ROOT take precedence if set (non-empty).
+    .rroot <- BRIDGE_PATHS$REGISTRIES_ROOT
+    if (is.null(.rroot) || !nzchar(.rroot)) .rroot <- NULL
+    reg <- load_registry(registries_root = .rroot)
   } else {
-    message("[load_bridge] WARNING: no registry loader found — reg = NULL")
-    reg <- NULL
+    stop("[load_bridge] v10 registry_loader.R not found. Searched: ",
+         paste(.full_loader_candidates, collapse = ", "),
+         ". The full v10 registry is now mandatory (full-reg migration). ",
+         "Install registries/api/R/registry_loader.R or set BASE to a tree ",
+         "that contains it.")
   }
 
 
@@ -467,11 +454,10 @@ if (exists(".LOAD_BRIDGE_DONE", envir = .GlobalEnv) &&
           if (.anc_groups_registered > 0L)
             paste0("ancestry_groups_new=", .anc_groups_registered, " ") else "")
 
-  # Clean up temporaries (only remove names that were actually assigned;
-  # .flat_candidates and .rroot are conditional on the fallback path).
+  # Clean up temporaries
   .to_rm <- intersect(
     c(".smap_file", ".reg_file", ".reg_flavor",
-      ".full_loader_candidates", ".flat_candidates", ".rroot",
+      ".full_loader_candidates", ".rroot",
       ".iq_loaded", ".disp_loaded", ".anc_groups_registered",
       ".bridge_self", ".bridge_dir"),
     ls(envir = environment(), all.names = TRUE)

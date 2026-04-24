@@ -663,8 +663,7 @@ for (ci in seq_len(nrow(cand_dt))) {
       candidate_id    = cid,
       block_type      = "regime_segments",
       data            = reg_seg_block,
-      source_script   = "STEP_C01j_regime_compatibility_engine.R",
-      outdir_fallback = cand_outdir
+      source_script   = "STEP_C01j_regime_compatibility_engine.R"
     )
   }
 
