@@ -49,9 +49,9 @@ REGISTRIES_ROOT="${REGISTRIES_ROOT:-}"
 SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 # pass 15: assign_structural_class_v7.py now lives in phase_9_classification
 PHASE9_DIR="${PHASE9_DIR:-$(cd "${SCRIPT_DIR}/../phase_9_classification" && pwd)}"
-V5_BLOCKS="$OUTDIR/v5_blocks"
+EVIDENCE_BLOCKS="$OUTDIR/evidence_blocks"
 FINAL="$OUTDIR/final"
-mkdir -p "$V5_BLOCKS" "$FINAL"
+mkdir -p "$EVIDENCE_BLOCKS" "$FINAL"
 
 echo "=============================================================================="
 echo "v5 pipeline: $SCRIPT_DIR"
@@ -68,7 +68,7 @@ python3 "$SCRIPT_DIR/q4_mechanism/cheat29b_assembled_junction.py" \
     --delly_inv_vcf "$DELLY_INV_VCF" \
     --delly_bnd_vcf "$DELLY_BND_VCF" \
     --manta_inv_vcf "$MANTA_INV_VCF" \
-    --outdir "$V5_BLOCKS" \
+    --outdir "$EVIDENCE_BLOCKS" \
     ${REGISTRIES_ROOT:+--registries_root "$REGISTRIES_ROOT"}
 
 # -------------------------------------------------------------
@@ -79,7 +79,7 @@ python3 "$SCRIPT_DIR/q7_existence_audit/bnd_sided_support.py" \
     --candidates "$CANDIDATES" \
     --delly_bnd_vcf "$DELLY_BND_VCF" \
     --manta_raw_vcf "$MANTA_RAW_VCF" \
-    --outdir "$V5_BLOCKS" \
+    --outdir "$EVIDENCE_BLOCKS" \
     ${REGISTRIES_ROOT:+--registries_root "$REGISTRIES_ROOT"}
 
 # -------------------------------------------------------------
@@ -92,7 +92,7 @@ python3 "$SCRIPT_DIR/q5_age_and_origin/cross_species_bridge_v6.py" \
     --flank_coherence_tsv "$FLANK_COHERENCE_TSV" \
     --polarized_tsv "$POLARIZED_TSV" \
     ${DOLLO_TSV:+--dollo_tsv "$DOLLO_TSV"} \
-    --outdir "$V5_BLOCKS" \
+    --outdir "$EVIDENCE_BLOCKS" \
     ${REGISTRIES_ROOT:+--registries_root "$REGISTRIES_ROOT"}
 
 
@@ -105,7 +105,7 @@ if [[ -n "$BP_CONSENSUS_TSV" && -n "$BP_FRAGMENTS_TSV" ]]; then
         --consensus_tsv "$BP_CONSENSUS_TSV" \
         --fragments_tsv "$BP_FRAGMENTS_TSV" \
         ${BP_PER_METHOD_TSV:+--per_method_tsv "$BP_PER_METHOD_TSV"} \
-        --outdir "$V5_BLOCKS" \
+        --outdir "$EVIDENCE_BLOCKS" \
         ${REGISTRIES_ROOT:+--registries_root "$REGISTRIES_ROOT"}
 else
     echo "[v5] STEP 3b: bp_pipeline bridge — SKIPPED (set BP_CONSENSUS_TSV + BP_FRAGMENTS_TSV to enable)"
@@ -118,7 +118,7 @@ echo "[v5] STEP 4: final structural-class assignment"
 python3 "$PHASE9_DIR/assign_structural_class_v7.py" \
     --candidates "$CANDIDATES" \
     --keys_dir "$KEYS_DIR" \
-    --v5_blocks_dir "$V5_BLOCKS" \
+    --evidence_blocks_dir "$EVIDENCE_BLOCKS" \
     --outdir "$FINAL"
 
 echo "=============================================================================="

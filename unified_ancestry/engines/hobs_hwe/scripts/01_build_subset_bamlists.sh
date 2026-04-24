@@ -228,6 +228,7 @@ MANIFEST="${OUTDIR}/subset_manifest.tsv"
 if [[ -f "${LOAD_BRIDGE}" ]]; then
   "${RSCRIPT_BIN}" -e "
     source('${LOAD_BRIDGE}')
+    '%+%' <- function(a, b) paste0(a, b)
     for (k in 1:${DEFAULT_K}) {
       sf <- '${OUTDIR}/Q' %+% k %+% '_full.samples'
       if (file.exists(sf)) {
@@ -242,7 +243,7 @@ if [[ -f "${LOAD_BRIDGE}" ]]; then
         }
       }
     }
-  " '%+%' <- function(a, b) paste0(a, b) 2>/dev/null || true
+  " 2>/dev/null || true
 fi
 
 hobs_log "Manifest: $MANIFEST"

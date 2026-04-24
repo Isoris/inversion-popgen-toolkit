@@ -390,8 +390,11 @@ if (SMOOTH_WIN > 1) {
 } else {
   dt[, snps_per_x_sm := snps_per_x]
 }
-sd_unit <- if (sd_scale_kb == 1) "SNPs/kb"
-           else sprintf("SNPs/%gkb", sd_scale_kb)
+sd_unit <- if (sd_scale_kb == 1) {
+  "SNPs/kb"
+} else {
+  sprintf("SNPs/%gkb", sd_scale_kb)
+}
 
 p2 <- decorate(
   ggplot(dt, aes(mb, snps_per_x_sm)) +

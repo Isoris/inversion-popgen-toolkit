@@ -351,7 +351,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__.split("=" * 77)[0])
     p.add_argument("--candidates", required=True)
     p.add_argument("--keys_dir", required=True)
-    p.add_argument("--v5_blocks_dir", required=True)
+    p.add_argument("--evidence_blocks_dir", required=True)
     p.add_argument("--outdir", required=True)
     p.add_argument("--dry_run", action="store_true")
     args = p.parse_args()
@@ -365,7 +365,7 @@ def main():
     outdir = Path(args.outdir)
     outdir.mkdir(parents=True, exist_ok=True)
     keys_dir = Path(args.keys_dir)
-    v5_dir = Path(args.v5_blocks_dir)
+    evidence_dir = Path(args.evidence_blocks_dir)
 
     summary = defaultdict(int)
     rows_out = []
@@ -376,13 +376,13 @@ def main():
             per_cand_keys = keys_dir / f"{cid}.keys.tsv"
         keys = load_keys_tsv(str(per_cand_keys)) if per_cand_keys.exists() else {}
 
-        cand_v5 = v5_dir / cid
-        asm = load_block(cand_v5, "mechanism_assembled")
-        bnd = load_block(cand_v5, "bnd_sided_support")
-        syn = load_block(cand_v5, "synteny_v6") or \
-              load_block(cand_v5, "synteny_dollo")
-        fragment = load_block(cand_v5, "fragment_distribution") or \
-                   load_block(cand_v5, "interior_structure")
+        cand_evidence = evidence_dir / cid
+        asm = load_block(cand_evidence, "mechanism_assembled")
+        bnd = load_block(cand_evidence, "bnd_sided_support")
+        syn = load_block(cand_evidence, "synteny_v6") or \
+              load_block(cand_evidence, "synteny_dollo")
+        fragment = load_block(cand_evidence, "fragment_distribution") or \
+                   load_block(cand_evidence, "interior_structure")
 
         label, just, weakest = assign_label(keys, asm, bnd, syn, fragment)
         summary[label] += 1

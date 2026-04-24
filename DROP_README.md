@@ -1,104 +1,135 @@
-# DROP_README — pass 14: design doc only (12-phase rename proposal)
+# DROP_README — chat A deliverable (2026-04-24)
 
-**Pass:** 14
-**Date:** 2026-04-24
-**Format:** diff-only, docs only — NO code changes
-**Scope:** Full blast-radius analysis + staged execution plan for the 12-phase rename. Execute in a fresh chat.
-
----
-
-## ⚠️ No manual commands. Zero code changes this pass.
-
-Two new docs, nothing deleted, nothing renamed.
+Three independent items in one drop. Drag the whole tree into GitHub Desktop;
+no files need to be removed first, no folder moves, nothing renamed at the
+path level.
 
 ---
 
-## What's in this tarball
+## 1. Data flow audit — `docs/DATA_FLOW_AUDIT.md` (new file, 25 KB)
 
-1. **`docs/TWELVE_PHASE_RENAME_PROPOSAL.md`**
-   - The full design: phase_4 → phase_4/5/6/7/8/9, shift downstream phases 5/6/7 → 10/11/12
-   - Blast radius enumeration: 159 files total (77 shell, 22 R, 7 Python, 50 MD, 3 JSON)
-   - Staged execution plan: checkpoint → moves → regroup → sed tiers → docs → verify
-   - Risks + don't-do list + the preserved-as-is list (pass 8/11/13 wiring)
-   - Suggested opening prompt for the fresh chat
+Chat A's primary deliverable. Static-analysis audit of the schema →
+`build_key_spec()` → `characterize_candidate.R` wiring. Identifies:
 
-2. **`docs/SESSION_AUDIT_2026-04-24_chat-3-end.md`**
-   - Full record of what passes 9, 10, 11-partial, 12, 13 shipped
-   - Architectural decisions made (soft flag semantics, fold vs sibling, etc.)
-   - Things I got wrong and recovered from (pass 12 DROP_README ordering bug, 4f subfolder flailing)
-   - Repository state at end of chat 3 — confirmed from filesystem
-   - Cohort identity + workflow conventions
-   - Open non-pass-14 tasks
+- **7 schemas missing the `block_type` field** — P1 silent-failure, fix first.
+- **`frequency.schema.json` + `frequency.v2.schema.json` share `block_type="frequency"`** — ambiguous `load_schema()` lookup.
+- **208 real phantom keys** (spec expects, nothing writes) across Q1–Q_QC_SHELF.
+- **149 orphan keys** (schemas produce, spec doesn't register).
+- **42 of 90 consumer reads in `characterize_candidate.R` (46%) target phantoms** — actively reading keys nothing writes.
 
-3. **This DROP_README.md**
+The audit is the input to chat B. No code fixes in this drop — the audit
+is diagnosis, chat B is treatment. Read the §7 "what this audit does NOT
+cover" before trusting any number blindly — static analysis has real
+limits and I documented them.
 
 ---
 
-## Why design-only this pass
+## 2. Pass 15b — `v5_blocks` naming rename (2 files, 16 touchpoints)
 
-Quentin asked for "Option 5 first" (see full cost) because:
+Pure rename as logged in the pass-15 handoff. No logic change.
 
-- Chat 3 already shipped 5 passes (9, 10, 11-partial, 12, 13) and is substantially tired
-- Pass 14 itself is 2.4× the blast radius of pass 12 (159 vs 66 files)
-- Starting a major rename on tired context is how things break silently
-- Execution in a fresh chat with the full proposal document in front of it will be cleaner
+| Old | New |
+|---|---|
+| `V5_BLOCKS` (bash var) | `EVIDENCE_BLOCKS` |
+| `v5_blocks` (subdir path) | `evidence_blocks` |
+| `--v5_blocks_dir` (CLI flag) | `--evidence_blocks_dir` |
+| `v5_dir` (python local) | `evidence_dir` |
+| `cand_v5` (python local) | `cand_evidence` |
 
----
+Files touched:
 
-## Why the 12-phase rename
+- `inversion_modules/phase_8_evidence_biology/run_evidence_biology.sh` (7 hits)
+- `inversion_modules/phase_9_classification/assign_structural_class_v7.py` (9 hits: 1 argparse + 1 var + 7 cand_v5 call sites)
 
-Quentin flagged three related concerns over the course of chat 3:
+**Intentionally NOT touched:** `docs/HANDOFF_2026-04-23_v7_wiring_plan.md`
+still contains `--v5_blocks_dir` at line 361. That's a dated historical
+handoff and per the pass-15 session-audit lesson, historical docs are left
+as-is. If you want it updated for consistency, it's a 1-line sed.
 
-1. "phase 4 post processing is a strange name its too general"
-2. "the biology is not only post process, its also real analysis"
-3. "maybe it must be flattened and have many more phases?"
-
-The diagnosis is correct. `phase_4_postprocessing/` currently packs 7 orthogonal jobs (catalog construction, QC triage, breakpoint refinement, group proposal, group validation, evidence biology, final classification) under one misleading label. The proposed 12-phase layout gives each its own top-level phase with a clear single-purpose name.
-
-See `TWELVE_PHASE_RENAME_PROPOSAL.md` for the full rationale.
-
----
-
-## What NOT to do this pass
-
-- Do not attempt any directory moves
-- Do not run any sed passes
-- Do not update any launcher paths
-- Do not rename the `phase_4_postprocessing/` folder yet
-
-The proposal is the deliverable. Execution is a fresh-chat job.
+No external callers — grepped the whole tree for `v5_blocks_dir` and the
+only call site is `run_evidence_biology.sh` itself calling
+`assign_structural_class_v7.py`, both of which are in this drop.
 
 ---
 
-## Commit message
+## 3. Three parse bug fixes (3 files, ~3 lines each)
 
-```
-pass 14: design doc for 12-phase rename
+Each was flagged in pass 15 verification. All pre-existing, unrelated to
+the audit or the rename. Each fix confirmed against the original to show
+the bug was real and the fix resolves it.
 
-Adds docs/TWELVE_PHASE_RENAME_PROPOSAL.md with full blast-radius
-analysis (159 files) and staged execution plan for flattening
-phase_4_postprocessing into 6 dedicated phases (4..9) and shifting
-downstream phases (5/6/7 -> 10/11/12).
+### 3.1 `Modules/MODULE_4A_clair3_snp_indel/steps/postprocess/STEP_P10_publication_figure.R:282`
 
-Supersedes docs/PHASE4_RENUMBER_PROPOSAL.md (pass 12's internal
-phase_4 renumber).
+R uses `%in%` for set membership, not SQL-style `in`.
 
-Also adds docs/SESSION_AUDIT_2026-04-24_chat-3-end.md documenting
-what passes 9, 10, 11-partial, 12, 13 shipped and architectural
-decisions made during chat 3.
+```r
+# before
+if (nrow(weak) > 0 && "N_READS_SUPPORT_INDEL" in names(weak)) {
 
-No code changes. Execute the rename in a fresh chat using the
-proposal document.
+# after
+if (nrow(weak) > 0 && "N_READS_SUPPORT_INDEL" %in% names(weak)) {
 ```
 
+### 3.2 `inversion_modules/phase_5_qc_triage/R/q04_compose_plot.R:394`
+
+R parser requires `if { ... } else { ... }` to be one expression.
+The original split `if ... "SNPs/kb"` and `else sprintf(...)` into
+two statements across a newline, which R reads as assignment + orphan
+`else`. Wrapped in braces.
+
+```r
+# before
+sd_unit <- if (sd_scale_kb == 1) "SNPs/kb"
+           else sprintf("SNPs/%gkb", sd_scale_kb)
+
+# after
+sd_unit <- if (sd_scale_kb == 1) {
+  "SNPs/kb"
+} else {
+  sprintf("SNPs/%gkb", sd_scale_kb)
+}
+```
+
+### 3.3 `unified_ancestry/engines/hobs_hwe/scripts/01_build_subset_bamlists.sh:245`
+
+The `%+%` operator was being used inside an R heredoc but defined
+*outside* the closing quote — bash saw `'%+%' <- function(a, b) paste0(a, b)`
+as stray tokens after the `Rscript -e "..."` call, which the `2>/dev/null || true`
+silently swallowed. Moved the `%+%` definition inside the heredoc where
+it actually belongs, removed the stray trailing tokens.
+
 ---
 
-## Phase progress
+## Verification
 
-- ✅ Pass 9: phase_3_refine Layer-tagged rename
-- ✅ Pass 10: phase_6 MODULE_5E archive
-- 🟡 Pass 11 (partial): qc_triage bridge script
-- ✅ Pass 12: phase_4 restructure (folded qc_shelf + breakpoint_pipeline in)
-- ✅ Pass 13: q_qc_shelf_* reader wired into 4g_final_classification
-- 📋 Pass 14 (this pass): design doc for 12-phase rename
-- ⏳ Pass 15 (next chat): execute the 12-phase rename per the design doc
+Every file in this drop passed parse checks in the sandbox:
+
+- `bash -n` on both `.sh` files: OK
+- `python3 ast.parse` on the `.py`: OK
+- `Rscript -e "parse(...)"` on both `.R` files: OK
+- MD fence balance on the audit: OK (0 fences — prose-only doc)
+
+The 3 pre-existing parse bugs in the original source tree were confirmed
+to fail the same checks; the drop versions all pass.
+
+---
+
+## What's not in this drop
+
+- **Chat B fixes.** The audit is the deliverable; chat B does the actual
+  schema/spec repairs. Wait for you to review the audit before picking
+  what to fix first — several findings might be static-analysis
+  false-positives (see §7 of the audit).
+- **`phase_10_followup/` anything.** Off my plate per your instruction.
+- **Folder renames / phase_7 wrapper README / sub-folder letter
+  schemes.** Left alone per your decision in chat A.
+
+---
+
+## Workflow
+
+1. Drag the four files + one new doc into GitHub Desktop at the
+   corresponding paths (the tree structure here mirrors the repo).
+2. Commit. No `rm` needed anywhere.
+3. Push. No HPC pull required yet — all 3 items are diff-only at the
+   laptop level; LANTA pulls after you commit.

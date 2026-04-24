@@ -279,7 +279,7 @@ pf <- ggplot(violin_all, aes(x = DISPLAY_CLASS, y = value, fill = DISPLAY_CLASS)
 # Panel (g): Weak-indel read support histogram
 # ============================================================================
 
-if (nrow(weak) > 0 && "N_READS_SUPPORT_INDEL" in names(weak)) {
+if (nrow(weak) > 0 && "N_READS_SUPPORT_INDEL" %in% names(weak)) {
   weak_hist <- weak %>%
     mutate(support_bin = case_when(
       N_READS_SUPPORT_INDEL == 0 ~ "0",
