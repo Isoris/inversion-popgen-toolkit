@@ -1,0 +1,2697 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Local PCA Scrubber v3 — L3 Contingency Debugger</title>
+<style>
+  :root {
+    --bg: #0e1116;
+    --panel: #151a22;
+    --panel-2: #1c2330;
+    --ink: #e7edf3;
+    --ink-dim: #8a94a3;
+    --ink-dimmer: #5a6472;
+    --accent: #f5a524;
+    --accent-2: #4fa3ff;
+    --good: #3cc08a;
+    --bad: #e0555c;
+    --neutral: #8a94a3;
+    --band-lo: #4fa3ff;   /* blue — group 0 / hom1 */
+    --band-mid: #b8b8b8;  /* grey — group 1 / het  */
+    --band-hi: #f5a524;   /* amber — group 2 / hom2 */
+    --l1-color: #4fa3ff;  /* blue (matches overlay PDFs envelope_color_l1=#0042FF) */
+    --l2-color: #00e676;  /* green (matches overlay PDFs envelope_color_l2=#00E676) */
+    --status-stable: #c8102e; /* red */
+    --status-marginal: #e07b3f; /* orange */
+    --status-decays: #999999;   /* gray */
+    --status-edge: #9b59b6;     /* purple */
+    --status-dedup: #555555;    /* dark gray */
+    --rule: #2a3242;
+    --mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink);
+               font-family: var(--serif); font-size: 13.5px; overflow: hidden; }
+  header { padding: 10px 22px; border-bottom: 1px solid var(--rule);
+           display: flex; align-items: baseline; gap: 18px; height: 44px; }
+  header h1 { font-size: 16px; font-weight: 500; margin: 0; letter-spacing: 0.02em; }
+  header .meta { color: var(--ink-dim); font-family: var(--mono); font-size: 11px; }
+  header .meta b { color: var(--ink); font-weight: 500; }
+
+  .wrap { display: grid; grid-template-columns: 320px 1fr; height: calc(100vh - 44px); }
+  aside { background: var(--panel); border-right: 1px solid var(--rule); padding: 14px 16px;
+          overflow-y: auto; font-size: 13px; }
+  aside h2 { font-size: 10.5px; font-weight: 600; text-transform: uppercase;
+             letter-spacing: 0.12em; color: var(--ink-dim); margin: 14px 0 5px;
+             font-family: var(--mono); }
+  aside h2:first-child { margin-top: 0; }
+  aside .ctl { margin: 5px 0; }
+  aside label { display: block; font-size: 11.5px; color: var(--ink-dim); margin: 3px 0; }
+  aside label.inline { display: inline; }
+  aside input[type="file"], aside select, aside button, aside input[type="number"] {
+    background: var(--panel-2); color: var(--ink); border: 1px solid var(--rule);
+    padding: 5px 7px; font-family: var(--mono); font-size: 11.5px; border-radius: 3px;
+    width: 100%;
+  }
+  aside button { cursor: pointer; transition: border-color 120ms; }
+  aside button:hover { border-color: var(--accent); }
+  aside .row { display: flex; gap: 6px; align-items: center; }
+  aside .row > * { flex: 1; }
+  aside .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+
+  .num { font-family: var(--mono); font-size: 12px; color: var(--ink); }
+  .dim { color: var(--ink-dim); }
+  .mono { font-family: var(--mono); }
+
+  /* Layout: sim + Z + PCA + L3 panel + scrubber */
+  main { display: grid;
+         grid-template-rows: 420px 100px 1fr 360px 50px;
+         overflow: hidden; }
+
+  .panel { position: relative; overflow: hidden; border-bottom: 1px solid var(--rule); }
+  .panel canvas { display: block; width: 100%; height: 100%; }
+  .panel-label { position: absolute; top: 6px; left: 12px; font-family: var(--mono);
+                 font-size: 10.5px; color: var(--ink-dim); pointer-events: none;
+                 text-transform: uppercase; letter-spacing: 0.1em; }
+  .panel-label b { color: var(--ink); font-weight: 500; text-transform: none;
+                   letter-spacing: 0; font-family: var(--serif); font-size: 12px; }
+
+  #simPanel    { background: #0b0e13; }
+  #simPanel canvas { cursor: crosshair; }
+  #simResize {
+    position: absolute; left: 0; right: 0; bottom: -3px; height: 8px;
+    cursor: ns-resize; z-index: 10;
+    background: transparent; border-top: 1px solid transparent;
+    transition: background 100ms, border-color 100ms;
+  }
+  #simResize:hover, #simResize.dragging {
+    background: rgba(245,165,36,0.10);
+    border-top: 1px solid var(--accent);
+  }
+  #simResize::after {
+    content: ""; position: absolute; left: 50%; top: 2px;
+    width: 28px; height: 3px; transform: translateX(-50%);
+    background: var(--ink-dimmer); border-radius: 1px;
+    transition: background 100ms;
+  }
+  #simResize:hover::after, #simResize.dragging::after { background: var(--accent); }
+  body.resizing-sim, body.resizing-sim * { cursor: ns-resize !important; user-select: none; }
+  #zPanel      { background: var(--panel); }
+  #zPanel canvas { cursor: crosshair; }
+  #pcaPanel    { background: var(--bg); }
+  #l3Panel     { background: var(--panel); padding: 0; overflow: hidden; display: flex;
+                 flex-direction: column; }
+  #l3Panel .l3-head { padding: 7px 14px 5px; display: flex; justify-content: space-between;
+                      align-items: center; border-bottom: 1px solid var(--rule); gap: 12px; }
+  #l3Panel .l3-head .title { font-family: var(--mono); font-size: 10.5px;
+                              color: var(--ink-dim); text-transform: uppercase;
+                              letter-spacing: 0.1em; flex: 0 0 auto; }
+  #l3Panel .l3-head .title b { color: var(--ink); font-weight: 500;
+                                text-transform: none; letter-spacing: 0;
+                                font-family: var(--serif); font-size: 12px; }
+  #l3Panel .l3-layout { display: flex; gap: 3px; flex: 1 1 auto; justify-content: flex-start;
+                        margin-left: 12px; }
+  #l3Panel .l3-layout button {
+    background: var(--panel-2); color: var(--ink-dim); border: 1px solid var(--rule);
+    padding: 3px 8px; font-family: var(--mono); font-size: 10.5px; border-radius: 3px;
+    cursor: pointer; transition: border-color 100ms, color 100ms; }
+  #l3Panel .l3-layout button:hover { color: var(--ink); border-color: var(--ink-dim); }
+  #l3Panel .l3-layout button.active {
+    background: var(--accent); color: #0e1116; border-color: var(--accent);
+    font-weight: 600; }
+  /* Generic button-row style reused for color-mode chooser */
+  .color-mode-row { display: flex; gap: 3px; flex-wrap: wrap; }
+  .color-mode-row button {
+    flex: 1 1 auto; min-width: 0;
+    background: var(--panel-2); color: var(--ink-dim); border: 1px solid var(--rule);
+    padding: 4px 6px; font-family: var(--mono); font-size: 10.5px; border-radius: 3px;
+    cursor: pointer; transition: border-color 100ms, color 100ms; }
+  .color-mode-row button:hover { color: var(--ink); border-color: var(--ink-dim); }
+  .color-mode-row button.active {
+    background: var(--accent); color: #0e1116; border-color: var(--accent);
+    font-weight: 600; }
+  .color-mode-row button:disabled {
+    opacity: 0.4; cursor: not-allowed; color: var(--ink-dimmer); }
+  #l3Panel .l3-body { display: grid; flex: 1; overflow: hidden; }
+  .l3-col { border-right: 1px solid var(--rule); overflow-y: auto;
+            padding: 6px 10px; font-size: 11.5px; min-width: 0;
+            display: flex; flex-direction: column; }
+  .l3-col:last-child { border-right: 0; }
+  .l3-col h3 { font-family: var(--mono); font-size: 10px; color: var(--ink-dim);
+               margin: 0 0 4px; font-weight: 600; letter-spacing: 0.08em;
+               text-transform: uppercase; flex: 0 0 auto; }
+  .l3-col h3 b { color: var(--ink); font-family: var(--serif);
+                  text-transform: none; letter-spacing: 0; font-weight: 500;
+                  font-size: 11.5px; margin-left: 4px; }
+  .l3-col h3.focal b { color: var(--accent); }
+  .l3-col .mini-pca { width: 100%; height: 110px; flex: 0 0 110px;
+                       background: #0b0e13; border: 1px solid var(--rule);
+                       border-radius: 2px; margin: 2px 0 6px; }
+  .l3-col .ct-content { flex: 1 1 auto; min-height: 0; }
+
+  /* Contingency table */
+  .ct-table { font-family: var(--mono); font-size: 11px; margin: 4px 0 6px;
+              border-collapse: collapse; }
+  .ct-table th, .ct-table td { padding: 3px 6px; text-align: right;
+                                border: 1px solid var(--rule); min-width: 28px; }
+  .ct-table th { color: var(--ink-dim); font-weight: 500; background: var(--panel-2); }
+  .ct-table td.diag { background: rgba(60,192,138,0.10); color: var(--good);
+                       font-weight: 600; }
+  .ct-table td.off  { background: rgba(224,85,92,0.06); color: var(--ink); }
+  .ct-table .swatch { display: inline-block; width: 9px; height: 9px;
+                       border-radius: 2px; margin-right: 4px; vertical-align: middle; }
+  .ct-row { display: grid; grid-template-columns: auto auto; gap: 4px 10px;
+            font-family: var(--mono); font-size: 11px; margin-top: 4px; }
+  .ct-row .lbl { color: var(--ink-dim); }
+  .ct-row .val { color: var(--ink); text-align: right; }
+  .verdict { display: inline-block; padding: 2px 8px; border-radius: 3px;
+             font-family: var(--mono); font-size: 10.5px; font-weight: 600;
+             letter-spacing: 0.05em; margin-top: 6px; }
+  .verdict.merge    { background: var(--good);    color: #0e1116; }
+  .verdict.separate { background: var(--bad);     color: #fff;    }
+  .verdict.skip     { background: var(--neutral); color: #0e1116; }
+  .verdict.lownwin  { background: var(--accent);  color: #0e1116; }
+
+  /* "Where am I" block */
+  .zone-block { font-family: var(--mono); font-size: 11px; line-height: 1.55; }
+  .zone-block .zone-title { color: var(--ink-dim); font-size: 10px;
+                             text-transform: uppercase; letter-spacing: 0.08em;
+                             margin-top: 5px; }
+  .zone-block .zone-id    { color: var(--ink); font-weight: 600; }
+  .zone-block .zone-meta  { color: var(--ink-dim); }
+  .zone-block .zone-status { display: inline-block; padding: 1px 5px; border-radius: 2px;
+                             font-size: 10px; font-weight: 600; }
+  .zone-block .neighbor { color: var(--ink); margin: 4px 0 2px; font-size: 11px; }
+  .zone-block .neighbor .arrow { color: var(--ink-dim); }
+  .zone-block .neighbor.empty { color: var(--ink-dimmer); font-style: italic; }
+  .zone-block .neighbor .ncur { color: var(--accent); font-weight: 700; }
+
+  /* Sample tracking chips */
+  .tag { display: inline-block; padding: 2px 6px; border-radius: 3px; font-family: var(--mono);
+         font-size: 10px; background: var(--panel-2); border: 1px solid var(--rule);
+         margin-right: 3px; margin-bottom: 3px; cursor: pointer; }
+  .tag.on { background: var(--accent); color: #0e1116; border-color: var(--accent);
+            font-weight: 600; }
+
+  /* Tunable sliders */
+  .hrange { display: grid; grid-template-columns: 60px 1fr 50px; gap: 4px; align-items: center; }
+  .hrange input[type="range"] { width: 100%; }
+  .hrange .val { text-align: center; font-family: var(--mono); font-size: 11px;
+                 color: var(--accent); }
+
+  /* Control bar at bottom */
+  #ctrlBar { display: grid; grid-template-columns: 110px 1fr 220px; gap: 18px;
+             align-items: center; padding: 10px 22px; background: var(--panel); }
+  #ctrlBar .play { font-family: var(--mono); font-size: 12px; padding: 6px 12px;
+                   background: var(--accent); color: #0e1116; border: 0;
+                   border-radius: 3px; cursor: pointer; font-weight: 600;
+                   letter-spacing: 0.04em; }
+  #ctrlBar .play.playing { background: var(--bad); color: white; }
+  #scrubber { width: 100%; height: 28px; -webkit-appearance: none; appearance: none;
+              background: transparent; }
+  #scrubber::-webkit-slider-runnable-track { height: 3px; background: var(--rule);
+                                              border-radius: 2px; }
+  #scrubber::-webkit-slider-thumb { -webkit-appearance: none; appearance: none;
+      width: 16px; height: 16px; border-radius: 50%; background: var(--accent);
+      margin-top: -6.5px; cursor: grab; border: 2px solid var(--panel); }
+  #scrubber::-moz-range-track { height: 3px; background: var(--rule); border-radius: 2px; }
+  #scrubber::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%;
+      background: var(--accent); border: 2px solid var(--panel); cursor: grab; }
+  #winLabel { font-family: var(--mono); font-size: 12px; color: var(--ink);
+              text-align: right; }
+  #winLabel .big { font-size: 16px; color: var(--accent); font-weight: 600; }
+
+  .empty { display: flex; flex-direction: column; align-items: center; justify-content: center;
+           height: 100%; color: var(--ink-dim); font-size: 12.5px; text-align: center;
+           padding: 30px; }
+  .empty h3 { color: var(--ink); font-family: var(--serif); font-weight: 500;
+              font-size: 16px; margin: 0 0 8px; }
+  .empty code { background: var(--panel); padding: 2px 6px; border-radius: 2px;
+                font-family: var(--mono); font-size: 11px; color: var(--accent); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Local PCA Scrubber · v3 · L3 debugger</h1>
+  <span class="meta" id="headerMeta">Load a precomp JSON to begin</span>
+</header>
+
+<div class="wrap">
+  <aside>
+    <h2>Data</h2>
+    <div class="ctl">
+      <input type="file" id="fileInput" accept=".json,application/json" />
+    </div>
+    <div class="ctl num dim" id="dataStatus">No data loaded</div>
+
+    <h2>Sim_mat smoothing</h2>
+    <div class="ctl">
+      <select id="simScaleSelect" disabled>
+        <option value="">— no scales loaded —</option>
+      </select>
+    </div>
+    <div class="ctl">
+      <label><input type="checkbox" id="pdfStyle" checked /> PDF-style (sim ↙ / Z ↗ split)</label>
+    </div>
+
+    <h2>Where am I</h2>
+    <div class="ctl zone-block" id="zoneBlock">—</div>
+
+    <h2>L3 clustering</h2>
+    <div class="ctl">
+      <label>K (clusters per L2)</label>
+      <select id="kSelect">
+        <option value="3" selected>K = 3 (hom1 / het / hom2)</option>
+        <option value="2">K = 2 (hom1 / hom2)</option>
+      </select>
+    </div>
+    <div class="ctl">
+      <label>Aggregation across L2 windows</label>
+      <select id="aggMethod">
+        <option value="mean_pc1" selected>mean PC1</option>
+        <option value="median_pc1">median PC1</option>
+        <option value="mean_pc12">mean PC1 + PC2 (2-D K-means)</option>
+      </select>
+    </div>
+    <div class="ctl hrange">
+      <label class="inline">merge τ</label>
+      <input type="range" id="mergeThr" min="0.50" max="0.99" step="0.01" value="0.85" />
+      <span class="val" id="mergeThrVal">0.85</span>
+    </div>
+    <div class="ctl hrange">
+      <label class="inline">α (Fisher)</label>
+      <input type="range" id="alphaThr" min="0.001" max="0.20" step="0.001" value="0.050" />
+      <span class="val" id="alphaThrVal">0.050</span>
+    </div>
+    <div class="ctl hrange">
+      <label class="inline">min n/group</label>
+      <input type="range" id="minNGroup" min="2" max="20" step="1" value="5" />
+      <span class="val" id="minNGroupVal">5</span>
+    </div>
+    <div class="ctl hrange">
+      <label class="inline">min n_wins</label>
+      <input type="range" id="minNWin" min="1" max="10" step="1" value="3" />
+      <span class="val" id="minNWinVal">3</span>
+    </div>
+
+    <h2>Display</h2>
+    <div class="ctl">
+      <label style="font-size: 11px; color: var(--ink-dim); margin-bottom: 3px;">color samples by</label>
+      <div class="color-mode-row" id="colorModeBar">
+        <button data-mode="cluster"  class="active">cluster</button>
+        <button data-mode="family">family</button>
+        <button data-mode="ancestry">ancestry</button>
+        <button data-mode="none">none</button>
+      </div>
+      <div class="dim" id="colorModeInfo" style="font-size: 10px; margin-top: 3px;">live K-means group, Hungarian-aligned to focal</div>
+    </div>
+    <div class="ctl">
+      <label><input type="checkbox" id="trailOn" checked /> show trails (within L2)</label>
+    </div>
+    <div class="ctl">
+      <label><input type="checkbox" id="flipPC1" checked /> sign-align PC1 across windows</label>
+    </div>
+    <div class="ctl hrange">
+      <label class="inline">trail back</label>
+      <input type="range" id="trailN" min="0" max="80" value="15" step="1" />
+      <span class="val" id="trailNVal">15</span>
+    </div>
+
+    <h2>Tracked samples</h2>
+    <div class="ctl hrange">
+      <label class="inline">N</label>
+      <input type="range" id="trackedN" min="0" max="30" step="1" value="10" />
+      <span class="val" id="trackedNVal">10</span>
+    </div>
+    <div class="ctl">
+      <label style="font-size: 11px; color: var(--ink-dim); margin-bottom: 3px;">pick N from focal L2</label>
+      <div class="color-mode-row" id="bandPickBar">
+        <button data-band="all"   class="active">all bands</button>
+        <button data-band="0">band 1 (lo)</button>
+        <button data-band="1">band 2 (mid)</button>
+        <button data-band="2">band 3 (hi)</button>
+      </div>
+    </div>
+    <div class="ctl"><button id="autoPickRadial">Auto-pick: radial (any window)</button></div>
+    <div class="ctl"><button id="clearPicks">Clear all</button></div>
+    <div class="ctl" id="trackedList" style="display:flex; flex-wrap:wrap;"></div>
+    <div class="ctl"><label style="font-size:10px; color: var(--ink-dimmer); line-height:1.4;">
+      Same samples persist as you scrub across L2 boundaries — watch where they land in each
+      envelope's K-means split. Click any dot in the PCA to add/remove. The "pick from focal L2"
+      buttons sample N from a specific K-means band of the current L2 envelope (or spread N across
+      all K bands). Currently
+      <span id="trackedCountInfo">0</span>/<span id="trackedNInfo">10</span>.
+    </label></div>
+
+    <h2>Jump</h2>
+    <div class="ctl row">
+      <select id="jumpUnit" style="flex: 0 0 70px;">
+        <option value="mb">Mb</option>
+        <option value="win">window</option>
+        <option value="bp">bp</option>
+      </select>
+      <input type="number" id="jumpVal" placeholder="value" step="0.1" />
+      <button id="jumpBtn" style="flex: 0 0 50px;">Go</button>
+    </div>
+    <div class="ctl"><button id="jumpToL2">Jump to next L2 →</button></div>
+    <div class="ctl"><button id="jumpPrevL2">← Jump to prev L2</button></div>
+    <div class="ctl"><button id="jumpToL1">Jump to next L1 →</button></div>
+    <div class="ctl"><button id="jumpPrevL1">← Jump to prev L1</button></div>
+
+    <h2>Current window</h2>
+    <div class="num" id="sidebarInfo" style="line-height: 1.6;">—</div>
+  </aside>
+
+  <main>
+    <div class="panel" id="simPanel">
+      <canvas id="simCanvas"></canvas>
+      <div class="panel-label"><b>sim_mat</b> · L1 (blue) / L2 (green) overlays · click to jump · drag bottom edge to resize</div>
+      <div id="simResize" title="Drag to resize"></div>
+    </div>
+
+    <div class="panel" id="zPanel">
+      <canvas id="zCanvas"></canvas>
+      <div class="panel-label"><b>Robust |Z|</b> · L1/L2 zone bars + boundary peaks · click to jump</div>
+    </div>
+
+    <div class="panel" id="pcaPanel">
+      <canvas id="pcaCanvas"></canvas>
+      <div class="panel-label"><b>PC1 × PC2</b> · current window · samples colored by L2 K-means group · click dots to track</div>
+      <div class="empty" id="emptyState">
+        <h3>Load a precomp JSON to begin</h3>
+        <p>On HPC:<br>
+          <code>Rscript export_precomp_to_json_v3.R --precomp &lt;LGNN.rds&gt; \<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;--l1_envelopes ..._d17L1_envelopes.tsv \<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;--l2_envelopes ..._d17L2_envelopes.tsv \<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;--l2_boundaries ..._d17L2_boundaries.tsv \<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;--out LG28.json</code>
+        </p>
+      </div>
+    </div>
+
+    <div class="panel" id="l3Panel">
+      <div class="l3-head">
+        <div class="title"><b>L3 contingency tables</b> · Hungarian-aligned · pick a layout →</div>
+        <div class="l3-layout" id="l3Layout">
+          <button data-layout="focal"     class="active">Focal only</button>
+          <button data-layout="left">     +Left</button>
+          <button data-layout="right">    +Right</button>
+          <button data-layout="leftright">+L/R</button>
+          <button data-layout="four">     ±2</button>
+        </div>
+        <div class="num dim" id="l3Meta">—</div>
+      </div>
+      <div class="l3-body" id="l3Body">
+        <div class="l3-col" id="l3FocalCol">
+          <div class="dim" style="padding: 12px;">scroll into an L2 envelope</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="ctrlBar">
+      <button class="play" id="playBtn">▶ Play</button>
+      <input type="range" id="scrubber" min="0" max="0" value="0" step="1" disabled />
+      <div id="winLabel"><span class="dim">window</span>
+        <span class="big" id="winIdx">—</span>
+        <span class="dim" id="winBp"></span></div>
+    </div>
+  </main>
+</div>
+
+<script>
+// =============================================================================
+// PCA Scrubber v3 — L3 contingency-table debugger
+// =============================================================================
+
+// =============================================================================
+// State
+// =============================================================================
+const state = {
+  data: null,
+  cur: 0,
+  tracked: [],
+  trailN: 15,
+  trailOn: true,
+  flipPC1: true,
+  playing: false,
+  playTimer: null,
+  pc1Sign: null,           // Float32Array length n_windows: +1 or -1
+
+  // L3 controls
+  k: 3,
+  aggMethod: 'mean_pc1',
+  mergeThr: 0.85,
+  alpha: 0.05,
+  minNGroup: 5,
+  minNWin: 3,
+  colorByL2: true,                        // legacy alias, kept in sync with colorMode
+  colorMode: 'cluster',                   // 'cluster' | 'family' | 'ancestry' | 'none'
+  l3Layout: 'focal',  // 'focal' | 'left' | 'right' | 'leftright' | 'four'
+
+  // Sim_mat display
+  simScale: null,          // currently displayed scale label
+  pdfStyle: true,          // PDF-style triangle split (lower=sim, upper=Z)
+  simPanelH: 420,          // resizable sim panel height in px
+
+  // Tracked-sample cap
+  trackedN: 10,
+
+  // Indexes
+  windowToL1: null,        // Int32Array length n_windows, value = L1 index or -1
+  windowToL2: null,        // Int32Array length n_windows, value = L2 index or -1
+  l2NeighborsInL1: null,   // Map<l2_idx, {left: l2_idx|null, right: l2_idx|null}>
+
+  // Cluster cache
+  l2GroupCache: null,      // Map<l2_idx, {labels: Int8Array, ok: bool, reason?, n_per_group}>
+  cacheKey: null,          // string capturing K + aggMethod + flipPC1
+
+  ancestryPalette: {},
+  familyPalette: {},                      // built on JSON load (Tol qualitative)
+  hubFamilies: [],                        // sorted list of family_ids with n>=4
+  smallFamilyIds: new Set(),              // family_ids with n in [2,3]
+  singletonFamilyIds: new Set(),          // family_ids with n == 1
+  _sampleIdxCache: null,
+};
+
+const PALETTE = [
+  '#f5a524', '#4fa3ff', '#3cc08a', '#e0555c',
+  '#b07cf7', '#f0d56a', '#7ad3db', '#ff8c6e',
+];
+const GROUP_COLORS = [
+  'rgba(79,163,255,0.85)',   // group 0 — blue (Lo / hom1)
+  'rgba(184,184,184,0.75)',  // group 1 — grey (Mid / het)
+  'rgba(245,165,36,0.85)',   // group 2 — amber (Hi / hom2)
+];
+const GROUP_COLORS_FADED = [
+  'rgba(79,163,255,0.35)',
+  'rgba(184,184,184,0.30)',
+  'rgba(245,165,36,0.40)',
+];
+const STATUS_COLOR = {
+  STABLE_BLUE: '#c8102e',
+  MARGINAL:    '#e07b3f',
+  DECAYS:      '#999999',
+  EDGE:        '#9b59b6',
+  DEDUP:       '#555555',
+};
+
+// =============================================================================
+// Canvas helper
+// =============================================================================
+function fitCanvas(canvas) {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width  = Math.floor(rect.width  * dpr);
+  canvas.height = Math.floor(rect.height * dpr);
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, w: rect.width, h: rect.height };
+}
+
+// =============================================================================
+// Indexing — build window → L1 / L2 lookup tables and L2 adjacency
+// =============================================================================
+// Envelopes are 1-based [start_w, end_w] inclusive in the TSVs. We store
+// 1-based windows as 0-based throughout the scrubber. `state.cur` is 0-based;
+// envelope coords are normalized to 0-based on load.
+function buildIndexes() {
+  const d = state.data;
+  if (!d) return;
+  const N = d.n_windows;
+
+  state.windowToL1 = new Int32Array(N).fill(-1);
+  state.windowToL2 = new Int32Array(N).fill(-1);
+
+  if (Array.isArray(d.l1_envelopes)) {
+    d.l1_envelopes.forEach((e, i) => {
+      const s0 = e.start_w - 1, e0 = e.end_w - 1;
+      e._s0 = s0; e._e0 = e0;
+      for (let w = Math.max(0, s0); w <= Math.min(N - 1, e0); w++) {
+        state.windowToL1[w] = i;
+      }
+    });
+  }
+  if (Array.isArray(d.l2_envelopes)) {
+    d.l2_envelopes.forEach((e, i) => {
+      const s0 = e.start_w - 1, e0 = e.end_w - 1;
+      e._s0 = s0; e._e0 = e0;
+      for (let w = Math.max(0, s0); w <= Math.min(N - 1, e0); w++) {
+        state.windowToL2[w] = i;
+      }
+    });
+  }
+
+  // L2 adjacency: within each parent_l1_id, sort by start_w and link.
+  state.l2NeighborsInL1 = new Map();
+  if (Array.isArray(d.l2_envelopes)) {
+    const byParent = new Map();
+    d.l2_envelopes.forEach((e, i) => {
+      const k = e.parent_l1_id || '__none__';
+      if (!byParent.has(k)) byParent.set(k, []);
+      byParent.get(k).push({ idx: i, start_w: e.start_w });
+    });
+    for (const [, arr] of byParent) {
+      arr.sort((a, b) => a.start_w - b.start_w);
+      for (let j = 0; j < arr.length; j++) {
+        state.l2NeighborsInL1.set(arr[j].idx, {
+          left:  j > 0             ? arr[j - 1].idx : null,
+          right: j < arr.length - 1 ? arr[j + 1].idx : null,
+        });
+      }
+    }
+  }
+}
+
+// =============================================================================
+// PC1 sign alignment (lifted from v2)
+// =============================================================================
+function computePC1Signs() {
+  if (!state.data) return;
+  const wins = state.data.windows;
+  const n = wins.length;
+  const signs = new Float32Array(n);
+  signs[0] = 1;
+  let prev = wins[0].pc1;
+  for (let i = 1; i < n; i++) {
+    const cur = wins[i].pc1;
+    let dot = 0, mp = 0, mc = 0;
+    for (let j = 0; j < cur.length; j++) {
+      dot += prev[j] * cur[j]; mp += prev[j] * prev[j]; mc += cur[j] * cur[j];
+    }
+    const cor = dot / Math.sqrt(mp * mc + 1e-9);
+    signs[i] = (cor >= 0 ? 1 : -1) * signs[i - 1];
+    prev = cur;
+  }
+  state.pc1Sign = signs;
+}
+function getPC(winIdx) {
+  const w = state.data.windows[winIdx];
+  const s = state.flipPC1 && state.pc1Sign ? state.pc1Sign[winIdx] : 1;
+  return { pc1: w.pc1, pc2: w.pc2, sign: s };
+}
+
+// =============================================================================
+// K-means (1-D and 2-D), small + deterministic
+// =============================================================================
+// 1-D K-means with init from sorted quantiles, 12 iterations max.
+// Returns { labels: Int8Array length n, centers: Float64Array length k, n_per_group }
+function kmeans1D(values, k) {
+  const n = values.length;
+  const labels = new Int8Array(n);
+  if (n === 0) return { labels, centers: new Float64Array(k), n_per_group: new Array(k).fill(0) };
+  const sorted = Float64Array.from(values).sort();
+  const centers = new Float64Array(k);
+  for (let i = 0; i < k; i++) {
+    const q = (i + 0.5) / k;
+    centers[i] = sorted[Math.min(n - 1, Math.max(0, Math.floor(q * n)))];
+  }
+  for (let it = 0; it < 12; it++) {
+    // Assign
+    let changed = false;
+    for (let i = 0; i < n; i++) {
+      let best = 0, bd = Infinity;
+      for (let j = 0; j < k; j++) {
+        const dd = Math.abs(values[i] - centers[j]);
+        if (dd < bd) { bd = dd; best = j; }
+      }
+      if (labels[i] !== best) { labels[i] = best; changed = true; }
+    }
+    // Recompute
+    const sums = new Float64Array(k);
+    const cnts = new Int32Array(k);
+    for (let i = 0; i < n; i++) { sums[labels[i]] += values[i]; cnts[labels[i]]++; }
+    for (let j = 0; j < k; j++) if (cnts[j] > 0) centers[j] = sums[j] / cnts[j];
+    if (!changed) break;
+  }
+  // Sort centers ascending so label 0 = lowest, label k-1 = highest.
+  const order = Array.from({ length: k }, (_, i) => i).sort((a, b) => centers[a] - centers[b]);
+  const remap = new Int8Array(k);
+  for (let i = 0; i < k; i++) remap[order[i]] = i;
+  const newCenters = new Float64Array(k);
+  for (let i = 0; i < k; i++) newCenters[i] = centers[order[i]];
+  for (let i = 0; i < n; i++) labels[i] = remap[labels[i]];
+  const npg = new Array(k).fill(0);
+  for (let i = 0; i < n; i++) npg[labels[i]]++;
+  return { labels, centers: newCenters, n_per_group: npg };
+}
+
+// 2-D K-means (PC1, PC2)
+function kmeans2D(xs, ys, k) {
+  const n = xs.length;
+  const labels = new Int8Array(n);
+  if (n === 0) return { labels, cx: new Float64Array(k), cy: new Float64Array(k), n_per_group: new Array(k).fill(0) };
+  // Init: sort by PC1, take quantile points
+  const idxSort = Array.from({ length: n }, (_, i) => i).sort((a, b) => xs[a] - xs[b]);
+  const cx = new Float64Array(k), cy = new Float64Array(k);
+  for (let i = 0; i < k; i++) {
+    const q = (i + 0.5) / k;
+    const ii = idxSort[Math.min(n - 1, Math.max(0, Math.floor(q * n)))];
+    cx[i] = xs[ii]; cy[i] = ys[ii];
+  }
+  for (let it = 0; it < 12; it++) {
+    let changed = false;
+    for (let i = 0; i < n; i++) {
+      let best = 0, bd = Infinity;
+      for (let j = 0; j < k; j++) {
+        const dx = xs[i] - cx[j], dy = ys[i] - cy[j];
+        const dd = dx * dx + dy * dy;
+        if (dd < bd) { bd = dd; best = j; }
+      }
+      if (labels[i] !== best) { labels[i] = best; changed = true; }
+    }
+    const sx = new Float64Array(k), sy = new Float64Array(k);
+    const cn = new Int32Array(k);
+    for (let i = 0; i < n; i++) { sx[labels[i]] += xs[i]; sy[labels[i]] += ys[i]; cn[labels[i]]++; }
+    for (let j = 0; j < k; j++) if (cn[j] > 0) { cx[j] = sx[j] / cn[j]; cy[j] = sy[j] / cn[j]; }
+    if (!changed) break;
+  }
+  // Sort centers by cx so label 0 = lowest PC1
+  const order = Array.from({ length: k }, (_, i) => i).sort((a, b) => cx[a] - cx[b]);
+  const remap = new Int8Array(k);
+  for (let i = 0; i < k; i++) remap[order[i]] = i;
+  const ncx = new Float64Array(k), ncy = new Float64Array(k);
+  for (let i = 0; i < k; i++) { ncx[i] = cx[order[i]]; ncy[i] = cy[order[i]]; }
+  for (let i = 0; i < n; i++) labels[i] = remap[labels[i]];
+  const npg = new Array(k).fill(0);
+  for (let i = 0; i < n; i++) npg[labels[i]]++;
+  return { labels, cx: ncx, cy: ncy, n_per_group: npg };
+}
+
+// =============================================================================
+// Per-L2 clustering: aggregate each sample's PC1 (and PC2 if 2D) across the
+// envelope's windows, then K-means.
+// =============================================================================
+function aggregateL2(l2idx) {
+  const d = state.data;
+  const env = d.l2_envelopes[l2idx];
+  const s = env._s0, e = env._e0;
+  const nW = e - s + 1;
+  const nS = d.n_samples;
+  if (nW <= 0) return null;
+
+  const xs = new Float64Array(nS);
+  const ys = state.aggMethod === 'mean_pc12' ? new Float64Array(nS) : null;
+
+  if (state.aggMethod === 'median_pc1') {
+    // Per-sample median across the windows
+    const tmp = new Float64Array(nW);
+    for (let si = 0; si < nS; si++) {
+      for (let w = 0; w < nW; w++) {
+        const { pc1, sign } = getPC(s + w);
+        tmp[w] = pc1[si] * sign;
+      }
+      // partial sort (small nW, simple sort fine)
+      const sorted = Array.from(tmp).sort((a, b) => a - b);
+      xs[si] = sorted.length % 2 === 1
+        ? sorted[(sorted.length - 1) >> 1]
+        : 0.5 * (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]);
+    }
+  } else {
+    // mean PC1 (and mean PC2 if 2D)
+    for (let w = 0; w < nW; w++) {
+      const { pc1, pc2, sign } = getPC(s + w);
+      for (let si = 0; si < nS; si++) {
+        xs[si] += pc1[si] * sign;
+        if (ys) ys[si] += pc2[si];
+      }
+    }
+    for (let si = 0; si < nS; si++) {
+      xs[si] /= nW;
+      if (ys) ys[si] /= nW;
+    }
+  }
+  return { xs, ys, nW };
+}
+
+function clusterL2(l2idx) {
+  const d = state.data;
+  const env = d.l2_envelopes[l2idx];
+  const nW = env._e0 - env._s0 + 1;
+  if (nW < 1) return { ok: false, reason: 'NO_WINDOWS' };
+
+  const agg = aggregateL2(l2idx);
+  if (!agg) return { ok: false, reason: 'NO_WINDOWS' };
+
+  let result;
+  if (state.aggMethod === 'mean_pc12') {
+    result = kmeans2D(agg.xs, agg.ys, state.k);
+  } else {
+    result = kmeans1D(agg.xs, state.k);
+  }
+  const ok = result.n_per_group.every(c => c >= state.minNGroup);
+  const reason = ok ? null
+    : (nW < state.minNWin ? 'LOW_NWIN' : 'LOW_GROUP_N');
+
+  // ---- Family purity (ported from STEP_D16 v3.2) -----------------------
+  // For each cluster, compute the fraction of samples that come from the
+  // most-common family in that cluster. Then average those fractions
+  // weighted by cluster size. Unmatched samples (family_id == -1) are
+  // excluded from the within-cluster ratio but still counted in cluster size.
+  //   ~1.0 -> bands ARE families => family LD, NOT inversion
+  //   ~0.2 -> bands span many families => real inversion-like signal
+  //   NaN  -> no family info loaded, or no samples have family_id != -1
+  let fam_purity = NaN;
+  let fam_per_cluster = null;
+  if (d.family_source && d.family_source !== 'none' && d.samples) {
+    const labels = result.labels;
+    const purity_vec = [];
+    const size_vec   = [];
+    fam_per_cluster = [];
+    for (let k = 0; k < state.k; k++) {
+      // Indices of samples in cluster k that have a family_id != -1
+      const counts = new Map();   // family_id -> count
+      let total = 0;
+      for (let si = 0; si < labels.length; si++) {
+        if (labels[si] !== k) continue;
+        const f = d.samples[si].family_id;
+        if (f == null || f === -1) continue;
+        counts.set(f, (counts.get(f) || 0) + 1);
+        total++;
+      }
+      if (total === 0) {
+        fam_per_cluster.push({ purity: NaN, total: 0, top_family: null, top_count: 0 });
+        continue;
+      }
+      let top_family = null, top_count = 0;
+      for (const [f, c] of counts) {
+        if (c > top_count) { top_count = c; top_family = f; }
+      }
+      const purity = top_count / total;
+      purity_vec.push(purity);
+      size_vec.push(total);
+      fam_per_cluster.push({ purity, total, top_family, top_count });
+    }
+    if (purity_vec.length > 0) {
+      let num = 0, den = 0;
+      for (let i = 0; i < purity_vec.length; i++) {
+        num += purity_vec[i] * size_vec[i];
+        den += size_vec[i];
+      }
+      if (den > 0) fam_purity = num / den;
+    }
+  }
+
+  return {
+    labels: result.labels,
+    n_per_group: result.n_per_group,
+    centers: result.centers || result.cx,
+    centers_y: result.cy || null,
+    nW,
+    n_below_threshold: nW < state.minNWin,
+    ok,
+    reason,
+    fam_purity,
+    fam_per_cluster,
+  };
+}
+
+function ensureL2Cache() {
+  if (!state.data || !state.data.l2_envelopes) return;
+  const key = `${state.k}|${state.aggMethod}|${state.flipPC1 ? 1 : 0}|${state.minNGroup}|${state.minNWin}`;
+  if (state.cacheKey === key && state.l2GroupCache) return;
+  state.l2GroupCache = new Map();
+  state.cacheKey = key;
+  // Lazy fill — clusterL2 results stored on first access.
+}
+function getL2Cluster(l2idx) {
+  ensureL2Cache();
+  if (state.l2GroupCache.has(l2idx)) return state.l2GroupCache.get(l2idx);
+  const r = clusterL2(l2idx);
+  state.l2GroupCache.set(l2idx, r);
+  return r;
+}
+
+// =============================================================================
+// Hungarian-style label alignment (brute-force enumeration for K ≤ 4)
+// =============================================================================
+// Given two label arrays g1, g2 of equal length and K classes, find the
+// permutation of g2's labels that maximizes diag(table(g1, g2_perm)).
+// Returns { table: K×K, perm: int[K], aligned: Int8Array, concord }.
+function alignLabels(g1, g2, K) {
+  const n = g1.length;
+  // Build raw contingency table
+  const T = Array.from({ length: K }, () => new Int32Array(K));
+  for (let i = 0; i < n; i++) T[g1[i]][g2[i]]++;
+  // Enumerate K! permutations, maximize trace
+  const perms = permutations(K);
+  let bestPerm = perms[0], bestSum = -1;
+  for (const p of perms) {
+    let s = 0;
+    for (let r = 0; r < K; r++) s += T[r][p[r]];
+    if (s > bestSum) { bestSum = s; bestPerm = p; }
+  }
+  // Apply permutation: new label for original g2 label j is invPerm[j],
+  // where bestPerm[r] is the g2-label that aligns to g1-label r.
+  // i.e. invPerm[bestPerm[r]] = r
+  const invPerm = new Array(K);
+  for (let r = 0; r < K; r++) invPerm[bestPerm[r]] = r;
+  const aligned = new Int8Array(n);
+  for (let i = 0; i < n; i++) aligned[i] = invPerm[g2[i]];
+  // Aligned table
+  const Ta = Array.from({ length: K }, () => new Int32Array(K));
+  for (let i = 0; i < n; i++) Ta[g1[i]][aligned[i]]++;
+  let diag = 0;
+  for (let r = 0; r < K; r++) diag += Ta[r][r];
+  return {
+    table: Ta,
+    raw_table: T,
+    perm: bestPerm,
+    invPerm,
+    aligned,
+    concord: n > 0 ? diag / n : 0,
+    n,
+  };
+}
+
+function permutations(K) {
+  const out = [];
+  const arr = Array.from({ length: K }, (_, i) => i);
+  function rec(start) {
+    if (start === K) { out.push(arr.slice()); return; }
+    for (let i = start; i < K; i++) {
+      [arr[start], arr[i]] = [arr[i], arr[start]];
+      rec(start + 1);
+      [arr[start], arr[i]] = [arr[i], arr[start]];
+    }
+  }
+  rec(0);
+  return out;
+}
+
+// =============================================================================
+// Fisher's exact test (2×2) and chi-square (k×k)
+// =============================================================================
+// Standard 2×2 Fisher two-tailed, using log-factorial for stability.
+function logFact(n) {
+  // Cached
+  if (logFact._cache === undefined) logFact._cache = [0, 0];
+  const c = logFact._cache;
+  while (c.length <= n) c.push(c[c.length - 1] + Math.log(c.length));
+  return c[n];
+}
+function logChoose(n, k) { return logFact(n) - logFact(k) - logFact(n - k); }
+function fisher2x2(table) {
+  const a = table[0][0], b = table[0][1], cv = table[1][0], dv = table[1][1];
+  const n = a + b + cv + dv;
+  const r1 = a + b, r2 = cv + dv, c1 = a + cv;
+  // P(X = a) under hypergeom
+  function lp(x) {
+    return logChoose(r1, x) + logChoose(r2, c1 - x) - logChoose(n, c1);
+  }
+  const lpObs = lp(a);
+  let p = 0;
+  const lo = Math.max(0, c1 - r2), hi = Math.min(c1, r1);
+  for (let x = lo; x <= hi; x++) {
+    const lpx = lp(x);
+    if (lpx <= lpObs + 1e-12) p += Math.exp(lpx);
+  }
+  return Math.min(1, p);
+}
+
+// Chi-square for K×K, returns { chi2, df, p_approx }.
+// p_approx uses a Wilson–Hilferty approximation (avoids needing a gamma function lib).
+function chiSquare(table, K) {
+  let n = 0;
+  for (let r = 0; r < K; r++) for (let c = 0; c < K; c++) n += table[r][c];
+  const rowSum = new Array(K).fill(0), colSum = new Array(K).fill(0);
+  for (let r = 0; r < K; r++) for (let c = 0; c < K; c++) {
+    rowSum[r] += table[r][c]; colSum[c] += table[r][c];
+  }
+  let chi2 = 0;
+  for (let r = 0; r < K; r++) for (let c = 0; c < K; c++) {
+    const E = (rowSum[r] * colSum[c]) / (n || 1);
+    if (E > 0) chi2 += (table[r][c] - E) ** 2 / E;
+  }
+  const df = (K - 1) * (K - 1);
+  // Wilson–Hilferty: ((chi2/df)^(1/3) - (1 - 2/(9 df))) / sqrt(2/(9 df)) ~ N(0,1)
+  // p = 1 - Phi(z)
+  const z = ((chi2 / df) ** (1 / 3) - (1 - 2 / (9 * df))) / Math.sqrt(2 / (9 * df));
+  const p_approx = 1 - normalCDF(z);
+  return { chi2, df, p_approx, n };
+}
+// Abramowitz & Stegun 7.1.26 normal CDF approximation
+function normalCDF(z) {
+  const t = 1 / (1 + 0.2316419 * Math.abs(z));
+  const d = 0.3989422804 * Math.exp(-z * z / 2);
+  let p = d * t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
+  return z >= 0 ? 1 - p : p;
+}
+
+// =============================================================================
+// L3 pairwise comparison: align(left, current), align(current, right)
+// =============================================================================
+// Returns null if either side is missing or skipped, otherwise { ... }.
+function compareL2Pair(leftIdx, rightIdx) {
+  if (leftIdx == null || rightIdx == null) return null;
+  const cl = getL2Cluster(leftIdx), cr = getL2Cluster(rightIdx);
+  // If either cluster is below thresholds, surface it but still try to align if labels exist.
+  if (!cl || !cr || !cl.labels || !cr.labels) return null;
+  const K = state.k;
+  const align = alignLabels(cl.labels, cr.labels, K);
+  let p_value, test_kind;
+  if (K === 2) {
+    p_value = fisher2x2(align.table);
+    test_kind = 'fisher_2x2';
+  } else {
+    const cs = chiSquare(align.table, K);
+    p_value = cs.p_approx;
+    test_kind = 'chi2_' + K + 'x' + K;
+  }
+  // Verdict
+  let verdict;
+  if (!cl.ok || !cr.ok) verdict = 'LOW_POWER';
+  else if (align.concord >= state.mergeThr && p_value > state.alpha) verdict = 'MERGE';
+  else if (align.concord >= state.mergeThr && p_value <= state.alpha) {
+    // High concordance but p significant => still considered MERGE per handoff.
+    // Concordance is the primary signal; significance only fires SEPARATE when concord low.
+    verdict = 'MERGE';
+  }
+  else verdict = 'SEPARATE';
+  return {
+    leftIdx, rightIdx, K,
+    table: align.table,
+    perm: align.perm,
+    concord: align.concord,
+    p_value,
+    test_kind,
+    verdict,
+    cl_ok: cl.ok, cr_ok: cr.ok,
+    cl_reason: cl.reason, cr_reason: cr.reason,
+    cl_npg: cl.n_per_group, cr_npg: cr.n_per_group,
+  };
+}
+
+// =============================================================================
+// Format helpers
+// =============================================================================
+function fmt(v, p = 3) {
+  if (v === null || v === undefined || (typeof v === 'number' && !isFinite(v))) return '—';
+  if (typeof v !== 'number') return String(v);
+  if (Math.abs(v) >= 100) return v.toFixed(0);
+  if (Math.abs(v) >= 10)  return v.toFixed(1);
+  return v.toFixed(p);
+}
+function fmtP(p) {
+  if (p === null || !isFinite(p)) return '—';
+  if (p < 1e-4) return p.toExponential(1);
+  return p.toFixed(4);
+}
+function fmtMb(bp) {
+  return (bp / 1e6).toFixed(3);
+}
+
+// =============================================================================
+// Drawing — Sim_mat with L1/L2 overlays
+// =============================================================================
+// Two color schemes:
+//   simColor      — legacy single-channel viridis-ish (when pdfStyle == false)
+//   simColorPDF   — matches STEP_D17c overlay's lower-triangle palette
+//   zColorPDF     — matches STEP_D17c overlay's upper-triangle Z palette
+// -----------------------------------------------------------------------------
+
+function simColor(v) {
+  v = Math.max(0, Math.min(1, v));
+  if (v < 0.5) {
+    const t = v / 0.5;
+    return [Math.round(30 + t * 40), Math.round(50 + t * 70), Math.round(120 + t * 100)];
+  }
+  const t = (v - 0.5) / 0.5;
+  return [Math.round(70 + t * 185), Math.round(120 + t * 100), Math.round(220 - t * 180)];
+}
+
+// Hex string -> [r, g, b]
+function hex(h) {
+  return [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+}
+function lerpRGB(a, b, t) {
+  return [
+    Math.round(a[0] + (b[0] - a[0]) * t),
+    Math.round(a[1] + (b[1] - a[1]) * t),
+    Math.round(a[2] + (b[2] - a[2]) * t),
+  ];
+}
+// Piecewise-linear gradientn on values [0..1] with breakpoints at:
+//   v0 = 0, v1 = q_lo, v2 = (q_lo+q_hi)/2, v3 = q_hi, v4 = 1
+//   c0..c4 = "#F8F8F8", "#A8DBC2", "#F2DC78", "#E08838", "#7E1F1F"
+const SIM_PDF_COLORS = ['#F8F8F8', '#A8DBC2', '#F2DC78', '#E08838', '#7E1F1F'].map(hex);
+function simColorPDF(v, q_lo, q_hi) {
+  if (v < 0) v = 0; else if (v > 1) v = 1;
+  const v2 = (q_lo + q_hi) / 2;
+  const breaks = [0, q_lo, v2, q_hi, 1];
+  // Find the segment
+  for (let i = 0; i < 4; i++) {
+    if (v <= breaks[i + 1]) {
+      const span = breaks[i + 1] - breaks[i];
+      const t = span > 1e-9 ? (v - breaks[i]) / span : 0;
+      return lerpRGB(SIM_PDF_COLORS[i], SIM_PDF_COLORS[i + 1], t);
+    }
+  }
+  return SIM_PDF_COLORS[4];
+}
+// Diverging blue/white/red (matches L2 overlay scale_fill_gradient2)
+const Z_LOW  = hex('#2C5AA0');
+const Z_MID  = hex('#FAFAFA');
+const Z_HIGH = hex('#B22222');
+function zColorPDF(z, z_max) {
+  if (!isFinite(z)) return [200, 200, 200];
+  if (z_max < 1e-6) z_max = 1;
+  // Squish into [-z_max, +z_max]
+  if (z < -z_max) z = -z_max; else if (z > z_max) z = z_max;
+  const t = (z + z_max) / (2 * z_max);  // 0..1
+  if (t <= 0.5) return lerpRGB(Z_LOW, Z_MID, t * 2);
+  return lerpRGB(Z_MID, Z_HIGH, (t - 0.5) * 2);
+}
+
+// Resolve which scale to render. Falls back to legacy `sim_thumb` when
+// no scales were embedded.
+function getActiveSimScale() {
+  const d = state.data;
+  if (!d) return null;
+  // New multi-scale path
+  if (d.sim_scales && Object.keys(d.sim_scales).length > 0) {
+    const lab = state.simScale && d.sim_scales[state.simScale]
+              ? state.simScale
+              : (d.default_sim_scale && d.sim_scales[d.default_sim_scale]
+                 ? d.default_sim_scale
+                 : Object.keys(d.sim_scales)[0]);
+    return d.sim_scales[lab];
+  }
+  // Legacy single-thumbnail path
+  if (d.sim_thumb && d.sim_thumb_n > 0) {
+    return { sim: d.sim_thumb, n: d.sim_thumb_n,
+             z: null, q_lo: 0.05, q_hi: 0.95, z_max: 2.5 };
+  }
+  return null;
+}
+
+function drawSim() {
+  const canvas = document.getElementById('simCanvas');
+  const { ctx, w, h } = fitCanvas(canvas);
+  ctx.clearRect(0, 0, w, h);
+  if (!state.data) return;
+  const d = state.data;
+
+  // ---- Compute centered square geometry ----
+  // The heatmap must be a perfect square so the diagonal reads at 45°
+  // (otherwise visual structure inside L2 envelopes is unreadable).
+  // Reserve a margin for axis text + a side legend strip.
+  const padTop    = 24;
+  const padBottom = 22;
+  const padLeft   = 50;
+  const padRight  = 130;   // leaves room for the legend strip
+  const availW = Math.max(50, w - padLeft - padRight);
+  const availH = Math.max(50, h - padTop - padBottom);
+  const side   = Math.max(50, Math.min(availW, availH));
+  const simX0  = padLeft + Math.floor((availW - side) / 2);
+  const simY0  = padTop  + Math.floor((availH - side) / 2);
+  const simX1  = simX0 + side;
+  const simY1  = simY0 + side;
+  // Persist geometry for the click handler
+  state._simGeom = { x0: simX0, y0: simY0, x1: simX1, y1: simY1, side };
+
+  const scale = getActiveSimScale();
+  if (scale && scale.sim && scale.n > 0) {
+    const N = scale.n;
+    const sim = scale.sim;
+    const zArr = scale.z;
+    const usePdf = state.pdfStyle && zArr;
+    const img = ctx.createImageData(N, N);
+
+    if (usePdf) {
+      const q_lo = scale.q_lo, q_hi = scale.q_hi, z_max = scale.z_max;
+      for (let k = 0; k < sim.length; k++) {
+        const i = Math.floor(k / N), j = k - i * N;
+        let r, g, b;
+        if (i === j) {
+          r = 232; g = 197; b = 71;  // diagonal yellow
+        } else if (j < i) {
+          [r, g, b] = simColorPDF(sim[k], q_lo, q_hi);
+        } else {
+          [r, g, b] = zColorPDF(zArr[k], z_max);
+        }
+        img.data[k*4]=r; img.data[k*4+1]=g; img.data[k*4+2]=b; img.data[k*4+3]=255;
+      }
+    } else {
+      let mn = Infinity, mx = -Infinity;
+      for (let i = 0; i < sim.length; i++) {
+        if (sim[i] < mn) mn = sim[i]; if (sim[i] > mx) mx = sim[i];
+      }
+      const rng = Math.max(1e-9, mx - mn);
+      for (let i = 0; i < sim.length; i++) {
+        const v = (sim[i] - mn) / rng;
+        const [r, g, b] = simColor(v);
+        img.data[i*4]=r; img.data[i*4+1]=g; img.data[i*4+2]=b; img.data[i*4+3]=255;
+      }
+    }
+    const off = document.createElement('canvas');
+    off.width = N; off.height = N;
+    off.getContext('2d').putImageData(img, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(off, simX0, simY0, side, side);
+
+    // Frame around the heatmap
+    ctx.strokeStyle = 'rgba(120,128,140,0.45)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(simX0 + 0.5, simY0 + 0.5, side - 1, side - 1);
+  } else {
+    ctx.fillStyle = '#1c2330';
+    ctx.fillRect(simX0, simY0, side, side);
+  }
+
+  // Window-coord -> pixel coord (mapped INSIDE the square)
+  const Nw = d.n_windows;
+  const toPx = (wIdx) => simX0 + (wIdx + 0.5) * side / Nw;
+  const toPy = (wIdx) => simY0 + (wIdx + 0.5) * side / Nw;
+
+  // L1 envelope rectangles
+  if (Array.isArray(d.l1_envelopes)) {
+    const curL1 = state.windowToL1 ? state.windowToL1[state.cur] : -1;
+    ctx.lineWidth = 1;
+    d.l1_envelopes.forEach((e, i) => {
+      const x0 = toPx(e._s0), x1 = toPx(e._e0);
+      const y0 = toPy(e._s0), y1 = toPy(e._e0);
+      const isCur = (i === curL1);
+      ctx.strokeStyle = isCur ? 'rgba(0,66,255,1.0)' : 'rgba(0,66,255,0.45)';
+      ctx.lineWidth = isCur ? 2 : 1;
+      if (isCur) {
+        ctx.fillStyle = 'rgba(0,66,255,0.10)';
+        ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+      }
+      ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
+    });
+  }
+
+  // L2 envelope rectangles
+  if (Array.isArray(d.l2_envelopes)) {
+    const curL2 = state.windowToL2 ? state.windowToL2[state.cur] : -1;
+    d.l2_envelopes.forEach((e, i) => {
+      const x0 = toPx(e._s0), x1 = toPx(e._e0);
+      const y0 = toPy(e._s0), y1 = toPy(e._e0);
+      const isCur = (i === curL2);
+      ctx.strokeStyle = isCur ? 'rgba(0,230,118,1.0)' : 'rgba(0,230,118,0.55)';
+      ctx.lineWidth = isCur ? 2 : 1;
+      if (isCur) {
+        ctx.fillStyle = 'rgba(0,230,118,0.12)';
+        ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+      }
+      ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
+    });
+  }
+
+  // Crosshair (clipped to inside the square)
+  const xc = toPx(state.cur), yc = toPy(state.cur);
+  ctx.strokeStyle = '#f5a524';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(Math.round(xc) + 0.5, simY0); ctx.lineTo(Math.round(xc) + 0.5, simY1);
+  ctx.moveTo(simX0, Math.round(yc) + 0.5); ctx.lineTo(simX1, Math.round(yc) + 0.5);
+  ctx.stroke();
+
+  // Mb tick labels along the bottom (every ~5 Mb)
+  const wins = d.windows;
+  if (wins && wins.length > 0) {
+    const mbMin = wins[0].center_mb, mbMax = wins[wins.length - 1].center_mb;
+    const ticks = niceTicks(mbMin, mbMax, 6);
+    ctx.fillStyle = '#8a94a3';
+    ctx.font = '10px ui-monospace, monospace';
+    ctx.textAlign = 'center';
+    for (const mb of ticks) {
+      // Find the nearest window
+      const t = (mb - mbMin) / Math.max(1e-9, mbMax - mbMin);
+      const x = simX0 + t * side;
+      ctx.fillText(mb.toFixed(0), x, simY1 + 14);
+    }
+    ctx.textAlign = 'right';
+    ctx.fillText('Mb', simX1, simY1 + 14);
+    // Y-axis label
+    ctx.save();
+    ctx.translate(simX0 - 8, simY0 + side / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.textAlign = 'center';
+    ctx.fillText('window index', 0, 0);
+    ctx.restore();
+  }
+
+  // ---- Side legend strip ----
+  // Show: scale label, q_lo / q_hi, z_max, and small color ramps
+  if (scale) {
+    const lx = simX1 + 14;
+    const lw = Math.max(30, Math.min(padRight - 20, w - lx - 8));
+    let ly = simY0 + 4;
+    ctx.fillStyle = '#e7edf3';
+    ctx.font = 'bold 11px ui-monospace, monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(scale.label || 'scale', lx, ly);
+    ly += 16;
+
+    if (state.pdfStyle && scale.z) {
+      // Sim ramp (lower triangle palette)
+      ctx.font = '10px ui-monospace, monospace';
+      ctx.fillStyle = '#8a94a3';
+      ctx.fillText('similarity', lx, ly);
+      ly += 4;
+      const rampW = Math.min(lw, 90), rampH = 8;
+      for (let i = 0; i < rampW; i++) {
+        const v = i / (rampW - 1);
+        const [r, g, b] = simColorPDF(v, scale.q_lo, scale.q_hi);
+        ctx.fillStyle = `rgb(${r},${g},${b})`;
+        ctx.fillRect(lx + i, ly, 1, rampH);
+      }
+      ly += rampH + 11;
+      ctx.fillStyle = '#8a94a3';
+      ctx.fillText(`q05 ${scale.q_lo.toFixed(2)}`, lx, ly);
+      ly += 11;
+      ctx.fillText(`q95 ${scale.q_hi.toFixed(2)}`, lx, ly);
+      ly += 16;
+
+      // Z ramp (upper triangle palette)
+      ctx.fillText('local |Z|', lx, ly);
+      ly += 4;
+      for (let i = 0; i < rampW; i++) {
+        const t = i / (rampW - 1);
+        const z = (t * 2 - 1) * scale.z_max;
+        const [r, g, b] = zColorPDF(z, scale.z_max);
+        ctx.fillStyle = `rgb(${r},${g},${b})`;
+        ctx.fillRect(lx + i, ly, 1, rampH);
+      }
+      ly += rampH + 11;
+      ctx.fillText(`±${scale.z_max.toFixed(1)}`, lx, ly);
+      ly += 16;
+    }
+    ctx.fillStyle = '#5a6472';
+    ctx.fillText(`${scale.n}×${scale.n}`, lx, ly);
+    ly += 11;
+    ctx.fillText(`thumb`, lx, ly);
+  }
+}
+
+// =============================================================================
+// Drawing — Z profile with zone bars + boundary peaks
+// =============================================================================
+function drawZ() {
+  const canvas = document.getElementById('zCanvas');
+  const { ctx, w, h } = fitCanvas(canvas);
+  ctx.clearRect(0, 0, w, h);
+  if (!state.data) return;
+  const d = state.data;
+  const pad = { l: 44, r: 16, t: 18, b: 22 };
+  // Reserve top strip for L1/L2 zone bars
+  const zoneH = 14;
+  const plotW = w - pad.l - pad.r;
+  const plotH = h - pad.t - pad.b - zoneH;
+
+  const mbs = d.windows.map(w0 => w0.center_mb);
+  const zs  = d.windows.map(w0 => Math.abs(w0.z || 0));
+  const mbMin = mbs[0], mbMax = mbs[mbs.length - 1];
+  let zMax = 0; for (const z of zs) if (z > zMax) zMax = z;
+  zMax = Math.max(3, Math.ceil(zMax));
+
+  const toX = (mb) => pad.l + ((mb - mbMin) / (mbMax - mbMin)) * plotW;
+  const toY = (z)  => pad.t + zoneH + plotH - (z / zMax) * plotH;
+  const xOfWin = (wi) => toX(d.windows[wi].center_mb);
+
+  // L1 zone bars (top half of zoneH, blue)
+  if (Array.isArray(d.l1_envelopes)) {
+    const y0 = pad.t, hzone = zoneH / 2 - 1;
+    const curL1 = state.windowToL1 ? state.windowToL1[state.cur] : -1;
+    d.l1_envelopes.forEach((e, i) => {
+      const x0 = xOfWin(e._s0), x1 = xOfWin(e._e0);
+      ctx.fillStyle = (i === curL1) ? 'rgba(79,163,255,0.85)' : 'rgba(79,163,255,0.35)';
+      ctx.fillRect(x0, y0, Math.max(1, x1 - x0), hzone);
+    });
+  }
+  // L2 zone bars (bottom half, green)
+  if (Array.isArray(d.l2_envelopes)) {
+    const y0 = pad.t + zoneH / 2 + 1, hzone = zoneH / 2 - 1;
+    const curL2 = state.windowToL2 ? state.windowToL2[state.cur] : -1;
+    d.l2_envelopes.forEach((e, i) => {
+      const x0 = xOfWin(e._s0), x1 = xOfWin(e._e0);
+      ctx.fillStyle = (i === curL2) ? 'rgba(0,230,118,0.95)' : 'rgba(0,230,118,0.45)';
+      ctx.fillRect(x0, y0, Math.max(1, x1 - x0), hzone);
+    });
+  }
+
+  // Threshold lines + |Z| points
+  ctx.strokeStyle = 'rgba(42,50,66,0.6)';
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.t + zoneH + (i / 4) * plotH;
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(pad.l + plotW, y); ctx.stroke();
+  }
+  const ths = [
+    { z: 2.5, color: 'rgba(224,85,92,0.45)' },
+    { z: 1.8, color: 'rgba(60,192,138,0.40)' },
+    { z: 1.2, color: 'rgba(245,165,36,0.40)' },
+  ];
+  ctx.setLineDash([4, 4]);
+  for (const th of ths) {
+    if (th.z > zMax) continue;
+    ctx.strokeStyle = th.color;
+    const y = toY(th.z);
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(pad.l + plotW, y); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  // Z dots
+  for (let i = 0; i < d.n_windows; i++) {
+    const z = zs[i];
+    let color;
+    if (z >= 2.5) color = 'rgba(79,83,180,0.85)';
+    else if (z >= 1.8) color = 'rgba(79,163,255,0.7)';
+    else if (z >= 1.2) color = 'rgba(122,211,219,0.6)';
+    else color = 'rgba(200,200,200,0.35)';
+    ctx.fillStyle = color;
+    const x = toX(mbs[i]), y = toY(z);
+    ctx.beginPath(); ctx.arc(x, y, 1.4, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // L2 boundary peaks colored by validation_status
+  if (Array.isArray(d.l2_boundaries)) {
+    const yPeak = pad.t + zoneH + plotH - 2;
+    for (const b of d.l2_boundaries) {
+      const wi = (b.boundary_w | 0) - 1;
+      if (wi < 0 || wi >= d.n_windows) continue;
+      const x = toX(d.windows[wi].center_mb);
+      const col = STATUS_COLOR[b.validation_status] || '#666';
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.arc(x, yPeak, 3, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  // Axes labels
+  ctx.fillStyle = '#8a94a3';
+  ctx.font = '10px ui-monospace, monospace';
+  ctx.textAlign = 'right';
+  for (let z = 0; z <= zMax; z++) {
+    const y = toY(z);
+    if (y > pad.t + zoneH - 2)
+      ctx.fillText(z.toFixed(0), pad.l - 5, y + 3);
+  }
+  ctx.textAlign = 'center';
+  const mbTicks = niceTicks(mbMin, mbMax, 6);
+  for (const mb of mbTicks) {
+    const x = toX(mb);
+    ctx.fillText(mb.toFixed(0), x, pad.t + zoneH + plotH + 14);
+  }
+  ctx.textAlign = 'right';
+  ctx.fillText(d.chrom + ' (Mb)', pad.l + plotW, h - 4);
+
+  // Current cursor
+  const xCur = toX(d.windows[state.cur].center_mb);
+  ctx.strokeStyle = '#f5a524';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(xCur + 0.5, pad.t);
+  ctx.lineTo(xCur + 0.5, pad.t + zoneH + plotH);
+  ctx.stroke();
+}
+function niceTicks(mn, mx, n) {
+  const range = mx - mn, raw = range / n;
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const norm = raw / mag;
+  let step;
+  if (norm < 1.5) step = 1 * mag;
+  else if (norm < 3) step = 2 * mag;
+  else if (norm < 7) step = 5 * mag;
+  else step = 10 * mag;
+  const first = Math.ceil(mn / step) * step;
+  const ticks = [];
+  for (let t = first; t <= mx; t += step) ticks.push(t);
+  return ticks;
+}
+
+// =============================================================================
+// PCA panel — sample dots colored by L2 group, tracked samples halo
+// =============================================================================
+function drawPCA() {
+  const canvas = document.getElementById('pcaCanvas');
+  const { ctx, w, h } = fitCanvas(canvas);
+  ctx.clearRect(0, 0, w, h);
+  if (!state.data) return;
+  document.getElementById('emptyState').style.display = 'none';
+  const d = state.data;
+  const cur = state.cur;
+  const trailStart = Math.max(0, cur - state.trailN);
+
+  // Range across trail span
+  let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
+  for (let wi = trailStart; wi <= cur; wi++) {
+    const { pc1, pc2, sign } = getPC(wi);
+    const samples = (wi === cur) ? allSampleIdx() : state.tracked;
+    for (const si of samples) {
+      const x = pc1[si] * sign, y = pc2[si];
+      if (x < xMin) xMin = x; if (x > xMax) xMax = x;
+      if (y < yMin) yMin = y; if (y > yMax) yMax = y;
+    }
+  }
+  const xPad = (xMax - xMin) * 0.08 || 0.01;
+  const yPad = (yMax - yMin) * 0.08 || 0.01;
+  xMin -= xPad; xMax += xPad; yMin -= yPad; yMax += yPad;
+
+  const pad = { l: 50, r: 200, t: 32, b: 38 };
+  const plotW = w - pad.l - pad.r, plotH = h - pad.t - pad.b;
+  const toX = v => pad.l + ((v - xMin) / (xMax - xMin)) * plotW;
+  const toY = v => pad.t + (1 - (v - yMin) / (yMax - yMin)) * plotH;
+
+  // Frame + grid
+  ctx.strokeStyle = '#2a3242';
+  ctx.strokeRect(pad.l + 0.5, pad.t + 0.5, plotW, plotH);
+  ctx.strokeStyle = 'rgba(42,50,66,0.5)';
+  ctx.setLineDash([2, 3]);
+  for (let i = 1; i < 5; i++) {
+    const gx = pad.l + (i / 5) * plotW;
+    ctx.beginPath(); ctx.moveTo(gx, pad.t); ctx.lineTo(gx, pad.t + plotH); ctx.stroke();
+    const gy = pad.t + (i / 5) * plotH;
+    ctx.beginPath(); ctx.moveTo(pad.l, gy); ctx.lineTo(pad.l + plotW, gy); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  // Axis labels
+  ctx.fillStyle = '#8a94a3';
+  ctx.font = '10px ui-monospace, monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('PC1', pad.l + plotW / 2, h - 12);
+  ctx.save(); ctx.translate(14, pad.t + plotH / 2); ctx.rotate(-Math.PI / 2);
+  ctx.fillText('PC2', 0, 0); ctx.restore();
+  ctx.textAlign = 'right';
+  ctx.fillText(yMax.toFixed(3), pad.l - 5, pad.t + 4);
+  ctx.fillText(yMin.toFixed(3), pad.l - 5, pad.t + plotH);
+  ctx.textAlign = 'center';
+  ctx.fillText(xMin.toFixed(3), pad.l, pad.t + plotH + 14);
+  ctx.fillText(xMax.toFixed(3), pad.l + plotW, pad.t + plotH + 14);
+
+  // Determine L2 group labels for cluster coloring
+  const curL2 = state.windowToL2 ? state.windowToL2[state.cur] : -1;
+  let groupLabels = null;
+  if (state.colorMode === 'cluster' && curL2 >= 0) {
+    const cl = getL2Cluster(curL2);
+    if (cl && cl.labels) groupLabels = cl.labels;
+  }
+
+  // Non-tracked samples
+  const { pc1: pc1c, pc2: pc2c, sign: signc } = getPC(cur);
+  const trackedSet = new Set(state.tracked);
+  for (let si = 0; si < d.n_samples; si++) {
+    if (trackedSet.has(si)) continue;
+    const x = toX(pc1c[si] * signc);
+    const y = toY(pc2c[si]);
+    const baseCol = getSampleColor(si, state.colorMode, groupLabels);
+    const col = withAlpha(baseCol, state.colorMode === 'cluster' ? 0.45 : 0.7);
+    ctx.fillStyle = col;
+    ctx.beginPath(); ctx.arc(x, y, 2.8, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // Trails (tracked samples)
+  if (state.trailOn && state.tracked.length > 0 && state.trailN > 0) {
+    for (const si of state.tracked) {
+      const col = trackedColor(si);
+      ctx.strokeStyle = col; ctx.lineWidth = 1.3;
+      ctx.globalAlpha = 0.85;
+      ctx.beginPath();
+      let first = true;
+      for (let wi = trailStart; wi <= cur; wi++) {
+        const { pc1, pc2, sign } = getPC(wi);
+        const x = toX(pc1[si] * sign), y = toY(pc2[si]);
+        if (first) { ctx.moveTo(x, y); first = false; } else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      for (let wi = trailStart; wi < cur; wi++) {
+        const { pc1, pc2, sign } = getPC(wi);
+        const t = (wi - trailStart) / Math.max(1, cur - trailStart);
+        ctx.fillStyle = col; ctx.globalAlpha = 0.15 + 0.5 * t;
+        const x = toX(pc1[si] * sign), y = toY(pc2[si]);
+        ctx.beginPath(); ctx.arc(x, y, 2.0, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // Tracked dots — outline color = group, fill = sample identity, label = CGA
+  for (const si of state.tracked) {
+    const col = trackedColor(si);
+    const x = toX(pc1c[si] * signc), y = toY(pc2c[si]);
+    // Group halo
+    if (groupLabels) {
+      const gcol = ['#4fa3ff', '#b8b8b8', '#f5a524'][groupLabels[si]] || '#666';
+      ctx.strokeStyle = gcol; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(x, y, 9, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.fillStyle = col;
+    ctx.strokeStyle = '#0e1116';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    // Label with text shadow for readability
+    const name = d.samples[si].cga || d.samples[si].ind;
+    ctx.font = 'bold 11px ui-monospace, monospace';
+    ctx.textAlign = 'left';
+    ctx.strokeStyle = '#0e1116'; ctx.lineWidth = 3;
+    ctx.strokeText(name, x + 9, y + 4);
+    ctx.fillStyle = col;
+    ctx.fillText(name, x + 9, y + 4);
+  }
+}
+function ancestryColor(sIdx) {
+  const a = state.data.samples[sIdx].ancestry || 'unknown';
+  if (!state.ancestryPalette) state.ancestryPalette = {};
+  if (!state.ancestryPalette[a]) {
+    const keys = Object.keys(state.ancestryPalette);
+    state.ancestryPalette[a] = PALETTE[keys.length % PALETTE.length];
+  }
+  return state.ancestryPalette[a];
+}
+function trackedColor(si) { return PALETTE[state.tracked.indexOf(si) % PALETTE.length]; }
+
+// Tol qualitative palette + extras (verbatim from STEP_D16 v3.2 fam_pal_base)
+const FAMILY_PALETTE_BASE = [
+  '#332288', '#117733', '#44AA99', '#88CCEE', '#DDCC77',
+  '#CC6677', '#AA4499', '#882255', '#999933', '#661100',
+  '#6699CC', '#888888', '#ed7953', '#0d9488', '#7c3aed',
+  '#dc2626', '#16a34a', '#ca8a04', '#0284c7', '#9333ea',
+  '#be123c', '#a16207', '#15803d', '#1d4ed8', '#7e22ce',
+  '#9f1239', '#854d0e', '#166534', '#1e40af', '#6b21a8'
+];
+const FAMILY_COLOR_SMALL    = '#cbd5e1';   // n==2 or 3
+const FAMILY_COLOR_SINGLETON = '#dde3eb';  // n==1
+const FAMILY_COLOR_UNMATCHED = '#94a3b8';  // family_id == -1
+
+// Build the family palette on JSON load. Hub families (n>=4) get distinct
+// Tol colors; smaller families collapse to grey buckets per D16 logic.
+function buildFamilyPalette() {
+  state.familyPalette = {};
+  state.hubFamilies = [];
+  state.smallFamilyIds = new Set();
+  state.singletonFamilyIds = new Set();
+  if (!state.data || !state.data.samples) return;
+  // Count distinct samples per family
+  const counts = new Map();
+  for (const s of state.data.samples) {
+    const f = (s.family_id == null) ? -1 : s.family_id;
+    counts.set(f, (counts.get(f) || 0) + 1);
+  }
+  // Hubs in descending size, excluding -1
+  const sorted = Array.from(counts.entries())
+    .filter(([f]) => f !== -1)
+    .sort((a, b) => b[1] - a[1]);
+  let palIdx = 0;
+  for (const [f, n] of sorted) {
+    if (n >= 4) {
+      state.familyPalette[f] = FAMILY_PALETTE_BASE[palIdx % FAMILY_PALETTE_BASE.length];
+      state.hubFamilies.push(f);
+      palIdx++;
+    } else if (n >= 2) {
+      state.smallFamilyIds.add(f);
+    } else {
+      state.singletonFamilyIds.add(f);
+    }
+  }
+}
+
+function familyColor(si) {
+  if (!state.data || !state.data.samples) return FAMILY_COLOR_UNMATCHED;
+  const f = state.data.samples[si].family_id;
+  if (f == null || f === -1) return FAMILY_COLOR_UNMATCHED;
+  if (state.familyPalette[f]) return state.familyPalette[f];
+  if (state.smallFamilyIds.has(f)) return FAMILY_COLOR_SMALL;
+  if (state.singletonFamilyIds.has(f)) return FAMILY_COLOR_SINGLETON;
+  return FAMILY_COLOR_UNMATCHED;
+}
+
+// Resolve the color for sample `si` according to the active color mode (or
+// override). `groupLabels` is the per-sample K-means assignment Hungarian-
+// aligned to the focal envelope; pass null for non-cluster modes.
+// Returns an opaque hex/rgb string (alpha is applied by the caller).
+function getSampleColor(si, mode, groupLabels) {
+  mode = mode || state.colorMode || 'cluster';
+  if (mode === 'cluster') {
+    if (groupLabels && groupLabels[si] != null && groupLabels[si] >= 0) {
+      return ['#4fa3ff', '#b8b8b8', '#f5a524', '#3cc08a', '#e0555c'][groupLabels[si]] || '#888';
+    }
+    return '#888';
+  }
+  if (mode === 'family')   return familyColor(si);
+  if (mode === 'ancestry') return ancestryColor(si);
+  /* mode === 'none' */    return '#888';
+}
+
+// Convert a hex/rgb color to an rgba string with alpha (for non-tracked dots
+// and trail tail). Accepts '#RRGGBB' or 'rgba(...)' as input.
+function withAlpha(col, a) {
+  if (!col) return `rgba(160,160,160,${a})`;
+  if (col[0] === '#' && col.length === 7) {
+    const r = parseInt(col.slice(1, 3), 16);
+    const g = parseInt(col.slice(3, 5), 16);
+    const b = parseInt(col.slice(5, 7), 16);
+    return `rgba(${r},${g},${b},${a})`;
+  }
+  return col;  // assume rgba already
+}
+function allSampleIdx() {
+  if (!state._sampleIdxCache || state._sampleIdxCache.length !== state.data.n_samples) {
+    const a = new Array(state.data.n_samples);
+    for (let i = 0; i < a.length; i++) a[i] = i;
+    state._sampleIdxCache = a;
+  }
+  return state._sampleIdxCache;
+}
+
+// =============================================================================
+// Sidebar zone block
+// =============================================================================
+function renderZoneBlock() {
+  const el = document.getElementById('zoneBlock');
+  if (!state.data) { el.textContent = '—'; return; }
+  const d = state.data;
+  const cur = state.cur;
+  const l1i = state.windowToL1 ? state.windowToL1[cur] : -1;
+  const l2i = state.windowToL2 ? state.windowToL2[cur] : -1;
+
+  let html = '';
+  if (l1i >= 0) {
+    const e = d.l1_envelopes[l1i];
+    html += `<div class="zone-title">L1 zone</div>` +
+            `<div><span class="zone-id">${e.candidate_id}</span></div>` +
+            `<div class="zone-meta">w ${e.start_w}–${e.end_w} · ${fmtMb(e.start_bp)}–${fmtMb(e.end_bp)} Mb · ${e.n_windows}W · sim ${fmt(e.mean_sim)}</div>`;
+  } else {
+    html += `<div class="zone-title">L1 zone</div><div class="zone-meta">— outside L1 envelopes —</div>`;
+  }
+
+  if (l2i >= 0) {
+    const e = d.l2_envelopes[l2i];
+    const cl = getL2Cluster(l2i);
+    const okText = cl && cl.ok ? `K=${state.k} · n/group: ${cl.n_per_group.join('/')}`
+                                : `K=${state.k} · ${cl ? cl.reason || 'INCOMPLETE' : '—'}`;
+    html += `<div class="zone-title">L2 zone</div>` +
+            `<div><span class="zone-id">${e.candidate_id}</span></div>` +
+            `<div class="zone-meta">w ${e.start_w}–${e.end_w} · ${fmtMb(e.start_bp)}–${fmtMb(e.end_bp)} Mb · ${e.n_windows}W · sim ${fmt(e.mean_sim)}</div>` +
+            `<div class="zone-meta">${okText}</div>`;
+
+    // Neighbors
+    const nb = state.l2NeighborsInL1.get(l2i) || { left: null, right: null };
+    let nbHtml = '<div class="zone-title">L2 neighbors (in same L1 parent)</div>';
+    const lname = nb.left  != null ? d.l2_envelopes[nb.left].candidate_id  : null;
+    const rname = nb.right != null ? d.l2_envelopes[nb.right].candidate_id : null;
+    nbHtml += `<div class="neighbor">` +
+              (lname ? `<span class="arrow">←</span> ${shortId(lname)} ` : `<span class="arrow">←</span> <span class="dim">none</span> `) +
+              `<span class="ncur">[${shortId(e.candidate_id)}]</span> ` +
+              (rname ? ` ${shortId(rname)} <span class="arrow">→</span>` : ` <span class="dim">none</span> <span class="arrow">→</span>`) +
+              `</div>`;
+    html += nbHtml;
+  } else {
+    html += `<div class="zone-title">L2 zone</div><div class="zone-meta">— outside L2 envelopes —</div>`;
+  }
+
+  el.innerHTML = html;
+}
+function shortId(id) {
+  // C_gar_LG28_d17L2_0008_03 -> L2 0008/03
+  if (!id) return '—';
+  const m = id.match(/d17L2_(\d+)_(\d+)$/);
+  if (m) return `L2 ${m[1]}/${m[2]}`;
+  const m2 = id.match(/d17L1_(\d+)$/);
+  if (m2) return `L1 ${m2[1]}`;
+  return id;
+}
+
+// =============================================================================
+// L3 panel — dynamic columns, layout selector, mini PCA per column
+// =============================================================================
+// Layouts:
+//   focal      [F]
+//   left       [L | F]
+//   right      [F | R]
+//   leftright  [L | F | R]
+//   four       [LL | L | F | R | RR]
+const L3_LAYOUTS = {
+  focal:     { offsets: [0],            cols: '1fr' },
+  left:      { offsets: [-1, 0],        cols: '1fr 1fr' },
+  right:     { offsets: [0, +1],        cols: '1fr 1fr' },
+  leftright: { offsets: [-1, 0, +1],    cols: '1fr 1fr 1fr' },
+  four:      { offsets: [-2, -1, 0, +1, +2], cols: '1fr 1fr 1fr 1fr 1fr' },
+};
+
+// Resolve an offset relative to the focal L2 within the same L1 parent.
+// Returns the L2 envelope index, or null if outside the parent.
+function l2NeighborAt(focalIdx, offset) {
+  if (focalIdx == null) return null;
+  if (offset === 0) return focalIdx;
+  const dir = offset > 0 ? 'right' : 'left';
+  let cur = focalIdx;
+  for (let s = 0; s < Math.abs(offset); s++) {
+    const nb = state.l2NeighborsInL1.get(cur);
+    if (!nb || nb[dir] == null) return null;
+    cur = nb[dir];
+  }
+  return cur;
+}
+
+// Hungarian-align this envelope's labels to the focal's, so that "group 0"
+// in the column display = "group 0" in the focal envelope.
+function alignedLabelsTo(focalIdx, neighborIdx) {
+  if (focalIdx == null || neighborIdx == null) return null;
+  if (focalIdx === neighborIdx) {
+    const cl = getL2Cluster(focalIdx);
+    return cl && cl.labels ? cl.labels : null;
+  }
+  const cf = getL2Cluster(focalIdx);
+  const cn = getL2Cluster(neighborIdx);
+  if (!cf || !cn || !cf.labels || !cn.labels) return null;
+  const a = alignLabels(cf.labels, cn.labels, state.k);
+  return a.aligned;
+}
+
+function renderL3Panel() {
+  const d = state.data;
+  if (!d) return;
+  const cur = state.cur;
+  const curL2 = state.windowToL2 ? state.windowToL2[cur] : -1;
+
+  const layoutKey = state.l3Layout || 'leftright';
+  const layout = L3_LAYOUTS[layoutKey] || L3_LAYOUTS.leftright;
+  const body = document.getElementById('l3Body');
+  body.style.gridTemplateColumns = layout.cols;
+  body.innerHTML = '';
+
+  // Meta line
+  const metaEl = document.getElementById('l3Meta');
+  if (curL2 < 0) {
+    metaEl.textContent = '— scrub into an L2 envelope —';
+    body.innerHTML = '<div class="l3-col"><div class="dim" style="padding:12px;">scroll into an L2 envelope</div></div>';
+    return;
+  }
+  metaEl.innerHTML = `K=${state.k} · agg=${state.aggMethod} · merge τ=${state.mergeThr.toFixed(2)} · α=${state.alpha.toFixed(3)} · min n/grp=${state.minNGroup}`;
+
+  // Build one column per offset
+  layout.offsets.forEach((offset, colIdx) => {
+    const isFocal = (offset === 0);
+    const l2idx   = l2NeighborAt(curL2, offset);
+
+    const col = document.createElement('div');
+    col.className = 'l3-col';
+
+    const h3 = document.createElement('h3');
+    if (isFocal) h3.classList.add('focal');
+    let titlePrefix = '';
+    if (offset < 0) titlePrefix = (offset === -1 ? '←' : '←←');
+    else if (offset > 0) titlePrefix = (offset === +1 ? '→' : '→→');
+    else titlePrefix = '◆';
+    if (l2idx == null) {
+      h3.innerHTML = `${titlePrefix} <b>—</b>`;
+    } else {
+      const env = d.l2_envelopes[l2idx];
+      h3.innerHTML = `${titlePrefix} <b>${shortId(env.candidate_id)}</b> <span class="dim" style="font-weight:400;">${env.n_windows}W · sim ${fmt(env.mean_sim)}</span>`;
+    }
+    col.appendChild(h3);
+
+    // Mini PCA canvas
+    const miniCanvas = document.createElement('canvas');
+    miniCanvas.className = 'mini-pca';
+    col.appendChild(miniCanvas);
+
+    // Content div
+    const content = document.createElement('div');
+    content.className = 'ct-content';
+    col.appendChild(content);
+
+    if (l2idx == null) {
+      content.innerHTML = `<div class="dim" style="padding: 4px 0;">no neighbor at offset ${offset}<br>(boundary of L1 parent)</div>`;
+      // Still draw an empty mini PCA backdrop
+      drawMiniPCAEmpty(miniCanvas);
+    } else if (isFocal) {
+      // Focal column: K-means details + the focal mini-PCA
+      const cl = getL2Cluster(l2idx);
+      const env = d.l2_envelopes[l2idx];
+      content.innerHTML = focalContentHtml(cl, env);
+      // After the column is in the DOM, draw mini PCA (need layout pass first)
+      requestAnimationFrame(() => drawMiniPCA(miniCanvas, l2idx, alignedLabelsTo(curL2, l2idx)));
+    } else {
+      // Neighbor column: contingency table vs FOCAL + neighbor's mini PCA aligned to focal
+      const cmp = (offset < 0)
+        ? compareL2Pair(l2idx, curL2)   // (left, focal)
+        : compareL2Pair(curL2, l2idx);  // (focal, right)
+      content.innerHTML = ctHtml(cmp, offset);
+      requestAnimationFrame(() => drawMiniPCA(miniCanvas, l2idx, alignedLabelsTo(curL2, l2idx)));
+    }
+
+    body.appendChild(col);
+  });
+}
+
+function focalContentHtml(cl, env) {
+  if (!cl || !cl.labels) return '<div class="dim">no cluster</div>';
+  let html = '';
+  html += `<div class="ct-row"><span class="lbl">windows</span><span class="val">${cl.nW}</span></div>`;
+  html += `<div class="ct-row"><span class="lbl">per group (lo→hi PC1)</span><span class="val">${cl.n_per_group.join(' / ')}</span></div>`;
+  html += `<div class="ct-row"><span class="lbl">center PC1</span><span class="val">${Array.from(cl.centers).map(v => v.toFixed(3)).join(' / ')}</span></div>`;
+  html += `<div class="ct-row"><span class="lbl">power</span><span class="val">${cl.ok ? 'OK' : (cl.reason || 'WEAK')}</span></div>`;
+  // Family purity (only if family info loaded)
+  if (cl.fam_purity != null && isFinite(cl.fam_purity)) {
+    const fp = cl.fam_purity;
+    const fpStr = fp.toFixed(2);
+    const isFamLD = fp >= 0.70;
+    html += `<div class="ct-row"><span class="lbl">fam_purity</span>` +
+            `<span class="val" style="color:${isFamLD ? 'var(--bad)' : 'var(--ink)'}">${fpStr}</span></div>`;
+    if (isFamLD) {
+      html += `<div class="verdict separate" style="background:var(--bad);">FAM-LD? · bands ARE families</div>`;
+    }
+  }
+  if (cl.n_below_threshold) {
+    html += `<div class="verdict lownwin">LOW_NWIN (${cl.nW} &lt; ${state.minNWin})</div>`;
+  } else if (!cl.ok) {
+    html += `<div class="verdict skip">${cl.reason || 'LOW_POWER'}</div>`;
+  }
+  // Group counts as colored chips
+  html += `<div style="margin-top:8px; font-family: var(--mono); font-size: 11px;">` +
+          cl.n_per_group.map((c, k) =>
+            `<span class="swatch" style="background:${groupColor(k)}"></span>${c}`
+          ).join('  ') +
+          `</div>`;
+  // Per-cluster top family breakdown (small, mono font)
+  if (cl.fam_per_cluster) {
+    const lines = cl.fam_per_cluster.map((fp, k) => {
+      if (fp.total === 0) return null;
+      const famLabel = fp.top_family != null ? `F${fp.top_family}` : '?';
+      return `<span class="dim">k${k}:</span> ${famLabel} (${fp.top_count}/${fp.total}, ${(fp.purity*100).toFixed(0)}%)`;
+    }).filter(Boolean);
+    if (lines.length > 0) {
+      html += `<div style="margin-top:6px; font-family: var(--mono); font-size: 10px; line-height:1.4;">` +
+              lines.join('<br>') + `</div>`;
+    }
+  }
+  return html;
+}
+
+// Contingency-table HTML for a pair comparison. `offset` indicates direction.
+function ctHtml(cmp, offset) {
+  if (!cmp) return '<div class="dim">no comparison available</div>';
+  const K = cmp.K;
+  const arrow = offset < 0 ? '←' : '→';
+  // Header: which side is rows, which is columns?
+  // For offset < 0 we did compareL2Pair(left, focal): rows = left, cols = focal.
+  // For offset > 0 we did compareL2Pair(focal, right): rows = focal, cols = right.
+  // Either way the "this column's envelope" is on one side and the focal on the other —
+  // we'll label rows = "this", cols = "focal" for left, and rows = "focal", cols = "this" for right.
+  const rowLabel = offset < 0 ? 'this' : 'focal';
+  const colLabel = offset < 0 ? 'focal' : 'this';
+  let tbl = `<table class="ct-table"><tr><th><span class="dim" style="font-size:9px;">${rowLabel}\\${colLabel}</span></th>`;
+  for (let c = 0; c < K; c++) {
+    tbl += `<th><span class="swatch" style="background:${groupColor(c)}"></span>g${c}</th>`;
+  }
+  tbl += `</tr>`;
+  for (let r = 0; r < K; r++) {
+    tbl += `<tr><th><span class="swatch" style="background:${groupColor(r)}"></span>g${r}</th>`;
+    for (let c = 0; c < K; c++) {
+      const cls = (r === c) ? 'diag' : 'off';
+      tbl += `<td class="${cls}">${cmp.table[r][c]}</td>`;
+    }
+    tbl += `</tr>`;
+  }
+  tbl += `</table>`;
+  const n = cmp.table.flat().reduce((a,b)=>a+b,0);
+  let stats = `<div class="ct-row"><span class="lbl">concord</span><span class="val">${(cmp.concord * 100).toFixed(1)}%</span></div>` +
+              `<div class="ct-row"><span class="lbl">${cmp.test_kind} p</span><span class="val">${fmtP(cmp.p_value)}</span></div>` +
+              `<div class="ct-row"><span class="lbl">n</span><span class="val">${n}</span></div>`;
+  let vClass = 'separate', vText = 'SEPARATE';
+  if (cmp.verdict === 'MERGE') { vClass = 'merge'; vText = 'MERGE'; }
+  else if (cmp.verdict === 'LOW_POWER') {
+    vClass = 'skip';
+    const reasons = [cmp.cl_reason, cmp.cr_reason].filter(Boolean).join('/');
+    vText = 'LOW POWER' + (reasons ? ' · ' + reasons : '');
+  }
+  const verdict = `<div class="verdict ${vClass}">${vText} ${arrow}</div>`;
+  return tbl + stats + verdict;
+}
+
+function groupColor(k) { return ['#4fa3ff','#b8b8b8','#f5a524','#3cc08a','#e0555c'][k] || '#666'; }
+
+// -----------------------------------------------------------------------------
+// Mini PCA — small scatter for one L2 envelope, drawn inside an L3 column.
+// Uses the envelope's center window for coords; samples colored by their
+// (Hungarian-aligned-to-focal) cluster label. Tracked samples get a halo +
+// bigger dot so the user can follow them across columns.
+// -----------------------------------------------------------------------------
+function drawMiniPCAEmpty(canvas) {
+  const { ctx, w, h } = fitCanvas(canvas);
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = '#5a6472';
+  ctx.font = '10px ui-monospace, monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('(no envelope)', w / 2, h / 2);
+}
+
+function drawMiniPCA(canvas, l2idx, alignedLabels) {
+  const { ctx, w, h } = fitCanvas(canvas);
+  ctx.clearRect(0, 0, w, h);
+  if (!state.data) return;
+  const d = state.data;
+  const env = d.l2_envelopes[l2idx];
+  if (!env) return;
+
+  // Pick the middle window of the envelope as the "representative" PCA frame.
+  const wMid = Math.round((env._s0 + env._e0) / 2);
+  const { pc1, pc2, sign } = getPC(wMid);
+  const nS = d.n_samples;
+
+  // Range over ALL samples in this single window
+  let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
+  for (let si = 0; si < nS; si++) {
+    const x = pc1[si] * sign, y = pc2[si];
+    if (x < xMin) xMin = x; if (x > xMax) xMax = x;
+    if (y < yMin) yMin = y; if (y > yMax) yMax = y;
+  }
+  const xPad = (xMax - xMin) * 0.08 || 0.01;
+  const yPad = (yMax - yMin) * 0.08 || 0.01;
+  xMin -= xPad; xMax += xPad; yMin -= yPad; yMax += yPad;
+
+  const pad = { l: 8, r: 8, t: 14, b: 14 };
+  const plotW = w - pad.l - pad.r, plotH = h - pad.t - pad.b;
+  const toX = v => pad.l + ((v - xMin) / (xMax - xMin)) * plotW;
+  const toY = v => pad.t + (1 - (v - yMin) / (yMax - yMin)) * plotH;
+
+  // Frame
+  ctx.strokeStyle = '#2a3242';
+  ctx.strokeRect(pad.l + 0.5, pad.t + 0.5, plotW, plotH);
+
+  // Annotate window index used + PC1 sign
+  ctx.fillStyle = '#5a6472';
+  ctx.font = '9px ui-monospace, monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText(`w${wMid + 1}${sign < 0 ? ' (PC1 flipped)' : ''}`, pad.l + 2, pad.t - 2);
+
+  // Determine which labels to use for coloring
+  // Priority: (a) Hungarian-aligned-to-focal labels from caller, else (b) own cluster, else (c) plain
+  let labels = alignedLabels;
+  if (!labels) {
+    const cl = getL2Cluster(l2idx);
+    labels = cl && cl.labels ? cl.labels : null;
+  }
+
+  const trackedSet = new Set(state.tracked);
+  // Non-tracked samples first
+  for (let si = 0; si < nS; si++) {
+    if (trackedSet.has(si)) continue;
+    const x = toX(pc1[si] * sign), y = toY(pc2[si]);
+    // Color mode applies here too. For 'cluster' mode, use the aligned labels
+    // so colors are consistent across the L3 strip (same as before). For
+    // family/ancestry/none, fall through to getSampleColor.
+    let baseCol;
+    if (state.colorMode === 'cluster' && labels && labels[si] != null) {
+      baseCol = ['#4fa3ff', '#b8b8b8', '#f5a524', '#3cc08a', '#e0555c'][labels[si]] || '#888';
+    } else {
+      baseCol = getSampleColor(si, state.colorMode, null);
+    }
+    ctx.fillStyle = withAlpha(baseCol, state.colorMode === 'cluster' ? 0.55 : 0.7);
+    ctx.beginPath(); ctx.arc(x, y, 1.8, 0, Math.PI * 2); ctx.fill();
+  }
+  // Tracked samples on top — colored ring per group + identity dot.
+  // Add CGA labels when there are few tracked samples (else it gets too crowded
+  // for the 110px-tall mini canvas).
+  const showLabels = state.tracked.length > 0 && state.tracked.length <= 8;
+  for (const si of state.tracked) {
+    const x = toX(pc1[si] * sign), y = toY(pc2[si]);
+    if (labels) {
+      const gcol = groupColor(labels[si]);
+      ctx.strokeStyle = gcol; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.fillStyle = trackedColor(si);
+    ctx.strokeStyle = '#0e1116'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(x, y, 2.8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    if (showLabels) {
+      const name = state.data.samples[si].cga || state.data.samples[si].ind;
+      ctx.fillStyle = trackedColor(si);
+      ctx.font = '9px ui-monospace, monospace';
+      ctx.textAlign = 'left';
+      // Text-with-shadow for readability against the bg
+      ctx.strokeStyle = '#0b0e13'; ctx.lineWidth = 2.5;
+      ctx.strokeText(name, x + 5, y + 3);
+      ctx.fillText(name, x + 5, y + 3);
+    }
+  }
+}
+
+// =============================================================================
+// Sidebar info
+// =============================================================================
+function updateSidebarInfo() {
+  const w = state.data.windows[state.cur];
+  document.getElementById('sidebarInfo').innerHTML =
+    `<span class="dim">idx</span> ${state.cur}<br>` +
+    `<span class="dim">Mb </span> ${w.center_mb.toFixed(3)}<br>` +
+    `<span class="dim">|Z|</span> ${fmt(Math.abs(w.z||0))}<br>` +
+    `<span class="dim">λ₁ </span> ${fmt(w.lam1)}<br>` +
+    `<span class="dim">λ₂ </span> ${fmt(w.lam2)}`;
+}
+function updateWinLabel() {
+  const w = state.data.windows[state.cur];
+  document.getElementById('winIdx').textContent = state.cur;
+  document.getElementById('winBp').innerHTML = `· <b>${w.center_mb.toFixed(3)} Mb</b>`;
+}
+
+// =============================================================================
+// setCur — central state mutation, redraws everything
+// =============================================================================
+function setCur(i) {
+  if (!state.data) return;
+  state.cur = Math.max(0, Math.min(state.data.n_windows - 1, i | 0));
+  document.getElementById('scrubber').value = state.cur;
+  updateWinLabel();
+  drawSim(); drawZ(); drawPCA();
+  updateSidebarInfo();
+  renderZoneBlock();
+  renderL3Panel();
+}
+
+// =============================================================================
+// Auto-pick (radial spread, like v2 + a per-group variant)
+// =============================================================================
+function autoPickRadial(n) {
+  if (!state.data) return;
+  if (n == null || !isFinite(n)) n = state.trackedN;
+  n = Math.max(0, Math.min(state.data.n_samples, n | 0));
+  if (n === 0) { state.tracked = []; renderTrackedList(); drawPCA(); renderL3Panel(); return; }
+  const { pc1, pc2, sign } = getPC(state.cur);
+  const N = state.data.n_samples;
+  let mx = 0, my = 0;
+  for (let i = 0; i < N; i++) { mx += pc1[i] * sign; my += pc2[i]; }
+  mx /= N; my /= N;
+  const picks = []; const used = new Set();
+  for (let k = 0; k < n; k++) {
+    const target = (k / n) * Math.PI * 2;
+    let bestI = -1, bestScore = -Infinity;
+    for (let i = 0; i < N; i++) {
+      if (used.has(i)) continue;
+      const dx = pc1[i] * sign - mx, dy = pc2[i] - my;
+      const r = Math.sqrt(dx * dx + dy * dy);
+      const ang = Math.atan2(dy, dx);
+      let dA = Math.abs(ang - target);
+      if (dA > Math.PI) dA = 2 * Math.PI - dA;
+      const score = r - 0.5 * r * (dA / Math.PI);
+      if (score > bestScore) { bestScore = score; bestI = i; }
+    }
+    if (bestI >= 0) { picks.push(bestI); used.add(bestI); }
+  }
+  state.tracked = picks;
+  renderTrackedList();
+  drawPCA();
+  renderL3Panel();
+}
+// Pick N samples from the focal L2's K-means clustering. When `band === 'all'`,
+// distribute across bands proportional to size. When `band` is a numeric K
+// index (0..k-1), pick exclusively from that band's samples (most typical
+// first, then spread across the cluster centroid → periphery).
+function pickFromFocalBand(band) {
+  const curL2 = state.windowToL2 ? state.windowToL2[state.cur] : -1;
+  if (curL2 < 0) { autoPickRadial(state.trackedN); return; }
+  const cl = getL2Cluster(curL2);
+  if (!cl || !cl.labels) { autoPickRadial(state.trackedN); return; }
+  const { pc1, pc2, sign } = getPC(state.cur);
+  const budget = state.trackedN;
+  if (budget === 0) {
+    state.tracked = []; renderTrackedList(); drawPCA(); renderL3Panel(); return;
+  }
+
+  // Helper: pick `want` samples from group `k` spread along distance from centroid
+  function pickInGroup(k, want) {
+    const grp = [];
+    for (let i = 0; i < cl.labels.length; i++) if (cl.labels[i] === k) grp.push(i);
+    if (grp.length === 0) return [];
+    let cxg = 0, cyg = 0;
+    for (const i of grp) { cxg += pc1[i] * sign; cyg += pc2[i]; }
+    cxg /= grp.length; cyg /= grp.length;
+    grp.sort((a, b) => {
+      const da = (pc1[a] * sign - cxg) ** 2 + (pc2[a] - cyg) ** 2;
+      const db = (pc1[b] * sign - cxg) ** 2 + (pc2[b] - cyg) ** 2;
+      return da - db;
+    });
+    const take = Math.min(grp.length, want);
+    const out = [];
+    for (let t = 0; t < take; t++) {
+      const idx = Math.round(t * (grp.length - 1) / Math.max(1, take - 1));
+      if (!out.includes(grp[idx])) out.push(grp[idx]);
+    }
+    return out;
+  }
+
+  let picks = [];
+  if (band === 'all') {
+    // Distribute trackedN across bands proportional to size (with floors)
+    const total_n = cl.labels.length;
+    const perGroup = new Array(state.k);
+    let allocated = 0;
+    for (let k = 0; k < state.k; k++) {
+      const want = Math.max(1, Math.round(budget * cl.n_per_group[k] / total_n));
+      perGroup[k] = Math.min(cl.n_per_group[k], want);
+      allocated += perGroup[k];
+    }
+    let kk = 0;
+    while (allocated > budget && kk < 1000) {
+      const idx = perGroup.indexOf(Math.max(...perGroup));
+      if (idx < 0 || perGroup[idx] <= 1) break;
+      perGroup[idx]--; allocated--; kk++;
+    }
+    for (let k = 0; k < state.k; k++) {
+      for (const si of pickInGroup(k, perGroup[k])) {
+        if (!picks.includes(si)) picks.push(si);
+      }
+    }
+  } else {
+    // Specific band index
+    const k = band | 0;
+    if (k < 0 || k >= state.k) return;
+    picks = pickInGroup(k, budget);
+  }
+  state.tracked = picks.slice(0, budget);
+  renderTrackedList();
+  drawPCA();
+  renderL3Panel();
+}
+
+// Backward-compat alias used in test files
+function autoPickPerGroup() { pickFromFocalBand('all'); }
+
+// Disable band buttons that don't exist for the current K (e.g. band 3 for K=2)
+// and reset to "all bands" if the currently-active button becomes invalid.
+function refreshBandPickBar() {
+  const btns = document.querySelectorAll('#bandPickBar button');
+  let activeStillValid = true;
+  btns.forEach(btn => {
+    const v = btn.dataset.band;
+    if (v === 'all') {
+      btn.disabled = false;
+      return;
+    }
+    const k = parseInt(v, 10);
+    const valid = k >= 0 && k < state.k;
+    btn.disabled = !valid;
+    if (!valid && btn.classList.contains('active')) activeStillValid = false;
+  });
+  if (!activeStillValid) {
+    btns.forEach(b => b.classList.remove('active'));
+    document.querySelector('#bandPickBar button[data-band="all"]').classList.add('active');
+  }
+}
+function clearPicks() {
+  state.tracked = [];
+  renderTrackedList();
+  drawPCA();
+  renderL3Panel();
+}
+function renderTrackedList() {
+  const el = document.getElementById('trackedList');
+  el.innerHTML = '';
+  // Update counters
+  const ci = document.getElementById('trackedCountInfo');
+  const ni = document.getElementById('trackedNInfo');
+  if (ci) ci.textContent = state.tracked.length;
+  if (ni) ni.textContent = state.trackedN;
+  if (!state.data) return;
+  state.tracked.forEach(si => {
+    const s = state.data.samples[si];
+    const chip = document.createElement('span');
+    chip.className = 'tag on';
+    chip.textContent = s.cga || s.ind;
+    chip.onclick = () => {
+      state.tracked = state.tracked.filter(x => x !== si);
+      renderTrackedList(); drawPCA(); renderL3Panel();
+    };
+    el.appendChild(chip);
+  });
+}
+
+// =============================================================================
+// Click handlers
+// =============================================================================
+function onSimClick(evt) {
+  if (!state.data) return;
+  const rect = document.getElementById('simCanvas').getBoundingClientRect();
+  const px = evt.clientX - rect.left;
+  const py = evt.clientY - rect.top;
+  const g = state._simGeom;
+  if (!g) return;
+  // Click outside the heatmap square: ignore
+  if (px < g.x0 || px > g.x1 || py < g.y0 || py > g.y1) return;
+  // Prefer x-axis (horizontal) → window index. The heatmap is symmetric, so
+  // either axis works, but x is the natural "scrub through chromosome" gesture.
+  const frac = (px - g.x0) / g.side;
+  setCur(Math.round(frac * (state.data.n_windows - 1)));
+}
+function onZClick(evt) {
+  if (!state.data) return;
+  const canvas = document.getElementById('zCanvas');
+  const rect = canvas.getBoundingClientRect();
+  const pad = { l: 44, r: 16 };
+  const x = evt.clientX - rect.left;
+  const plotW = rect.width - pad.l - pad.r;
+  const frac = Math.max(0, Math.min(1, (x - pad.l) / plotW));
+  const d = state.data;
+  const mbMin = d.windows[0].center_mb;
+  const mbMax = d.windows[d.n_windows - 1].center_mb;
+  const targetMb = mbMin + frac * (mbMax - mbMin);
+  let bestI = 0, bestD = Infinity;
+  for (let i = 0; i < d.n_windows; i++) {
+    const dd = Math.abs(d.windows[i].center_mb - targetMb);
+    if (dd < bestD) { bestD = dd; bestI = i; }
+  }
+  setCur(bestI);
+}
+function onPCAClick(evt) {
+  if (!state.data) return;
+  const canvas = document.getElementById('pcaCanvas');
+  const rect = canvas.getBoundingClientRect();
+  const px = evt.clientX - rect.left, py = evt.clientY - rect.top;
+  const d = state.data, cur = state.cur;
+  const trailStart = Math.max(0, cur - state.trailN);
+  let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
+  for (let wi = trailStart; wi <= cur; wi++) {
+    const { pc1, pc2, sign } = getPC(wi);
+    const samples = (wi === cur) ? allSampleIdx() : state.tracked;
+    for (const si of samples) {
+      const x = pc1[si] * sign, y = pc2[si];
+      if (x < xMin) xMin = x; if (x > xMax) xMax = x;
+      if (y < yMin) yMin = y; if (y > yMax) yMax = y;
+    }
+  }
+  const xPad = (xMax - xMin) * 0.08 || 0.01, yPad = (yMax - yMin) * 0.08 || 0.01;
+  xMin -= xPad; xMax += xPad; yMin -= yPad; yMax += yPad;
+  const w = rect.width, h = rect.height;
+  const pad = { l: 50, r: 200, t: 32, b: 38 };
+  const plotW = w - pad.l - pad.r, plotH = h - pad.t - pad.b;
+  if (px < pad.l || px > w - pad.r || py < pad.t || py > h - pad.b) return;
+  const toX = v => pad.l + ((v - xMin) / (xMax - xMin)) * plotW;
+  const toY = v => pad.t + (1 - (v - yMin) / (yMax - yMin)) * plotH;
+  const { pc1, pc2, sign } = getPC(cur);
+  let bestI = -1, bestD = Infinity;
+  for (let si = 0; si < d.n_samples; si++) {
+    const x = toX(pc1[si] * sign), y = toY(pc2[si]);
+    const dd = (x - px) * (x - px) + (y - py) * (y - py);
+    if (dd < bestD) { bestD = dd; bestI = si; }
+  }
+  if (bestI >= 0 && bestD < 400) {
+    const i = state.tracked.indexOf(bestI);
+    if (i >= 0) state.tracked.splice(i, 1);
+    else if (state.tracked.length < state.trackedN) state.tracked.push(bestI);
+    renderTrackedList(); drawPCA(); renderL3Panel();
+  }
+}
+function togglePlay() {
+  const btn = document.getElementById('playBtn');
+  if (state.playing) {
+    clearInterval(state.playTimer);
+    state.playing = false;
+    btn.textContent = '▶ Play';
+    btn.classList.remove('playing');
+  } else {
+    state.playing = true;
+    btn.textContent = '❚❚ Pause';
+    btn.classList.add('playing');
+    state.playTimer = setInterval(() => {
+      if (!state.data) return;
+      let next = state.cur + 2;
+      if (next >= state.data.n_windows) next = 0;
+      setCur(next);
+    }, 80);
+  }
+}
+function jumpToValue() {
+  if (!state.data) return;
+  const unit = document.getElementById('jumpUnit').value;
+  const v = parseFloat(document.getElementById('jumpVal').value);
+  if (!isFinite(v)) return;
+  const d = state.data;
+  if (unit === 'win') {
+    // 1-based input -> 0-based index
+    setCur(Math.round(v) - 1);
+    return;
+  }
+  // For Mb / bp: find nearest window center
+  const targetBp = unit === 'mb' ? v * 1e6 : v;
+  let bestI = 0, bestD = Infinity;
+  for (let i = 0; i < d.n_windows; i++) {
+    const w = d.windows[i];
+    const center = (w.start_bp + w.end_bp) / 2;
+    const dd = Math.abs(center - targetBp);
+    if (dd < bestD) { bestD = dd; bestI = i; }
+  }
+  setCur(bestI);
+}
+function jumpL2(direction) {
+  if (!state.data || !state.data.l2_envelopes) return;
+  const cur = state.cur;
+  const sorted = state.data.l2_envelopes
+    .map((e, i) => ({ i, s: e._s0 }))
+    .sort((a, b) => a.s - b.s);
+  if (direction > 0) {
+    for (const it of sorted) if (it.s > cur) { setCur(it.s); return; }
+  } else {
+    for (let i = sorted.length - 1; i >= 0; i--) {
+      if (sorted[i].s < cur) { setCur(sorted[i].s); return; }
+    }
+  }
+}
+function jumpL1(direction) {
+  if (!state.data || !state.data.l1_envelopes) return;
+  const cur = state.cur;
+  const sorted = state.data.l1_envelopes
+    .map((e, i) => ({ i, s: e._s0 }))
+    .sort((a, b) => a.s - b.s);
+  if (direction > 0) {
+    for (const it of sorted) if (it.s > cur) { setCur(it.s); return; }
+  } else {
+    for (let i = sorted.length - 1; i >= 0; i--) {
+      if (sorted[i].s < cur) { setCur(sorted[i].s); return; }
+    }
+  }
+}
+
+// =============================================================================
+// File loading
+// =============================================================================
+function populateSimScales() {
+  const sel = document.getElementById('simScaleSelect');
+  if (!sel) return;
+  sel.innerHTML = '';
+  const d = state.data;
+  if (!d) return;
+  if (d.sim_scales && Object.keys(d.sim_scales).length > 0) {
+    const labels = Object.keys(d.sim_scales);
+    const def = (d.default_sim_scale && d.sim_scales[d.default_sim_scale])
+              ? d.default_sim_scale : labels[0];
+    state.simScale = def;
+    for (const lab of labels) {
+      const opt = document.createElement('option');
+      opt.value = lab; opt.textContent = lab;
+      if (lab === def) opt.selected = true;
+      sel.appendChild(opt);
+    }
+    sel.disabled = false;
+  } else if (d.sim_thumb) {
+    const opt = document.createElement('option');
+    opt.value = '__legacy__'; opt.textContent = '(legacy single scale)';
+    opt.selected = true;
+    sel.appendChild(opt);
+    sel.disabled = true;
+  } else {
+    const opt = document.createElement('option');
+    opt.value = ''; opt.textContent = '(no sim_mat embedded)';
+    sel.appendChild(opt);
+    sel.disabled = true;
+  }
+}
+
+function loadJSON(file) {
+  const reader = new FileReader();
+  document.getElementById('dataStatus').textContent = `Loading ${file.name}...`;
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      state.data = data;
+      state.cur = 0;
+      state.tracked = [];
+      state.ancestryPalette = {};
+      state.l2GroupCache = null;
+      state.cacheKey = null;
+      buildIndexes();
+      computePC1Signs();
+      populateSimScales();
+      buildFamilyPalette();
+      refreshColorModeBar();
+      refreshBandPickBar();
+      document.getElementById('scrubber').max = data.n_windows - 1;
+      document.getElementById('scrubber').disabled = false;
+      const l1c = (data.l1_envelopes || []).length;
+      const l2c = (data.l2_envelopes || []).length;
+      const bc  = (data.l2_boundaries || []).length;
+      const scaleSummary = data.sim_scales && Object.keys(data.sim_scales).length > 0
+        ? `<br><span class="dim">sim scales: ${Object.keys(data.sim_scales).join(', ')} (default: ${state.simScale})</span>`
+        : '';
+      let famSummary = '';
+      if (data.family_source && data.family_source !== 'none') {
+        const nHub = state.hubFamilies.length;
+        const nSmall = state.smallFamilyIds.size;
+        const nSing = state.singletonFamilyIds.size;
+        const src = data.family_source === 'pairs' ? `pairs θ≥${data.theta_cutoff}` : 'natora --family';
+        famSummary = `<br><span class="dim">families (${src}): ${nHub} hubs (n≥4), ${nSmall} small, ${nSing} singletons</span>`;
+      }
+      // Are CGA names available?
+      const sampleNames = data.samples && data.samples[0] && data.samples[0].cga !== data.samples[0].ind ? 'CGA' : 'Ind';
+      // PC2 status — slim precomp typically has no PC2 per-sample, exporter falls back to per-sample jitter
+      const pc2Note = data.has_pc2 === false
+        ? `<br><span class="dim" style="color: var(--accent);">PC2: jittered (slim precomp — no per-sample PC2)</span>`
+        : '';
+      document.getElementById('dataStatus').innerHTML =
+        `<b>${data.chrom}</b><br>${data.n_windows} W · ${data.n_samples} samples (${sampleNames})<br>` +
+        `<span class="dim">L1 envelopes: ${l1c}, L2 envelopes: ${l2c}, L2 peaks: ${bc}</span>` +
+        scaleSummary + famSummary + pc2Note;
+      document.getElementById('headerMeta').innerHTML =
+        `<b>${data.chrom}</b> · <b>${data.n_windows}</b> W · <b>${data.n_samples}</b> samples · ` +
+        `L1=${l1c} · L2=${l2c} · L2 peaks=${bc}`;
+      renderTrackedList();
+      setCur(0);
+    } catch (err) {
+      document.getElementById('dataStatus').textContent = `Error: ${err.message}`;
+      console.error(err);
+    }
+  };
+  reader.readAsText(file);
+}
+
+// =============================================================================
+// Wire up
+// =============================================================================
+const $ = id => document.getElementById(id);
+$('fileInput').addEventListener('change', e => { if (e.target.files[0]) loadJSON(e.target.files[0]); });
+$('scrubber').addEventListener('input', e => setCur(+e.target.value));
+$('playBtn').addEventListener('click', togglePlay);
+// Band-pick button bar
+document.querySelectorAll('#bandPickBar button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#bandPickBar button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const v = btn.dataset.band;
+    if (v === 'all') pickFromFocalBand('all');
+    else pickFromFocalBand(parseInt(v, 10));
+  });
+});
+$('autoPickRadial').addEventListener('click', () => autoPickRadial(state.trackedN));
+$('clearPicks').addEventListener('click', clearPicks);
+$('trackedN').addEventListener('input', e => {
+  state.trackedN = +e.target.value;
+  $('trackedNVal').textContent = state.trackedN;
+  // Trim if currently over the new cap
+  if (state.tracked.length > state.trackedN) {
+    state.tracked = state.tracked.slice(0, state.trackedN);
+  }
+  renderTrackedList();
+  drawPCA();
+  renderL3Panel();
+});
+$('jumpBtn').addEventListener('click', jumpToValue);
+$('jumpVal').addEventListener('keydown', e => { if (e.key === 'Enter') jumpToValue(); });
+$('jumpUnit').addEventListener('change', () => {
+  // Update placeholder
+  const unit = $('jumpUnit').value;
+  const ph = unit === 'mb' ? 'Mb' : (unit === 'win' ? 'window (1-based)' : 'bp');
+  $('jumpVal').placeholder = ph;
+});
+$('jumpToL2').addEventListener('click', () => jumpL2(+1));
+$('jumpPrevL2').addEventListener('click', () => jumpL2(-1));
+$('jumpToL1').addEventListener('click', () => jumpL1(+1));
+$('jumpPrevL1').addEventListener('click', () => jumpL1(-1));
+
+$('simScaleSelect').addEventListener('change', e => {
+  state.simScale = e.target.value;
+  drawSim();
+});
+$('pdfStyle').addEventListener('change', e => {
+  state.pdfStyle = e.target.checked;
+  drawSim();
+});
+
+$('kSelect').addEventListener('change', e => {
+  state.k = +e.target.value;
+  state.l2GroupCache = null; state.cacheKey = null;
+  refreshBandPickBar();
+  drawPCA(); renderZoneBlock(); renderL3Panel();
+});
+$('aggMethod').addEventListener('change', e => {
+  state.aggMethod = e.target.value;
+  state.l2GroupCache = null; state.cacheKey = null;
+  drawPCA(); renderZoneBlock(); renderL3Panel();
+});
+$('mergeThr').addEventListener('input', e => {
+  state.mergeThr = +e.target.value;
+  $('mergeThrVal').textContent = state.mergeThr.toFixed(2);
+  renderL3Panel();
+});
+$('alphaThr').addEventListener('input', e => {
+  state.alpha = +e.target.value;
+  $('alphaThrVal').textContent = state.alpha.toFixed(3);
+  renderL3Panel();
+});
+$('minNGroup').addEventListener('input', e => {
+  state.minNGroup = +e.target.value;
+  $('minNGroupVal').textContent = state.minNGroup;
+  state.l2GroupCache = null; state.cacheKey = null;
+  drawPCA(); renderZoneBlock(); renderL3Panel();
+});
+$('minNWin').addEventListener('input', e => {
+  state.minNWin = +e.target.value;
+  $('minNWinVal').textContent = state.minNWin;
+  state.l2GroupCache = null; state.cacheKey = null;
+  renderZoneBlock(); renderL3Panel();
+});
+
+// Color-mode button bar
+document.querySelectorAll('#colorModeBar button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (btn.disabled) return;
+    document.querySelectorAll('#colorModeBar button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.colorMode = btn.dataset.mode;
+    state.colorByL2 = (state.colorMode === 'cluster');  // legacy alias
+    updateColorModeInfo();
+    drawPCA();
+    renderL3Panel();
+  });
+});
+function updateColorModeInfo() {
+  const el = document.getElementById('colorModeInfo');
+  if (!el) return;
+  let msg = '';
+  switch (state.colorMode) {
+    case 'cluster':
+      msg = 'live K-means group, Hungarian-aligned to focal';
+      break;
+    case 'family':
+      if (state.data && state.data.family_source && state.data.family_source !== 'none') {
+        const src = state.data.family_source === 'pairs'
+          ? `pairs · θ ≥ ${state.data.theta_cutoff}`
+          : 'natora --family';
+        msg = `${src} · ${state.hubFamilies.length} hub families (n≥4)`;
+      } else {
+        msg = 'no family info — run exporter with --pairs or --family';
+      }
+      break;
+    case 'ancestry':
+      msg = state.data ? `${Object.keys(state.ancestryPalette).length} ancestry classes` : 'no data';
+      break;
+    case 'none':
+      msg = 'all samples in neutral grey';
+      break;
+  }
+  el.textContent = msg;
+}
+function refreshColorModeBar() {
+  // Disable buttons that can't be used (e.g. family when no data)
+  const famBtn = document.querySelector('#colorModeBar button[data-mode="family"]');
+  if (famBtn) {
+    const ok = state.data && state.data.family_source && state.data.family_source !== 'none';
+    famBtn.disabled = !ok;
+  }
+  const ancBtn = document.querySelector('#colorModeBar button[data-mode="ancestry"]');
+  if (ancBtn) {
+    // Enabled if at least 2 distinct ancestry values exist
+    const set = new Set();
+    if (state.data && state.data.samples) {
+      for (const s of state.data.samples) set.add(s.ancestry || 'unknown');
+    }
+    ancBtn.disabled = set.size < 2;
+  }
+  // If currently selected mode is now disabled, fall back to cluster
+  const curBtn = document.querySelector(`#colorModeBar button[data-mode="${state.colorMode}"]`);
+  if (curBtn && curBtn.disabled) {
+    document.querySelectorAll('#colorModeBar button').forEach(b => b.classList.remove('active'));
+    const fallback = document.querySelector('#colorModeBar button[data-mode="cluster"]');
+    if (fallback) fallback.classList.add('active');
+    state.colorMode = 'cluster';
+    state.colorByL2 = true;
+  }
+  updateColorModeInfo();
+}
+$('trailOn').addEventListener('change', e => { state.trailOn = e.target.checked; drawPCA(); });
+$('flipPC1').addEventListener('change', e => {
+  state.flipPC1 = e.target.checked;
+  state.l2GroupCache = null; state.cacheKey = null;
+  drawPCA(); renderL3Panel();
+});
+$('trailN').addEventListener('input', e => {
+  state.trailN = +e.target.value;
+  $('trailNVal').textContent = state.trailN;
+  drawPCA();
+});
+
+// ---- Sim panel vertical resize ----
+(function () {
+  const handle = document.getElementById('simResize');
+  if (!handle) return;
+  const mainEl = document.querySelector('main');
+  function applyHeight(h) {
+    state.simPanelH = Math.max(150, Math.min(900, Math.round(h)));
+    if (mainEl) {
+      mainEl.style.gridTemplateRows =
+        `${state.simPanelH}px 100px 1fr 360px 50px`;
+    }
+    if (state.data) drawSim();
+  }
+  let dragging = false, startY = 0, startH = 0;
+  handle.addEventListener('pointerdown', (e) => {
+    dragging = true;
+    startY = e.clientY;
+    startH = state.simPanelH;
+    handle.classList.add('dragging');
+    document.body.classList.add('resizing-sim');
+    handle.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  handle.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    applyHeight(startH + (e.clientY - startY));
+  });
+  function endDrag(e) {
+    if (!dragging) return;
+    dragging = false;
+    handle.classList.remove('dragging');
+    document.body.classList.remove('resizing-sim');
+    try { handle.releasePointerCapture(e.pointerId); } catch (_) {}
+  }
+  handle.addEventListener('pointerup', endDrag);
+  handle.addEventListener('pointercancel', endDrag);
+  // Double-click to reset to default
+  handle.addEventListener('dblclick', () => applyHeight(420));
+})();
+
+$('simCanvas').addEventListener('click', onSimClick);
+$('zCanvas').addEventListener('click', onZClick);
+$('pcaCanvas').addEventListener('click', onPCAClick);
+
+// L3 layout button group
+document.querySelectorAll('#l3Layout button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#l3Layout button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.l3Layout = btn.dataset.layout;
+    renderL3Panel();
+  });
+});
+
+window.addEventListener('keydown', e => {
+  if (!state.data) return;
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  if (e.key === ' ')         { e.preventDefault(); togglePlay(); }
+  else if (e.key === 'ArrowRight') setCur(state.cur + (e.shiftKey ? 20 : 1));
+  else if (e.key === 'ArrowLeft')  setCur(state.cur - (e.shiftKey ? 20 : 1));
+  else if (e.key === 'n' || e.key === 'N') jumpL2(+1);
+  else if (e.key === 'p' || e.key === 'P') jumpL2(-1);
+});
+window.addEventListener('resize', () => {
+  if (state.data) { drawSim(); drawZ(); drawPCA(); renderL3Panel(); }
+});
+
+// Initial blank draw
+drawSim(); drawZ(); drawPCA();
+
+</script>
+</body>
+</html>
