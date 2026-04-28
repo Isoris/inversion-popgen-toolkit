@@ -117,6 +117,11 @@
     background: var(--panel-2); border: 1px solid var(--rule); color: var(--ink);
     padding: 4px 12px; font-family: var(--mono); font-size: 11px;
     border-radius: 3px; cursor: pointer; line-height: 1;
+    /* v3.99 turn 9: enforce single-line button text — was wrapping to 2 lines
+       at narrow viewport widths even though the labels have no \n. The mono
+       font + standard padding forces them to expand horizontally if needed
+       (header is flex with align-items:baseline, no flex-shrink on these). */
+    white-space: nowrap; flex-shrink: 0;
   }
   header #candidateModeBtn[data-active="1"] {
     background: var(--accent); color: #0e1116; border-color: var(--accent);
@@ -136,6 +141,8 @@
     background: var(--panel-2); border: 1px solid var(--rule); color: var(--ink-dim);
     padding: 3px 8px; font-family: var(--mono); font-size: 10px;
     border-radius: 3px; line-height: 1.4;
+    /* v3.99 turn 9: keep "schema v2 · 0 layers" on a single line. */
+    white-space: nowrap; flex-shrink: 0;
   }
   header #schemaBadge.v1 { color: var(--ink-dimmer); }
   header #schemaBadge.v2 { color: var(--good); border-color: var(--good); }
@@ -268,6 +275,16 @@
     z-index: 5; transition: background 120ms, border-color 120ms;
   }
   #sidebarToggleBtn:hover { background: var(--panel-3); border-color: var(--accent); color: var(--ink); }
+  /* v3.99 turn 11: original sidebar collapse arrow now hidden — its job
+     moved to #globalSettingsBtn at the start of the tab bar. The element
+     stays in the DOM because state-management code (applySidebarState,
+     reset-layout) reads/writes its visibility, and other code may also
+     reference it. display:none keeps it out of the layout entirely. */
+  #sidebarToggleBtn { display: none !important; }
+  /* v3.99 turn 11: hover/active state for the global settings gear. */
+  #globalSettingsBtn:hover { background: #9a3412; border-color: #c2410c; }
+  #globalSettingsBtn:active { transform: translateY(1px); }
+  body.light-theme #globalSettingsBtn { color: #fff; }
   .wrap[data-sidebar="collapsed"] #sidebarToggleBtn {
     top: 8px; right: 4px; left: 4px; width: auto;
   }
@@ -404,7 +421,10 @@
       var(--compact-leftpct)
       8px
       1fr;
-    grid-template-rows: 40px 28px 1.5fr auto 1fr 8px var(--compact-l3fr);
+    /* v3.99 turn 9: handle row 8px → 4px (50% height) per Quentin's request.
+       The thinner bar is still grabbable but takes less vertical space; the
+       hover/drag highlight (rgba(245,165,36,0.15)) remains visible. */
+    grid-template-rows: 40px 28px 1.5fr auto 1fr 4px var(--compact-l3fr);
     overflow: hidden;
   }
   body[data-layout-mode="compact"] main#page1 #ctrlBar          { grid-column: 1 / 4; grid-row: 1; }
@@ -455,6 +475,23 @@
   body[data-layout-mode="compact"] main#page1 #compactStackResize.dragging::after {
                                                                    background: var(--accent); }
   body:not([data-layout-mode="compact"]) #compactStackResize { display: none; }
+  /* v3.99 turn 9: when the tracked-samples panel is collapsed via the header
+     arrow, the panel shrinks to its header height (~28px) and the resize
+     handle is hidden — there's nothing useful to drag against. The PCA panel
+     above grows via its existing `flex: 1 1 var(--compact-leftupperpct)`
+     to fill the freed space. flex-grow > 0 is what does the work; we just
+     need to take the tracked panel out of the flex math by setting flex
+     to a fixed-height auto. */
+  body[data-layout-mode="compact"][data-tracked-compact-collapsed="1"]
+    main#page1 #compactLeftStack > #trackedSamplesPanelCompact {
+      flex: 0 0 auto;
+      min-height: 0;
+      overflow: hidden;
+    }
+  body[data-layout-mode="compact"][data-tracked-compact-collapsed="1"]
+    main#page1 #compactLeftStack > #compactStackResize {
+      display: none;
+    }
   body[data-layout-mode="compact"] main#page1 #anchorStripPanel { grid-column: 3; grid-row: 2;
                                                                    min-height: 0; }
   body[data-layout-mode="compact"] main#page1 #zPanel           { grid-column: 3; grid-row: 3;
@@ -520,7 +557,8 @@
   body[data-layout-mode="compact"] main#page1 #compactL3Resize.dragging {
                                                                    background: rgba(245,165,36,0.10); }
   body[data-layout-mode="compact"] main#page1 #compactL3Resize::after {
-                                                                   content: ""; height: 3px; width: 28px;
+                                                                   /* v3.99 turn 9: 3px → 2px to fit the thinner 4px handle row. */
+                                                                   content: ""; height: 2px; width: 28px;
                                                                    background: var(--ink-dimmer);
                                                                    border-radius: 1px;
                                                                    transition: background 100ms; }
@@ -589,10 +627,16 @@
                         padding: 5px 12px; font-family: var(--mono); font-size: 11px;
                         border-radius: 3px; cursor: pointer; }
   #page3 .cat-toolbar button:hover { background: var(--panel-3); }
-  #page3 .cat-toolbar .view-mode-row button { border-radius: 0; border: none;
+  #page3 .cat-toolbar .view-mode-row button,
+  #page3 .cat-toolbar .display-mode-row button {
+                        border-radius: 0; border: none;
                         border-right: 1px solid var(--rule); padding: 5px 14px; }
-  #page3 .cat-toolbar .view-mode-row button:last-child { border-right: none; }
-  #page3 .cat-toolbar .view-mode-row button.active { background: var(--accent);
+  #page3 .cat-toolbar .view-mode-row button:last-child,
+  #page3 .cat-toolbar .display-mode-row button:last-child {
+                        border-right: none; }
+  #page3 .cat-toolbar .view-mode-row button.active,
+  #page3 .cat-toolbar .display-mode-row button.active {
+                        background: var(--accent);
                         color: #0e1116; font-weight: 500; }
   #page3 .cat-toolbar button.export { background: var(--accent); color: #0e1116;
                                        border-color: var(--accent); font-weight: 500; }
@@ -615,6 +659,31 @@
   #page3 table.cat tbody tr { cursor: pointer; }
   #page3 table.cat tbody tr:hover { background: var(--panel-2); }
   #page3 table.cat tbody tr.selected { background: rgba(245,165,36,0.10); }
+  /* v3.99 turn 11: column-flash effect — hovering a header (<th>) highlights
+     all body cells in that column. JS toggles .col-hover on the matching
+     <td>s on mouseenter/leave of the <th>. Tint matches row-hover so the
+     visual rhythm is consistent (panel-2). When a row is selected, the
+     selected accent tint stays on top. */
+  #page3 table.cat tbody td.col-hover { background: var(--panel-2); }
+  /* v3.99 turn 12 ask 2: confirmed-candidate rows get a soft alpha-green
+     background tint + a green left-border accent. The tint is layered with
+     row-hover (panel-2) and selection (gold) so users can see selection +
+     hover state on top of "this is confirmed". The chip showing the
+     candidate ID renders inside the L2 ID cell — see _confirmedChip helper. */
+  #page3 table.cat tbody tr.cand-confirmed { background: rgba(60,192,138,0.06); }
+  #page3 table.cat tbody tr.cand-confirmed td:first-child { border-left: 3px solid rgba(60,192,138,0.55); }
+  #page3 table.cat tbody tr.cand-confirmed:hover { background: rgba(60,192,138,0.10); }
+  #page3 table.cat tbody tr.cand-confirmed.selected { background: rgba(245,165,36,0.10); }
+  /* The check chip itself */
+  .cat-conf-chip {
+    display: inline-block; margin-left: 6px;
+    padding: 1px 5px; border-radius: 3px;
+    background: rgba(60,192,138,0.15); color: #3cc08a;
+    border: 1px solid rgba(60,192,138,0.40);
+    font-family: var(--mono); font-size: 9.5px;
+    vertical-align: middle; line-height: 1.4;
+    letter-spacing: 0.04em;
+  }
   #page3 table.cat td.verdict { font-size: 10px; }
   #page3 table.cat td.verdict.merge { color: #3cc08a; }
   #page3 table.cat td.verdict.separate { color: #e0555c; }
@@ -1726,8 +1795,17 @@
      renders empty even when the parent panel has 700+ px of allocated
      space). overflow:hidden alone doesn't always neutralize this when the
      flex child is also a grid container. */
+  /* v3.99 turn 7 (revised in turn 8): the L3 body is a grid container with
+     dynamic columns set per layout (Focal / +Left / +Right / +L/R / ±2 /
+     Dual). Without an explicit row track, the implicit row sizes to
+     content height — making the .l3-col panes only as tall as their
+     header line (26px in some configurations). Per Quentin's feedback:
+     panes should fill the panel's available height. grid-auto-rows: 1fr
+     makes any row track stretch to fill remaining space; grid-auto-flow:
+     row stays the default. */
   #l3Panel .l3-body { display: grid; flex: 1; overflow: hidden;
-                       min-height: 0; min-width: 0; }
+                       min-height: 0; min-width: 0;
+                       grid-auto-rows: 1fr; }
   .l3-col { border-right: 1px solid var(--rule); overflow-y: auto;
             padding: 6px 10px; font-size: 11.5px; min-width: 0;
             display: flex; flex-direction: column; }
@@ -1920,17 +1998,34 @@
 </header>
 
 <nav id="tabBar">
-  <button data-page="page1" class="active"><span class="num">1</span> diagnostic</button>
-  <button data-page="page2"><span class="num">2</span> candidate focus</button>
+  <!-- v3.99 turn 11: global-settings gear at the leftmost position. Dark
+       orange to stand apart from the regular tab buttons. Same toggle
+       behavior as the original sidebar collapse arrow (which is now
+       hidden via CSS — kept in DOM so state-management code still works).
+       Per Quentin's request: pages shift right; gear takes the upper-left
+       slot of the tab bar. -->
+  <button id="globalSettingsBtn"
+          title="Toggle the parameters sidebar"
+          aria-label="Toggle parameters sidebar"
+          style="background: #c2410c; color: #fff8e7;
+                 border: 1px solid #9a3412; border-radius: 4px;
+                 padding: 0 10px; margin: 4px 12px 4px 0;
+                 font-family: var(--mono); font-size: 14px; line-height: 1;
+                 cursor: pointer; align-self: center;
+                 display: inline-flex; align-items: center; justify-content: center;
+                 height: 24px; min-width: 28px;
+                 transition: background 120ms, border-color 120ms;">⚙</button>
+  <button data-page="page1" class="active" title="Main scrubber: sim_mat heatmap, robust |Z| profile, per-sample PC lines, K-means PCA, L3 contingency tables. Where you do exploratory inversion calling — tune K, lock colors, promote candidates."><span class="num">1</span> diagnostic</button>
+  <button data-page="page2" title="Deep-dive on a single promoted candidate. Multi-panel grid (sim_mini, karyogram, dosage heatmap, ancestry strip, etc.) with prev/next navigation. Toggle 'mark confirmed' here to populate page 9."><span class="num">2</span> candidate focus</button>
   <button data-page="page11" title="Refine each promoted candidate's [start_bp, end_bp] interval into approximate left/right boundary zones using multiple evidence tracks. Auto-propose + manual override (E/F keys)."><span class="num">3</span> boundaries</button>
-  <button data-page="page3"><span class="num">4</span> catalogue</button>
-  <button data-page="page4"><span class="num">5</span> karyotype</button>
-  <button data-page="page6"><span class="num">6</span> popstats</button>
-  <button data-page="page7"><span class="num">7</span> ancestry</button>
-  <button data-page="page8"><span class="num">8</span> windows</button>
-  <button data-page="page9" title="Carousel walk-through of all candidates marked confirmed on page 2"><span class="num">9</span> confirmed</button>
+  <button data-page="page3" title="Sortable, filterable catalogue of all L2 envelopes (or L1-merged inversions). Hover any column header for definition. Export selected rows as TSV or Markdown."><span class="num">4</span> catalogue</button>
+  <button data-page="page4" title="Per-promoted-candidate sample-level karyotype breakdown — which sample carries which K=3 regime (HOMO_1 / HET / HOMO_2)."><span class="num">5</span> karyotype</button>
+  <button data-page="page6" title="Stack of population-genetic tracks (Z, SNP density, BEAGLE uncertainty, coverage, θπ, FST, Hobs/Hexp, ancestry Δ12) aligned to the chromosome. Click chips to toggle visibility."><span class="num">6</span> popstats</button>
+  <button data-page="page7" title="Per-window ancestry view: K-cluster assignment + delta12 confidence heatmap, sample × window. Driven by the ancestry layer in precomp."><span class="num">7</span> ancestry</button>
+  <button data-page="page8" title="Per-window summary table — robust |Z|, λ₁/λ₂, eigenvalue ratio, SNP counts, L1/L2 envelope membership. Filter + sort. Click any row to jump to that window."><span class="num">8</span> windows</button>
+  <button data-page="page9" title="Carousel walk-through of all candidates marked confirmed on page 2."><span class="num">9</span> confirmed</button>
   <button data-page="page10" title="Diagnostic PCR marker panels per candidate. Activates when marker_panel_summary is loaded (phase 13 output)." id="page10TabBtn" style="display: none;"><span class="num">10</span> markers</button>
-  <button data-page="page5"><span class="num">11</span> help</button>
+  <button data-page="page5" title="Help / vocabulary / hotkeys / pipeline diagram."><span class="num">11</span> help</button>
 </nav>
 
 <div class="wrap" id="appWrap">
@@ -2166,11 +2261,15 @@
       <button class="play" id="playBtn">▶ Play</button>
       <input type="range" id="scrubber" min="0" max="0" value="0" step="1" disabled />
       <!-- v3.99 turn 5: viewModeBar moved here from header. Sits between
-           slider and window stats. -->
+           slider and window stats.
+           v3.99 turn 8: added L2 zoom button — shows only the current L2
+           envelope's window range. Useful for fine-grained inspection of
+           a specific L2 candidate without manually zooming. -->
       <span id="viewModeBar"
-            title="View scope for the Z panel + tracks: genome-wide (full chromosome) or L1-zoom (only the current L1 envelope; better for small screens)">
+            title="View scope for the Z panel + tracks: genome (whole chromosome) | L1 zoom (current L1 envelope) | L2 zoom (current L2 envelope only)">
         <button data-viewmode="genome" class="active">🌍 genome</button>
         <button data-viewmode="l1">🔎 L1 zoom</button>
+        <button data-viewmode="l2" title="Zoom to the current L2 envelope only — tightest scope, useful for boundary inspection">🔬 L2 zoom</button>
       </span>
       <div id="winLabel"><span class="dim">window</span>
         <span class="big" id="winIdx">—</span>
@@ -2187,8 +2286,23 @@
 
     <div class="panel" id="zPanel">
       <canvas id="zCanvas"></canvas>
+      <!-- v3.99 turn 9: gear button at lower-left of the Z canvas. Toggles
+           visibility of #zSettingsBox in the toolbar above. Default closed
+           so the canvas waveform is more readable; click to expand. -->
+      <button id="zSettingsToggleBtn" type="button"
+              title="Toggle Z panel settings (color mode / value mode / highlight threshold)"
+              style="position: absolute; left: 6px; bottom: 6px; z-index: 12;
+                     background: var(--panel-2); color: var(--ink-dim);
+                     border: 1px solid var(--rule); border-radius: 3px;
+                     padding: 1px 6px; font-family: var(--mono); font-size: 10px;
+                     cursor: pointer; line-height: 1;">⚙</button>
       <div class="panel-label" id="zPanelLabel">
         <b>Robust |Z|</b> · L1/L2 zone bars + boundary peaks · click to jump
+        <!-- v3.99 turn 9: settings wrapped in a collapsible box. Default
+             hidden — toggled open by #zSettingsToggleBtn at the lower-left
+             of the canvas. Frees toolbar space and makes the |Z| waveform
+             more readable. -->
+        <span id="zSettingsBox" style="display: none; align-items: center; gap: 6px; flex-wrap: wrap;">
         <span style="margin-left: 12px; opacity: 0.85;">color:</span>
         <span id="zColorMode" class="z-toolbar">
           <button data-zcolor="bands"     class="active" title="Banded thresholds (default)">bands</button>
@@ -2208,6 +2322,7 @@
                         font-size: 10.5px; background: var(--panel-2); color: var(--ink);
                         border: 1px solid var(--rule); border-radius: 3px;">
         </span>
+        </span><!-- /#zSettingsBox -->
         <button id="zCollapseBtn" title="Collapse / expand the Z panel"
                 style="margin-left: 8px; background: var(--panel-2); color: var(--ink-dim);
                        border: 1px solid var(--rule); border-radius: 3px;
@@ -2678,11 +2793,29 @@
   <div id="page3" class="page">
     <div class="cat-toolbar">
       <div class="view-mode-row" style="display:flex; gap:0; border:1px solid var(--rule); border-radius:3px; overflow:hidden;">
+        <!-- v3.99 turn 10: two new view buttons left of "L2 raw":
+               ⭐ favorites filter (yellow star) — shows only rows the user has starred
+               L3 view — placeholder for L3-level (sub-L2) catalogue view
+             Per Quentin's request. -->
+        <button id="catViewFav" title="Show only favorited rows (toggle stars in the leftmost column)"
+                style="color: #f5a524;">⭐</button>
+        <button id="catViewL3" title="L3 view — sub-L2 cluster groupings (placeholder; will populate when wired)">L3</button>
         <button id="catViewL2" class="active" title="One row per raw L2 envelope">L2 raw</button>
         <button id="catViewL1" title="L2s merged left-to-right by concord ≥ merge_thr (final-style catalogue)">L1 merged</button>
       </div>
-      <input type="text" id="catFilter" placeholder="filter (id, chr, verdict, family...)" />
-      <select id="catVerdictFilter">
+      <!-- v3.99 turn 12 ask 3: simple/detailed display toggle. Hides
+           parent_l1, silhouette, coherence, fam_purity, cluster_ok, n_windows
+           in 'simple' mode for a cleaner scan. Default 'detailed' (all
+           columns visible). -->
+      <div class="display-mode-row" style="display:flex; gap:0; border:1px solid var(--rule); border-radius:3px; overflow:hidden;">
+        <button id="catDispSimple" title="Hide secondary columns (parent_l1, silhouette, coherence, fam_purity, cluster_ok, n_windows)">simple</button>
+        <button id="catDispDetailed" class="active" title="Show all columns (default)">detailed</button>
+      </div>
+      <input type="text" id="catFilter"
+             placeholder="filter (id, chr, verdict, family...)"
+             title="Free-text filter — matches against L2 ID, chromosome, verdict, parent L1, and other string fields. Substring match, case-insensitive." />
+      <select id="catVerdictFilter"
+              title="Filter rows by σ-band-diagnostics verdict (see σ verdict column tooltip for definitions).">
         <option value="">all verdicts</option>
         <option value="TWO_INVERSIONS">TWO_INVERSIONS</option>
         <option value="CROSSOVER_ARTIFACTS">CROSSOVER_ARTIFACTS</option>
@@ -2690,12 +2823,12 @@
         <option value="NA">NA (K≤3)</option>
         <option value="UNDETERMINED">UNDETERMINED</option>
       </select>
-      <button id="catSelectAll">select all</button>
-      <button id="catClearSel">clear</button>
+      <button id="catSelectAll" title="Select all currently-visible rows (respects active filters).">select all</button>
+      <button id="catClearSel" title="Clear all row selections (does not affect favorites).">clear</button>
       <button id="catViewAsCandidate" class="export" title="Promote the selected interval(s) to provisional candidates and open the first one on page 2 candidate-focus">👁 view as candidate</button>
-      <button id="catExportTSV" class="export">⬇ export TSV</button>
-      <button id="catExportMD" class="export">⬇ export Markdown</button>
-      <span class="sel-info" id="catSelInfo">0 selected of 0</span>
+      <button id="catExportTSV" class="export" title="Export the currently-visible rows (after filter + sort) as a tab-separated file. Includes all visible columns.">⬇ export TSV</button>
+      <button id="catExportMD" class="export" title="Export the currently-visible rows as a Markdown table — handy for pasting into a manuscript or Slack.">⬇ export Markdown</button>
+      <span class="sel-info" id="catSelInfo" title="Live counts of selected rows / visible rows / total rows in the catalogue.">0 selected of 0</span>
     </div>
     <table class="cat" id="catTable">
       <thead><tr id="catHead"></tr></thead>
@@ -2780,39 +2913,45 @@
     <div id="winSumTableWrap" class="winsum-table-wrap" style="display:none;">
       <div class="winsum-table-controls">
         <span class="label">filter by L2:</span>
-        <select id="winSumL2Filter">
+        <select id="winSumL2Filter"
+                title="Restrict the table to windows that fall inside an L2 envelope. 'in any L2' = any of the 48 envelopes; 'in current focal L2' = only the L2 the cursor is currently on (page 1).">
           <option value="">(all windows)</option>
           <option value="in_l2">in any L2 envelope</option>
           <option value="in_focal">in current focal L2</option>
         </select>
         <span class="label" style="margin-left: 12px;">min |Z|:</span>
         <input id="winSumZFilter" type="number" step="0.1" min="0" value="0"
+               title="Hide windows whose |Z| score is below this threshold. 0 = show all. Useful for surfacing only candidate inversion peaks."
                style="width: 60px; padding: 1px 4px; font-family: var(--mono);
                       font-size: 11px; background: var(--panel-2); color: var(--ink);
                       border: 1px solid var(--rule); border-radius: 3px;">
-        <span class="winsum-count" id="winSumCount"></span>
+        <span class="winsum-count" id="winSumCount" title="Live count of windows passing the active filters."></span>
       </div>
       <div class="winsum-table-scroll">
         <table id="winSumTable">
           <thead>
             <tr>
-              <th data-sort="idx" class="sortable">w#</th>
-              <th data-sort="mb" class="sortable">center Mb</th>
+              <th data-sort="idx" class="sortable" title="Window index — 0-based position of this window in the precomp grid. Click to sort.">w#</th>
+              <th data-sort="mb" class="sortable" title="Center of the window in megabases (center_bp / 1e6). Click to sort.">center Mb</th>
               <!-- v3.99 turn 5: per-window SNP stats added per Quentin's request:
                    raw count, span in kb (end_bp - start_bp), and density per kb.
                    span and density use the window boundaries, n_snps comes from
                    the window object (defaults applied when absent, see
-                   WINDOW_DEFAULT_SNPS_FALLBACK). -->
-              <th data-sort="n_snps" class="sortable" title="Number of SNPs in this window (from window.n_snps; falls back to default when missing)">n SNPs</th>
-              <th data-sort="span_kb" class="sortable" title="Window span in kb (end_bp − start_bp) / 1000">span kb</th>
-              <th data-sort="snp_density" class="sortable" title="SNP density: n_snps / span_kb">SNPs / kb</th>
-              <th data-sort="z" class="sortable">|Z|</th>
-              <th data-sort="lam1" class="sortable">λ₁</th>
-              <th data-sort="lam2" class="sortable">λ₂</th>
-              <th data-sort="ratio" class="sortable">λ₁/λ₂</th>
-              <th data-sort="l1" class="sortable">L1</th>
-              <th data-sort="l2" class="sortable">L2</th>
-              <th></th>
+                   WINDOW_DEFAULT_SNPS_FALLBACK).
+                   v3.99 turn 12 ask 4: relabeled to bi-SNPs (the underlying
+                   count is bi-allelic SNPs only — that's the input the local
+                   PCA pipeline runs on). The data field name stays n_snps for
+                   backward compatibility with the existing R-side schema. -->
+              <th data-sort="n_snps" class="sortable" title="Number of bi-allelic SNPs in this window (from window.n_snps; falls back to default when missing). Click to sort.">n bi-SNPs</th>
+              <th data-sort="span_kb" class="sortable" title="Window span in kb: (end_bp − start_bp) / 1000. Click to sort.">span kb</th>
+              <th data-sort="snp_density" class="sortable" title="bi-SNP density: n_snps / span_kb. Window-by-window measure of how SNP-rich the local interval is. Click to sort.">bi-SNPs / kb</th>
+              <th data-sort="z" class="sortable" title="Robust |Z| score for the window — abs(z) where z is computed from the local PCA's leading eigenvalue ratio. High |Z| = strong local PCA structure (candidate inversion signal). Click to sort.">|Z|</th>
+              <th data-sort="lam1" class="sortable" title="First eigenvalue (λ₁) of the local PCA covariance matrix — variance explained by PC1. Higher = more dominant first axis. Click to sort.">λ₁</th>
+              <th data-sort="lam2" class="sortable" title="Second eigenvalue (λ₂) — variance explained by PC2. Click to sort.">λ₂</th>
+              <th data-sort="ratio" class="sortable" title="Eigenvalue ratio λ₁/λ₂ — measure of how dominant PC1 is over PC2. Higher = clearer single-axis structure (typical inversion signature is λ₁ ≫ λ₂). Click to sort.">λ₁/λ₂</th>
+              <th data-sort="l1" class="sortable" title="L1 envelope ID this window belongs to (or empty if outside any L1). L1 = coarse chromosomal block. Click to sort.">L1</th>
+              <th data-sort="l2" class="sortable" title="L2 envelope ID this window belongs to (or empty if outside any L2). L2 = refined sub-block of L1. Click to sort.">L2</th>
+              <th title="Action button column — click 'go' on a row to jump to that window on page 1."></th>
             </tr>
           </thead>
           <tbody id="winSumTableBody"></tbody>
@@ -7804,6 +7943,24 @@ function renderBoundariesPage() {
   const slot = document.getElementById('page11Content');
   if (!slot) return;
   const bs = _ensureBoundariesState();
+  // v3.99 turn 13 ask 1: candidate-nav bar above the existing toolbar. Always
+  // re-rendered so prev/next button state stays in sync. Boundaries page also
+  // has its own #bndCandSelect dropdown, but the prev/next buttons are
+  // faster for stepping through; both stay in sync via _navigateToCandidate.
+  const page11 = document.getElementById('page11');
+  if (page11) {
+    const oldNav = page11.querySelector('.cand-nav-inline');
+    if (oldNav) oldNav.remove();
+    const navBar = _renderCandidateNavInline({ idPrefix: 'bnd' });
+    navBar.style.margin = '12px 32px 0';
+    // Insert AFTER the page11Header so the nav sits between title and content
+    const header = document.getElementById('page11Header');
+    if (header && header.nextSibling) {
+      page11.insertBefore(navBar, header.nextSibling);
+    } else {
+      page11.appendChild(navBar);
+    }
+  }
   // Build toolbar + structure once; populate dynamic parts each time
   if (!slot.__bndBuilt) {
     slot.innerHTML = `
@@ -8845,6 +9002,59 @@ function drawSim() {
     });
   }
 
+  // v3.99 turn 13 ask 2: confirmed candidates render as green-outlined zones
+  // in the sim_mat, with their short ID label on top. The same dark-green
+  // hue used for the catalogue confirmed-row indicator (rgba(60,192,138)).
+  // Each confirmed candidate is drawn as an outlined box spanning its
+  // bp interval, with the candidate ID rendered in dark green just above
+  // the box. Provisional candidates do NOT get this treatment — only
+  // candidates that the user has explicitly marked confirmed.
+  if (Array.isArray(state.candidateList) && state.candidateList.length > 0) {
+    ctx.save();
+    for (const cand of state.candidateList) {
+      if (!cand || !cand.confirmed) continue;
+      // Map bp range to window indices (nearest-neighbor); guard against missing
+      // start_bp / end_bp on malformed candidates.
+      if (!isFinite(cand.start_bp) || !isFinite(cand.end_bp)) continue;
+      let s0 = -1, e0 = -1;
+      for (let wi = 0; wi < d.n_windows; wi++) {
+        const w0 = d.windows[wi];
+        if (!w0) continue;
+        if (s0 < 0 && w0.end_bp >= cand.start_bp) s0 = wi;
+        if (w0.start_bp <= cand.end_bp) e0 = wi;
+      }
+      if (s0 < 0 || e0 < s0) continue;
+      const x0 = toPx(s0), x1 = toPx(e0);
+      const y0 = toPy(s0), y1 = toPy(e0);
+      // Outline + soft-green fill (tint matches catalogue confirmed-row alpha)
+      ctx.strokeStyle = 'rgba(60,192,138,0.85)';
+      ctx.fillStyle   = 'rgba(60,192,138,0.10)';
+      ctx.lineWidth = 1.5;
+      ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+      ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
+      // ID label centered above the top edge. Short form strips chrom prefix
+      // (e.g. "C_gar_LG28_d17L2_0001_03" → "d17L2_0001_03"); falls back to
+      // full ID for non-conventional names.
+      const fullId = String(cand.id || '?');
+      const shortId = fullId.replace(/^[^_]+_[^_]+_[^_]+_/, '');
+      // Position label just above the upper-left corner of the box. If the
+      // box is at the very top of the matrix, render the label INSIDE the
+      // top-left corner instead so it doesn't get clipped above the matrix.
+      const labelY = (y0 - 4 < simY0 + 8) ? y0 + 11 : y0 - 4;
+      ctx.font = 'bold 9.5px ui-monospace, monospace';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'alphabetic';
+      // Background pill so the label is readable over heatmap data.
+      const labelW = ctx.measureText(shortId).width;
+      const padX = 3, padY = 2;
+      ctx.fillStyle = 'rgba(60,192,138,0.18)';
+      ctx.fillRect(x0 - padX, labelY - 9, labelW + padX * 2, 9 + padY);
+      ctx.fillStyle = 'rgba(40,140,90,1.0)';
+      ctx.fillText(shortId, x0, labelY);
+    }
+    ctx.restore();
+  }
+
   // Crosshair (clipped to inside the square)
   const xc = toPx(state.cur), yc = toPy(state.cur);
   ctx.strokeStyle = '#f5a524';
@@ -9062,6 +9272,9 @@ function drawSimMini() {
 // Returns { mbMin, mbMax } reflecting state.viewMode:
 //   'genome' (default) → first..last window center_mb
 //   'l1'              → bounds of the current L1 envelope (expanded slightly)
+//   'l2'              → bounds of the current L2 envelope (expanded slightly)
+//                       — v3.99 turn 8 — tightest scope, useful for L2-level
+//                       inspection. Falls back to L1 then genome if outside.
 // If viewMode is 'l1' but no current L1 envelope exists (e.g. empty data,
 // scrubbing through unenveloped regions), falls back to genome scope.
 function currentMbRange() {
@@ -9072,8 +9285,24 @@ function currentMbRange() {
   const genomeMin = wins[0].center_mb;
   const genomeMax = wins[wins.length - 1].center_mb;
   const mode = state.viewMode || 'genome';
-  if (mode !== 'l1') return { mbMin: genomeMin, mbMax: genomeMax };
-  // L1-zoom mode: clamp to current L1 envelope's window range
+  if (mode === 'genome') return { mbMin: genomeMin, mbMax: genomeMax };
+  // v3.99 turn 8: L2-zoom branch. Same logic as L1 but reads windowToL2 +
+  // l2_envelopes. Falls back to L1-zoom behavior if no current L2 (e.g.
+  // scrubbing in inter-L2 territory).
+  if (mode === 'l2') {
+    const cur = state.cur;
+    const l2i = (state.windowToL2 && cur != null) ? state.windowToL2[cur] : -1;
+    if (l2i != null && l2i >= 0 && Array.isArray(state.data.l2_envelopes)
+        && state.data.l2_envelopes[l2i]) {
+      const e = state.data.l2_envelopes[l2i];
+      const lo = wins[Math.max(0, e._s0)].center_mb;
+      const hi = wins[Math.min(wins.length-1, e._e0)].center_mb;
+      const pad = (hi - lo) * 0.05;
+      return { mbMin: Math.max(genomeMin, lo - pad), mbMax: Math.min(genomeMax, hi + pad) };
+    }
+    // Outside any L2 — try L1 fallback below
+  }
+  // L1-zoom mode (or L2 fallback): clamp to current L1 envelope's window range
   const cur = state.cur;
   const l1i = (state.windowToL1 && cur != null) ? state.windowToL1[cur] : -1;
   if (l1i == null || l1i < 0) {
@@ -9127,25 +9356,35 @@ function drawZ() {
     const mbMin = _mbR.mbMin, mbMax = _mbR.mbMax;
     const toX = (mb) => pad.l + ((mb - mbMin) / (mbMax - mbMin)) * plotW;
     const xOfWin = (wi) => toX(d.windows[wi].center_mb);
-    // L1 zone bars (top half of zoneH, blue)
+    // L1 zone bars (top half of zoneH, deeper blue — v3.99 turn 13 ask 3)
     if (Array.isArray(d.l1_envelopes)) {
       const y0 = pad.t, hzone = zoneH / 2 - 1;
       const curL1 = state.windowToL1 ? state.windowToL1[state.cur] : -1;
       d.l1_envelopes.forEach((e, i) => {
         const x0 = xOfWin(e._s0), x1 = xOfWin(e._e0);
-        ctx.fillStyle = (i === curL1) ? 'rgba(79,163,255,0.85)' : 'rgba(79,163,255,0.35)';
+        ctx.fillStyle = (i === curL1) ? 'rgba(48,116,200,0.95)' : 'rgba(48,116,200,0.50)';
         ctx.fillRect(x0, y0, Math.max(1, x1 - x0), hzone);
       });
+      ctx.fillStyle = 'rgba(48,116,200,0.95)';
+      ctx.font = '9px ui-monospace, monospace';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('L1', pad.l - 4, y0 + hzone / 2);
     }
-    // L2 zone bars (bottom half, green)
+    // L2 zone bars (bottom half, deeper green — v3.99 turn 13 ask 3)
     if (Array.isArray(d.l2_envelopes)) {
       const y0 = pad.t + zoneH / 2 + 1, hzone = zoneH / 2 - 1;
       const curL2 = state.windowToL2 ? state.windowToL2[state.cur] : -1;
       d.l2_envelopes.forEach((e, i) => {
         const x0 = xOfWin(e._s0), x1 = xOfWin(e._e0);
-        ctx.fillStyle = (i === curL2) ? 'rgba(0,230,118,0.95)' : 'rgba(0,230,118,0.45)';
+        ctx.fillStyle = (i === curL2) ? 'rgba(34,160,80,0.95)' : 'rgba(34,160,80,0.50)';
         ctx.fillRect(x0, y0, Math.max(1, x1 - x0), hzone);
       });
+      ctx.fillStyle = 'rgba(34,160,80,0.95)';
+      ctx.font = '9px ui-monospace, monospace';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('L2', pad.l - 4, y0 + hzone / 2);
     }
     // Boundary arrows (just below zone bars)
     if (Array.isArray(d.l2_boundaries)) {
@@ -9224,25 +9463,43 @@ function drawZ() {
   const toY = (z)  => pad.t + zoneH + peaksH + plotH - ((z - zMin) / (zMax - zMin)) * plotH;
   const xOfWin = (wi) => toX(d.windows[wi].center_mb);
 
-  // L1 zone bars (top half of zoneH, blue)
+  // L1 zone bars (top half of zoneH, deeper blue per Quentin's request).
+  // v3.99 turn 13 ask 3: colors darkened to be more legible against the
+  // panel background; old 79,163,255 was washed-out and the inactive band
+  // at 0.35 alpha was nearly invisible. New rgb(48,116,200) is the same hue
+  // family but with more saturation. Active state stays brighter via alpha.
   if (Array.isArray(d.l1_envelopes)) {
     const y0 = pad.t, hzone = zoneH / 2 - 1;
     const curL1 = state.windowToL1 ? state.windowToL1[state.cur] : -1;
     d.l1_envelopes.forEach((e, i) => {
       const x0 = xOfWin(e._s0), x1 = xOfWin(e._e0);
-      ctx.fillStyle = (i === curL1) ? 'rgba(79,163,255,0.85)' : 'rgba(79,163,255,0.35)';
+      ctx.fillStyle = (i === curL1) ? 'rgba(48,116,200,0.95)' : 'rgba(48,116,200,0.50)';
       ctx.fillRect(x0, y0, Math.max(1, x1 - x0), hzone);
     });
+    // v3.99 turn 13 ask 3: "L1" label in the y-axis margin so users can
+    // tell what the blue bar means. Right-aligned to pad.l - 4 so it sits
+    // just inside the bar's left edge.
+    ctx.fillStyle = 'rgba(48,116,200,0.95)';
+    ctx.font = '9px ui-monospace, monospace';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('L1', pad.l - 4, y0 + hzone / 2);
   }
-  // L2 zone bars (bottom half, green)
+  // L2 zone bars (bottom half, deeper green)
   if (Array.isArray(d.l2_envelopes)) {
     const y0 = pad.t + zoneH / 2 + 1, hzone = zoneH / 2 - 1;
     const curL2 = state.windowToL2 ? state.windowToL2[state.cur] : -1;
     d.l2_envelopes.forEach((e, i) => {
       const x0 = xOfWin(e._s0), x1 = xOfWin(e._e0);
-      ctx.fillStyle = (i === curL2) ? 'rgba(0,230,118,0.95)' : 'rgba(0,230,118,0.45)';
+      ctx.fillStyle = (i === curL2) ? 'rgba(34,160,80,0.95)' : 'rgba(34,160,80,0.50)';
       ctx.fillRect(x0, y0, Math.max(1, x1 - x0), hzone);
     });
+    // v3.99 turn 13 ask 3: "L2" label, same pattern as L1
+    ctx.fillStyle = 'rgba(34,160,80,0.95)';
+    ctx.font = '9px ui-monospace, monospace';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('L2', pad.l - 4, y0 + hzone / 2);
   }
 
   // Threshold lines + |Z| points
@@ -9419,8 +9676,16 @@ function drawZ() {
     const x = toX(mb);
     ctx.fillText(mb.toFixed(0), x, pad.t + zoneH + peaksH + plotH + 14);
   }
-  ctx.textAlign = 'right';
-  ctx.fillText(d.chrom + ' (Mb)', pad.l + plotW, h - 4);
+  // v3.99 turn 13 ask 5: chromosome name + "(Mb)" label moved from the
+  // right edge to the left edge of the X-axis. At the right edge it was
+  // colliding with the rightmost mb tick label (e.g. "20") because the
+  // tick labels are textAlign:center but anchored at the tick's x and the
+  // chrom label was textAlign:right anchored at pad.l + plotW — same
+  // pixel for the last tick, so they overlapped. Anchor at pad.l with
+  // textAlign:left places the label where there's safely empty space
+  // below the y-axis "Z" letter.
+  ctx.textAlign = 'left';
+  ctx.fillText(d.chrom + ' (Mb)', pad.l, h - 4);
 
   // Current cursor
   const xCur = toX(d.windows[state.cur].center_mb);
@@ -9780,6 +10045,12 @@ function buildLinesPanelCheckboxes() {
     // Keep PC labels short ('PC1'); GHSL labels readable ('het', 'div_s50')
     if (/^pc[1-4]$/.test(src)) {
       span.textContent = src.toUpperCase();
+      // v3.99 turn 13 ask 4: per-PC tooltip explaining --npc availability so
+      // the verbose visible note can be hidden. The text is built once we
+      // know `avail.length` and `sources.length`, so we set the title
+      // attribute on each PC label after the loop. For now, leave a
+      // placeholder; the tooltip is patched below.
+      lab.dataset.pcTooltip = '1';
     } else if (src === 'het') {
       span.textContent = 'het';
     } else if (/^ghsl_div_s\d+$/.test(src)) {
@@ -9791,17 +10062,34 @@ function buildLinesPanelCheckboxes() {
     wrap.appendChild(lab);
   }
 
-  // Note about availability
-  const note = document.getElementById('linesYsourceNote');
-  if (note) {
+  // v3.99 turn 13 ask 4: build the npc-availability text once, then attach it
+  // as a tooltip to every PC label (instead of a separate visible inline note
+  // that pushed the toolbar to wrap onto a second line). The visible
+  // #linesYsourceNote span is now hidden via display:none — kept in DOM so
+  // older code paths that reference it don't crash.
+  let npcTooltip = '';
+  {
     const ghslExtras = sources.length - avail.length;
     if (ghslExtras > 0) {
-      note.textContent = `${avail.length} PCs · ${ghslExtras} GHSL sources`;
+      npcTooltip = `${avail.length} PCs · ${ghslExtras} GHSL sources in this dataset`;
     } else {
-      note.textContent = avail.length <= 2
-        ? `${avail.length} PCs (run with --npc 4 for more)`
+      npcTooltip = avail.length <= 2
+        ? `${avail.length} PCs in this dataset (run with --npc 4 for more)`
         : `${avail.length} PCs available`;
     }
+  }
+  wrap.querySelectorAll('label[data-pc-tooltip]').forEach(lab => {
+    lab.title = npcTooltip;
+  });
+
+  // Note about availability — v3.99 turn 13 ask 4: hidden by default. The
+  // text is now in the per-PC label tooltips above. Element kept so the
+  // initial-render code path at line ~19842 (which sets a different message
+  // pre-buildLinesPanel) still finds the node without erroring.
+  const note = document.getElementById('linesYsourceNote');
+  if (note) {
+    note.textContent = '';
+    note.style.display = 'none';
   }
 }
 
@@ -10234,6 +10522,14 @@ function setLinesLassoActive(b) {
   });
 })();
 
+// v3.99 turn 7 perf: invalidate per-source y-matrix cache. Called by data
+// loaders + sign-flip toggles + anything that changes lines panel inputs.
+// state.__linesCache is keyed by source name; clearing the whole map is
+// fine — the cache rebuilds lazily on the next draw.
+function _linesCacheInvalidate() {
+  state.__linesCache = {};
+}
+
 function drawLinesPanel() {
   if (!state.data) return;
   const container = document.getElementById('linesCanvasContainer');
@@ -10288,34 +10584,89 @@ function drawLinesPanel() {
       continue;
     }
 
-    // Compute Y range across all samples and all windows for this source
-    let yMin = Infinity, yMax = -Infinity;
-    let validData = false;
-    for (let gi = 0; gi < nGrid; gi++) {
-      const vals = getLinesValuesAt(gi, source);
-      if (!vals) continue;
-      const sign = getLinesSignAt(gi, source);
-      for (let si = 0; si < nS; si++) {
-        const v = vals[si] * sign;
-        if (!isFinite(v)) continue;
-        if (v < yMin) yMin = v;
-        if (v > yMax) yMax = v;
-        validData = true;
+    // v3.99 turn 7 perf: per-source cache for the expensive y-matrix +
+    // y-bounds + x-by-grid. None of these depend on state.cur — they're
+    // pure functions of (source data, source sign, plotW, plotH, mb range,
+    // pad). On window-by-window stepping the inputs don't change, so we
+    // can reuse the entire computation. Cache key includes everything that
+    // affects the values; on cache hit we just re-stroke the polylines on
+    // top of the freshly cleared canvas.
+    if (!state.__linesCache) state.__linesCache = {};
+    const cacheKey = [
+      'v1',
+      source,
+      nGrid,
+      mbMin.toFixed(6), mbMax.toFixed(6),
+      plotW, plotH,
+      pad.l, pad.r, pad.t, pad.b,
+      // sign array is per-grid-step; the data it derives from rarely
+      // changes during stepping, but include a coarse marker so flips
+      // (sign-align toggle) invalidate. state.flipPC1 controls whether
+      // the per-window sign-flip is applied to the PC1 source.
+      state.flipPC1 ? 'sa' : '',
+      // data identity — if the user loads a different chromosome the cache
+      // must miss
+      state.data && state.data.chrom ? state.data.chrom : '',
+    ].join('|');
+    let cached = state.__linesCache[source];
+    if (!cached || cached._key !== cacheKey) {
+      // Compute Y range across all samples and all windows for this source
+      let yMin = Infinity, yMax = -Infinity;
+      let validData = false;
+      for (let gi = 0; gi < nGrid; gi++) {
+        const vals = getLinesValuesAt(gi, source);
+        if (!vals) continue;
+        const sign = getLinesSignAt(gi, source);
+        for (let si = 0; si < nS; si++) {
+          const v = vals[si] * sign;
+          if (!isFinite(v)) continue;
+          if (v < yMin) yMin = v;
+          if (v > yMax) yMax = v;
+          validData = true;
+        }
       }
+      if (!validData) {
+        // Source not present — render an info message (not cached)
+        ctx.fillStyle = themeColor('dim');
+        ctx.font = '12px ui-monospace, monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(`(${source.toUpperCase()} not available in this dataset)`, w / 2, h / 2);
+        continue;
+      }
+      const yPad = (yMax - yMin) * 0.05 || 0.01;
+      yMin -= yPad; yMax += yPad;
+      const toY = (v) => pad.t + plotH - ((v - yMin) / (yMax - yMin)) * plotH;
+      const xByGrid = new Float32Array(nGrid);
+      for (let gi = 0; gi < nGrid; gi++) {
+        xByGrid[gi] = pad.l + ((mbAt(gi) - mbMin) / (mbMax - mbMin)) * plotW;
+      }
+      const yMatrix = new Array(nS);
+      for (let si = 0; si < nS; si++) {
+        const arr = new Float32Array(nGrid);
+        for (let i = 0; i < nGrid; i++) arr[i] = NaN;
+        yMatrix[si] = arr;
+      }
+      for (let gi = 0; gi < nGrid; gi++) {
+        const vals = getLinesValuesAt(gi, source);
+        if (!vals) continue;
+        const sign = getLinesSignAt(gi, source);
+        for (let si = 0; si < nS; si++) {
+          const v = vals[si] * sign;
+          if (isFinite(v)) yMatrix[si][gi] = toY(v);
+        }
+      }
+      cached = { _key: cacheKey, yMin, yMax, xByGrid, yMatrix };
+      state.__linesCache[source] = cached;
     }
-    if (!validData) {
-      // Source not present — render an info message
-      ctx.fillStyle = themeColor('dim');
-      ctx.font = '12px ui-monospace, monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText(`(${source.toUpperCase()} not available in this dataset)`, w / 2, h / 2);
-      continue;
-    }
-    const yPad = (yMax - yMin) * 0.05 || 0.01;
-    yMin -= yPad; yMax += yPad;
-
+    const yMin = cached.yMin;
+    const yMax = cached.yMax;
+    const xByGrid = cached.xByGrid;
+    const yMatrix = cached.yMatrix;
+    // toY still defined for downstream cursor-overlay code that needs to
+    // forward-map a y value not in the cache (rare — kept for compatibility
+    // with the geometry stash + click-inspect popover).
+    const toY = (v) => pad.t + plotH - ((v - yMin) / (yMax - yMin)) * plotH;
     const toX = (mb) => pad.l + ((mb - mbMin) / (mbMax - mbMin)) * plotW;
-    const toY = (v)  => pad.t + plotH - ((v - yMin) / (yMax - yMin)) * plotH;
 
     // v3.87: stash this sub-canvas's geometry on state so the click-inspect
     // popover can forward-map per-sample values into canvas y to find the
@@ -10352,28 +10703,10 @@ function drawLinesPanel() {
       ctx.stroke();
     }
 
-    // X positions per grid step (used for line drawing)
-    const xByGrid = new Float32Array(nGrid);
-    for (let gi = 0; gi < nGrid; gi++) xByGrid[gi] = toX(mbAt(gi));
-
-    // Pre-compute Y by sample × grid for this source (one pass).
-    // NaN-safe: Float32Array initializes to 0; we mark missing entries
-    // with NaN explicitly so the line code can break the path on gaps.
-    const yMatrix = new Array(nS);
-    for (let si = 0; si < nS; si++) {
-      const arr = new Float32Array(nGrid);
-      for (let i = 0; i < nGrid; i++) arr[i] = NaN;
-      yMatrix[si] = arr;
-    }
-    for (let gi = 0; gi < nGrid; gi++) {
-      const vals = getLinesValuesAt(gi, source);
-      if (!vals) continue;
-      const sign = getLinesSignAt(gi, source);
-      for (let si = 0; si < nS; si++) {
-        const v = vals[si] * sign;
-        if (isFinite(v)) yMatrix[si][gi] = toY(v);
-      }
-    }
+    // v3.99 turn 7 perf: xByGrid + yMatrix were previously built here on
+    // every draw. They're now provided by state.__linesCache[source] above
+    // (rebuilt only when inputs change). Helpers below (strokeSamplePath,
+    // strokeSamplePathStyled) close over the cached references.
 
     // Helper to stroke a polyline with NaN gap handling
     function strokeSamplePath(si) {
@@ -10443,12 +10776,51 @@ function drawLinesPanel() {
     }
 
     // Draw untracked first as a single batched stroke per sample (cheap)
-    ctx.lineWidth = 0.6;
-    ctx.strokeStyle = 'rgba(180,190,210,0.10)';
-    for (let si = 0; si < nS; si++) {
-      if (trackedSet.has(si)) continue;
-      strokeSamplePath(si);
+    // v3.99 turn 8 perf: the untracked-gray cloud (~200-220 polylines × nGrid
+    // segments) is a pure function of (yMatrix, xByGrid, trackedSet, w, h).
+    // None of those depend on state.cur. Cache an offscreen canvas with the
+    // pre-stroked cloud and blit it on each frame instead of re-stroking.
+    // Cache key includes the trackedSet hash since picking a sample to track
+    // moves it from the untracked-gray bucket to the colored-overlay bucket.
+    let trackedHashLocal = 0;
+    for (const si of trackedSet) trackedHashLocal += si | 0;
+    trackedHashLocal = (trackedHashLocal * 31) ^ (trackedSet.size << 16);
+    const overlayCacheKey = cacheKey + '|tr=' + trackedHashLocal + '|wh=' + w + 'x' + h;
+    if (!cached.bgCanvas || cached.bgCanvasKey !== overlayCacheKey) {
+      // (Re)build offscreen canvas. Use a plain canvas (matches main 2D
+      // context) sized to the visible CSS pixels of the live canvas — so
+      // drawImage maps 1:1 without scaling artifacts.
+      const off = (typeof OffscreenCanvas !== 'undefined')
+        ? new OffscreenCanvas(Math.max(1, w | 0), Math.max(1, h | 0))
+        : (function() {
+            const c = document.createElement('canvas');
+            c.width = Math.max(1, w | 0);
+            c.height = Math.max(1, h | 0);
+            return c;
+          })();
+      const offCtx = off.getContext('2d');
+      offCtx.lineWidth = 0.6;
+      offCtx.strokeStyle = 'rgba(180,190,210,0.10)';
+      for (let si = 0; si < nS; si++) {
+        if (trackedSet.has(si)) continue;
+        const ys = yMatrix[si];
+        let started = false;
+        offCtx.beginPath();
+        for (let gi = 0; gi < nGrid; gi++) {
+          const y = ys[gi];
+          if (!isFinite(y)) { started = false; continue; }
+          const x = xByGrid[gi];
+          if (!started) { offCtx.moveTo(x, y); started = true; }
+          else { offCtx.lineTo(x, y); }
+        }
+        offCtx.stroke();
+      }
+      cached.bgCanvas = off;
+      cached.bgCanvasKey = overlayCacheKey;
     }
+    // Blit the pre-rendered untracked cloud (single drawImage call instead
+    // of ~220 strokes × nGrid segments). Massive speedup on stepping.
+    ctx.drawImage(cached.bgCanvas, 0, 0);
 
     // v3.76: Lasso mode for the PC1 sub-canvas — suppress tracked-color so
     // the user can pick fresh by trajectory. Tracked samples still render but
@@ -11831,6 +12203,84 @@ function alignedLabelsTo(focalIdx, neighborIdx) {
   return a.aligned;
 }
 
+// v3.99 turn 7 perf: L3 panel render cache.
+//
+// renderL3Panel() is called on every setCur(), but the panes only change when
+// the focal L2 envelope or one of the rendering settings changes. Within a
+// single L2, stepping window-by-window doesn't affect the L3 content at all
+// — it's all envelope-level clustering. The cache short-circuits the rebuild
+// in that common case (~50ms saved per same-L2 step on ~5-pane layouts).
+//
+// Fingerprint covers EVERY input that affects pane rendering:
+//   - curL2 (the focal envelope)
+//   - state.l3Layout (Focal / +Left / +Right / +L/R / ±2 / Dual)
+//   - state.l3ColorMode (shared/unique/dual)
+//   - state.l3KMode (k3/k6/both)
+//   - state.k, state.aggMethod, state.mergeThr, state.alpha, state.minNGroup
+//   - state.lockedLabels (color lock)
+//   - state.l3Detailed
+//   - state.secondaryL2 (for dual layout)
+//   - state.candidateMode + draft fingerprint (for the gold border + banner)
+//   - state.tracked.length + tracked-set hash (for detailed readout)
+//   - state.bcScope (band-continuity scope)
+//   - state.compareUnit (slab mode early-out happens before this anyway,
+//     but include for safety so a transition into/out of L2 mode invalidates)
+//
+// Callers that mutate any of these settings should call _l3CacheInvalidate()
+// before renderL3Panel(), or pass options that aren't part of the fingerprint
+// — but the fingerprint covers everything visible in the pane DOM, so for
+// most callers it's enough to call renderL3Panel() and rely on automatic
+// cache miss when the settings change.
+function _renderL3Fingerprint(curL2) {
+  // Hash tracked samples cheaply: sum of indices + length is enough to
+  // detect any change to the set (collisions vanishingly rare in practice
+  // and a false-cache-hit just shows the previous detailed readout for
+  // one render — corrected on the next state change).
+  let trackedHash = 0;
+  if (Array.isArray(state.tracked)) {
+    for (let i = 0; i < state.tracked.length; i++) trackedHash += state.tracked[i] | 0;
+    trackedHash = (trackedHash * 31) ^ (state.tracked.length << 16);
+  }
+  // Draft fingerprint: anchor + span + verdict (warning flag changes border)
+  let draftFp = '';
+  if (state.candidateMode && state.l3Draft) {
+    const dr = state.l3Draft;
+    draftFp = `${dr.focal_l2idx}|${dr.l2_left}|${dr.l2_right}|${dr.has_warning ? 1 : 0}|${dr.verdict || ''}`;
+  }
+  return [
+    curL2,
+    state.l3Layout || '',
+    state.l3ColorMode || '',
+    state.l3KMode || '',
+    state.compareUnit || 'L2',
+    state.k | 0,
+    state.aggMethod || '',
+    (state.mergeThr || 0).toFixed(3),
+    (state.alpha || 0).toFixed(4),
+    state.minNGroup | 0,
+    state.lockedLabels ? 'L' : '',
+    state.l3Detailed ? 'D' : '',
+    state.secondaryL2 != null ? state.secondaryL2 : '',
+    state.candidateMode ? 'CM' : '',
+    draftFp,
+    trackedHash,
+    state.bcScope || '',
+    // state.cacheKey changes whenever the L2 cluster cache is invalidated
+    // (callers set it to null then rebuild). Including it here means any
+    // clustering-parameter change automatically forces an L3 re-render
+    // without needing 9 explicit _l3CacheInvalidate() calls.
+    state.cacheKey || '',
+  ].join('::');
+}
+
+// Force the next renderL3Panel() to actually rebuild, bypassing the cache.
+// Called by code paths that mutate state in ways the fingerprint can't track
+// (e.g. invalidating cluster caches, schema reloads, layout-mode changes).
+function _l3CacheInvalidate() {
+  state._l3CacheFp = null;
+  state._l3CacheRendered = false;
+}
+
 function renderL3Panel() {
   const d = state.data;
   if (!d) return;
@@ -11843,8 +12293,23 @@ function renderL3Panel() {
     return renderL3PanelSlab();
   }
 
+  // v3.99 turn 7 perf: short-circuit when nothing that affects pane content
+  // has changed since the last render. The L3 panes are a pure function of
+  // (curL2, layout, color mode, K mode, K, agg, merge τ, α, min n/grp,
+  //  lockedLabels, l3Detailed, secondaryL2, candidate-draft state, tracked
+  //  samples for the detailed readout, bcScope). state.cur within the same
+  //  L2 doesn't affect anything — the panes show envelope-level clusters,
+  //  not cursor-relative state. Skipping the rebuild on same-L2 steps avoids
+  //  ~5 mini-PCA canvas redraws + the DOM teardown of body.innerHTML='' +
+  //  full pane reconstruction. Big payoff for window-by-window scrubbing.
   const cur = state.cur;
   const curL2 = state.windowToL2 ? state.windowToL2[cur] : -1;
+  const fp = _renderL3Fingerprint(curL2);
+  if (state._l3CacheFp === fp && state._l3CacheRendered === true) {
+    return;   // same render — DOM unchanged
+  }
+  state._l3CacheFp = fp;
+  state._l3CacheRendered = true;
 
   const layoutKey = state.l3Layout || 'leftright';
   const layout = L3_LAYOUTS[layoutKey] || L3_LAYOUTS.leftright;
@@ -14991,6 +15456,12 @@ function applyData(data) {
   // Load saved candidate list for this chromosome from localStorage.
   // Each chromosome has its own list (cross-chrom labels are meaningless).
   if (typeof loadCandidateList === 'function') loadCandidateList();
+  // v3.99 turn 10: load saved catalogue favorites for this chromosome.
+  // catState may not exist yet at very first call (it's defined later in the
+  // file), so guard with typeof.
+  if (typeof catState !== 'undefined' && typeof _loadCatFavorites === 'function') {
+    catState.favorites = _loadCatFavorites();
+  }
   // Load saved view controls (PCA axis selection etc.) and reconcile against
   // the data we just loaded — drops PC3/PC4 if not available, keeps PC1×PC2.
   loadViewControls();
@@ -15000,6 +15471,9 @@ function applyData(data) {
   state.ancestryPalette = {};
   state.l2GroupCache = null;
   state.cacheKey = null;
+  // v3.99 turn 7 perf: clear render caches whenever a new dataset loads
+  if (typeof _l3CacheInvalidate === 'function') _l3CacheInvalidate();
+  if (typeof _linesCacheInvalidate === 'function') _linesCacheInvalidate();
   buildIndexes();
   computePC1Signs();
   populateSimScales();
@@ -15067,10 +15541,29 @@ function applyData(data) {
   setCur(0);
 }
 
+// v3.99 turn 10: distinguish chromosome JSONs from auxiliary JSONs (e.g.
+// catfish_226_relatedness) that get dropped onto the file picker. Chromosome
+// JSONs MUST have a positive integer n_windows AND an Array `windows` field
+// — auxiliaries lack one or both. Without this guard the dropdown shows
+// entries like "catfish_226_relatedness (undefined W)" which can't actually
+// be loaded as chromosomes (no scrubber, no L2/L3 envelopes).
+function _isChromosomeJSON(data) {
+  return !!(
+    data &&
+    typeof data.n_windows === 'number' &&
+    data.n_windows > 0 &&
+    Array.isArray(data.windows) &&
+    data.windows.length > 0
+  );
+}
+
 function refreshChromSelect() {
   const sel = document.getElementById('chromSelect');
   if (!sel) return;
-  const keys = Array.from(_chromCache.keys()).sort();
+  // v3.99 turn 10: only chromosomes — filter out auxiliary JSONs
+  const keys = Array.from(_chromCache.keys())
+    .filter(k => _isChromosomeJSON(_chromCache.get(k)))
+    .sort();
   sel.innerHTML = '';
   if (keys.length === 0) {
     sel.innerHTML = '<option value="">— none loaded —</option>';
@@ -15107,10 +15600,12 @@ function loadJSON(file) {
 }
 
 function loadMultipleJSONs(files) {
-  // Sequentially load all selected files; activate the first one.
+  // Sequentially load all selected files; activate the first chromosome JSON
+  // (auxiliary files like relatedness are kept in cache but not displayed).
   const arr = Array.from(files);
   if (arr.length === 0) return;
   let i = 0;
+  let displayedFirst = false;
   const next = () => {
     if (i >= arr.length) return;
     const f = arr[i++];
@@ -15121,7 +15616,13 @@ function loadMultipleJSONs(files) {
         const chrom = data.chrom || f.name.replace(/\.json$/, '');
         data.chrom = chrom;
         _chromCache.set(chrom, data);
-        if (i === 1) applyData(data);   // Show the first one
+        // v3.99 turn 10: only auto-display chromosome JSONs. Auxiliary JSONs
+        // (relatedness, etc.) populate the cache but don't get displayed
+        // — they have no scrubber/envelopes/etc and would crash applyData.
+        if (!displayedFirst && _isChromosomeJSON(data)) {
+          applyData(data);
+          displayedFirst = true;
+        }
         refreshChromSelect();
       } catch (err) { console.error('Failed to parse', f.name, err); }
       next();
@@ -15303,13 +15804,28 @@ if (_clearPicksCompact2) _clearPicksCompact2.addEventListener('click', () => {
 });
 // v3.99 turn 4: tracked-samples panel header collapse arrow. Toggles the
 // body's display between flex and none; persists across reloads.
+// v3.99 turn 9: also toggles a body attribute so CSS can shrink the panel
+// to header-only height and hide the now-meaningless resize handle. With
+// flex: 0 0 auto on the tracked panel, the PCA panel's flex-grow takes
+// over and fills the freed space.
 const _TRACKED_COMPACT_COLLAPSED_KEY = 'pca_scrubber_v3.trackedCompactCollapsed';
 function _applyTrackedCompactCollapsed(collapsed) {
   const body = document.getElementById('trackedSamplesPanelCompactBody');
   const arrow = document.getElementById('trackedSamplesPanelCompactArrow');
   if (body) body.style.display = collapsed ? 'none' : 'flex';
   if (arrow) arrow.textContent = collapsed ? '▶' : '▼';
+  if (document.body) {
+    if (collapsed) document.body.setAttribute('data-tracked-compact-collapsed', '1');
+    else           document.body.removeAttribute('data-tracked-compact-collapsed');
+  }
   try { localStorage.setItem(_TRACKED_COMPACT_COLLAPSED_KEY, collapsed ? '1' : '0'); } catch (_) {}
+  // v3.99 turn 9: nudge a redraw so PCA picks up its new height. The
+  // ResizeObserver from turn 2 should fire automatically when the flex
+  // children resize, but call drawPCA explicitly for immediate feedback
+  // (no waiting for the next rAF).
+  if (typeof drawPCA === 'function') {
+    requestAnimationFrame(() => { try { drawPCA(); } catch (_) {} });
+  }
 }
 const _trackedCompactHead = document.getElementById('trackedSamplesPanelCompactHead');
 if (_trackedCompactHead) {
@@ -17105,10 +17621,29 @@ function wireCandidateNav(c) {
     confirmBtn.addEventListener('click', () => {
       // Mutate active candidate's confirmed flag
       c.confirmed = !c.confirmed;
-      // If this candidate is in the saved list, mutate that copy too
-      const inList = state.candidateList.find(x => x.id === c.id);
+      // v3.99 turn 12 fix: if the candidate isn't in the saved list yet (e.g.
+      // it was opened via catalogue "view as candidate" without explicit save),
+      // auto-add it now when the user confirms. Without this, "mark confirmed"
+      // had no effect on the saved list — the page-9 confirmed walkthrough
+      // would never see the candidate. We only auto-add on confirm=true; on
+      // un-confirm of an unsaved candidate we keep the list untouched (the
+      // user clearly never wanted this in the list).
+      let inList = state.candidateList.find(x => x.id === c.id);
+      if (!inList && c.confirmed) {
+        // Snapshot mirrors the page-2 list-toggle path
+        const snapshot = candidateFromJSON(candidateToJSON(c));
+        snapshot.confirmed = true;
+        addCandidateToList(snapshot);
+        inList = state.candidateList.find(x => x.id === c.id);
+      }
+      // Mirror the flag onto the saved copy
       if (inList) inList.confirmed = c.confirmed;
       persistCandidateList();
+      // v3.99 turn 12: refresh the catalogue so the new ✓ green tint + ID
+      // chip on confirmed rows reflects the change immediately. Cheap re-render.
+      if (typeof renderCatalogue === 'function') {
+        try { renderCatalogue(); } catch (_) {}
+      }
       // v3.56: if we're in confirmed-only mode (page 8) and the user just
       // UN-confirmed the current candidate, it disappears from the navigation.
       // Advance to the next confirmed candidate, or show the empty state if
@@ -17158,6 +17693,138 @@ function _navigateToCandidate(targetCand) {
   state.candidate = candidateFromJSON(candidateToJSON(targetCand));
   refreshCandidateUI();
   refreshCandidateListUI();
+  // v3.99 turn 13 ask 1: also center the scrubber cursor on the candidate's
+  // middle window so popstats / ancestry / boundaries pages reflect the
+  // navigation when the user is viewing them. setCur is defined later in
+  // the file; guard with typeof.
+  if (typeof setCur === 'function' && targetCand && state.data && state.data.windows) {
+    const wins = state.data.windows;
+    // Find window indices that bracket the candidate's bp interval, take midpoint
+    let s0 = 0, e0 = wins.length - 1;
+    for (let i = 0; i < wins.length; i++) {
+      if (wins[i].start_bp >= targetCand.start_bp) { s0 = i; break; }
+    }
+    for (let i = wins.length - 1; i >= 0; i--) {
+      if (wins[i].end_bp <= targetCand.end_bp) { e0 = i; break; }
+    }
+    const mid = Math.max(0, Math.min(wins.length - 1, Math.floor((s0 + e0) / 2)));
+    try { setCur(mid); } catch (_) {}
+  }
+  // Refresh popstats / ancestry / boundaries IF currently visible
+  if (typeof renderPopstatsPage === 'function') {
+    try { renderPopstatsPage(); } catch (_) {}
+  }
+  if (typeof renderAncestryPage === 'function') {
+    try { renderAncestryPage(); } catch (_) {}
+  }
+  if (typeof renderBoundariesPage === 'function') {
+    try { renderBoundariesPage(); } catch (_) {}
+  }
+}
+
+// =============================================================================
+// v3.99 turn 13 ask 1: reusable candidate-navigation bar
+// =============================================================================
+// Renders a small inline toolbar with [‹ prev] [active name] [next ›]
+// [whole genome] for use on popstats / ancestry / boundaries pages. The
+// page-2 candidate-focus already has its own richer nav (with confirm
+// toggle) — this helper is for the simpler case where a page just wants
+// to scrub between candidates without all the page-2 chrome.
+//
+// Usage:
+//   const nav = _renderCandidateNavInline({ idPrefix: 'ps' });
+//   container.insertBefore(nav, container.firstChild);
+//
+// idPrefix avoids ID collision when multiple navs are on different pages
+// in the DOM tree at once. Each nav uses _navigateToCandidate (which also
+// re-renders these pages so the nav state stays in sync).
+function _renderCandidateNavInline(opts) {
+  opts = opts || {};
+  const prefix = opts.idPrefix || 'cand';
+  const bar = document.createElement('div');
+  bar.className = 'cand-nav-inline';
+  bar.style.cssText = 'display: flex; align-items: center; gap: 10px; ' +
+                       'padding: 6px 12px; background: var(--panel-2); ' +
+                       'border: 1px solid var(--rule); border-radius: 4px; ' +
+                       'margin-bottom: 12px; font-family: var(--mono); font-size: 11.5px;';
+  const sorted = (typeof candidateListSortedByPos === 'function')
+    ? candidateListSortedByPos() : [];
+  const c = state.candidate;
+  let posLabel = 'whole genome view';
+  let prevDisabled = sorted.length === 0;
+  let nextDisabled = sorted.length === 0;
+  if (c && sorted.length > 0) {
+    const idx = sorted.findIndex(x => x.id === c.id);
+    if (idx >= 0) {
+      posLabel = `candidate ${idx + 1} / ${sorted.length}`;
+      prevDisabled = (idx === 0);
+      nextDisabled = (idx === sorted.length - 1);
+    } else {
+      posLabel = `candidate (off-list)`;
+    }
+  }
+  // Active candidate name — short form, e.g. "moig0k3l_2_mwit"
+  const activeName = c
+    ? `<span style="color: var(--accent); font-weight: 500;">${(c.id || '?')}</span>`
+    : `<span style="color: var(--ink-dim); font-style: italic;">no candidate selected</span>`;
+  bar.innerHTML =
+    `<button id="${prefix}NavPrev" ${prevDisabled ? 'disabled' : ''}` +
+    `        title="Previous candidate by genomic position"` +
+    `        style="background: var(--panel); border: 1px solid var(--rule);` +
+    `               color: var(--ink); border-radius: 3px; padding: 4px 12px;` +
+    `               font-family: var(--mono); font-size: 11px;` +
+    `               cursor: ${prevDisabled ? 'default' : 'pointer'};` +
+    `               opacity: ${prevDisabled ? 0.4 : 1};">‹ prev</button>` +
+    `<span style="color: var(--ink-dim); min-width: 130px; text-align: center;` +
+    `             white-space: nowrap;">${posLabel}</span>` +
+    `<button id="${prefix}NavNext" ${nextDisabled ? 'disabled' : ''}` +
+    `        title="Next candidate by genomic position"` +
+    `        style="background: var(--panel); border: 1px solid var(--rule);` +
+    `               color: var(--ink); border-radius: 3px; padding: 4px 12px;` +
+    `               font-family: var(--mono); font-size: 11px;` +
+    `               cursor: ${nextDisabled ? 'default' : 'pointer'};` +
+    `               opacity: ${nextDisabled ? 0.4 : 1};">next ›</button>` +
+    `<span style="color: var(--ink-dim); margin: 0 6px;">·</span>` +
+    `<span style="color: var(--ink-dim);">active:</span> ${activeName}` +
+    `<span style="flex: 1;"></span>` +
+    `<button id="${prefix}NavGenome" title="Clear candidate selection — show whole-genome view"` +
+    `        style="background: var(--panel); border: 1px solid var(--rule);` +
+    `               color: var(--ink-dim); border-radius: 3px; padding: 4px 12px;` +
+    `               font-family: var(--mono); font-size: 11px; cursor: pointer;">` +
+    `🌍 whole genome</button>`;
+  // Wire after insertion happens at caller time — but querySelector inside
+  // bar works pre-insertion because the elements are children of bar.
+  const prevBtn = bar.querySelector(`#${prefix}NavPrev`);
+  const nextBtn = bar.querySelector(`#${prefix}NavNext`);
+  const genomeBtn = bar.querySelector(`#${prefix}NavGenome`);
+  if (prevBtn) prevBtn.addEventListener('click', () => {
+    if (sorted.length === 0) return;
+    const idx = c ? sorted.findIndex(x => x.id === c.id) : -1;
+    const target = (idx > 0) ? sorted[idx - 1] : sorted[0];
+    if (target) _navigateToCandidate(target);
+  });
+  if (nextBtn) nextBtn.addEventListener('click', () => {
+    if (sorted.length === 0) return;
+    const idx = c ? sorted.findIndex(x => x.id === c.id) : -1;
+    const target = (idx >= 0 && idx < sorted.length - 1)
+      ? sorted[idx + 1]
+      : sorted[sorted.length - 1];
+    if (target) _navigateToCandidate(target);
+  });
+  if (genomeBtn) genomeBtn.addEventListener('click', () => {
+    state.candidate = null;
+    if (typeof refreshCandidateListUI === 'function') refreshCandidateListUI();
+    if (typeof renderPopstatsPage === 'function') {
+      try { renderPopstatsPage(); } catch (_) {}
+    }
+    if (typeof renderAncestryPage === 'function') {
+      try { renderAncestryPage(); } catch (_) {}
+    }
+    if (typeof renderBoundariesPage === 'function') {
+      try { renderBoundariesPage(); } catch (_) {}
+    }
+  });
+  return bar;
 }
 
 // Compact summary card — distills the candidate down to ~7 key facts.
@@ -19990,6 +20657,28 @@ function setZColorMode(mode) {
       setZCollapsed(!state.zCollapsed);
     });
   }
+  // v3.99 turn 9: settings-box toggle. Default hidden; click ⚙ to show
+  // the color/value/highlight controls. Persisted in localStorage.
+  const _Z_SETTINGS_KEY = 'pca_scrubber_v3.zSettingsOpen';
+  const settingsBtn = document.getElementById('zSettingsToggleBtn');
+  const settingsBox = document.getElementById('zSettingsBox');
+  function _applyZSettingsOpen(open) {
+    if (settingsBox) settingsBox.style.display = open ? 'inline-flex' : 'none';
+    if (settingsBtn) settingsBtn.textContent = open ? '✕' : '⚙';
+    try { localStorage.setItem(_Z_SETTINGS_KEY, open ? '1' : '0'); } catch (_) {}
+  }
+  if (settingsBtn) {
+    settingsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = settingsBox && settingsBox.style.display !== 'none';
+      _applyZSettingsOpen(!isOpen);
+    });
+  }
+  // Restore saved state on startup
+  try {
+    const v = localStorage.getItem(_Z_SETTINGS_KEY);
+    if (v === '1') _applyZSettingsOpen(true);
+  } catch (_) {}
 })();
 
 // =============================================================================
@@ -20290,11 +20979,17 @@ function setL3Collapsed(b) {
 // keep their own scope and are not affected here.
 const _VIEWMODE_STORAGE_KEY = 'pca_scrubber_v3.viewmode';
 function applyViewMode(mode) {
-  if (mode !== 'genome' && mode !== 'l1') mode = 'genome';
+  // v3.99 turn 8: 'l2' added. Default fallback remains 'genome' for unknowns.
+  if (mode !== 'genome' && mode !== 'l1' && mode !== 'l2') mode = 'genome';
   state.viewMode = mode;
   document.querySelectorAll('#viewModeBar button').forEach(b => {
     b.classList.toggle('active', b.dataset.viewmode === mode);
   });
+  // v3.99 turn 7 perf: viewMode change affects mbMin/mbMax inside the lines
+  // panel cache fingerprint, so the cache will auto-miss. But invalidate
+  // explicitly here to be safe — also covers L3 panel which may show
+  // L1/L2 zone bars sized by the same range.
+  if (typeof _linesCacheInvalidate === 'function') _linesCacheInvalidate();
   // Redraw the affected panels
   if (state.data) {
     requestAnimationFrame(() => {
@@ -20307,7 +21002,7 @@ function applyViewMode(mode) {
 // Load saved preference at startup (before the user touches anything)
 try {
   const v = localStorage.getItem(_VIEWMODE_STORAGE_KEY);
-  if (v === 'l1' || v === 'genome') applyViewMode(v);
+  if (v === 'l1' || v === 'l2' || v === 'genome') applyViewMode(v);
 } catch (e) {}
 
 document.querySelectorAll('#viewModeBar button').forEach(btn => {
@@ -21350,6 +22045,19 @@ function renderPopstatsPage() {
   }
   if (noChrom) noChrom.style.display = 'none';
 
+  // v3.99 turn 13 ask 1: candidate navigation bar at the top of the page.
+  // Always replaces any prior nav so prev/next button state stays in sync.
+  // The bar is injected just inside #page6, before the existing toolbar
+  // chips so it sits at the very top.
+  const page6 = document.getElementById('page6');
+  if (page6) {
+    const oldNav = page6.querySelector('.cand-nav-inline');
+    if (oldNav) oldNav.remove();
+    const navBar = _renderCandidateNavInline({ idPrefix: 'ps' });
+    navBar.style.margin = '12px 24px 8px';
+    page6.insertBefore(navBar, page6.firstChild);
+  }
+
   const tracks = collectPopstatsTracks();
   // Determine visibility: data-present tracks are visible by default;
   // placeholders are hidden by default. User toggles override via storage.
@@ -21369,8 +22077,22 @@ function renderPopstatsPage() {
     if (visible(t)) chip.classList.add('active');
     if (!t.hasData && !t.alwaysOn) chip.classList.add('no-data');
     chip.textContent = t.label;
-    chip.title = t.hasData ? `Click to toggle ${t.label}` :
-                             `${t.label} — ${t.loadHint || 'data not loaded'}`;
+    // v3.99 turn 14b: enriched tooltip combining track label + axis label +
+    // edge interpretations (top/bot) when present, so users hovering a chip
+    // see what the track measures and what high/low values mean. Falls back
+    // to the simpler "Click to toggle" hint for tracks lacking metadata.
+    if (t.hasData) {
+      const parts = [`${t.label} — click to toggle visibility.`];
+      if (t.yLabel) parts.push(`Y axis: ${t.yLabel}.`);
+      if (t.edgeTop && t.edgeBot) {
+        parts.push(`High → ${t.edgeTop} · low → ${t.edgeBot}.`);
+      } else if (t.edgeTop) {
+        parts.push(`High → ${t.edgeTop}.`);
+      }
+      chip.title = parts.join(' ');
+    } else {
+      chip.title = `${t.label} — ${t.loadHint || 'data not loaded'}`;
+    }
     chip.dataset.trackId = t.id;
     chip.addEventListener('click', () => {
       const cur = loadPopstatsView() || new Set();
@@ -22142,6 +22864,17 @@ function renderAncestryPage() {
   }
   if (noChrom) noChrom.style.display = 'none';
 
+  // v3.99 turn 13 ask 1: candidate-nav bar at top of page (same pattern as
+  // popstats page above).
+  const page7 = document.getElementById('page7');
+  if (page7) {
+    const oldNav = page7.querySelector('.cand-nav-inline');
+    if (oldNav) oldNav.remove();
+    const navBar = _renderCandidateNavInline({ idPrefix: 'anc' });
+    navBar.style.margin = '12px 24px 8px';
+    page7.insertBefore(navBar, page7.firstChild);
+  }
+
   const ancW = state.data.ancestry_window;
   const ancS = state.data.ancestry_sample;
   const ancQ = state.data.ancestry_q_means;
@@ -22159,6 +22892,13 @@ function renderAncestryPage() {
     if (view.heatmap_field === field) chip.classList.add('active');
     if (!ancS || !ancS[field]) chip.classList.add('no-data');
     chip.textContent = `heatmap: ${field}`;
+    // v3.99 turn 14b: discoverability — explain what each heatmap field
+    // represents. maxQ_label = which K cluster the sample most likely
+    // belongs to per window (color-coded by cluster ID). delta12 = how
+    // confident the assignment is (Q1 - Q2 gap; high = clear majority).
+    chip.title = field === 'maxQ_label'
+      ? 'Heatmap field: maxQ_label — at each window, which K cluster (1, 2, …) the sample is most likely from. Color-coded by cluster ID. Click to switch heatmap to this field.'
+      : 'Heatmap field: delta12 — gap between top-1 and top-2 cluster probabilities (Q1 − Q2). Higher = more confident assignment; lower = ambiguous. Click to switch heatmap to this field.';
     chip.dataset.field = field;
     chip.addEventListener('click', () => {
       const v = loadAncestryView() || {};
@@ -22569,34 +23309,73 @@ function drawAncestrySections(view) {
 // =============================================================================
 // Page 3 — Inversion Catalogue (per L2)
 // =============================================================================
+// v3.99 turn 14b: each column gets a `tooltip` field describing what the
+// column means (units, what data it's derived from, what to look for when
+// scanning). Rendered into <th title="..."> in renderCatalogue() so users
+// hovering a header see a brief explanation. The tooltips also serve as
+// inline schema documentation — same definitions appear in SCHEMA_V2.md.
 const CAT_COLS_BASE = [
-  { key: 'chrom',         label: 'Chr',          type: 'str' },
-  { key: 'start_mb',      label: 'Start Mb',     type: 'num', fmt: v => v.toFixed(2) },
-  { key: 'end_mb',        label: 'End Mb',       type: 'num', fmt: v => v.toFixed(2) },
-  { key: 'span_mb',       label: 'Span Mb',      type: 'num', fmt: v => v.toFixed(2) },
-  { key: 'n_windows',     label: 'N windows',    type: 'num' },
-  { key: 'parent_l1',     label: 'Parent L1',    type: 'str' },
-  { key: 'k_used',        label: 'K used',       type: 'num' },
-  { key: 'silhouette',    label: 'Silhouette',   type: 'num', fmt: v => isFinite(v) ? v.toFixed(2) : '—' },
-  { key: 'coherence',     label: 'Coherence',    type: 'num', fmt: v => isFinite(v) ? v.toFixed(2) : '—' },
-  { key: 'fam_purity',    label: 'Fam purity',   type: 'num', fmt: v => isFinite(v) ? v.toFixed(2) : '—' },
-  { key: 'verdict',       label: 'σ verdict',    type: 'str' },
-  { key: 'cluster_ok',    label: 'Power',        type: 'str' },
+  { key: 'chrom',         label: 'Chr',          type: 'str',
+    tooltip: 'Chromosome / linkage group the inversion is on. From the loaded precomp JSON\'s chrom field.' },
+  { key: 'start_mb',      label: 'Start Mb',     type: 'num', fmt: v => v.toFixed(2),
+    tooltip: 'Left edge of the L2 envelope in megabases. Derived from start_bp / 1e6.' },
+  { key: 'end_mb',        label: 'End Mb',       type: 'num', fmt: v => v.toFixed(2),
+    tooltip: 'Right edge of the L2 envelope in megabases. Derived from end_bp / 1e6.' },
+  { key: 'span_mb',       label: 'Span Mb',      type: 'num', fmt: v => v.toFixed(2),
+    tooltip: 'Length of the inversion in megabases (end_mb − start_mb). Useful for filtering out very small or very large candidates.' },
+  { key: 'n_windows',     label: 'N windows',    type: 'num',
+    tooltip: 'Number of local-PCA windows the L2 envelope spans. Inversions backed by more windows have more support; very short L2s (< 5 windows) are often noise.' },
+  { key: 'parent_l1',     label: 'Parent L1',    type: 'str',
+    tooltip: 'Identifier of the L1 envelope this L2 nests inside. L1 = coarse chromosomal block; L2 = refined sub-block. L1s contain one or more L2s.' },
+  { key: 'k_used',        label: 'K used',       type: 'num',
+    tooltip: 'Number of K-means clusters the local PCA settled on for this envelope. Typically K=3 (homo1 / het / homo2) for true inversions; K=6 indicates within-regime substructure (sub-bands).' },
+  { key: 'silhouette',    label: 'Silhouette',   type: 'num', fmt: v => isFinite(v) ? v.toFixed(2) : '—',
+    tooltip: 'Mean silhouette coefficient over the K clusters, range [−1, 1]. Higher = clusters are more separated and well-defined. Below ~0.3 means clusters are overlapping (suspicious).' },
+  { key: 'coherence',     label: 'Coherence',    type: 'num', fmt: v => isFinite(v) ? v.toFixed(2) : '—',
+    tooltip: 'Within-envelope band coherence: how consistently each sample stays in the same K-means cluster across all windows of the envelope. Range [0, 1]. < 0.7 typically means CROSSOVER_ARTIFACTS or NOISY_REGION.' },
+  { key: 'fam_purity',    label: 'Fam purity',   type: 'num', fmt: v => isFinite(v) ? v.toFixed(2) : '—',
+    tooltip: 'Family-purity diagnostic: fraction of K-means assignments that respect the founder-family structure (samples from the same hatchery family cluster together). Low = something else is driving the variation, often technical artifacts.' },
+  { key: 'verdict',       label: 'σ verdict',    type: 'str',
+    tooltip: 'σ-band-diagnostics verdict per the band-diagnostics module (§11). Values: TWO_INVERSIONS (true two-inversion signature), CROSSOVER_ARTIFACTS (recombination breakdown not real inversion), NOISY_REGION (low signal-to-noise), NA (K≤3 not enough bands), UNDETERMINED (diagnostics inconclusive).' },
+  { key: 'cluster_ok',    label: 'Power',        type: 'str',
+    tooltip: 'Statistical power flag: whether the smallest K cluster has enough samples (≥ minNGroup) for the K-means and downstream tests to be reliable. "ok" = passes; "low" = at least one regime has too few samples for trustworthy clustering.' },
 ];
 
+// v3.99 turn 12 ask 3: columns considered "secondary" — hidden in
+// catState.displayMode === 'simple'. The rest (chr, span, span_mb, k_used,
+// conservation, verdict) stay visible because they're the most commonly
+// scanned during catalogue review.
+const CAT_COLS_SECONDARY = new Set(['parent_l1', 'silhouette', 'coherence', 'fam_purity', 'cluster_ok', 'n_windows']);
+
 function getCatCols() {
+  // v3.99 turn 14b: dynamic columns also carry `tooltip` for header
+  // discoverability. The same field name (`l2_id`) is shown as different
+  // labels depending on viewMode (L2 raw vs L1 merged), so each variant
+  // gets its own tooltip phrasing.
   const id = catState.viewMode === 'L1'
-    ? { key: 'l2_id', label: 'Inversion ID', type: 'str' }
-    : { key: 'l2_id', label: 'L2 ID',        type: 'str' };
+    ? { key: 'l2_id', label: 'Inversion ID', type: 'str',
+        tooltip: 'Inversion ID — same as the leftmost L2 in this merged group. In L1-merged view, multiple consecutive L2s with high concord (≥ merge_thr) are collapsed into a single row representing one inversion. Click row to jump to its center on page 1.' }
+    : { key: 'l2_id', label: 'L2 ID',        type: 'str',
+        tooltip: 'L2 envelope identifier (e.g. C_gar_LG28_d17L2_0001_03). Each L2 is an independently-clustered sub-block of an L1 envelope. Click row to jump to its center on page 1.' };
   const conservationCol = catState.viewMode === 'L1'
     ? { key: 'conservation', label: 'Merge conf', type: 'num',
-        fmt: v => isFinite(v) ? (v * 100).toFixed(0) + '%' : '—' }
+        fmt: v => isFinite(v) ? (v * 100).toFixed(0) + '%' : '—',
+        tooltip: 'Merge confidence: minimum pairwise concord (Cramér\'s V) across the L2-to-L2 joins in this merged group. 100% = all internal joins are very high concord; < 70% means the L1-merge call is fragile.' }
     : { key: 'conservation', label: 'Conservation', type: 'num',
-        fmt: v => isFinite(v) ? (v * 100).toFixed(0) + '%' : '—' };
+        fmt: v => isFinite(v) ? (v * 100).toFixed(0) + '%' : '—',
+        tooltip: 'Conservation: mean concord (Cramér\'s V) of this L2 with its immediate left and right neighbors. High = the K-means clustering is stable across L2 boundaries; low = sample-grouping reshuffles at the boundary (boundary signal).' };
   // In L1 view, prepend a column showing how many L2s collapsed
-  const cols = [id, ...CAT_COLS_BASE.slice(0, 8), conservationCol, ...CAT_COLS_BASE.slice(8)];
+  let cols = [id, ...CAT_COLS_BASE.slice(0, 8), conservationCol, ...CAT_COLS_BASE.slice(8)];
   if (catState.viewMode === 'L1') {
-    cols.splice(7, 0, { key: 'n_L2_merged', label: 'N L2s', type: 'num' });
+    cols.splice(7, 0, { key: 'n_L2_merged', label: 'N L2s', type: 'num',
+      tooltip: 'Number of consecutive L2 envelopes merged into this L1-merged inversion (≥ merge_thr concord between each pair).' });
+  }
+  // v3.99 turn 12 ask 3: in 'simple' display mode, drop secondary columns
+  // (parent_l1, silhouette, coherence, fam_purity, cluster_ok, n_windows).
+  // Detailed mode (default) keeps them all. The toolbar button toggles
+  // catState.displayMode.
+  if (catState.displayMode === 'simple') {
+    cols = cols.filter(c => !CAT_COLS_SECONDARY.has(c.key));
   }
   return cols;
 }
@@ -22611,12 +23390,31 @@ const catState = {
   verdictFilter: '',
   viewMode: 'L2',      // 'L2' (raw) | 'L1' (merged via L3 logic)
   selected: new Set(), // keys = l2_idx (for L1 view, keys = first l2_idx in merge)
+  _anchorL2: null,     // v3.99 turn 10: last plain-/Ctrl-click row, for Shift+click range
+  // v3.99 turn 12 ask 3: 'simple' hides parent_l1, silhouette, coherence,
+  // fam_purity, cluster_ok, n_windows. 'detailed' (default) shows all.
+  // Persisted in localStorage so the user's choice survives reloads.
+  displayMode: 'detailed',
 };
 
 function buildCatalogueRows() {
   const d = state.data;
   if (!d || !d.l2_envelopes) return [];
   const rows = [];
+  // v3.99 turn 12 ask 2: pre-build a map from l2_idx → confirmed candidate id
+  // so each catalogue row can show a green tint + the candidate ID it belongs
+  // to. A single L2 may belong to at most one candidate (l2_indices arrays
+  // don't overlap in current pipeline). Map only includes confirmed candidates;
+  // provisional candidates don't get the green tint.
+  const l2ToConfirmedId = new Map();
+  if (Array.isArray(state.candidateList)) {
+    for (const cand of state.candidateList) {
+      if (!cand || !cand.confirmed || !Array.isArray(cand.l2_indices)) continue;
+      for (const li of cand.l2_indices) {
+        if (typeof li === 'number') l2ToConfirmedId.set(li, cand.id);
+      }
+    }
+  }
   for (let l2idx = 0; l2idx < d.l2_envelopes.length; l2idx++) {
     const env = d.l2_envelopes[l2idx];
     const cl = getL2Cluster(l2idx);
@@ -22663,6 +23461,9 @@ function buildCatalogueRows() {
       fam_purity:    cl.fam_purity != null ? cl.fam_purity : NaN,
       verdict,
       cluster_ok:    cl.ok ? 'OK' : (cl.reason || 'WEAK'),
+      // v3.99 turn 12: null when not in any confirmed candidate; otherwise
+      // the candidate's id. Used to tint the row green + show ✓ + cand id.
+      confirmed_cand_id: l2ToConfirmedId.get(l2idx) || null,
     });
   }
   return rows;
@@ -22746,6 +23547,19 @@ function buildCatalogueRowsL1Merged() {
         ? ids[0]
         : `${ids[0]}..${ids[ids.length - 1]}`;
       const cluster_ok = cls.every(c => c.ok) ? 'OK' : 'WEAK';
+      // v3.99 turn 12 ask 2: L1-merged row is "confirmed" if any of its
+      // constituent L2s belongs to a confirmed candidate. Use the first
+      // such candidate's id (multiple is unusual; if it happens we just
+      // show the first one).
+      let confirmed_cand_id = null;
+      if (Array.isArray(state.candidateList)) {
+        for (const li of idxs) {
+          const cand = state.candidateList.find(
+            x => x && x.confirmed && Array.isArray(x.l2_indices) && x.l2_indices.includes(li)
+          );
+          if (cand) { confirmed_cand_id = cand.id; break; }
+        }
+      }
       merged.push({
         l2_idx:          idxs[Math.floor(idxs.length / 2)],   // representative for jump
         l2_indices:      idxs,
@@ -22764,6 +23578,7 @@ function buildCatalogueRowsL1Merged() {
         verdict,
         cluster_ok,
         n_L2_merged:     idxs.length,
+        confirmed_cand_id,
       });
     };
     for (let i = 1; i < arr.length; i++) {
@@ -22813,9 +23628,30 @@ function filterRows(rows, q, verdict) {
 }
 
 function renderCatalogue() {
-  catState.rows = catState.viewMode === 'L1'
-    ? buildCatalogueRowsL1Merged()
-    : buildCatalogueRows();
+  // v3.99 turn 10: 'fav' uses L2 rows, filtered to favorites only.
+  //                'L3' shows a placeholder until the L3 row builder lands.
+  if (catState.viewMode === 'L3') {
+    catState.rows = [];
+    const head = document.getElementById('catHead');
+    const body = document.getElementById('catBody');
+    const empty = document.getElementById('catEmpty');
+    if (head) head.innerHTML = '';
+    if (body) body.innerHTML = '';
+    if (empty) {
+      empty.textContent = 'L3 view — coming soon. (Will show one row per L2-internal sub-cluster group.)';
+      empty.style.display = 'block';
+    }
+    refreshCatSelInfo(0);
+    return;
+  }
+  if (catState.viewMode === 'fav') {
+    const allRows = buildCatalogueRows();
+    catState.rows = allRows.filter(r => catState.favorites.has(r.l2_id));
+  } else {
+    catState.rows = catState.viewMode === 'L1'
+      ? buildCatalogueRowsL1Merged()
+      : buildCatalogueRows();
+  }
   const head = document.getElementById('catHead');
   const body = document.getElementById('catBody');
   const empty = document.getElementById('catEmpty');
@@ -22830,11 +23666,25 @@ function renderCatalogue() {
   if (empty) empty.style.display = 'none';
 
   // Build header
-  head.innerHTML = '<th style="width:32px"><input type="checkbox" id="catHeadCheck" /></th>' +
+  // v3.99 turn 10: extra leftmost column for star (favorite toggle) — always
+  // present in L2/L1/fav modes; cell is empty in L3 placeholder.
+  // v3.99 turn 14b: tooltips on every <th> for header discoverability.
+  // Each catalogue column now carries a `tooltip` field (see CAT_COLS_BASE
+  // + getCatCols dynamic columns) describing what the column means. Native
+  // browser title= attribute = ~1s hover delay, OS-styled, accessible.
+  // Hint text appended to clickable headers tells the user "click to sort".
+  head.innerHTML = '<th style="width:24px;text-align:center;" title="Favorite — click the ☆ in any row to mark it. Switch to the ⭐ view in the toolbar to filter to favorites only.">⭐</th>' +
+    '<th style="width:32px" title="Selection checkbox. Check rows to include in TSV/Markdown export. Click the row body to jump to the L2 on page 1."><input type="checkbox" id="catHeadCheck" /></th>' +
     getCatCols().map(c => {
       const sorted = catState.sortKey === c.key;
       const arr = sorted ? (catState.sortAsc ? '▲' : '▼') : '↕';
-      return `<th data-key="${c.key}" class="${sorted ? 'sorted' : ''}">${c.label}<span class="sort-arr">${arr}</span></th>`;
+      const tip = c.tooltip
+        ? `${c.tooltip} · click to sort.`
+        : 'Click to sort.';
+      // Escape double quotes for the title attribute (very unlikely in
+      // controlled tooltip strings, but defensive)
+      const tipEsc = String(tip).replace(/"/g, '&quot;');
+      return `<th data-key="${c.key}" class="${sorted ? 'sorted' : ''}" title="${tipEsc}">${c.label}<span class="sort-arr">${arr}</span></th>`;
     }).join('');
   head.querySelectorAll('th[data-key]').forEach(th => {
     th.addEventListener('click', () => {
@@ -22843,6 +23693,27 @@ function renderCatalogue() {
       else { catState.sortKey = k; catState.sortAsc = true; }
       renderCatalogue();
     });
+  });
+  // v3.99 turn 11 ask 4: column-flash effect — hovering a column header
+  // highlights all body cells in that column. We wire ALL <th> elements,
+  // not just sortable ones, so the star + checkbox columns also flash.
+  // cellIndex on each <th> gives its column position; we then walk every
+  // body row's td at that index and toggle .col-hover. Cleared on
+  // mouseleave so the highlight follows the cursor.
+  head.querySelectorAll('th').forEach(th => {
+    const colIdx = th.cellIndex;
+    if (colIdx == null || colIdx < 0) return;
+    const flashOn  = () => {
+      body.querySelectorAll('tr').forEach(tr => {
+        const cell = tr.cells && tr.cells[colIdx];
+        if (cell) cell.classList.add('col-hover');
+      });
+    };
+    const flashOff = () => {
+      body.querySelectorAll('td.col-hover').forEach(td => td.classList.remove('col-hover'));
+    };
+    th.addEventListener('mouseenter', flashOn);
+    th.addEventListener('mouseleave', flashOff);
   });
   const headCheck = document.getElementById('catHeadCheck');
   if (headCheck) headCheck.addEventListener('change', e => {
@@ -22862,6 +23733,17 @@ function renderCatalogue() {
   // Build body
   body.innerHTML = sorted.map(r => {
     const sel = catState.selected.has(r.l2_idx);
+    const fav = catState.favorites.has(r.l2_id);
+    // v3.99 turn 12 ask 2: confirmed-candidate visual state
+    const confId = r.confirmed_cand_id || null;
+    const confChipFor = (key) => {
+      if (!confId || key !== 'l2_id') return '';
+      // Short candidate id: trim the chrom prefix if it's the same as the row's
+      // (cosmetic — the full ID is in title). e.g. "C_gar_LG28_d17L2_0001_03"
+      // → "d17L2_0001_03".
+      const shortId = String(confId).replace(/^[^_]+_[^_]+_[^_]+_/, '');
+      return ` <span class="cat-conf-chip" title="Confirmed candidate: ${confId}">✓ ${shortId}</span>`;
+    };
     const cells = getCatCols().map(c => {
       let v = r[c.key];
       if (c.fmt) v = c.fmt(v);
@@ -22870,20 +23752,73 @@ function renderCatalogue() {
       if (c.key === 'verdict') {
         cls = 'verdict ' + (v || '').toLowerCase();
       } else if (c.type === 'num') cls = 'num';
-      return `<td class="${cls}">${v}</td>`;
+      return `<td class="${cls}">${v}${confChipFor(c.key)}</td>`;
     }).join('');
-    return `<tr data-idx="${r.l2_idx}" class="${sel ? 'selected' : ''}">` +
+    // v3.99 turn 10: star cell (cursor: pointer; gold when fav, dim grey otherwise)
+    const starCell = `<td class="cat-star-cell" style="text-align:center;cursor:pointer;font-size:13px;color:${fav ? '#f5a524' : 'var(--ink-dimmer)'};" data-l2id="${r.l2_id}" title="Toggle favorite">${fav ? '★' : '☆'}</td>`;
+    const trClasses = [
+      sel ? 'selected' : '',
+      confId ? 'cand-confirmed' : '',
+    ].filter(Boolean).join(' ');
+    return `<tr data-idx="${r.l2_idx}" data-l2id="${r.l2_id}" class="${trClasses}">` +
+           starCell +
            `<td><input type="checkbox" class="cat-row-check" ${sel ? 'checked' : ''} /></td>` +
            cells + `</tr>`;
   }).join('');
 
-  // Row click: jump to that L2 in page 1 and switch tab
+  // Row click handler with multi-select support.
+  // v3.99 turn 10: standard desktop-file-manager selection semantics
+  //   plain click       → clear selection, select this row + jump to L2
+  //   Ctrl/Cmd+click    → toggle this row's selection (no jump)
+  //   Shift+click       → range-select from anchor row to this row (no jump)
+  // The "anchor" is the last plain-click or Ctrl-click row (catState._anchorL2).
+  // Range selection uses the currently visible/sorted order so the user gets
+  // what they see, not what's underlying.
   body.querySelectorAll('tr').forEach(tr => {
     tr.addEventListener('click', e => {
-      // Don't trigger jump on checkbox click
+      // Don't trigger anything on direct checkbox click — let the change
+      // handler below own that path (and don't propagate the click to
+      // the row's own logic, which would also toggle).
       if (e.target.tagName === 'INPUT') return;
       const l2idx = parseInt(tr.dataset.idx, 10);
       if (!isFinite(l2idx)) return;
+      const isCtrl = e.ctrlKey || e.metaKey;
+      const isShift = e.shiftKey;
+      if (isShift && catState._anchorL2 != null) {
+        // Range selection from anchor to this row, in displayed order
+        const idsInOrder = sorted.map(r => r.l2_idx);
+        const a = idsInOrder.indexOf(catState._anchorL2);
+        const b = idsInOrder.indexOf(l2idx);
+        if (a >= 0 && b >= 0) {
+          const lo = Math.min(a, b), hi = Math.max(a, b);
+          for (let i = lo; i <= hi; i++) catState.selected.add(idsInOrder[i]);
+          renderCatTable();   // refresh row highlights + checkboxes
+        }
+        e.preventDefault();
+        return;
+      }
+      if (isCtrl) {
+        // Toggle this row's selection, set as new anchor
+        if (catState.selected.has(l2idx)) catState.selected.delete(l2idx);
+        else catState.selected.add(l2idx);
+        catState._anchorL2 = l2idx;
+        renderCatTable();
+        e.preventDefault();
+        return;
+      }
+      // Plain click: clear, select this row, set anchor, then jump.
+      catState.selected.clear();
+      catState.selected.add(l2idx);
+      catState._anchorL2 = l2idx;
+      // Visually update without full re-render (faster + preserves scroll)
+      body.querySelectorAll('tr').forEach(other => {
+        const oid = parseInt(other.dataset.idx, 10);
+        const isMe = oid === l2idx;
+        other.classList.toggle('selected', isMe);
+        const cb = other.querySelector('.cat-row-check');
+        if (cb) cb.checked = isMe;
+      });
+      refreshCatSelInfo(filtered.length);
       const env = state.data.l2_envelopes[l2idx];
       if (!env) return;
       // Switch to page 1
@@ -22904,7 +23839,29 @@ function renderCatalogue() {
       if (e.target.checked) catState.selected.add(l2idx);
       else catState.selected.delete(l2idx);
       tr.classList.toggle('selected', e.target.checked);
+      // Update anchor on checkbox interaction too
+      catState._anchorL2 = l2idx;
       refreshCatSelInfo(filtered.length);
+    });
+  });
+  // v3.99 turn 10: star toggle clicks
+  body.querySelectorAll('.cat-star-cell').forEach(td => {
+    td.addEventListener('click', e => {
+      e.stopPropagation();   // don't trigger row jump/select
+      const l2id = td.dataset.l2id;
+      if (!l2id) return;
+      if (catState.favorites.has(l2id)) {
+        catState.favorites.delete(l2id);
+        td.style.color = 'var(--ink-dimmer)';
+        td.textContent = '☆';
+      } else {
+        catState.favorites.add(l2id);
+        td.style.color = '#f5a524';
+        td.textContent = '★';
+      }
+      _saveCatFavorites(catState.favorites);
+      // If currently in 'fav' view, re-render so the row falls out
+      if (catState.viewMode === 'fav') renderCatalogue();
     });
   });
   refreshCatSelInfo(filtered.length);
@@ -22917,21 +23874,71 @@ function refreshCatSelInfo(visibleN) {
 }
 
 // Catalogue toolbar wiring
-// View-mode toggle (L2 raw / L1 merged)
+// View-mode toggle (⭐ fav / L3 / L2 raw / L1 merged)
+const _catViewFav = document.getElementById('catViewFav');
+const _catViewL3  = document.getElementById('catViewL3');
 const _catViewL2 = document.getElementById('catViewL2');
 const _catViewL1 = document.getElementById('catViewL1');
+// v3.99 turn 10: persistent favorites set keyed by L2 ID. Survives reloads
+// per chromosome. Stored as a JSON array of l2_id strings.
+const _CAT_FAV_KEY_PREFIX = 'pca_scrubber_v3.catFavorites.';
+function _catFavKey() {
+  return _CAT_FAV_KEY_PREFIX + (state.data && state.data.chrom ? state.data.chrom : '_default');
+}
+function _loadCatFavorites() {
+  try {
+    const raw = localStorage.getItem(_catFavKey());
+    const arr = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(arr) ? arr : []);
+  } catch (_) { return new Set(); }
+}
+function _saveCatFavorites(set) {
+  try { localStorage.setItem(_catFavKey(), JSON.stringify(Array.from(set))); } catch (_) {}
+}
+catState.favorites = _loadCatFavorites();
 function setCatView(mode) {
+  // v3.99 turn 10: 'fav' is a filter-overlay (still uses L2 rows underneath
+  // but only shows favorited ones); 'L3' is a placeholder — renders an
+  // info row until the L3 catalogue builder is wired in a later turn.
   catState.viewMode = mode;
   catState.selected.clear();   // selections don't transfer across views
-  if (_catViewL2) _catViewL2.classList.toggle('active', mode === 'L2');
-  if (_catViewL1) _catViewL1.classList.toggle('active', mode === 'L1');
-  // Pick a sensible default sort key for each view
-  catState.sortKey = mode === 'L1' ? 'start_mb' : 'l2_id';
+  catState._anchorL2 = null;
+  if (_catViewFav) _catViewFav.classList.toggle('active', mode === 'fav');
+  if (_catViewL3)  _catViewL3.classList.toggle('active',  mode === 'L3');
+  if (_catViewL2)  _catViewL2.classList.toggle('active',  mode === 'L2');
+  if (_catViewL1)  _catViewL1.classList.toggle('active',  mode === 'L1');
+  // Sensible default sort per view
+  if (mode === 'L1') { catState.sortKey = 'start_mb'; }
+  else if (mode === 'fav' || mode === 'L2') { catState.sortKey = 'l2_id'; }
+  else if (mode === 'L3') { catState.sortKey = 'l2_id'; }
   catState.sortAsc = true;
   renderCatalogue();
 }
-if (_catViewL2) _catViewL2.addEventListener('click', () => setCatView('L2'));
+if (_catViewFav) _catViewFav.addEventListener('click', () => setCatView('fav'));
+if (_catViewL3)  _catViewL3.addEventListener('click',  () => setCatView('L3'));
+if (_catViewL2)  _catViewL2.addEventListener('click',  () => setCatView('L2'));
 if (_catViewL1) _catViewL1.addEventListener('click', () => setCatView('L1'));
+
+// v3.99 turn 12 ask 3: simple/detailed display toggle. Persisted in
+// localStorage so the choice survives reloads. Defaults to 'detailed'.
+const _CAT_DISPMODE_KEY = 'pca_scrubber_v3.catDisplayMode';
+const _catDispSimple   = document.getElementById('catDispSimple');
+const _catDispDetailed = document.getElementById('catDispDetailed');
+function setCatDisplayMode(mode) {
+  if (mode !== 'simple' && mode !== 'detailed') mode = 'detailed';
+  catState.displayMode = mode;
+  if (_catDispSimple)   _catDispSimple.classList.toggle('active', mode === 'simple');
+  if (_catDispDetailed) _catDispDetailed.classList.toggle('active', mode === 'detailed');
+  try { localStorage.setItem(_CAT_DISPMODE_KEY, mode); } catch (_) {}
+  renderCatalogue();
+}
+if (_catDispSimple)   _catDispSimple.addEventListener('click',   () => setCatDisplayMode('simple'));
+if (_catDispDetailed) _catDispDetailed.addEventListener('click', () => setCatDisplayMode('detailed'));
+// Restore on startup
+try {
+  const v = localStorage.getItem(_CAT_DISPMODE_KEY);
+  if (v === 'simple') setCatDisplayMode('simple');
+} catch (_) {}
 
 const _catFilterEl = document.getElementById('catFilter');
 if (_catFilterEl) _catFilterEl.addEventListener('input', e => {
@@ -23231,6 +24238,19 @@ applySidebarState(_savedSidebarCollapsed);
 
 const _sidebarBtn = document.getElementById('sidebarToggleBtn');
 if (_sidebarBtn) _sidebarBtn.addEventListener('click', () => {
+  const wrap = document.getElementById('appWrap');
+  const isCollapsed = wrap && wrap.getAttribute('data-sidebar') === 'collapsed';
+  const next = !isCollapsed;
+  try { localStorage.setItem(_SIDEBAR_STORAGE_KEY, String(next)); } catch (e) {}
+  applySidebarState(next);
+});
+
+// v3.99 turn 11: same toggle wired to the new gear in the tab bar. Both
+// fire identical state changes; the gear is the user-visible control,
+// the original arrow is display:none-hidden but kept in DOM for the
+// state-management code (applySidebarState etc.) that may reference it.
+const _globalSettingsBtn = document.getElementById('globalSettingsBtn');
+if (_globalSettingsBtn) _globalSettingsBtn.addEventListener('click', () => {
   const wrap = document.getElementById('appWrap');
   const isCollapsed = wrap && wrap.getAttribute('data-sidebar') === 'collapsed';
   const next = !isCollapsed;
