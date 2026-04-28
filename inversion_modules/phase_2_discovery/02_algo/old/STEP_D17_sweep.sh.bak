@@ -1,0 +1,152 @@
+#!/usr/bin/env bash
+# =============================================================================
+# STEP_D17_sweep.sh
+#
+# Runs STEP_D17_multipass.R + STEP_D17c_overlay_plot_v2.R across a small
+# parameter grid for one chromosome. One PDF per setting, named with the
+# parameter values so pages line up tile-by-tile across PDFs.
+#
+# Sweep dimensions (8 settings total):
+#   post_trim_nms     : OFF, 0.20, 0.30, 0.50
+#   trim_drop_z       : 0.5, 1.0
+#
+# Usage:
+#   bash STEP_D17_sweep.sh \
+#     --precomp <precomp.rds> --sim_mat <sim_mat.rds> \
+#     --chr <label> --outroot <root_dir> \
+#     [--rscript <path_to_Rscript>] \
+#     [--multipass <path>] [--overlay <path>]
+#
+# Output layout:
+#   <outroot>/<chr>/sweep_<setting_id>/
+#       <chr>_d17_catalogue.tsv
+#       <chr>_d17c_overlay.pdf
+#   <outroot>/<chr>/_summary.tsv
+# =============================================================================
+
+set -euo pipefail
+
+PRECOMP=""
+SIM_MAT=""
+CHR=""
+OUTROOT=""
+RSCRIPT="Rscript"
+MULTIPASS_R="$(dirname "$0")/STEP_D17_multipass.R"
+OVERLAY_R="$(dirname "$0")/STEP_D17c_overlay_plot_v2.R"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --precomp)   PRECOMP="$2"; shift 2 ;;
+    --sim_mat)   SIM_MAT="$2"; shift 2 ;;
+    --chr)       CHR="$2"; shift 2 ;;
+    --outroot)   OUTROOT="$2"; shift 2 ;;
+    --rscript)   RSCRIPT="$2"; shift 2 ;;
+    --multipass) MULTIPASS_R="$2"; shift 2 ;;
+    --overlay)   OVERLAY_R="$2"; shift 2 ;;
+    *) echo "[sweep] unknown arg: $1" >&2; exit 1 ;;
+  esac
+done
+
+if [[ -z "$PRECOMP" || -z "$SIM_MAT" || -z "$CHR" || -z "$OUTROOT" ]]; then
+  echo "[sweep] usage: --precomp <f> --sim_mat <f> --chr <label> --outroot <dir>" >&2
+  exit 2
+fi
+for f in "$PRECOMP" "$SIM_MAT" "$MULTIPASS_R" "$OVERLAY_R"; do
+  [[ -f "$f" ]] || { echo "[sweep] missing: $f" >&2; exit 3; }
+done
+
+CHR_ROOT="${OUTROOT}/${CHR}"
+mkdir -p "$CHR_ROOT"
+SUMMARY="${CHR_ROOT}/_summary.tsv"
+printf "setting_id\tdrop_z\tpost_nms\tpost_nms_overlap\tcatalogue_rows\tphase_qc_rows\n" \
+  > "$SUMMARY"
+
+# Settings grid: drop_z, post_nms_mode, post_nms_overlap
+# post_nms_mode = "off" means we omit --post_trim_nms entirely
+SETTINGS=(
+  "0.5  off    -"
+  "0.5  on     0.20"
+  "0.5  on     0.30"
+  "0.5  on     0.50"
+  "1.0  off    -"
+  "1.0  on     0.20"
+  "1.0  on     0.30"
+  "1.0  on     0.50"
+)
+
+for setting in "${SETTINGS[@]}"; do
+  read -r DZ MODE OV <<< "$setting"
+  if [[ "$MODE" == "on" ]]; then
+    SID="dz${DZ}_postnms${OV}"
+  else
+    SID="dz${DZ}_postnmsOFF"
+  fi
+  SETDIR="${CHR_ROOT}/sweep_${SID}"
+  mkdir -p "$SETDIR"
+
+  echo "================================================================="
+  echo "[sweep] setting: $SID"
+  echo "[sweep]   trim_drop_z = $DZ"
+  echo "[sweep]   post_trim_nms = $MODE  overlap = $OV"
+  echo "================================================================="
+
+  # ---- run multipass ------------------------------------------------------
+  MP_ARGS=(
+    --precomp "$PRECOMP"
+    --sim_mat "$SIM_MAT"
+    --chr     "$CHR"
+    --outdir  "$SETDIR"
+    --trim_core   TRUE
+    --trim_drop_z "$DZ"
+  )
+  if [[ "$MODE" == "on" ]]; then
+    MP_ARGS+=( --post_trim_nms TRUE --post_trim_nms_overlap "$OV" )
+  fi
+
+  "$RSCRIPT" "$MULTIPASS_R" "${MP_ARGS[@]}" \
+    2>&1 | tee "${SETDIR}/multipass.log"
+
+  CAT_FILE="${SETDIR}/${CHR}_d17_catalogue.tsv"
+  PQC_FILE="${SETDIR}/${CHR}_phase_qc_candidates.tsv"
+  if [[ ! -f "$CAT_FILE" ]]; then
+    echo "[sweep]   no catalogue produced; skipping overlay for $SID"
+    printf "%s\t%s\t%s\t%s\tNA\tNA\n" "$SID" "$DZ" "$MODE" "$OV" >> "$SUMMARY"
+    continue
+  fi
+
+  # rows = (lines - 1) for header
+  CAT_ROWS=$(($(wc -l < "$CAT_FILE") - 1))
+  PQC_ROWS="NA"
+  if [[ -f "$PQC_FILE" ]]; then
+    PQC_ROWS=$(($(wc -l < "$PQC_FILE") - 1))
+  fi
+  printf "%s\t%s\t%s\t%s\t%s\t%s\n" \
+    "$SID" "$DZ" "$MODE" "$OV" "$CAT_ROWS" "$PQC_ROWS" >> "$SUMMARY"
+
+  # ---- run overlay --------------------------------------------------------
+  "$RSCRIPT" "$OVERLAY_R" \
+    --precomp   "$PRECOMP" \
+    --sim_mat   "$SIM_MAT" \
+    --catalogue "$CAT_FILE" \
+    --chr       "$CHR" \
+    --outdir    "$SETDIR" \
+    --n_tiles   5 \
+    --z_mode    diagonal \
+    2>&1 | tee "${SETDIR}/overlay.log"
+
+  # Rename the PDF so the filename carries the setting id (helps when
+  # opening many at once / stacking pages).
+  SRC_PDF="${SETDIR}/${CHR}_d17c_overlay.pdf"
+  DST_PDF="${SETDIR}/${CHR}_d17c_overlay__${SID}.pdf"
+  if [[ -f "$SRC_PDF" ]]; then
+    cp "$SRC_PDF" "$DST_PDF"
+  fi
+done
+
+echo ""
+echo "[sweep] all done."
+echo "[sweep] summary: $SUMMARY"
+column -t -s $'\t' "$SUMMARY"
+echo ""
+echo "[sweep] PDFs:"
+find "$CHR_ROOT" -name "*_d17c_overlay__*.pdf" | sort

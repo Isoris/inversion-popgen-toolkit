@@ -1,0 +1,616 @@
+#!/usr/bin/env Rscript
+# =============================================================================
+# STEP_D17_multipass_L2_v8.R
+#
+# Level-2 sub-boundary discovery. Reads the L1 envelope catalogue produced
+# by STEP_D17_multipass_L1_only_v7.R and runs the same boundary-scan
+# logic INDEPENDENTLY INSIDE EACH L1 SEGMENT, producing a finer partition
+# of each L1 segment into L2 sub-segments.
+#
+# Inputs:
+#   --precomp        : precomp.slim.rds (window coords)
+#   --sim_mat        : sim_mat .rds (any nn level; user typically passes nn40
+#                                    for L2 to resolve finer structure)
+#   --l1_catalogue   : *_d17L1_envelopes.tsv from the L1 multipass
+#   --chr            : chromosome label
+#   --outdir         : where to write outputs
+#
+# Boundary-scan parameters:
+#   --boundary_W                       (default 5)
+#   --boundary_offset                  (default 5)
+#   --boundary_score_min               (default 1.0  -- LOWER than L1's 2.0
+#                                       because L2 catches finer/weaker
+#                                       sub-architecture)
+#   --boundary_min_dist                (default 10  -- absolute, fixed; the
+#                                       percent-of-N adaptive logic doesn't
+#                                       translate well to short L1 segments)
+#   --boundary_validator_mode          (default "grow")
+#   --boundary_grow_W                  (absolute list, optional)
+#   --boundary_grow_W_pct              (default scales with segment N;
+#                                       wider series than L1 because
+#                                       segments are smaller)
+#   --boundary_grow_threshold_mode     (default "adaptive", but POOLED across
+#                                       all L2 peaks rather than per-segment)
+#   --boundary_grow_real_pct           (default 0.30)
+#   --boundary_grow_fake_pct           (default 0.50)
+#   --boundary_grow_real_max_ceiling   (default 0.10)
+#   --boundary_grow_fake_min_floor     (default 0.10)
+#
+# Outputs:
+#   <chr>_d17L2_boundaries.tsv   : ALL L2 boundaries, one row per peak,
+#                                  with parent_l1_id column. Same column
+#                                  schema as L1's d17L1_boundaries.tsv,
+#                                  plus boundary_w_local and parent_l1_id.
+#   <chr>_d17L2_envelopes.tsv    : L2 segments derived from STABLE_BLUE
+#                                  boundaries within each L1 parent. Has
+#                                  parent_l1_id and candidate_id columns.
+#
+# Threshold pooling design:
+#   Per-segment adaptive thresholds break down on small L1 segments (1-2
+#   peaks per segment). Instead, this script:
+#     1. Runs the boundary scan on each L1 segment, producing peaks WITHOUT
+#        a final classification. Each peak's grow_max_z is computed.
+#     2. Pools all peaks across all L1 segments.
+#     3. Computes ONE adaptive threshold pair from the pooled grow_max_z.
+#     4. Classifies all peaks with the pooled thresholds.
+#
+# Author: Claude (Anthropic)
+# =============================================================================
+
+suppressPackageStartupMessages({
+  library(data.table)
+})
+
+`%||%` <- function(a, b) if (is.null(a) || is.na(a)) b else a
+
+# ---- CLI --------------------------------------------------------------------
+
+args <- commandArgs(trailingOnly = TRUE)
+get_arg <- function(flag, default = NA_character_) {
+  i <- match(flag, args)
+  if (is.na(i) || i == length(args)) return(default)
+  args[i + 1]
+}
+
+precomp_f      <- get_arg("--precomp")
+sim_mat_f      <- get_arg("--sim_mat")
+l1_cat_f       <- get_arg("--l1_catalogue")
+chr_label      <- get_arg("--chr", "chr")
+outdir         <- get_arg("--outdir", ".")
+
+if (is.na(precomp_f) || !file.exists(precomp_f))
+  stop("[D17L2] --precomp is required and must exist")
+if (is.na(sim_mat_f) || !file.exists(sim_mat_f))
+  stop("[D17L2] --sim_mat is required and must exist")
+if (is.na(l1_cat_f) || !file.exists(l1_cat_f))
+  stop("[D17L2] --l1_catalogue is required and must exist (the L1 envelope TSV)")
+
+dir.create(outdir, recursive = TRUE, showWarnings = FALSE)
+
+# Boundary scan parameters
+boundary_W             <- as.integer(get_arg("--boundary_W", "5"))
+boundary_offset        <- as.integer(get_arg("--boundary_offset", "5"))
+boundary_score_min     <- as.numeric(get_arg("--boundary_score_min", "1.0"))
+boundary_min_dist      <- as.integer(get_arg("--boundary_min_dist", "10"))
+
+# Perp-ray validator parameters
+boundary_validate      <- get_arg("--boundary_validate", "TRUE")
+boundary_validate      <- !(toupper(boundary_validate) %in%
+                            c("FALSE", "F", "0", "NO"))
+boundary_perp_d_max    <- as.integer(get_arg("--boundary_perp_d_max", "20"))
+boundary_perp_min_blue_frac    <- as.numeric(get_arg(
+  "--boundary_perp_min_blue_frac", "0.70"))
+boundary_perp_max_red          <- as.numeric(get_arg(
+  "--boundary_perp_max_red", "0.50"))
+boundary_perp_first_d_red_max  <- as.integer(get_arg(
+  "--boundary_perp_first_d_red_max", "5"))
+boundary_perp_red_z            <- as.numeric(get_arg(
+  "--boundary_perp_red_z", "0.50"))
+
+# Growing-W validator parameters
+boundary_validator_mode        <- tolower(get_arg(
+  "--boundary_validator_mode", "grow"))
+boundary_grow_W_arg            <- get_arg("--boundary_grow_W", NA_character_)
+boundary_grow_W_pct_str        <- get_arg("--boundary_grow_W_pct",
+                                          "0.005,0.02,0.05,0.10,0.20,0.40")
+# NOTE: at L2 the percent-of-N series is WIDER than at L1 because segments
+# are smaller. 40% of a 500-window segment = 200 windows -- still meaningful.
+boundary_grow_W_pct            <- as.numeric(strsplit(
+  boundary_grow_W_pct_str, ",")[[1]])
+boundary_grow_W_pct            <- sort(unique(boundary_grow_W_pct[
+  is.finite(boundary_grow_W_pct) & boundary_grow_W_pct > 0]))
+boundary_grow_W_floor          <- as.integer(get_arg(
+  "--boundary_grow_W_floor", "5"))
+
+# Threshold parameters (pooled across all L2 peaks)
+boundary_grow_threshold_mode   <- tolower(get_arg(
+  "--boundary_grow_threshold_mode", "adaptive"))
+boundary_grow_real_pct         <- as.numeric(get_arg(
+  "--boundary_grow_real_pct", "0.30"))
+boundary_grow_fake_pct         <- as.numeric(get_arg(
+  "--boundary_grow_fake_pct", "0.50"))
+boundary_grow_real_max_ceiling <- as.numeric(get_arg(
+  "--boundary_grow_real_max_ceiling", "0.10"))
+boundary_grow_fake_min_floor   <- as.numeric(get_arg(
+  "--boundary_grow_fake_min_floor", "0.10"))
+boundary_grow_min_n_for_adaptive <- as.integer(get_arg(
+  "--boundary_grow_min_n_for_adaptive", "10"))
+boundary_grow_real_max         <- as.numeric(get_arg(
+  "--boundary_grow_real_max", "0.10"))
+boundary_grow_fake_min         <- as.numeric(get_arg(
+  "--boundary_grow_fake_min", "0.20"))
+boundary_grow_min_largest_W    <- as.integer(get_arg(
+  "--boundary_grow_min_largest_W", "20"))
+
+# Filter: which L1 segments to scan? Default all. Pass a regex against
+# parent_l1_id to subset.
+l1_filter_regex <- get_arg("--l1_filter_regex", NA_character_)
+
+dry_run <- !is.na(get_arg("--dry_run", NA_character_))
+
+# ---- Banner -----------------------------------------------------------------
+
+cat("[D17L2] precomp:      ", precomp_f,    "\n", sep = "")
+cat("[D17L2] sim_mat:      ", sim_mat_f,    "\n", sep = "")
+cat("[D17L2] l1_catalogue: ", l1_cat_f,     "\n", sep = "")
+cat("[D17L2] chr:          ", chr_label,    "\n", sep = "")
+cat("[D17L2] outdir:       ", outdir,       "\n", sep = "")
+cat("[D17L2] boundary scan:  W=", boundary_W,
+    "  offset=", boundary_offset,
+    "  score_min=", boundary_score_min,
+    "  min_dist=", boundary_min_dist, "\n", sep = "")
+cat("[D17L2] validator_mode=", boundary_validator_mode,
+    "  threshold_mode=", boundary_grow_threshold_mode,
+    "\n", sep = "")
+cat("[D17L2] grow W series percent-of-segment-N: ",
+    paste(boundary_grow_W_pct, collapse = ","),
+    " (floor=", boundary_grow_W_floor, ")\n", sep = "")
+
+# ---- Load precomp -----------------------------------------------------------
+
+cat("[D17L2] loading precomp\n")
+pc <- readRDS(precomp_f)
+dt_pc <- if (!is.null(pc$dt)) {
+  as.data.table(pc$dt)
+} else if (!is.null(pc$pc) && !is.null(pc$pc$dt)) {
+  as.data.table(pc$pc$dt)
+} else {
+  stop("[D17L2] cannot find dt inside precomp")
+}
+
+if (!is.null(dt_pc$start)) {
+  window_start_bp <- dt_pc$start
+  window_end_bp   <- dt_pc$end
+} else if (!is.null(dt_pc$start_bp)) {
+  window_start_bp <- dt_pc$start_bp
+  window_end_bp   <- dt_pc$end_bp
+} else if (!is.null(dt_pc$window_start)) {
+  window_start_bp <- dt_pc$window_start
+  window_end_bp   <- dt_pc$window_end
+} else if (!is.null(dt_pc$bp_start)) {
+  window_start_bp <- dt_pc$bp_start
+  window_end_bp   <- dt_pc$bp_end
+} else {
+  stop("[D17L2] precomp dt is missing window start/end columns")
+}
+
+n_windows_total <- length(window_start_bp)
+cat("[D17L2] N windows: ", n_windows_total, "\n", sep = "")
+
+# ---- Load sim_mat -----------------------------------------------------------
+
+cat("[D17L2] loading sim_mat\n")
+sm_obj <- readRDS(sim_mat_f)
+sim_mat <- if (is.matrix(sm_obj)) {
+  sm_obj
+} else if (!is.null(sm_obj$sim_mat)) {
+  sm_obj$sim_mat
+} else if (is.list(sm_obj) && length(sm_obj) >= 1L) {
+  sm_obj[[1]]
+} else {
+  stop("[D17L2] sim_mat structure not recognized")
+}
+if (nrow(sim_mat) != n_windows_total)
+  stop(sprintf("[D17L2] sim_mat has %d rows but precomp has %d windows",
+               nrow(sim_mat), n_windows_total))
+
+# ---- Load L1 catalogue ------------------------------------------------------
+
+cat("[D17L2] loading L1 catalogue\n")
+l1_dt <- fread(l1_cat_f)
+required_cols <- c("candidate_id", "start_w", "end_w")
+missing <- setdiff(required_cols, names(l1_dt))
+if (length(missing) > 0L)
+  stop("[D17L2] L1 catalogue is missing columns: ",
+       paste(missing, collapse = ", "))
+if (!is.na(l1_filter_regex)) {
+  l1_dt <- l1_dt[grepl(l1_filter_regex, candidate_id)]
+}
+n_l1_segments <- nrow(l1_dt)
+cat("[D17L2] L1 segments to scan: ", n_l1_segments, "\n", sep = "")
+if (n_l1_segments == 0L) {
+  cat("[D17L2] no L1 segments to scan -- nothing to do\n")
+  quit(status = 0L)
+}
+
+# ---- Helper: per-distance Z stats on a sub-matrix ---------------------------
+build_diag_stats <- function(sim_seg) {
+  N <- nrow(sim_seg)
+  diag_mean <- numeric(N)
+  diag_sd   <- numeric(N)
+  for (d in 0:(N - 1L)) {
+    if (d == 0L) {
+      vals <- diag(sim_seg)
+    } else {
+      ii <- seq.int(1L, N - d)
+      vals <- sim_seg[cbind(ii, ii + d)]
+    }
+    vals <- vals[is.finite(vals)]
+    if (length(vals) >= 5L) {
+      diag_mean[d + 1L] <- mean(vals)
+      sg <- sd(vals)
+      diag_sd[d + 1L]   <- if (is.finite(sg) && sg > 1e-9) sg else NA_real_
+    } else {
+      diag_mean[d + 1L] <- NA_real_
+      diag_sd[d + 1L]   <- NA_real_
+    }
+  }
+  list(diag_mean = diag_mean, diag_sd = diag_sd)
+}
+
+# ---- Helper: run a boundary scan on one segment -----------------------------
+# Returns a data.table with both LOCAL (boundary_w_local) and ABSOLUTE
+# (boundary_w) window indices. No final classification yet -- pool first.
+scan_segment <- function(sim_seg, parent_id, abs_offset) {
+  N <- nrow(sim_seg)
+  W <- boundary_W
+  G <- boundary_offset
+
+  ds <- build_diag_stats(sim_seg)
+  diag_mean <- ds$diag_mean
+  diag_sd   <- ds$diag_sd
+
+  # Per-segment grow W series
+  if (!is.na(boundary_grow_W_arg)) {
+    grow_W <- as.integer(strsplit(boundary_grow_W_arg, ",")[[1]])
+    grow_W <- grow_W[is.finite(grow_W)]
+  } else {
+    grow_W <- as.integer(round(boundary_grow_W_pct * N))
+  }
+  grow_W <- pmax(grow_W, boundary_grow_W_floor)
+  grow_W <- sort(unique(grow_W))
+
+  # Trigger scoring
+  i_lo <- W
+  i_hi <- N - G - W
+  if (i_hi < i_lo) return(NULL)
+  centers <- seq.int(i_lo, i_hi)
+  boundary_score <- rep(NA_real_, N)
+  for (ctr in centers) {
+    ii <- seq.int(ctr - W + 1L, ctr)
+    jj <- seq.int(ctr + G + 1L, ctr + G + W)
+    block <- sim_seg[ii, jj]
+    d_mat <- outer(ii, jj, FUN = function(a, b) b - a)
+    idx <- d_mat + 1L
+    mu <- diag_mean[idx]; sg <- diag_sd[idx]
+    z <- (block - mu) / sg
+    z[!is.finite(z)] <- NA_real_
+    vals <- as.numeric(z); vals <- vals[is.finite(vals)]
+    if (length(vals) >= 5L) boundary_score[ctr] <- -median(vals)
+  }
+
+  # 1D peak detection
+  peaks <- integer(0)
+  for (ctr in centers) {
+    s <- boundary_score[ctr]
+    if (!is.finite(s) || s < boundary_score_min) next
+    lo <- max(1L, ctr - boundary_min_dist)
+    hi <- min(N, ctr + boundary_min_dist)
+    win <- boundary_score[lo:hi]; win <- win[is.finite(win)]
+    if (length(win) == 0L) next
+    if (s >= max(win)) peaks <- c(peaks, ctr)
+  }
+  if (length(peaks) == 0L) return(NULL)
+
+  perp_z <- function(r, c) {
+    if (r < 1L || r > N) return(NA_real_)
+    if (c < 1L || c > N) return(NA_real_)
+    d <- abs(c - r)
+    mu <- diag_mean[d + 1L]; sg <- diag_sd[d + 1L]
+    sm <- sim_seg[r, c]
+    if (!is.finite(sm) || !is.finite(mu) || !is.finite(sg) || sg < 1e-9)
+      return(NA_real_)
+    (sm - mu) / sg
+  }
+
+  bdt <- data.table(
+    chr              = chr_label,
+    parent_l1_id     = parent_id,
+    boundary_w_local = peaks,
+    boundary_w       = peaks + abs_offset,
+    boundary_bp      = window_start_bp[peaks + abs_offset],
+    boundary_score   = boundary_score[peaks],
+    boundary_W       = W,
+    boundary_offset  = G
+  )
+  bdt <- bdt[order(boundary_w_local)]
+
+  # Perp-ray validation
+  if (boundary_validate) {
+    n_peaks <- nrow(bdt)
+    rfb <- numeric(n_peaks); lfb <- numeric(n_peaks)
+    rmz <- numeric(n_peaks); lmz <- numeric(n_peaks)
+    rfr <- integer(n_peaks); lfr <- integer(n_peaks)
+    rnf <- integer(n_peaks); lnf <- integer(n_peaks)
+    d_seq <- seq_len(boundary_perp_d_max)
+    for (k in seq_len(n_peaks)) {
+      i <- bdt$boundary_w_local[k]
+      r_vals <- vapply(d_seq, function(d) perp_z(i, i + d), numeric(1))
+      l_vals <- vapply(d_seq, function(d) perp_z(i - d, i), numeric(1))
+      ok_r <- is.finite(r_vals); rnf[k] <- sum(ok_r)
+      if (any(ok_r)) {
+        rfb[k] <- mean(r_vals[ok_r] < 0); rmz[k] <- max(r_vals[ok_r])
+        ri <- which(r_vals > boundary_perp_red_z & ok_r)
+        rfr[k] <- if (length(ri) > 0L) as.integer(ri[1]) else NA_integer_
+      } else { rfb[k] <- NA_real_; rmz[k] <- NA_real_; rfr[k] <- NA_integer_ }
+      ok_l <- is.finite(l_vals); lnf[k] <- sum(ok_l)
+      if (any(ok_l)) {
+        lfb[k] <- mean(l_vals[ok_l] < 0); lmz[k] <- max(l_vals[ok_l])
+        li <- which(l_vals > boundary_perp_red_z & ok_l)
+        lfr[k] <- if (length(li) > 0L) as.integer(li[1]) else NA_integer_
+      } else { lfb[k] <- NA_real_; lmz[k] <- NA_real_; lfr[k] <- NA_integer_ }
+    }
+    bdt[, right_frac_blue := rfb]
+    bdt[, left_frac_blue  := lfb]
+    bdt[, right_max_z     := rmz]
+    bdt[, left_max_z      := lmz]
+    bdt[, right_first_red := rfr]
+    bdt[, left_first_red  := lfr]
+    bdt[, right_n_finite  := rnf]
+    bdt[, left_n_finite   := lnf]
+    perp_status <- rep("STABLE_BLUE", n_peaks)
+    for (k in seq_len(n_peaks)) {
+      r_ok <- is.finite(rfb[k]) && rfb[k] >= boundary_perp_min_blue_frac &&
+              is.finite(rmz[k]) && rmz[k] <= boundary_perp_max_red
+      l_ok <- is.finite(lfb[k]) && lfb[k] >= boundary_perp_min_blue_frac &&
+              is.finite(lmz[k]) && lmz[k] <= boundary_perp_max_red
+      if (!(r_ok && l_ok)) {
+        early_red <-
+          (is.finite(rfr[k]) && rfr[k] <= boundary_perp_first_d_red_max) ||
+          (is.finite(lfr[k]) && lfr[k] <= boundary_perp_first_d_red_max)
+        perp_status[k] <- if (early_red) "DECAYS" else "MARGINAL"
+      }
+    }
+    bdt[, perp_status := perp_status]
+  }
+
+  # Growing-W cross-block z
+  if (boundary_validator_mode %in% c("grow", "both")) {
+    n_peaks <- nrow(bdt)
+    grow_mat <- matrix(NA_real_, nrow = n_peaks, ncol = length(grow_W))
+    colnames(grow_mat) <- sprintf("cross_z_W%d", grow_W)
+    for (k in seq_len(n_peaks)) {
+      i <- bdt$boundary_w_local[k]
+      for (wj in seq_along(grow_W)) {
+        Wgrow <- grow_W[wj]
+        ii <- (i - Wgrow + 1L):i
+        jj <- (i + G + 1L):(i + G + Wgrow)
+        if (ii[1] < 1L) next
+        if (jj[length(jj)] > N) next
+        block <- sim_seg[ii, jj]
+        d_mat <- outer(ii, jj, FUN = function(a, b) b - a)
+        idx <- d_mat + 1L
+        mu <- diag_mean[idx]; sg <- diag_sd[idx]
+        z  <- (block - mu) / sg
+        z[!is.finite(z)] <- NA_real_
+        vals <- as.numeric(z); vals <- vals[is.finite(vals)]
+        if (length(vals) >= 5L) grow_mat[k, wj] <- median(vals)
+      }
+    }
+    for (wj in seq_along(grow_W)) {
+      col <- colnames(grow_mat)[wj]
+      bdt[, (col) := grow_mat[, wj]]
+    }
+    grow_max_z <- numeric(n_peaks)
+    grow_largest_W <- integer(n_peaks)
+    grow_z_at_largest <- numeric(n_peaks)
+    for (k in seq_len(n_peaks)) {
+      row_z <- grow_mat[k, ]
+      ok <- which(is.finite(row_z))
+      if (length(ok) == 0L) {
+        grow_max_z[k]        <- NA_real_
+        grow_largest_W[k]    <- NA_integer_
+        grow_z_at_largest[k] <- NA_real_
+      } else {
+        grow_max_z[k]        <- max(row_z[ok])
+        grow_largest_W[k]    <- as.integer(grow_W[max(ok)])
+        grow_z_at_largest[k] <- row_z[max(ok)]
+      }
+    }
+    bdt[, grow_max_z        := grow_max_z]
+    bdt[, grow_largest_W    := grow_largest_W]
+    bdt[, grow_z_at_largest := grow_z_at_largest]
+  }
+
+  bdt
+}
+
+# ---- Run scan on every L1 segment -------------------------------------------
+
+cat("\n[D17L2] === SCANNING L1 SEGMENTS ===\n")
+all_bdt_list <- vector("list", n_l1_segments)
+for (k in seq_len(n_l1_segments)) {
+  row <- l1_dt[k]
+  s <- as.integer(row$start_w); e <- as.integer(row$end_w)
+  pid <- as.character(row$candidate_id)
+  N_seg <- e - s + 1L
+  if (N_seg < 2L * boundary_W + boundary_offset + 5L) {
+    cat(sprintf("[D17L2]   %s  [%d..%d]  N=%d  (too small to scan, skipping)\n",
+                pid, s, e, N_seg))
+    next
+  }
+  cat(sprintf("[D17L2]   %s  [%d..%d]  N=%d  (%.2f-%.2f Mb)\n",
+              pid, s, e, N_seg,
+              window_start_bp[s] / 1e6, window_end_bp[e] / 1e6))
+  sim_seg <- sim_mat[s:e, s:e]
+  bdt_seg <- scan_segment(sim_seg, pid, abs_offset = s - 1L)
+  if (is.null(bdt_seg) || nrow(bdt_seg) == 0L) {
+    cat("[D17L2]     no peaks\n"); next
+  }
+  cat(sprintf("[D17L2]     peaks: %d\n", nrow(bdt_seg)))
+  all_bdt_list[[k]] <- bdt_seg
+}
+all_bdt_list <- all_bdt_list[!vapply(all_bdt_list, is.null, logical(1))]
+if (length(all_bdt_list) == 0L) {
+  cat("\n[D17L2] no L2 peaks found in any L1 segment -- writing empty outputs\n")
+  bdt_all <- data.table()
+} else {
+  bdt_all <- rbindlist(all_bdt_list, fill = TRUE)
+  bdt_all[, boundary_idx := sprintf("%s_d17L2_b%04d", chr_label,
+                                    seq_len(.N))]
+  cat(sprintf("\n[D17L2] total L2 peaks across all segments: %d\n",
+              nrow(bdt_all)))
+}
+
+# ---- Pooled adaptive thresholds + final classification ----------------------
+
+if (nrow(bdt_all) > 0L && boundary_validator_mode %in% c("grow", "both")) {
+  finite_gmz <- bdt_all$grow_max_z
+  finite_gmz <- finite_gmz[is.finite(finite_gmz)]
+  use_adaptive <- (boundary_grow_threshold_mode == "adaptive") &&
+                  (length(finite_gmz) >= boundary_grow_min_n_for_adaptive)
+  if (use_adaptive) {
+    q_real <- as.numeric(quantile(finite_gmz, boundary_grow_real_pct))
+    q_fake <- as.numeric(quantile(finite_gmz, boundary_grow_fake_pct))
+    resolved_real_max <- min(q_real, boundary_grow_real_max_ceiling)
+    resolved_fake_min <- max(q_fake, boundary_grow_fake_min_floor)
+    if (resolved_fake_min <= resolved_real_max)
+      resolved_fake_min <- resolved_real_max + 0.05
+    cat(sprintf("[D17L2] POOLED adaptive thresholds (n=%d): q%.2f=%+.3f -> real_max=%+.3f  q%.2f=%+.3f -> fake_min=%+.3f\n",
+                length(finite_gmz),
+                boundary_grow_real_pct, q_real, resolved_real_max,
+                boundary_grow_fake_pct, q_fake, resolved_fake_min))
+  } else {
+    if (boundary_grow_threshold_mode == "adaptive")
+      cat(sprintf("[D17L2] adaptive requested but only %d finite peaks (need %d). Using fixed.\n",
+                  length(finite_gmz), boundary_grow_min_n_for_adaptive))
+    resolved_real_max <- boundary_grow_real_max
+    resolved_fake_min <- boundary_grow_fake_min
+    cat(sprintf("[D17L2] fixed thresholds: real_max=%+.3f  fake_min=%+.3f\n",
+                resolved_real_max, resolved_fake_min))
+  }
+  bdt_all[, resolved_real_max := resolved_real_max]
+  bdt_all[, resolved_fake_min := resolved_fake_min]
+
+  classify_grow <- function(gmax, glargest) {
+    if (!is.finite(gmax) || !is.finite(glargest)) return("EDGE")
+    if (glargest < boundary_grow_min_largest_W)   return("EDGE")
+    if (gmax <= resolved_real_max)                return("REAL")
+    if (gmax >= resolved_fake_min)                return("FAKE")
+    "MARGINAL"
+  }
+  bdt_all[, grow_status := mapply(classify_grow, grow_max_z, grow_largest_W)]
+  remap <- c("REAL" = "STABLE_BLUE", "FAKE" = "DECAYS",
+             "MARGINAL" = "MARGINAL", "EDGE" = "EDGE")
+  bdt_all[, validation_status := unname(remap[grow_status])]
+
+  tab <- table(bdt_all$validation_status)
+  cat("[D17L2] validation summary: ",
+      paste(names(tab), tab, sep = "=", collapse = "  "), "\n", sep = "")
+} else if (nrow(bdt_all) > 0L) {
+  bdt_all[, validation_status := perp_status]
+}
+
+# ---- Write boundaries -------------------------------------------------------
+
+out_b <- file.path(outdir, paste0(chr_label, "_d17L2_boundaries.tsv"))
+if (!dry_run) {
+  if (nrow(bdt_all) > 0L) {
+    setcolorder(bdt_all, c(
+      "chr", "boundary_idx", "parent_l1_id",
+      "boundary_w_local", "boundary_w", "boundary_bp",
+      "boundary_score", "boundary_W", "boundary_offset",
+      intersect(c("right_frac_blue","left_frac_blue","right_max_z","left_max_z",
+                  "right_first_red","left_first_red","right_n_finite",
+                  "left_n_finite","perp_status"), names(bdt_all)),
+      intersect(c(grep("^cross_z_W", names(bdt_all), value = TRUE),
+                  "grow_max_z","grow_largest_W","grow_z_at_largest",
+                  "grow_status","resolved_real_max","resolved_fake_min"),
+                names(bdt_all)),
+      "validation_status"
+    ))
+    fwrite(bdt_all, out_b, sep = "\t")
+    cat("[D17L2] L2 boundaries written: ", out_b, "\n", sep = "")
+  } else {
+    fwrite(data.table(), out_b, sep = "\t")
+    cat("[D17L2] L2 boundaries (empty) written: ", out_b, "\n", sep = "")
+  }
+}
+
+# ---- Derive L2 segments per L1 parent ---------------------------------------
+
+if (!dry_run) {
+  cut_keep_set <- c("STABLE_BLUE")
+  l2_segs <- vector("list", n_l1_segments)
+  for (k in seq_len(n_l1_segments)) {
+    row <- l1_dt[k]
+    s <- as.integer(row$start_w); e <- as.integer(row$end_w)
+    pid <- as.character(row$candidate_id)
+
+    if (nrow(bdt_all) > 0L && "validation_status" %in% names(bdt_all)) {
+      cuts_dt <- bdt_all[parent_l1_id == pid &
+                         validation_status %in% cut_keep_set]
+    } else {
+      cuts_dt <- bdt_all[FALSE]
+    }
+    cuts <- sort(unique(as.integer(cuts_dt$boundary_w)))
+    cuts <- cuts[is.finite(cuts) & cuts >= s & cuts < e]
+
+    if (length(cuts) == 0L) {
+      seg_starts <- s; seg_ends <- e
+    } else {
+      seg_starts <- c(s, cuts + 1L)
+      seg_ends   <- c(cuts, e)
+      keep <- seg_ends >= seg_starts
+      seg_starts <- seg_starts[keep]; seg_ends <- seg_ends[keep]
+    }
+    n_sub <- length(seg_starts)
+    sub_dt <- data.table(
+      chr           = chr_label,
+      parent_l1_id  = pid,
+      candidate_id  = sprintf("%s_d17L2_%04d_%02d", chr_label, k, seq_len(n_sub)),
+      start_w       = seg_starts,
+      end_w         = seg_ends,
+      start_bp      = window_start_bp[seg_starts],
+      end_bp        = window_end_bp[seg_ends],
+      n_windows     = seg_ends - seg_starts + 1L,
+      scale_W       = seg_ends - seg_starts + 1L,
+      status        = "L2_ENVELOPE"
+    )
+    sub_dt[, mean_sim := vapply(seq_len(.N), function(j) {
+      ss <- start_w[j]; ee <- end_w[j]
+      if (ee <= ss) return(NA_real_)
+      mean(sim_mat[ss:ee, ss:ee], na.rm = TRUE)
+    }, numeric(1))]
+    sub_dt[, density_p70 := vapply(seq_len(.N), function(j) {
+      ss <- start_w[j]; ee <- end_w[j]
+      if (ee <= ss) return(NA_real_)
+      mean(sim_mat[ss:ee, ss:ee] >= 0.70, na.rm = TRUE)
+    }, numeric(1))]
+    l2_segs[[k]] <- sub_dt
+  }
+  l2_dt <- rbindlist(l2_segs, fill = TRUE)
+  out_e <- file.path(outdir, paste0(chr_label, "_d17L2_envelopes.tsv"))
+  fwrite(l2_dt, out_e, sep = "\t")
+  cat(sprintf("[D17L2] L2 envelopes written (%d segments across %d L1 parents): %s\n",
+              nrow(l2_dt), n_l1_segments, out_e))
+
+  cat("[D17L2] L2 segments per L1 parent:\n")
+  per_parent <- l2_dt[, .N, by = parent_l1_id]
+  for (i in seq_len(nrow(per_parent))) {
+    cat(sprintf("[D17L2]   %s -> %d sub-segments\n",
+                per_parent$parent_l1_id[i], per_parent$N[i]))
+  }
+}
+
+cat("[D17L2] done\n")

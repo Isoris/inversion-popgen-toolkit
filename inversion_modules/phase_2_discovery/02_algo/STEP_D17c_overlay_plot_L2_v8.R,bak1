@@ -1,0 +1,463 @@
+#!/usr/bin/env Rscript
+# =============================================================================
+# STEP_D17c_overlay_plot_L2_v8.R
+#
+# Multi-page PDF overlay for the L1 + L2 hierarchy:
+#   Page 1     : whole-chromosome heatmap with L1 envelopes (outlines) and
+#                L1 STABLE_BLUE boundaries (red squares + text labels).
+#                Same look as STEP_D17c_overlay_plot_L1_only_v7.R.
+#   Pages 2..N+1 : one per L1 segment. Heatmap is the SUB-MATRIX
+#                  sim_mat[s:e, s:e] for that L1 segment, with diagonal-
+#                  distance Z computed locally (so colors are calibrated
+#                  to the architecture inside that segment, not the chr).
+#                  L2 boundaries inside the segment are overlaid as red
+#                  squares + text labels (same style as L1).
+#
+# Inputs:
+#   --precomp           : precomp.slim.rds
+#   --sim_mat           : sim_mat for L1 page (whole chr; nn80 typical)
+#   --sim_mat_l2        : sim_mat for L2 pages (per-segment; nn40 typical).
+#                         Optional -- defaults to --sim_mat if not given.
+#   --l1_catalogue      : *_d17L1_envelopes.tsv
+#   --l1_boundaries     : *_d17L1_boundaries.tsv
+#   --l2_boundaries     : *_d17L2_boundaries.tsv (from STEP_D17_multipass_L2_v8.R)
+#   --l2_envelopes      : *_d17L2_envelopes.tsv (optional, for overlaying L2
+#                         segment outlines on the per-segment pages)
+#   --chr               : chromosome label
+#   --outdir            : where to write the PDF
+#   --boundary_filter   : stable | non_decay | all  (applied to both L1 and L2)
+#   --page_size         : inches per page (default 14)
+#
+# Output:
+#   <chr>_d17L2_overlay.pdf  : multi-page PDF
+#
+# Author: Claude (Anthropic)
+# =============================================================================
+
+suppressPackageStartupMessages({
+  library(data.table)
+  library(ggplot2)
+  library(ggnewscale)
+  library(scales)
+  library(ggrepel)
+})
+
+`%||%` <- function(a, b) if (is.null(a) || is.na(a)) b else a
+
+# ---- CLI --------------------------------------------------------------------
+
+args <- commandArgs(trailingOnly = TRUE)
+get_arg <- function(flag, default = NA_character_) {
+  i <- match(flag, args)
+  if (is.na(i) || i == length(args)) return(default)
+  args[i + 1]
+}
+
+precomp_f      <- get_arg("--precomp")
+sim_mat_f      <- get_arg("--sim_mat")
+sim_mat_l2_f   <- get_arg("--sim_mat_l2", NA_character_)
+if (is.na(sim_mat_l2_f)) sim_mat_l2_f <- sim_mat_f
+l1_cat_f       <- get_arg("--l1_catalogue")
+l1_bnd_f       <- get_arg("--l1_boundaries")
+l2_bnd_f       <- get_arg("--l2_boundaries", NA_character_)
+l2_env_f       <- get_arg("--l2_envelopes", NA_character_)
+chr_label      <- get_arg("--chr", "chr")
+outdir         <- get_arg("--outdir", ".")
+boundary_filter <- tolower(get_arg("--boundary_filter", "stable"))
+page_size      <- as.numeric(get_arg("--page_size", "14"))
+# Cosmetics — defaults match the L1 overlay's "v7" styling
+boundary_number_size <- as.numeric(get_arg("--boundary_number_size", "3.5"))
+boundary_label_size  <- as.numeric(get_arg("--boundary_label_size",  "2.4"))
+z_clip               <- as.numeric(get_arg("--z_clip", "5"))
+
+if (is.na(precomp_f) || !file.exists(precomp_f))
+  stop("[D17L2c] --precomp is required and must exist")
+if (is.na(sim_mat_f) || !file.exists(sim_mat_f))
+  stop("[D17L2c] --sim_mat is required and must exist")
+if (is.na(l1_cat_f) || !file.exists(l1_cat_f))
+  stop("[D17L2c] --l1_catalogue is required")
+if (is.na(l1_bnd_f) || !file.exists(l1_bnd_f))
+  stop("[D17L2c] --l1_boundaries is required")
+# --l2_boundaries is OPTIONAL. If not given, the per-segment pages just
+# show the L1 segment outline with no L2 overlays -- effectively turning
+# this script into a multi-page L1 viewer.
+have_l2 <- !is.na(l2_bnd_f) && file.exists(l2_bnd_f)
+
+dir.create(outdir, recursive = TRUE, showWarnings = FALSE)
+
+cat("[D17L2c] precomp:        ", precomp_f, "\n", sep = "")
+cat("[D17L2c] sim_mat (L1):   ", sim_mat_f, "\n", sep = "")
+cat("[D17L2c] sim_mat (L2):   ", sim_mat_l2_f, "\n", sep = "")
+cat("[D17L2c] l1_catalogue:   ", l1_cat_f, "\n", sep = "")
+cat("[D17L2c] l1_boundaries:  ", l1_bnd_f, "\n", sep = "")
+cat("[D17L2c] l2_boundaries:  ",
+    if (have_l2) l2_bnd_f else "(none -- multi-page L1-only mode)",
+    "\n", sep = "")
+cat("[D17L2c] l2_envelopes:   ", if (is.na(l2_env_f)) "(none)" else l2_env_f, "\n", sep = "")
+cat("[D17L2c] boundary_filter:", boundary_filter, "\n", sep = "")
+cat("[D17L2c] outdir:         ", outdir, "\n", sep = "")
+
+# ---- Status palette (same as L1 overlay) ------------------------------------
+
+status_palette <- c(
+  "STABLE_BLUE" = "#C8102E",  # red
+  "DECAYS"      = "#999999",  # gray
+  "MARGINAL"    = "#E07B3F",  # orange
+  "EDGE"        = "#7A4FBF"   # purple
+)
+
+filter_status_set <- switch(boundary_filter,
+  "stable"    = c("STABLE_BLUE"),
+  "non_decay" = c("STABLE_BLUE", "MARGINAL", "EDGE"),
+  "all"       = c("STABLE_BLUE", "DECAYS", "MARGINAL", "EDGE"),
+  c("STABLE_BLUE")
+)
+
+# ---- Loaders ----------------------------------------------------------------
+
+load_precomp <- function(f) {
+  pc <- readRDS(f)
+  dt_pc <- if (!is.null(pc$dt)) {
+    as.data.table(pc$dt)
+  } else if (!is.null(pc$pc) && !is.null(pc$pc$dt)) {
+    as.data.table(pc$pc$dt)
+  } else {
+    stop("[D17L2c] cannot find dt inside precomp")
+  }
+  if (!is.null(dt_pc$start)) {
+    list(start_bp = dt_pc$start, end_bp = dt_pc$end)
+  } else if (!is.null(dt_pc$start_bp)) {
+    list(start_bp = dt_pc$start_bp, end_bp = dt_pc$end_bp)
+  } else if (!is.null(dt_pc$window_start)) {
+    list(start_bp = dt_pc$window_start, end_bp = dt_pc$window_end)
+  } else if (!is.null(dt_pc$bp_start)) {
+    list(start_bp = dt_pc$bp_start, end_bp = dt_pc$bp_end)
+  } else {
+    stop("[D17L2c] precomp missing window start/end columns")
+  }
+}
+
+load_sim <- function(f) {
+  sm_obj <- readRDS(f)
+  if (is.matrix(sm_obj))                   return(sm_obj)
+  if (!is.null(sm_obj$sim_mat))            return(sm_obj$sim_mat)
+  if (is.list(sm_obj) && length(sm_obj))   return(sm_obj[[1]])
+  stop("[D17L2c] sim_mat structure not recognized")
+}
+
+cat("[D17L2c] loading precomp\n")
+pc_lst <- load_precomp(precomp_f)
+window_start_bp <- pc_lst$start_bp
+window_end_bp   <- pc_lst$end_bp
+N <- length(window_start_bp)
+cat("[D17L2c] N windows: ", N, "\n", sep = "")
+
+cat("[D17L2c] loading sim_mat L1\n")
+sim_mat_l1 <- load_sim(sim_mat_f)
+if (nrow(sim_mat_l1) != N)
+  stop("[D17L2c] sim_mat (L1) rows != N windows")
+
+if (sim_mat_l2_f == sim_mat_f) {
+  sim_mat_l2 <- sim_mat_l1
+} else {
+  cat("[D17L2c] loading sim_mat L2\n")
+  sim_mat_l2 <- load_sim(sim_mat_l2_f)
+  if (nrow(sim_mat_l2) != N)
+    stop("[D17L2c] sim_mat (L2) rows != N windows")
+}
+
+cat("[D17L2c] loading L1 catalogue + boundaries\n")
+l1_envs <- fread(l1_cat_f)
+l1_bnd  <- fread(l1_bnd_f)
+l1_bnd_keep <- if ("validation_status" %in% names(l1_bnd))
+  l1_bnd[validation_status %in% filter_status_set] else l1_bnd
+
+if (have_l2) {
+  cat("[D17L2c] loading L2 boundaries\n")
+  l2_bnd <- fread(l2_bnd_f)
+  l2_bnd_keep <- if (nrow(l2_bnd) > 0L && "validation_status" %in% names(l2_bnd))
+    l2_bnd[validation_status %in% filter_status_set] else l2_bnd[FALSE]
+} else {
+  cat("[D17L2c] L2 boundaries not provided -- multi-page L1-only mode\n")
+  l2_bnd      <- data.table()
+  l2_bnd_keep <- data.table()
+}
+
+l2_envs <- if (have_l2 && !is.na(l2_env_f) && file.exists(l2_env_f))
+  fread(l2_env_f) else NULL
+
+# ---- Per-distance Z (local within an x-range) ------------------------------
+# Computes a Z(i,j) matrix on a sub-matrix using the sub-matrix's own
+# per-distance mean/sd. Returns the Z matrix clipped at +/- z_clip.
+compute_local_z <- function(sm, z_clip = 5) {
+  Nl <- nrow(sm)
+  out <- matrix(NA_real_, Nl, Nl)
+  for (d in 0:(Nl - 1L)) {
+    if (d == 0L) {
+      v <- diag(sm); ii <- seq_len(Nl); jj <- ii
+    } else {
+      ii <- seq.int(1L, Nl - d); jj <- ii + d
+      v  <- sm[cbind(ii, jj)]
+    }
+    okv <- v[is.finite(v)]
+    if (length(okv) < 5L) next
+    mu <- mean(okv); sg <- sd(okv)
+    if (!is.finite(sg) || sg < 1e-9) next
+    z <- (v - mu) / sg
+    out[cbind(ii, jj)] <- z
+    out[cbind(jj, ii)] <- z   # symmetric Z
+  }
+  out[out >  z_clip] <-  z_clip
+  out[out < -z_clip] <- -z_clip
+  out
+}
+
+# ---- Boundary square geometry helper ---------------------------------------
+# Returns the brect data.table with sq_xmin..sq_ymax columns AND the
+# anchor_w column. Inputs: a peaks data.table, plus min/max window in the
+# plot view (for clipping). draw_W is the visual square edge.
+build_brect <- function(bnd_dt, w_min, w_max, draw_W = 5L) {
+  if (nrow(bnd_dt) == 0L) return(NULL)
+  brect <- copy(bnd_dt)
+  bG <- if ("boundary_offset" %in% names(brect))
+    as.integer(brect$boundary_offset[1]) else 5L
+  if (!is.finite(bG)) bG <- 5L
+  shift_to_gap_center <- as.integer(ceiling((bG + 1L) / 2L))
+  brect[, anchor_w := boundary_w + shift_to_gap_center]
+  brect[, sq_xmin := anchor_w - draw_W + 0.5]
+  brect[, sq_xmax := anchor_w + 0.5]
+  brect[, sq_ymin := anchor_w - 0.5]
+  brect[, sq_ymax := anchor_w + draw_W - 0.5]
+  brect[, draw_W_used := draw_W]
+  brect <- brect[anchor_w >= w_min & anchor_w <= w_max]
+  brect
+}
+
+# ---- Page builder -----------------------------------------------------------
+# Builds one ggplot for a window range [w_lo, w_hi]. The heatmap below the
+# diagonal is `sm[w_lo..w_hi, w_lo..w_hi]` similarity (lower triangle), the
+# heatmap above is the local Z (upper triangle). Boundaries to overlay are
+# in `bnd` (data.table with boundary_w in absolute coords).
+# `envs` is the segment outlines to draw (data.table with start_w, end_w),
+# also in absolute coords.
+# `env_color` is the outline colour for the envelope rectangles. L1 envelopes
+# are drawn dark blue (#1A237E); L2 envelopes are drawn orange (#E07B3F) so
+# they're visually distinct from L1 on per-segment zoomed pages.
+build_page <- function(sm, w_lo, w_hi, bnd, envs, page_title,
+                       env_color = "#1A237E", env_linewidth = 0.6) {
+  Nl <- w_hi - w_lo + 1L
+  sub <- sm[w_lo:w_hi, w_lo:w_hi]
+  # local Z
+  z_mat <- compute_local_z(sub, z_clip = 5)
+  # build long-form: x = row index (varies fast), y = column index (varies slow).
+  # Matches the L1 overlay convention: aes(x = i (row), y = j (col)).
+  abs_idx <- w_lo:w_hi
+  i_row <- rep(abs_idx, times = Nl)   # row, varies fastly (column-major)
+  j_col <- rep(abs_idx, each  = Nl)   # col, varies slowly
+  sim_v <- as.numeric(sub)
+  z_v   <- as.numeric(z_mat)
+  # In this convention the diagonal is i_row == j_col. We render the lower
+  # triangle (j_col < i_row) as similarity and the upper triangle
+  # (j_col > i_row) as local Z, which matches the L1 overlay's split.
+  is_lower <- j_col < i_row
+  is_upper <- j_col > i_row
+  hm_dt <- data.table(x = i_row, y = j_col,
+                      lower = ifelse(is_lower, sim_v, NA_real_),
+                      upper = ifelse(is_upper, z_v,   NA_real_))
+  # Drop fully-NA rows (diagonal) for speed
+  hm_dt <- hm_dt[is.finite(lower) | is.finite(upper)]
+
+  # Quantile-based color stretching for the similarity palette so the
+  # heatmap reads the same way as the L1 overlay (q05..q98 anchors).
+  sim_v_finite <- sim_v[is.finite(sim_v)]
+  q_lo <- if (length(sim_v_finite) > 0L)
+            as.numeric(quantile(sim_v_finite, 0.05, na.rm = TRUE)) else 0.0
+  q_hi <- if (length(sim_v_finite) > 0L)
+            as.numeric(quantile(sim_v_finite, 0.98, na.rm = TRUE)) else 1.0
+  if (!is.finite(q_lo)) q_lo <- 0.0
+  if (!is.finite(q_hi) || q_hi <= q_lo) q_hi <- min(1.0, q_lo + 0.1)
+  z_max_local <- max(abs(hm_dt$upper), na.rm = TRUE)
+  if (!is.finite(z_max_local) || z_max_local < 1e-3) z_max_local <- 1
+  z_max_local <- min(z_max_local, z_clip)
+
+  p <- ggplot() +
+    # Lower triangle: similarity (matches L1 overlay's pale->green->yellow->orange->red)
+    geom_raster(data = hm_dt[is.finite(lower)],
+                aes(x = x, y = y, fill = lower)) +
+    scale_fill_gradientn(
+      colours = c("#F8F8F8", "#A8DBC2", "#F2DC78", "#E08838", "#7E1F1F"),
+      values  = scales::rescale(c(0, q_lo, (q_lo + q_hi) / 2, q_hi, 1)),
+      limits  = c(0, 1), oob = scales::squish,
+      name    = "Similarity\n(lower)"
+    ) +
+    ggnewscale::new_scale_fill() +
+    # Upper triangle: Z (matches L1 overlay's deeper blue->white->deeper red)
+    geom_raster(data = hm_dt[is.finite(upper)],
+                aes(x = x, y = y, fill = upper)) +
+    scale_fill_gradient2(
+      low      = "#2C5AA0",
+      mid      = "#FAFAFA",
+      high     = "#B22222",
+      midpoint = 0,
+      limits   = c(-z_max_local, z_max_local),
+      oob      = scales::squish,
+      name     = "Z (diagonal)\n(upper)"
+    ) +
+    # Diagonal as a thin yellow line (drawn via segment for crispness)
+    annotate("segment",
+             x = w_lo - 0.5, y = w_lo - 0.5,
+             xend = w_hi + 0.5, yend = w_hi + 0.5,
+             colour = "#E8C547", linewidth = 0.4, alpha = 0.8) +
+    coord_fixed(xlim = c(w_lo - 0.5, w_hi + 0.5),
+                ylim = c(w_lo - 0.5, w_hi + 0.5),
+                expand = FALSE) +
+    labs(title = page_title, x = "window index", y = "window index") +
+    theme_minimal(base_size = 10) +
+    theme(legend.position = "bottom",
+          panel.grid = element_blank(),
+          plot.title  = element_text(size = 12, face = "bold"))
+
+  # Envelope outlines (absolute coords)
+  if (!is.null(envs) && nrow(envs) > 0L) {
+    envs_view <- envs[end_w >= w_lo & start_w <= w_hi]
+    if (nrow(envs_view) > 0L) {
+      env_rect <- envs_view[, .(
+        xmin = pmax(start_w, w_lo) - 0.5,
+        xmax = pmin(end_w,   w_hi) + 0.5,
+        ymin = pmax(start_w, w_lo) - 0.5,
+        ymax = pmin(end_w,   w_hi) + 0.5)]
+      p <- p +
+        geom_rect(data = env_rect,
+                  aes(xmin = xmin, xmax = xmax,
+                      ymin = ymin, ymax = ymax),
+                  fill = NA, colour = env_color, linewidth = env_linewidth,
+                  inherit.aes = FALSE)
+    }
+  }
+
+  # Boundary squares + labels
+  brect <- build_brect(bnd, w_min = w_lo, w_max = w_hi)
+  if (!is.null(brect) && nrow(brect) > 0L) {
+    number_dx <- Nl * 0.005
+    text_dx   <- Nl * 0.020
+    has_perp   <- "right_frac_blue" %in% names(brect)
+    has_grow   <- "grow_max_z"      %in% names(brect)
+    brect[, label_text_b := {
+      base <- sprintf("%s  %.2f Mb  s=%.1f",
+                      boundary_idx, boundary_bp / 1e6, boundary_score)
+      if (has_grow) base <- sprintf("%s  gmz=%+.2f", base, grow_max_z)
+      if (has_perp) base <- sprintf("%s  rfb=%.2f lfb=%.2f rmz=%+.1f lmz=%+.1f",
+                                    base, right_frac_blue, left_frac_blue,
+                                    right_max_z, left_max_z)
+      base
+    }]
+    brect[, number_text := {
+      raw <- sub("^.*?b0*([0-9]+)$", "\\1", boundary_idx)
+      ifelse(grepl("^[0-9]+$", raw), raw, as.character(seq_len(.N)))
+    }]
+    p <- p +
+      ggnewscale::new_scale_fill() +
+      geom_rect(data = brect,
+                aes(xmin = sq_xmin, xmax = sq_xmax,
+                    ymin = sq_ymin, ymax = sq_ymax,
+                    fill = validation_status),
+                colour = NA, inherit.aes = FALSE) +
+      scale_fill_manual(values = status_palette, drop = TRUE,
+                        guide = "none") +
+      ggrepel::geom_text_repel(
+        data = brect,
+        aes(x = anchor_w, y = anchor_w, label = label_text_b,
+            colour = validation_status),
+        size = boundary_label_size, fontface = "plain",
+        nudge_x = text_dx, direction = "y",
+        force = 0.5, force_pull = 0,
+        hjust = 0, bg.colour = "white", bg.r = 0.15,
+        segment.size = 0.3, segment.alpha = 0.6,
+        min.segment.length = 0,
+        max.overlaps = Inf, seed = 2,
+        inherit.aes = FALSE, show.legend = FALSE) +
+      scale_colour_manual(values = status_palette, drop = TRUE,
+                          guide = "none") +
+      ggnewscale::new_scale_colour() +
+      # Place the boundary number AT THE CENTER of the boundary square
+      # (square spans [anchor-draw_W+0.5 .. anchor+0.5] x [anchor-0.5 ..
+      # anchor+draw_W-0.5], so center is anchor_w + (1-draw_W)/2 in x and
+      # anchor_w + (draw_W-1)/2 in y). Use plain geom_text for stable
+      # positioning -- no ggrepel pulling it away.
+      geom_text(
+        data = brect,
+        aes(x = anchor_w + (1 - draw_W_used) / 2,
+            y = anchor_w + (draw_W_used - 1) / 2,
+            label = number_text),
+        size       = boundary_number_size,
+        colour     = "#7A0000",
+        fontface   = "bold",
+        inherit.aes = FALSE,
+        show.legend = FALSE)
+  }
+  p
+}
+
+# ---- Build all pages --------------------------------------------------------
+
+n_l1 <- nrow(l1_envs)
+cat(sprintf("[D17L2c] L1 segments to render as zoom pages: %d\n", n_l1))
+
+outpath <- file.path(outdir, paste0(chr_label, "_d17L2_overlay.pdf"))
+cat("[D17L2c] writing PDF: ", outpath, "\n", sep = "")
+pdf(outpath, width = page_size, height = page_size)
+
+# Page 1: whole chromosome at nn80 (or whatever --sim_mat is) with L1 overlays
+title1 <- sprintf("%s | whole chromosome (L1 sim_mat) | L1 envelopes (%d) | L1 STABLE_BLUE boundaries (%d)",
+                  chr_label, n_l1, nrow(l1_bnd_keep))
+cat("[D17L2c]   page 1: whole chromosome (L1 sim_mat)\n")
+p1 <- build_page(sim_mat_l1, 1L, N, l1_bnd_keep, l1_envs, title1)
+print(p1)
+
+# Page 2: whole chromosome at the L2 sim_mat (e.g. nn40) -- same L1
+# overlays as page 1, but rendered against the noisier-but-finer
+# heatmap so the user can compare. If sim_mat_l2_f == sim_mat_f then
+# this page is a duplicate of page 1; in that case we skip it.
+page_offset <- 1L
+if (sim_mat_l2_f != sim_mat_f) {
+  title2 <- sprintf("%s | whole chromosome (L2 sim_mat) | L1 envelopes (%d) | L1 STABLE_BLUE boundaries (%d)",
+                    chr_label, n_l1, nrow(l1_bnd_keep))
+  cat("[D17L2c]   page 2: whole chromosome (L2 sim_mat)\n")
+  p2 <- build_page(sim_mat_l2, 1L, N, l1_bnd_keep, l1_envs, title2)
+  print(p2)
+  page_offset <- 2L
+}
+
+# Pages (page_offset+1)..(page_offset+n_l1): per-L1-segment zoomed views.
+# When --l2_boundaries is given, L2 boundaries inside each L1 segment are
+# overlaid; otherwise these are just zoomed L1 views with no L2 markers.
+for (k in seq_len(n_l1)) {
+  row <- l1_envs[k]
+  s <- as.integer(row$start_w); e <- as.integer(row$end_w)
+  pid <- as.character(row$candidate_id)
+  l2_in <- if (nrow(l2_bnd_keep) > 0L)
+    l2_bnd_keep[parent_l1_id == pid] else l2_bnd_keep
+  l2_envs_in <- if (!is.null(l2_envs))
+    l2_envs[parent_l1_id == pid] else NULL
+  title_k <- if (have_l2) {
+    sprintf("%s | L1 segment %d/%d (%s) | %.2f-%.2f Mb | L2 boundaries (%d)",
+            chr_label, k, n_l1, pid,
+            window_start_bp[s] / 1e6, window_end_bp[e] / 1e6,
+            nrow(l2_in))
+  } else {
+    sprintf("%s | L1 segment %d/%d (%s) | %.2f-%.2f Mb (zoomed L1 view)",
+            chr_label, k, n_l1, pid,
+            window_start_bp[s] / 1e6, window_end_bp[e] / 1e6)
+  }
+  cat(sprintf("[D17L2c]   page %d: %s  [%d..%d]  N=%d\n",
+              k + page_offset, pid, s, e, e - s + 1L))
+  # On per-segment pages, draw L2 envelopes in orange (#E07B3F) so they are
+  # visually distinct from L1 envelopes (dark blue on whole-chr pages).
+  # Slightly thicker line so the orange reads clearly against the heatmap.
+  p_k <- build_page(sim_mat_l2, s, e, l2_in, l2_envs_in, title_k,
+                    env_color = "#E07B3F", env_linewidth = 0.8)
+  print(p_k)
+}
+
+dev.off()
+cat("[D17L2c] done\n")
