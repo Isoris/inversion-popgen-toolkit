@@ -243,7 +243,7 @@ In strict priority order:
 1. Run LG28 dry-run from `RUNBOOK_produce_phase2_jsons.md` Section 1
    (~1 hour wall clock)
 2. Browser smoke test: drag-drop `LG28_ghsl.json` and `LG28_theta.json`
-   into `Atlas/atlas.html`, verify no console errors, verify panels render
+   into `Atlas/Inversion_atlas.html`, verify no console errors, verify panels render
    (~5 min)
 3. Send back evidence: screenshot, structural dump, or console error log
 

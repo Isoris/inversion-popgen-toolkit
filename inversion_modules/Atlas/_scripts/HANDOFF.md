@@ -22,7 +22,7 @@ If something fails, the runbook's troubleshooting section names the 5 most likel
 
 ## Second action — atlas browser test (~5 min)
 
-Open `Atlas/atlas.html`. Load existing dosage precomp first. Drag-drop `LG28_ghsl.json`. Click page 15 tab.
+Open `Atlas/Inversion_atlas.html`. Load existing dosage precomp first. Drag-drop `LG28_ghsl.json`. Click page 15 tab.
 
 **Expected:** sim_mat heatmap renders. Four other panels show TODO placeholders.
 

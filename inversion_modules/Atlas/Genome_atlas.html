@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Genome Atlas — Assembly / Synteny / Annotations lens</title>
+<style>
+  :root {
+    --bg: #0e1116;
+    --panel: #151a22;
+    --panel-2: #1c2330;
+    --panel-3: #2a3242;
+    --ink: #e7edf3;
+    --ink-dim: #8a94a3;
+    --ink-dimmer: #5a6472;
+    --accent: #e48a3c;
+    --accent-2: #4fa3ff;
+    --good: #5fd49a;
+    --bad: #e0555c;
+    --neutral: #8a94a3;
+    --rule: #2a3242;
+    --mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  }
+  html[data-theme="light"] {
+    --bg:           #fafbfc;
+    --panel:        #ffffff;
+    --panel-2:      #f1f3f6;
+    --panel-3:      #e3e7ec;
+    --ink:          #1a1f26;
+    --ink-dim:      #5b6573;
+    --ink-dimmer:   #98a0ac;
+    --rule:         #d8dde3;
+    --accent:       #c2410c;
+    --accent-2:     #2563eb;
+    --good:         #16a34a;
+    --bad:          #dc2626;
+    --neutral:      #5b6573;
+  }
+  html[data-theme="academic"] {
+    --bg:           #f7f5ef;
+    --panel:        #fefcf6;
+    --panel-2:      #efebe0;
+    --panel-3:      #e5dfd1;
+    --ink:          #2b2d31;
+    --ink-dim:      #5e6168;
+    --ink-dimmer:   #97999f;
+    --rule:         #c9c4b6;
+    --accent:       #7a4f1a;
+    --accent-2:     #2c5d8c;
+    --good:         #4f7a4d;
+    --bad:          #8c2f2f;
+    --neutral:      #6e6f74;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--mono);
+         font-size: 13px; line-height: 1.5;
+         display: flex; flex-direction: column; min-height: 100vh; }
+
+  header { padding: 10px 22px; border-bottom: 1px solid var(--rule);
+           display: flex; align-items: baseline; gap: 18px; height: 44px;
+           background: var(--panel); }
+  header h1 { font-size: 16px; font-weight: 500; margin: 0; letter-spacing: 0.02em; }
+  header .meta { color: var(--ink-dim); font-family: var(--mono); font-size: 11px; }
+  header .meta b { color: var(--ink); font-weight: 500; }
+
+  /* Atlas selector dropdown — same as in Inversion_atlas.html */
+  /* v4 turn 73f: flex-shrink: 0 added because in stub atlases (with longer
+     meta strings and fewer header items than Inversion), the flex layout
+     was squeezing the indicator down to zero width and effectively hiding
+     it. Force it to keep its natural size. */
+  header #atlasModeIndicator { position: relative; align-self: center; margin: 0 8px;
+                                font-family: var(--mono); font-size: 10.5px;
+                                flex-shrink: 0; }
+  header #atlasActiveBtn { flex-shrink: 0; }
+  header #atlasActiveBtn:hover { background: rgba(228, 138, 60, 0.30) !important;
+                                  border-color: rgba(228, 138, 60, 0.85) !important; }
+  header .meta { flex-shrink: 1; min-width: 0;
+                 overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  header #atlasModeIndicator:hover #atlasDropdown,
+  header #atlasModeIndicator:focus-within #atlasDropdown { display: block !important; }
+  header .atlas-row:hover { color: var(--ink) !important; }
+  header .atlas-row[data-color="blue"]:hover   { background: rgba(64, 144, 220, 0.18) !important; }
+  header .atlas-row[data-color="green"]:hover  { background: rgba(72, 200, 120, 0.18) !important; }
+  header .atlas-row[data-color="orange"]:hover { background: rgba(228, 138, 60, 0.18) !important; }
+  header .atlas-row[data-color="yellow"]:hover { background: rgba(232, 196, 76, 0.18) !important; }
+
+  header #themeToggleBtn {
+    margin-left: auto; align-self: center;
+    background: var(--panel-2); border: 1px solid var(--rule); color: var(--ink);
+    padding: 4px 12px; font-family: var(--mono); font-size: 11px;
+    border-radius: 3px; cursor: pointer; line-height: 1;
+    white-space: nowrap; flex-shrink: 0;
+  }
+  header #themeToggleBtn:hover {
+    background: var(--panel-3); border-color: var(--accent);
+  }
+
+  /* Tab bar — single tab for now (this is a stub) */
+  #tabBar { display: flex; gap: 0; height: 32px; padding: 0 22px;
+            background: var(--panel); border-bottom: 1px solid var(--rule);
+            align-items: stretch; flex-shrink: 0; }
+  #tabBar button { background: none; border: none; color: var(--ink-dim);
+                   font-family: var(--mono); font-size: 11px; padding: 0 16px;
+                   cursor: pointer; letter-spacing: 0.04em;
+                   border-bottom: 2px solid transparent;
+                   transition: color 0.1s, border-color 0.1s;
+                   white-space: nowrap; }
+  #tabBar button:hover { color: var(--ink); }
+  #tabBar button.active { color: var(--ink); border-bottom-color: var(--accent);
+    background: linear-gradient(to bottom,
+      rgba(228, 138, 60, 0.22) 0%,
+      rgba(228, 138, 60, 0.08) 50%,
+      rgba(228, 138, 60, 0.00) 100%); }
+  #tabBar button .num { font-family: var(--mono); color: var(--ink-dimmer);
+                        font-size: 9px; margin-right: 4px; }
+
+  /* Page system */
+  .page { display: none; flex: 1; overflow-y: auto; }
+  .page.active { display: block; }
+
+  /* Code style */
+  code { font-family: var(--mono); font-size: 0.92em;
+         background: var(--panel-2); padding: 1px 5px; border-radius: 3px;
+         border: 1px solid var(--rule); color: var(--accent); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Genome Atlas</h1>
+  <span class="meta">Genome-assembly + annotation lens · 226-sample <i>C. gariepinus</i> cohort · stub / scaffold</span>
+
+  <div id="atlasModeIndicator" title="Active atlas — hover to see all four">
+    <button id="atlasActiveBtn"
+            data-atlas-mode="genome"
+            title="Currently viewing the Genome Atlas. Hover to switch atlases."
+            style="background: rgba(228, 138, 60, 0.18); color: var(--ink);
+                   border: 1px solid rgba(228, 138, 60, 0.55);
+                   border-radius: 3px; padding: 3px 12px;
+                   cursor: pointer; line-height: 1.4;
+                   font-family: var(--mono); font-size: 10.5px;
+                   letter-spacing: 0.04em; white-space: nowrap;">
+      Genome Atlas <span style="opacity: 0.6; margin-left: 4px;">▾</span>
+    </button>
+    <div id="atlasDropdown"
+         style="position: absolute; top: 100%; left: 0; right: 0; min-width: 100%;
+                background: var(--panel-2); border: 1px solid var(--rule);
+                border-radius: 0 0 3px 3px; padding: 2px 0;
+                display: none; z-index: 200;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);">
+      <a data-atlas-mode="inversion" data-color="blue"
+         href="Inversion_atlas.html"
+         title="Inversion Atlas — curate candidates, manage tracks, refine boundaries."
+         class="atlas-row"
+         style="display: block; width: 100%; text-align: left; box-sizing: border-box;
+                background: transparent; color: var(--ink-dim);
+                border: none;
+                border-left: 3px solid rgba(64, 144, 220, 0.85);
+                padding: 4px 12px; cursor: pointer; text-decoration: none;
+                font-family: var(--mono); font-size: 10.5px;
+                letter-spacing: 0.04em; white-space: nowrap;
+                transition: background 80ms, color 80ms;">Inversion Atlas</a>
+      <a data-atlas-mode="diversity" data-color="green"
+         href="Diversity_atlas.html"
+         title="Diversity Atlas — population-genetic-diversity lens (θπ, F_ROH, ROH atlas, ancestry-Q stratification, kinship/relatedness)."
+         class="atlas-row"
+         style="display: block; width: 100%; text-align: left; box-sizing: border-box;
+                background: transparent; color: var(--ink-dim);
+                border: none;
+                border-left: 3px solid rgba(72, 200, 120, 0.85);
+                padding: 4px 12px; cursor: pointer; text-decoration: none;
+                font-family: var(--mono); font-size: 10.5px;
+                letter-spacing: 0.04em; white-space: nowrap;
+                transition: background 80ms, color 80ms;">Diversity Atlas →</a>
+      <a data-atlas-mode="population" data-color="yellow"
+         href="Population_atlas.html"
+         title="Population Atlas — Samples / QC / Families / Heterozygosity / Diversity / Inbreeding."
+         class="atlas-row"
+         style="display: block; width: 100%; text-align: left; box-sizing: border-box;
+                background: transparent; color: var(--ink-dim);
+                border: none;
+                border-left: 3px solid rgba(232, 196, 76, 0.85);
+                padding: 4px 12px; cursor: pointer; text-decoration: none;
+                font-family: var(--mono); font-size: 10.5px;
+                letter-spacing: 0.04em; white-space: nowrap;
+                transition: background 80ms, color 80ms;">Population Atlas →</a>
+    </div>
+  </div>
+
+  <button id="themeToggleBtn" title="Cycle theme: dark → light → academic">☀ light</button>
+</header>
+
+<nav id="tabBar">
+  <button data-page="page1" class="active"><span class="num">1</span> genome · scaffold</button>
+</nav>
+
+<div id="page1" class="page active">
+<div id="genomeAtlasContent" style="padding: 40px 32px; max-width: 1180px; margin: 0 auto;
+                                         color: var(--ink); font-family: var(--mono);
+                                         font-size: 11.5px; line-height: 1.65;">
+      <div style="font-size: 16px; font-weight: 600; margin-bottom: 4px; color: var(--ink);">
+        <span style="color: #ff8c6e;">▰</span> Genome Atlas — landing / scaffold preview
+      </div>
+      <div style="font-size: 11.5px; color: var(--ink-dim); margin-bottom: 24px;
+                  letter-spacing: 0.02em;">
+        SCHEMA §28 · layout-only · per-page renderers ship as cluster-side genome layers land
+      </div>
+
+      <!-- ── Section 1: Vision / what this atlas is for ─────────────────── -->
+      <div style="background: var(--panel-2); border: 1px solid var(--rule);
+                  border-left: 3px solid #ff8c6e; border-radius: 4px;
+                  padding: 16px 18px; margin-bottom: 18px;">
+        <div style="display: flex; justify-content: space-between; align-items: baseline;
+                    margin-bottom: 10px;">
+          <div style="font-size: 12px; font-weight: 600; color: var(--ink);">
+            The third atlas
+          </div>
+          <div style="font-size: 9.5px; color: #c97a4f; letter-spacing: 0.04em;
+                      padding: 2px 6px; border: 1px solid #c97a4f; border-radius: 2px;">
+            schema-only · phase A
+          </div>
+        </div>
+        <div style="margin-bottom: 8px;">
+          The <b>Inversion Atlas</b> reads the chromosome JSON to find structural
+          rearrangements; the <b>Diversity Atlas</b> reinterprets the same data
+          through a population-genetic-diversity lens. The <b>Genome Atlas</b>
+          is the third sibling: it grounds both in the actual reference assembly
+          + its annotations.
+        </div>
+        <div style="margin-bottom: 8px;">
+          Where the other two atlases ask "what is segregating in this cohort?",
+          the Genome Atlas asks "what is the genome itself?" — assembly quality,
+          chromosome architecture, gene content, repeat landscape, conserved
+          synteny with related Siluriformes, and the variant annotations that
+          let inversion candidates be interpreted in terms of disrupted genes
+          or regulatory elements.
+        </div>
+        <div style="color: var(--ink-dim);">
+          Three contexts the cohort lives in: this Genome Atlas (the reference)
+          — Inversion Atlas (what's polymorphic in 226 samples) — Diversity
+          Atlas (how diverse / inbred / structured the cohort is). The Genome
+          Atlas is where you cross-reference an inversion to its gene cargo
+          (phase 12) without leaving the tool.
+        </div>
+      </div>
+
+      <!-- ── Section 2: Data layers required ──────────────────────────── -->
+      <div style="background: var(--panel-2); border: 1px solid var(--rule);
+                  border-left: 3px solid #ff8c6e; border-radius: 4px;
+                  padding: 16px 18px; margin-bottom: 18px;">
+        <div style="display: flex; justify-content: space-between; align-items: baseline;
+                    margin-bottom: 10px;">
+          <div style="font-size: 12px; font-weight: 600; color: var(--ink);">
+            Required data layers
+          </div>
+          <div style="font-size: 9.5px; color: var(--ink-dim); letter-spacing: 0.04em;
+                      padding: 2px 6px; border: 1px solid var(--rule); border-radius: 2px;">
+            consumed from cluster-side genome-annotation pipeline
+          </div>
+        </div>
+        <div style="display: grid;
+                    grid-template-columns: 1.4fr 1.0fr 1.0fr 1.6fr; gap: 6px 12px;
+                    font-size: 10.5px; align-items: baseline;">
+          <div style="font-weight: 600; color: var(--ink-dim);">layer</div>
+          <div style="font-weight: 600; color: var(--ink-dim);">source</div>
+          <div style="font-weight: 600; color: var(--ink-dim);">status</div>
+          <div style="font-weight: 600; color: var(--ink-dim);">feeds</div>
+
+          <div><code>assembly_stats</code></div>
+          <div><code>BUSCO + asmstats</code></div>
+          <div data-ga-layer="assembly_stats" style="color: var(--ink-dimmer);">⚪ not loaded</div>
+          <div style="color: var(--ink-dim);">chromosome overview · QC banner</div>
+
+          <div><code>chromosome_map</code></div>
+          <div><code>FAI + AGP</code></div>
+          <div data-ga-layer="chromosome_map" style="color: var(--ink-dimmer);">⚪ not loaded</div>
+          <div style="color: var(--ink-dim);">karyotype strip · per-chrom navigation</div>
+
+          <div><code>gene_track</code></div>
+          <div><code>BRAKER / TOGA / RefSeq</code></div>
+          <div data-ga-layer="gene_track" style="color: var(--ink-dimmer);">⚪ not loaded</div>
+          <div style="color: var(--ink-dim);">gene cargo per inversion · functional context</div>
+
+          <div><code>repeat_track</code></div>
+          <div><code>RepeatMasker / EDTA</code></div>
+          <div data-ga-layer="repeat_track" style="color: var(--ink-dimmer);">⚪ not loaded</div>
+          <div style="color: var(--ink-dim);">TE landscape · breakpoint repeat enrichment</div>
+
+          <div><code>conserved_elements</code></div>
+          <div><code>Cactus / phastCons</code></div>
+          <div data-ga-layer="conserved_elements" style="color: var(--ink-dimmer);">⚪ not loaded</div>
+          <div style="color: var(--ink-dim);">UCEs · regulatory candidates</div>
+
+          <div><code>synteny_blocks</code></div>
+          <div><code>Cactus pairwise</code></div>
+          <div data-ga-layer="synteny_blocks" style="color: var(--ink-dimmer);">⚪ not loaded</div>
+          <div style="color: var(--ink-dim);">collinearity vs related Siluriformes · ancestral karyotype</div>
+
+          <div><code>centromere_telomere</code></div>
+          <div><code>tidk / centromics</code></div>
+          <div data-ga-layer="centromere_telomere" style="color: var(--ink-dimmer);">⚪ not loaded</div>
+          <div style="color: var(--ink-dim);">centromere bands · T2T completeness chip</div>
+
+          <div><code>variant_annotations</code></div>
+          <div><code>SnpEff + VEP</code></div>
+          <div data-ga-layer="variant_annotations" style="color: var(--ink-dimmer);">⚪ not loaded</div>
+          <div style="color: var(--ink-dim);">deleterious-variant overlap with inversions</div>
+        </div>
+      </div>
+
+      <!-- ── Section 3: Chromosome overview mockup ────────────────────── -->
+      <div style="background: var(--panel-2); border: 1px solid var(--rule);
+                  border-left: 3px solid #ff8c6e; border-radius: 4px;
+                  padding: 16px 18px; margin-bottom: 18px;">
+        <div style="display: flex; justify-content: space-between; align-items: baseline;
+                    margin-bottom: 10px;">
+          <div style="font-size: 12px; font-weight: 600; color: var(--ink);">
+            Chromosome overview (planned panel)
+          </div>
+          <div style="font-size: 9.5px; color: var(--ink-dim); letter-spacing: 0.04em;
+                      padding: 2px 6px; border: 1px solid var(--rule); border-radius: 2px;">
+            mockup
+          </div>
+        </div>
+        <div style="margin-bottom: 10px; color: var(--ink-dim); font-size: 10.5px;">
+          One row per chromosome, length-scaled. Each row stacks: gene density,
+          repeat density, conserved-element density, current cohort's L2
+          envelopes, current cohort's promoted candidates. Click a chromosome
+          to drill into it.
+        </div>
+        <div style="font-family: var(--mono); font-size: 10px; color: var(--ink-dim);">
+          <div style="display: grid; grid-template-columns: 60px 1fr 80px; gap: 8px;
+                      align-items: center; padding: 4px 0;">
+            <div>LG01</div>
+            <div style="background: linear-gradient(90deg, #2a1a14 0%, #4a2820 30%, #2a1a14 60%, #1a1a1a 100%);
+                        height: 14px; border-radius: 2px; opacity: 0.55;"></div>
+            <div style="text-align: right;">28.4 Mb</div>
+          </div>
+          <div style="display: grid; grid-template-columns: 60px 1fr 80px; gap: 8px;
+                      align-items: center; padding: 4px 0;">
+            <div>LG02</div>
+            <div style="background: linear-gradient(90deg, #1a1a1a 0%, #3a2418 25%, #5a3220 50%, #2a1a14 100%);
+                        height: 14px; border-radius: 2px; opacity: 0.55;"></div>
+            <div style="text-align: right;">31.2 Mb</div>
+          </div>
+          <div style="display: grid; grid-template-columns: 60px 1fr 80px; gap: 8px;
+                      align-items: center; padding: 4px 0;">
+            <div>…</div>
+            <div style="color: var(--ink-dimmer);">26 more chromosomes</div>
+            <div></div>
+          </div>
+          <div style="display: grid; grid-template-columns: 60px 1fr 80px; gap: 8px;
+                      align-items: center; padding: 4px 0;">
+            <div style="color: #ff8c6e;">LG28</div>
+            <div style="background: linear-gradient(90deg, #2a1a14 0%, #4a2820 20%, #ff8c6e44 35%, #ff8c6e88 45%, #ff8c6e44 55%, #4a2820 70%, #2a1a14 100%);
+                        height: 14px; border-radius: 2px; opacity: 0.7;"></div>
+            <div style="text-align: right; color: #ff8c6e;">19.7 Mb</div>
+          </div>
+        </div>
+        <div style="color: var(--ink-dim); font-size: 10px; margin-top: 8px;
+                    padding-top: 8px; border-top: 1px dashed var(--rule);">
+          Highlighted row = current chromosome loaded in the Inversion Atlas.
+          Mockup gradients stand in for real density tracks; all renderers ship
+          as the corresponding layers land.
+        </div>
+      </div>
+
+      <!-- ── Section 4: Panel inventory ──────────────────────────────── -->
+      <div style="background: var(--panel-2); border: 1px solid var(--rule);
+                  border-left: 3px solid #ff8c6e; border-radius: 4px;
+                  padding: 16px 18px; margin-bottom: 18px;">
+        <div style="display: flex; justify-content: space-between; align-items: baseline;
+                    margin-bottom: 10px;">
+          <div style="font-size: 12px; font-weight: 600; color: var(--ink);">
+            Planned panels
+          </div>
+          <div style="font-size: 9.5px; color: var(--ink-dim); letter-spacing: 0.04em;
+                      padding: 2px 6px; border: 1px solid var(--rule); border-radius: 2px;">
+            phase B+
+          </div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1.0fr 2.0fr; gap: 6px 14px;
+                    font-size: 10.5px; align-items: baseline;">
+          <div style="color: #ff8c6e; font-weight: 600;">Assembly QC banner</div>
+          <div style="color: var(--ink-dim);">BUSCO single-copy %, contig N50, scaffold N50, gap rate, T2T completeness chip per chromosome.</div>
+
+          <div style="color: #ff8c6e; font-weight: 600;">Chromosome strip</div>
+          <div style="color: var(--ink-dim);">Length-scaled per-chromosome rows with stacked density tracks (gene / repeat / conserved). Click to drill.</div>
+
+          <div style="color: #ff8c6e; font-weight: 600;">Gene cargo overlay</div>
+          <div style="color: var(--ink-dim);">For each promoted candidate in the Inversion Atlas, list the genes inside the inversion span. Highlight deleterious-variant overlap from VESM / SIFT4G / SnpEff.</div>
+
+          <div style="color: #ff8c6e; font-weight: 600;">TE / repeat panel</div>
+          <div style="color: var(--ink-dim);">Per-class repeat density across the chromosome. Test breakpoint zones for repeat enrichment (a known mechanism for inversion fixation).</div>
+
+          <div style="color: #ff8c6e; font-weight: 600;">Synteny ribbon</div>
+          <div style="color: var(--ink-dim);">Pairwise collinearity blocks vs related Siluriformes (e.g. <i>C. macrocephalus</i>, <i>I. punctatus</i>). Ancestral karyotype reconstruction from Cactus.</div>
+
+          <div style="color: #ff8c6e; font-weight: 600;">Conserved-element atlas</div>
+          <div style="color: var(--ink-dim);">UCEs and phastCons-derived conserved elements as a sub-track. Used to score regulatory disruption when a conserved element falls in an inversion zone.</div>
+
+          <div style="color: #ff8c6e; font-weight: 600;">Variant-annotation overlay</div>
+          <div style="color: var(--ink-dim);">SnpEff impact categories (HIGH / MODERATE / LOW / MODIFIER) summarized per inversion candidate.</div>
+        </div>
+      </div>
+
+      <!-- ── Section 5: Phasing roadmap ───────────────────────────────── -->
+      <div style="background: var(--panel-2); border: 1px solid var(--rule);
+                  border-left: 3px solid #ff8c6e; border-radius: 4px;
+                  padding: 16px 18px; margin-bottom: 18px;">
+        <div style="display: flex; justify-content: space-between; align-items: baseline;
+                    margin-bottom: 10px;">
+          <div style="font-size: 12px; font-weight: 600; color: var(--ink);">
+            Phasing roadmap
+          </div>
+          <div style="font-size: 9.5px; color: var(--ink-dim); letter-spacing: 0.04em;
+                      padding: 2px 6px; border: 1px solid var(--rule); border-radius: 2px;">
+            ship-when-ready
+          </div>
+        </div>
+        <div style="display: grid; grid-template-columns: 90px 1fr; gap: 6px 14px;
+                    font-size: 10.5px;">
+          <div style="color: #ff8c6e; font-weight: 600;">phase A</div>
+          <div style="color: var(--ink-dim);">This scaffold — schema commitment, layer inventory, panel mockups. <b style="color: var(--good);">[shipped — turn 53]</b></div>
+
+          <div style="color: #ff8c6e; font-weight: 600;">phase B</div>
+          <div style="color: var(--ink-dim);">Chromosome overview renderer — one row per chrom, length-scaled, with gene-density + repeat-density tracks. Wires <code>chromosome_map</code> + <code>gene_track</code> + <code>repeat_track</code> layers.</div>
+
+          <div style="color: #ff8c6e; font-weight: 600;">phase C</div>
+          <div style="color: var(--ink-dim);">Gene-cargo overlay on candidates — for each promoted inversion, list the genes inside its span. Surfaces deleterious-variant overlap when MODULE_CONSERVATION outputs land.</div>
+
+          <div style="color: #ff8c6e; font-weight: 600;">phase D</div>
+          <div style="color: var(--ink-dim);">Synteny + ancestral karyotype — Cactus pairwise blocks rendered as a ribbon track. Cross-references the Inversion Atlas's σ-verdicts at chromosome scale.</div>
+
+          <div style="color: #ff8c6e; font-weight: 600;">phase E</div>
+          <div style="color: var(--ink-dim);">Variant-annotation overlay — SnpEff/VEP impact categories per candidate. Final piece for the "what does this inversion break?" question.</div>
+        </div>
+      </div>
+
+      <!-- ── Section 6: Cross-references ──────────────────────────────── -->
+      <div style="background: var(--panel-2); border: 1px solid var(--rule);
+                  border-left: 3px solid #ff8c6e; border-radius: 4px;
+                  padding: 16px 18px;">
+        <div style="display: flex; justify-content: space-between; align-items: baseline;
+                    margin-bottom: 10px;">
+          <div style="font-size: 12px; font-weight: 600; color: var(--ink);">
+            Cross-references
+          </div>
+          <div style="font-size: 9.5px; color: var(--ink-dim); letter-spacing: 0.04em;
+                      padding: 2px 6px; border: 1px solid var(--rule); border-radius: 2px;">
+            see also
+          </div>
+        </div>
+        <div style="color: var(--ink-dim);">
+          • <b>Inversion Atlas</b> (tabs 1–11) — the candidate-curation tool. Genome Atlas
+          contextualizes its candidates with gene cargo, repeat density at breakpoints,
+          and conserved-element overlap.<br>
+          • <b>Diversity Atlas</b> (tab 13) — the per-sample diversity / ROH / kinship
+          interpretation of the same JSON. The two non-Inversion atlases share the
+          "render-only, compute external" architecture (turn 53 architectural note).<br>
+          • <b>Population Atlas</b> (separate HTML) — sibling deliverable covering
+          Samples / QC / Families / Heterozygosity / Diversity / Inbreeding.<br>
+          • <b>SCHEMA §28</b> — this page's specification (added in turn 53).<br>
+          • <b>MODULE_CONSERVATION</b> (cluster-side) — emits the deleterious-variant
+          calls (VESM / SIFT4G / SnpEff / GERP++) that feed the gene-cargo overlay.<br>
+          • <b>Cactus alignment</b> — feeds <code>synteny_blocks</code> +
+          <code>conserved_elements</code> layers.
+        </div>
+      </div>
+    </div>
+</div>
+
+
+<script>
+(function() {
+  const KEY = 'atlas_v1_theme';
+  const order = ['dark', 'light', 'academic'];
+  const labels = { dark: '\u2600 light', light: '\ud83d\udcd6 academic', academic: '\u263d dark' };
+  function get() {
+    try { return localStorage.getItem(KEY) || 'dark'; } catch(_) { return 'dark'; }
+  }
+  function set(t) {
+    document.documentElement.setAttribute('data-theme', t);
+    try { localStorage.setItem(KEY, t); } catch(_) {}
+    const btn = document.getElementById('themeToggleBtn');
+    if (btn) btn.textContent = labels[t];
+  }
+  // Apply on load
+  set(get());
+  // Wire the button
+  document.addEventListener('DOMContentLoaded', () => {
+    const btn = document.getElementById('themeToggleBtn');
+    if (btn) {
+      btn.textContent = labels[get()];
+      btn.addEventListener('click', () => {
+        const cur = get();
+        const next = order[(order.indexOf(cur) + 1) % order.length];
+        set(next);
+      });
+    }
+  });
+})();
+</script>
+
+</body>
+</html>

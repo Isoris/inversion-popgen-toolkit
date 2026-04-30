@@ -51,7 +51,7 @@
 # Usage
 # -----
 #   source 00_theta_config.sh
-#   Rscript STEP_TR_A_compute_theta_matrices.R <CHROM>
+#   Rscript STEP_TR_A_compute_theta_matrices.R --chrom <CHROM>
 #
 # Wall time: ~3–5 minutes per chromosome for 226 samples on LANTA scratch.
 # =============================================================================
@@ -61,10 +61,22 @@ suppressPackageStartupMessages({
 })
 
 args <- commandArgs(trailingOnly = TRUE)
-if (length(args) < 1) {
-  stop("Usage: Rscript STEP_TR00b_aggregate_pestPG.R <CHROM>")
+
+# B01-style named-arg parser — mirrors STEP_B01_mds_multimode_stage1.R
+CHROM <- NULL
+i <- 1L
+while (i <= length(args)) {
+  a <- args[i]
+  if (a == "--chrom" && i < length(args)) {
+    CHROM <- args[i + 1]; i <- i + 2L
+  } else {
+    i <- i + 1L
+  }
 }
-CHROM <- args[1]
+
+if (is.null(CHROM)) {
+  stop("Usage: Rscript STEP_TR_A_compute_theta_matrices.R --chrom <CHROM>")
+}
 
 # ── Config (from 00_theta_config.sh) ──────────────────────────────────────
 PESTPG_DIR         <- Sys.getenv("PESTPG_DIR",         unset = NA)
@@ -192,7 +204,7 @@ if (THETA_GRID_MODE == "native") {
     out_rows[[i]] <- joined[, .(sample, chrom, window_idx,
                                 start_bp = i.start_bp,
                                 end_bp   = i.end_bp,
-                                theta_pi, n_sites)]
+                                theta_pi, tP_sum, n_sites)]
     n_ok <- n_ok + 1L
     if (i %% 50 == 0) {
       message("[STEP_TR00b] processed ", i, " / ", length(samples))
@@ -226,14 +238,14 @@ if (THETA_GRID_MODE == "native") {
       warning("[STEP_TR00b] Missing/malformed pestPG for ", s, " — skip")
       n_skip <- n_skip + 1L; next
     }
-    pp_for_join <- pp[, .(mid_bp, theta_pi, n_sites)]
+    pp_for_join <- pp[, .(mid_bp, theta_pi, tP_sum, n_sites)]
     setkey(pp_for_join, mid_bp)
     joined <- pp_for_join[dosage, roll = "nearest", on = "mid_bp"]
     joined[, sample := s]
     joined[, chrom  := CHROM]
     out_rows[[i]] <- joined[, .(sample, chrom, window_idx,
                                 start_bp, end_bp,
-                                theta_pi, n_sites)]
+                                theta_pi, tP_sum, n_sites)]
     n_ok <- n_ok + 1L
     if (i %% 50 == 0) {
       message("[STEP_TR00b] processed ", i, " / ", length(samples))

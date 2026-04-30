@@ -36,13 +36,13 @@
 # Usage
 # -----
 #   source 00_theta_config.sh
-#   Rscript STEP_TR_B_classify_theta.R <CHROM> [--out-json <path>]
-#                                              [--intervals <bed.gz>]
-#                                              [--z-threshold 2.5]
-#                                              [--min-l2-windows 5]
-#                                              [--merge-gap 3]
-#                                              [--pad 1]
-#                                              [--max-k 5]
+#   Rscript STEP_TR_B_classify_theta.R --chrom <CHROM> [--out-json <path>]
+#                                                      [--intervals <bed.gz>]
+#                                                      [--z-threshold 2.5]
+#                                                      [--min-l2-windows 5]
+#                                                      [--merge-gap 3]
+#                                                      [--pad 1]
+#                                                      [--max-k 5]
 #
 # Walltime: ~30 seconds per chromosome at win10000.step2000 (16,500
 #           windows). Iterate freely on threshold tuning.
@@ -60,11 +60,9 @@ suppressPackageStartupMessages({
 # =============================================================================
 
 args <- commandArgs(trailingOnly = TRUE)
-if (length(args) < 1) {
-  stop("Usage: Rscript STEP_TR_B_classify_theta.R <CHROM> [opts]")
-}
 
-CHROM         <- args[1]
+# B01-style: all args named. CHROM is required; rest have defaults.
+CHROM         <- NULL
 OUT_JSON      <- NULL
 INTERVAL_FILE <- NULL
 Z_THRESHOLD   <- 2.5
@@ -73,17 +71,22 @@ MERGE_GAP     <- 3L
 PAD           <- 1L
 MAX_K         <- 5L
 
-i <- 2L
+i <- 1L
 while (i <= length(args)) {
   a <- args[i]
-  if (a == "--out-json"       && i < length(args)) { OUT_JSON      <- args[i + 1]; i <- i + 2L }
-  else if (a == "--intervals" && i < length(args)) { INTERVAL_FILE <- args[i + 1]; i <- i + 2L }
-  else if (a == "--z-threshold" && i < length(args)) { Z_THRESHOLD <- as.numeric(args[i + 1]); i <- i + 2L }
+  if (a == "--chrom"            && i < length(args)) { CHROM         <- args[i + 1]; i <- i + 2L }
+  else if (a == "--out-json"    && i < length(args)) { OUT_JSON      <- args[i + 1]; i <- i + 2L }
+  else if (a == "--intervals"   && i < length(args)) { INTERVAL_FILE <- args[i + 1]; i <- i + 2L }
+  else if (a == "--z-threshold" && i < length(args)) { Z_THRESHOLD   <- as.numeric(args[i + 1]); i <- i + 2L }
   else if (a == "--min-l2-windows" && i < length(args)) { MIN_L2_WIN <- as.integer(args[i + 1]); i <- i + 2L }
-  else if (a == "--merge-gap" && i < length(args)) { MERGE_GAP <- as.integer(args[i + 1]); i <- i + 2L }
-  else if (a == "--pad"       && i < length(args)) { PAD       <- as.integer(args[i + 1]); i <- i + 2L }
-  else if (a == "--max-k"     && i < length(args)) { MAX_K     <- as.integer(args[i + 1]); i <- i + 2L }
+  else if (a == "--merge-gap"   && i < length(args)) { MERGE_GAP     <- as.integer(args[i + 1]); i <- i + 2L }
+  else if (a == "--pad"         && i < length(args)) { PAD           <- as.integer(args[i + 1]); i <- i + 2L }
+  else if (a == "--max-k"       && i < length(args)) { MAX_K         <- as.integer(args[i + 1]); i <- i + 2L }
   else { i <- i + 1L }
+}
+
+if (is.null(CHROM)) {
+  stop("Usage: Rscript STEP_TR_B_classify_theta.R --chrom <CHROM> [opts]")
 }
 
 # Configuration from 00_theta_config.sh

@@ -184,41 +184,75 @@
      bordered container; "active" pill has darker bg + brighter text;
      "inactive" pills are dimmed. Hover lights up the inactive pills.
      Inline styles in the markup carry the initial state; CSS here adds
-     hover affordance. */
-  header #atlasModeIndicator { align-self: center; }
-  header .atlas-mode-pill { transition: background 120ms, color 120ms; }
-  header .atlas-mode-pill:hover:not(.active) {
-    background: var(--panel-3) !important;
-    color: var(--ink) !important;
-  }
+     hover affordance.
+     v4 turn 73d: replaced 3-pill bar with hover-expanding 4-atlas dropdown.
+     The .atlas-row class (rows in the dropdown panel) lights up on hover;
+     the dropdown reveals when #atlasModeIndicator is hovered. */
+  header #atlasModeIndicator { align-self: center; flex-shrink: 0; }
+  header #atlasActiveBtn { flex-shrink: 0; }
+  header #atlasActiveBtn:hover { background: rgba(64, 144, 220, 0.30) !important;
+                                  border-color: rgba(64, 144, 220, 0.85) !important; }
+  /* Show dropdown on hover. A small invisible spacer above the dropdown
+     prevents flicker when moving cursor from button → list. */
+  header #atlasModeIndicator:hover #atlasDropdown,
+  header #atlasModeIndicator:focus-within #atlasDropdown { display: block !important; }
+  /* Row hover highlights pick up each row's accent color, fading the bg
+     toward the row's left-border tint. */
+  header .atlas-row:hover { color: var(--ink) !important; }
+  header .atlas-row[data-color="blue"]:hover   { background: rgba(64, 144, 220, 0.18) !important; }
+  header .atlas-row[data-color="green"]:hover  { background: rgba(72, 200, 120, 0.18) !important; }
+  header .atlas-row[data-color="orange"]:hover { background: rgba(228, 138, 60, 0.18) !important; }
+  header .atlas-row[data-color="yellow"]:hover { background: rgba(232, 196, 76, 0.18) !important; }
 
   /* Tab bar pinned below header */
   #tabBar { display: flex; gap: 0; height: 32px; padding: 0 22px;
             background: var(--panel); border-bottom: 1px solid var(--rule);
-            align-items: stretch; }
-  /* v4 turn 73: white-space: nowrap on tab buttons keeps "1 local PCA |z|"
-     on a single line — without it, browsers break between the number span
-     and the description when the button is narrow (the bug Quentin saw at
-     133% zoom: tab 2 rendered as "2" on one line + "local PCA θπ" wrapped
-     below). The ellipsis prevents overflow into adjacent tabs at extreme
-     widths; better to truncate one tab than to break the row layout. */
+            align-items: stretch;
+            /* v4 turn 73b: prevent wrap of buttons themselves AND prevent
+               vertical squish by giving the bar a stable height. */
+            flex-wrap: nowrap; }
+  /* v4 turn 73b: aggressive single-line enforcement on tab buttons. The
+     bug Quentin hit at 133% zoom was the page number and label rendering
+     on separate lines (e.g. "2" then "local PCA θπ" below). Multiple
+     defenses needed because flex children in a row don't honor
+     white-space alone unless min-width: 0 is also set. */
   #tabBar button { background: none; border: none; color: var(--ink-dim);
                    font-family: var(--mono); font-size: 11px; padding: 0 16px;
                    cursor: pointer; letter-spacing: 0.04em;
                    border-bottom: 2px solid transparent;
-                   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-                   max-width: 220px;
+                   white-space: nowrap !important;
+                   word-break: keep-all;
+                   overflow: hidden; text-overflow: ellipsis;
+                   max-width: 220px; min-width: 0;
+                   /* Vertically center the (now single-line) text */
+                   display: inline-flex; align-items: center;
+                   line-height: 1;
                    transition: color 0.1s, border-color 0.1s; }
-  /* v4 turn 73: at >120% browser zoom, ttbar font-size scales with zoom,
-     pushing the active tab's text past the button width. Nudge font-size
-     down at narrow viewports so the labels stay legible. */
+  /* v4 turn 73b: descendants of tab button MUST also be inline-flow.
+     The .num span was wrapping to its own row in some browsers when the
+     button had insufficient width. Force inline rendering. */
+  #tabBar button > * { white-space: nowrap !important; display: inline; }
+  /* v4 turn 73 / 73b: at progressively narrower viewports, font shrinks
+     so labels stay legible without truncation. The active label gets
+     priority — keep it readable at the cost of others getting ellipsis. */
+  @media (max-width: 1700px) {
+    #tabBar button { font-size: 10.5px; padding: 0 13px; max-width: 200px; }
+    #tabBar button .num { font-size: 9px; }
+  }
   @media (max-width: 1500px) {
-    #tabBar button { font-size: 10px; padding: 0 12px; }
+    #tabBar button { font-size: 10px; padding: 0 11px; max-width: 180px;
+                     letter-spacing: 0.02em; }
     #tabBar button .num { font-size: 8.5px; }
   }
-  @media (max-width: 1200px) {
-    #tabBar button { font-size: 9.5px; padding: 0 9px; letter-spacing: 0.02em; }
+  @media (max-width: 1300px) {
+    #tabBar button { font-size: 9.5px; padding: 0 9px; max-width: 160px;
+                     letter-spacing: 0.01em; }
     #tabBar button .num { font-size: 8px; margin-right: 3px; }
+  }
+  @media (max-width: 1100px) {
+    #tabBar button { font-size: 9px; padding: 0 7px; max-width: 140px;
+                     letter-spacing: 0; }
+    #tabBar button .num { font-size: 7.5px; margin-right: 2px; }
   }
   #tabBar button:hover { color: var(--ink); }
   /* v3.99 turn 6: active tab gets a soft vertical alpha-gradient background
@@ -240,17 +274,18 @@
       rgba(245, 165, 36, 0.00) 100%); }
   #tabBar button .num { font-family: var(--mono); color: var(--ink-dimmer);
                         font-size: 9px; margin-right: 4px; }
-  .page { display: none; height: 100%; overflow: hidden; }
+  .page { display: none; height: 100%; min-height: 0; overflow: hidden; }
   .page.active { display: block; }
-  /* v4 turn 73: long-form scaffold pages (θπ landing, GHSL landing,
+  /* v4 turn 73 / 73b: long-form scaffold pages (θπ landing, GHSL landing,
      diversity atlas, genome atlas) need vertical scroll because their
      content (intro + required-layers table + panel-layout description)
      is taller than the viewport. The page1 grid layout overrides this
-     to manage its own canvas-fit constraint. */
+     to manage its own canvas-fit constraint.
+     v4 turn 73b: !important on overflow-y because some browsers in
+     compositing edge cases compute the .page rule's overflow:hidden
+     after the .active rule's overflow-y:auto, leaving scroll disabled. */
   .page#page12.active,
-  .page#page13.active,
-  .page#page14.active,
-  .page#page15.active { overflow-y: auto; }
+  .page#page15.active { overflow-y: auto !important; overflow-x: hidden; }
   .page#page1 { display: none; }       /* will be flipped by tab init */
   .page#page1.active { display: grid;
                        grid-template-rows: 40px 520px 100px auto 0px 28px 1fr 360px; }
@@ -263,6 +298,13 @@
      after the header + tabBar, regardless of zoom or font-size adjustments.
      min-height:0 lets the inner grid shrink/scroll its rows correctly. */
   .wrap { display: grid; grid-template-columns: 320px 1fr;
+          /* v4 turn 73b: explicit single-row template + min-height:0 so
+             child .page elements that ask for height:100% resolve against
+             a definite container, NOT against their own auto content
+             height. Without this, scaffold pages (page12, 13, 14, 15)
+             refuse to scroll at high zoom because their height matches
+             content and overflow-y: auto never engages. */
+          grid-template-rows: minmax(0, 1fr);
           flex: 1; min-height: 0;
           transition: grid-template-columns 180ms ease; }
   .wrap[data-sidebar="collapsed"] { grid-template-columns: 28px 1fr; }
@@ -2953,34 +2995,85 @@
           title="Toggle fixed (grid) vs free (scrollable) layout. Fixed fits all panels on screen; free lets panels keep their natural heights and you scroll."
           data-mode="fixed">📐 fixed</button>
   <button id="resetLayoutBtn" title="Reset layout to defaults (sidebar expanded, panels at default size)">↺ reset layout</button>
-  <!-- v4 turn 58: atlas-mode indicator. Three pills, one per atlas in the
-       trio (Inversion / Diversity / Genome). Highlights the active lens.
-       Clicking a pill switches to the corresponding atlas's first tab.
-       Mirrors the architectural commitment from turns 53/55: these three
-       are siblings, not just three tabs. State slot: state.atlas, persisted
-       to localStorage 'pca_scrubber_v3.atlasMode'. -->
-  <span id="atlasModeIndicator" title="Active atlas lens — click to switch."
-        style="display: inline-flex; gap: 0; align-self: center; margin: 0 8px;
-               border: 1px solid var(--rule); border-radius: 3px; overflow: hidden;
-               font-family: var(--mono); font-size: 10.5px;">
-    <button data-atlas-mode="inversion"
-            class="atlas-mode-pill active"
+  <!-- v4 turn 73d: atlas selector — hover-expanding dropdown unifying all
+       four atlases (Inversion / Diversity / Genome — same HTML, page mode;
+       Population — separate HTML file). Default collapsed shows the active
+       atlas as a single colored button. On hover, the other three atlases
+       reveal as a vertical list below. Color-coded:
+         Inversion = blue, Diversity = green, Genome = orange, Population = yellow.
+       Replaces the previous 3-pill segmented control. State slot:
+       state.atlas, persisted to localStorage 'pca_scrubber_v3.atlasMode'. -->
+  <div id="atlasModeIndicator" title="Active atlas — hover to see all four"
+       style="position: relative; align-self: center; margin: 0 8px;
+              font-family: var(--mono); font-size: 10.5px;">
+    <!-- Active button (always visible). Style updated by _setAtlasMode. -->
+    <button id="atlasActiveBtn"
+            data-atlas-mode="inversion"
             title="Inversion Atlas — curate candidates, manage tracks, refine boundaries (tabs 1-12)."
-            style="background: var(--panel-3); color: var(--ink); border: none;
-                   padding: 3px 9px; cursor: pointer; line-height: 1.4;">inversion</button>
-    <button data-atlas-mode="diversity"
-            class="atlas-mode-pill"
-            title="Diversity Atlas — population-genetic-diversity lens (tab 13). Render-only; needs R-side layers."
-            style="background: var(--panel-2); color: var(--ink-dim); border: none;
-                   border-left: 1px solid var(--rule);
-                   padding: 3px 9px; cursor: pointer; line-height: 1.4;">diversity</button>
-    <button data-atlas-mode="genome"
-            class="atlas-mode-pill"
-            title="Genome Atlas — assembly + annotations lens (tab 14). Render-only; needs cluster-side genome layers."
-            style="background: var(--panel-2); color: var(--ink-dim); border: none;
-                   border-left: 1px solid var(--rule);
-                   padding: 3px 9px; cursor: pointer; line-height: 1.4;">genome</button>
-  </span>
+            style="background: rgba(64, 144, 220, 0.18); color: var(--ink);
+                   border: 1px solid rgba(64, 144, 220, 0.55);
+                   border-radius: 3px; padding: 3px 12px;
+                   cursor: pointer; line-height: 1.4;
+                   font-family: var(--mono); font-size: 10.5px;
+                   letter-spacing: 0.04em; white-space: nowrap;">
+      Inversion Atlas <span style="opacity: 0.6; margin-left: 4px;">▾</span>
+    </button>
+    <!-- Dropdown panel (revealed on hover). The hover region covers both
+         the button and the panel via the wrapping div, with a small gap-
+         filling pseudo-element so moving cursor between them doesn't lose
+         hover. -->
+    <div id="atlasDropdown"
+         style="position: absolute; top: 100%; left: 0; right: 0; min-width: 100%;
+                background: var(--panel-2); border: 1px solid var(--rule);
+                border-radius: 0 0 3px 3px; padding: 2px 0;
+                display: none; z-index: 200;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);">
+      <button data-atlas-mode="inversion" data-color="blue"
+              title="Inversion Atlas — curate candidates, manage tracks, refine boundaries. You are here."
+              class="atlas-row"
+              style="display: block; width: 100%; text-align: left;
+                     background: transparent; color: var(--ink-dim); border: none;
+                     border-left: 3px solid rgba(64, 144, 220, 0.85);
+                     padding: 4px 12px; cursor: pointer;
+                     font-family: var(--mono); font-size: 10.5px;
+                     letter-spacing: 0.04em; white-space: nowrap;
+                     transition: background 80ms, color 80ms;">Inversion Atlas</button>
+      <a data-atlas-mode="diversity" data-color="green"
+         href="Diversity_atlas.html"
+         title="Open the Diversity Atlas — separate HTML, population-genetic-diversity lens (θπ, F_ROH, ROH atlas, ancestry-Q stratification, kinship/relatedness)."
+         class="atlas-row"
+         style="display: block; width: 100%; text-align: left; box-sizing: border-box;
+                background: transparent; color: var(--ink-dim); border: none;
+                border-left: 3px solid rgba(72, 200, 120, 0.85);
+                padding: 4px 12px; cursor: pointer; text-decoration: none;
+                font-family: var(--mono); font-size: 10.5px;
+                letter-spacing: 0.04em; white-space: nowrap;
+                transition: background 80ms, color 80ms;">Diversity Atlas →</a>
+      <a data-atlas-mode="genome" data-color="orange"
+         href="Genome_atlas.html"
+         title="Open the Genome Atlas — separate HTML, assembly + annotations lens (chromosome assembly stats, synteny, gene tracks, repeats, conserved elements)."
+         class="atlas-row"
+         style="display: block; width: 100%; text-align: left; box-sizing: border-box;
+                background: transparent; color: var(--ink-dim); border: none;
+                border-left: 3px solid rgba(228, 138, 60, 0.85);
+                padding: 4px 12px; cursor: pointer; text-decoration: none;
+                font-family: var(--mono); font-size: 10.5px;
+                letter-spacing: 0.04em; white-space: nowrap;
+                transition: background 80ms, color 80ms;">Genome Atlas →</a>
+      <a data-atlas-mode="population" data-color="yellow"
+         href="Population_atlas.html"
+         title="Open the Population Atlas — separate HTML covering Samples / QC / Families / Heterozygosity / Diversity / Inbreeding."
+         class="atlas-row"
+         style="display: block; width: 100%; text-align: left; box-sizing: border-box;
+                background: transparent; color: var(--ink-dim);
+                border: none;
+                border-left: 3px solid rgba(232, 196, 76, 0.85);
+                padding: 4px 12px; cursor: pointer; text-decoration: none;
+                font-family: var(--mono); font-size: 10.5px;
+                letter-spacing: 0.04em; white-space: nowrap;
+                transition: background 80ms, color 80ms;">Population Atlas →</a>
+    </div>
+  </div>
   <button id="themeToggleBtn" title="Cycle theme: dark → light → academic → dark">☀ light</button>
 </header>
 
@@ -3033,33 +3126,16 @@
   <button data-page="page9" title="Carousel walk-through of all candidates marked confirmed on page 2."><span class="num">10</span> confirmed</button>
   <button data-page="page10" title="Diagnostic PCR marker panels per candidate. Activates when marker_panel_summary is loaded (phase 13 output)." id="page10TabBtn" style="display: none;"><span class="num">11</span> markers</button>
   <button data-page="page5" title="Help / vocabulary / hotkeys / pipeline diagram."><span class="num">12</span> help</button>
-  <!-- v4: NEW Diversity Atlas landing page (page13). Layout-only scaffold;
-       previews the planned dual-mode Diversity Atlas (vs the current
-       Inversion Atlas). Each section shows what panels will exist when
-       built + the data layers required. Same JSON, different
-       interpretation layer. SCHEMA §17 and §23. -->
-  <button data-page="page13" title="Diversity Atlas (preview / scaffold) — landing page for the planned Diversity Atlas mode. Previews the dual-mode design where the same JSON is rendered through a diversity-perspective lens (θπ, F_ROH, ROH atlas, ancestry-Q stratification, kinship/relatedness, family-LD). Layout-only this turn; per-page renderers ship as R-side data layers land. SCHEMA §17 + §23."><span class="num">13</span> diversity atlas</button>
-  <!-- v4 turn 53: Genome Atlas landing page (page14). Third atlas in the
-       trio (Inversion / Diversity / Genome). Targets the genome assembly
-       + annotation layers — chromosome-scale assembly stats, synteny,
-       gene tracks, repeats, conserved elements, variant annotations.
-       Layout-only scaffold with red/coral palette signaling "not yet
-       wired"; per-page renderers ship as R-side / cluster-side genome-
-       annotation layers land. SCHEMA §28 (this page). -->
-  <button data-page="page14" title="Genome Atlas (preview / scaffold) — landing page for the planned Genome Atlas mode. Previews the genome-assembly + annotation lens: chromosome-scale assembly stats, synteny / ancestral karyotype, gene tracks, repeats / TE landscape, conserved elements, variant annotations. Layout-only this turn; per-page renderers ship as cluster-side genome layers land. SCHEMA §28."><span class="num">14</span> genome atlas</button>
-  <!-- v4 cross-link: sibling deliverable → Population Atlas (separate HTML
-       file). Right-aligned via margin-left:auto so it sits at the far end
-       of the tab bar like a footer. Mirrors the population atlas's
-       "→ Inversions Atlas" link. Same domain rules (relative path),
-       opens in same tab so back button works. -->
-  <a href="population_atlas_v1.html" id="populationAtlasLink"
-     title="Open the Population Atlas — sibling deliverable covering Samples / QC / Families / Heterozygosity / Diversity / Inbreeding."
-     style="margin-left: auto; align-self: center;
-            background: none; border: 1px solid var(--rule); color: var(--ink-dim);
-            padding: 3px 10px; font-family: var(--mono); font-size: 10px;
-            border-radius: 3px; cursor: pointer; line-height: 1.4;
-            text-decoration: none; letter-spacing: 0.04em;
-            transition: color 0.1s, border-color 0.1s;">→ Population Atlas</a>
+  <!-- v4 turn 73e: removed page13 (diversity) and page14 (genome) tab
+       buttons from the Inversion Atlas tab bar. Both are now standalone
+       sibling HTML files (Diversity_atlas.html, Genome_atlas.html)
+       reachable via the four-atlas dropdown in the header. The page13/14
+       scaffold content has been migrated to those files; the in-app
+       atlas-mode toggle no longer routes here. -->
+  <!-- v4 turn 73d: removed the standalone "→ Population Atlas" link from
+       the tab bar; it's now folded into the unified atlas dropdown in the
+       header (next to the theme toggle). The four atlases are now styled
+       consistently. -->
 </nav>
 
 <div class="wrap" id="appWrap">
@@ -3087,6 +3163,14 @@
       </select>
     </div>
     <div class="ctl num dim" id="dataStatus">No data loaded</div>
+    <!-- v4 turn 73f: IndexedDB-backed JSON cache. Drag-dropped JSONs are
+         auto-persisted between sessions; click here to wipe the cache.
+         Doesn't affect the currently-loaded view until you refresh. -->
+    <div class="ctl">
+      <button id="clearJsonCacheBtn"
+              title="Clear cached JSONs from IndexedDB. Does not affect the currently-displayed atlas until refresh. Useful if a saved JSON is bad or quota is exceeded."
+              style="font-size: 10px; padding: 3px 8px;">🗑 clear cached JSONs</button>
+    </div>
 
     <h2>Sim_mat smoothing</h2>
     <div class="ctl">
@@ -3856,9 +3940,14 @@
       </div>
       <!-- v3.78: tightened spacing for the narrow column in compact mode.
            Rows use 4px gap, 4px 8px padding; text 10.5px; band buttons wrap to
-           2 columns so longer labels stay readable. -->
+           2 columns so longer labels stay readable.
+           v4 turn 73c: parity with fixed-mode sidebar — added lock / promote /
+           export buttons + color-mode picker + tracked list + manual-groups
+           section. All IDs use `Compact` suffix; `_syncTrackedCompactUI` and
+           `renderTrackedList` mirror state from the sidebar. -->
       <div id="trackedSamplesPanelCompactBody"
-           style="padding: 4px 8px; display: flex; flex-direction: column; gap: 4px;">
+           style="padding: 4px 8px; display: flex; flex-direction: column; gap: 4px;
+                  overflow-y: auto;">
         <div style="display: flex; gap: 8px; align-items: center; font-size: 10.5px; flex-wrap: wrap;">
           <label><input type="checkbox" id="trailOnCompact" /> trails</label>
           <label><input type="checkbox" id="flipPC1Compact" /> sign-align PC1</label>
@@ -3894,6 +3983,68 @@
         <div style="font-size: 9.5px; color: var(--ink-dim); line-height: 1.3;">
           tracked: <span id="trackedCountInfoCompact">0</span> /
           <span id="trackedNInfoCompact">10</span>
+        </div>
+
+        <!-- v4 turn 73c: action buttons mirroring sidebar — stacked vertically
+             so the labels read fully even at narrow column widths. Each
+             button is a thin proxy that delegates to the existing sidebar
+             handler (no logic duplication). -->
+        <div style="border-top: 1px solid var(--rule); margin-top: 4px; padding-top: 4px;
+                    display: flex; flex-direction: column; gap: 3px;">
+          <button id="lockColorsBtnCompact"
+                  title="Freeze cluster colors using current L2's labels — stay stable as you scrub"
+                  style="font-size: 10px; padding: 3px 6px; text-align: left;">🔒 lock colors</button>
+          <button id="promoteCandidateBtnCompact" disabled
+                  title="Lock colors on an L2 first (🔒 button above)"
+                  style="font-size: 10px; padding: 3px 6px; text-align: left;">⬆ promote to candidate</button>
+          <button id="exportKLabelsBtnCompact"
+                  title="Download per-(L2, sample) K-means labels as TSV — feed into C++ pop-stats engine"
+                  style="font-size: 10px; padding: 3px 6px; text-align: left;">⬇ export K labels TSV</button>
+        </div>
+
+        <!-- v4 turn 73c: color-mode picker. Same five buttons as sidebar. -->
+        <div style="border-top: 1px solid var(--rule); margin-top: 4px; padding-top: 4px;">
+          <div style="font-size: 10px; color: var(--ink-dim); margin-bottom: 3px;">color samples by</div>
+          <div class="color-mode-row" id="colorModeBarCompact"
+               style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2px;">
+            <button data-mode-compact="cluster" class="active"
+                    style="font-size: 9.5px; padding: 2px 4px;">cluster</button>
+            <button data-mode-compact="family"
+                    style="font-size: 9.5px; padding: 2px 4px;">family</button>
+            <button data-mode-compact="ancestry"
+                    style="font-size: 9.5px; padding: 2px 4px;">ancestry</button>
+            <button data-mode-compact="manual"
+                    title="Manually-curated groups (set in 'Manual groups' below)"
+                    style="font-size: 9.5px; padding: 2px 4px;">manual</button>
+            <button data-mode-compact="none"
+                    style="font-size: 9.5px; padding: 2px 4px;">none</button>
+          </div>
+        </div>
+
+        <!-- v4 turn 73c: tracked-sample list. Renderer dual-writes from
+             renderTrackedList → both #trackedList (sidebar) and #trackedListCompact. -->
+        <div style="border-top: 1px solid var(--rule); margin-top: 4px; padding-top: 4px;">
+          <div style="font-size: 10px; color: var(--ink-dim); margin-bottom: 3px;">tracked samples</div>
+          <div id="trackedListCompact" style="font-size: 10px; max-height: 140px; overflow-y: auto;"></div>
+        </div>
+
+        <!-- v4 turn 73c: manual groups section. Renderer dual-writes into
+             #manualGroupsListCompact when present. -->
+        <div style="border-top: 1px solid var(--rule); margin-top: 4px; padding-top: 4px;">
+          <div style="font-size: 10px; color: var(--ink-dim); margin-bottom: 3px;"
+               title="Manually-curated sample groups — overrides K-means coloring when 'manual' color mode is active.">
+            manual groups
+          </div>
+          <div id="manualGroupsListCompact"
+               style="display: flex; flex-direction: column; gap: 3px; font-size: 10px; max-height: 100px; overflow-y: auto;"></div>
+          <div style="display: flex; gap: 3px; margin-top: 4px;">
+            <button id="mgAddBtnCompact"
+                    title="Create a new manual group from the current tracked samples"
+                    style="font-size: 9.5px; padding: 2px 4px; flex: 1 1 auto;">+ from tracked</button>
+            <button id="mgClearAllBtnCompact"
+                    title="Delete all manual groups (cannot be undone)"
+                    style="font-size: 9.5px; padding: 2px 4px; flex: 0 0 auto; color: var(--bad);">×</button>
+          </div>
         </div>
       </div>
     </div>
@@ -4336,737 +4487,6 @@
           those θπ profiles per window with the same neighbourhood as page 1's
           dosage local PCA; STEP_R41 thresholds the diversity-|Z| into L1
           envelopes, re-decomposes inside each, promotes L2s passing thresholds.
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- v4: NEW Diversity Atlas landing page (page13).
-       Layout-only scaffold modeled on page12's empty-state pattern.
-       Previews the planned dual-mode Diversity Atlas (vs the current
-       Inversion Atlas) via six section cards: vision, data layers,
-       page mapping, panel mockups, phasing roadmap, cross-references.
-       Per-page renderers ship as R-side data layers land.
-       SCHEMA §17 (atlas mode switching) + §23 (this page). -->
-  <div id="page13" class="page">
-    <div id="diversityAtlasContent" style="padding: 40px 32px; max-width: 1180px; margin: 0 auto;
-                                            color: var(--ink); font-family: var(--mono);
-                                            font-size: 11.5px; line-height: 1.65;">
-      <div style="font-size: 16px; font-weight: 600; margin-bottom: 4px; color: var(--ink);">
-        Diversity Atlas — landing / scaffold preview
-      </div>
-      <div style="font-size: 11.5px; color: var(--ink-dim); margin-bottom: 24px;
-                  letter-spacing: 0.02em;">
-        SCHEMA §17 + §23 · layout-only · per-page renderers ship post-v4
-      </div>
-
-      <!-- ── Section 1: Vision / dual-mode concept ─────────────────────── -->
-      <div style="background: var(--panel-2); border: 1px solid var(--rule);
-                  border-radius: 4px; padding: 16px 18px; margin-bottom: 18px;">
-        <div style="display: flex; justify-content: space-between; align-items: baseline;
-                    margin-bottom: 10px;">
-          <div style="font-size: 12px; font-weight: 600; color: var(--ink);">
-            The dual-atlas idea
-          </div>
-          <div style="font-size: 9.5px; color: var(--ink-dim); letter-spacing: 0.04em;
-                      padding: 2px 6px; border: 1px solid var(--rule); border-radius: 2px;">
-            schema-only · phase A
-          </div>
-        </div>
-        <div style="margin-bottom: 8px;">
-          The same chromosome JSON, viewed through two different lenses. The
-          <b>Inversion Atlas</b> (every page you see today) interprets the data
-          to find chromosomal-rearrangement candidates: L1/L2 envelopes, K-means
-          karyotype groups, σ-profile verdicts, breakpoint zones, regime calls.
-          The <b>Diversity Atlas</b> (this preview page) reinterprets the same
-          loaded JSON — without freeing or refetching it — through a
-          population-genetic-diversity lens.
-        </div>
-        <div style="margin-bottom: 8px;">
-          One JSON, two interpretation layers, single button to flip between
-          them. The toggle ships in a follow-up turn (phase B); this page is
-          the structural commitment to what the toggle will reveal.
-        </div>
-        <div style="color: var(--ink-dim);">
-          State slot <code>state.atlas</code> ∈ {<code>inversion</code>,
-          <code>diversity</code>}, persisted to localStorage. Per-page caches
-          (<code>state._l3CacheFp</code>, <code>state.__linesCache</code>) stay
-          populated across mode flips — switching atlases is instant.
-        </div>
-      </div>
-
-      <!-- ── Section 2: Data layers required ──────────────────────────── -->
-      <div style="background: var(--panel-2); border: 1px solid var(--rule);
-                  border-radius: 4px; padding: 16px 18px; margin-bottom: 18px;">
-        <div style="display: flex; justify-content: space-between; align-items: baseline;
-                    margin-bottom: 10px;">
-          <div style="font-size: 12px; font-weight: 600; color: var(--ink);">
-            Required data layers
-          </div>
-          <div style="font-size: 9.5px; color: var(--ink-dim); letter-spacing: 0.04em;
-                      padding: 2px 6px; border: 1px solid var(--rule); border-radius: 2px;">
-            consumed from cluster-side R-pipeline
-          </div>
-        </div>
-        <div style="display: grid;
-                    grid-template-columns: 1.4fr 1.0fr 1.0fr 1.6fr; gap: 6px 12px;
-                    font-size: 10.5px; align-items: baseline;">
-          <div style="font-weight: 600; color: var(--ink-dim);">layer</div>
-          <div style="font-weight: 600; color: var(--ink-dim);">R-side script</div>
-          <div style="font-weight: 600; color: var(--ink-dim);">status</div>
-          <div style="font-weight: 600; color: var(--ink-dim);">feeds</div>
-
-          <div><code>theta_pi_per_window</code></div>
-          <div><code>STEP_R39</code></div>
-          <div data-da-layer="theta_pi_per_window"
-               style="color: var(--ink-dimmer);">⚪ not loaded</div>
-          <div style="color: var(--ink-dim);">θπ overview · diversity scrubber (page 12)</div>
-
-          <div><code>per_sample_theta_pi</code></div>
-          <div><code>STEP_R36</code></div>
-          <div data-da-layer="per_sample_theta_pi"
-               style="color: var(--ink-dimmer);">⚪ not loaded</div>
-          <div style="color: var(--ink-dim);">per-sample diversity tracks</div>
-
-          <div><code>per_sample_froh</code></div>
-          <div><code>STEP_R??</code></div>
-          <div data-da-layer="per_sample_froh"
-               style="color: var(--ink-dimmer);">⚪ not loaded</div>
-          <div style="color: var(--ink-dim);">F_ROH genome-wide · ROH atlas</div>
-
-          <div><code>roh_segments</code></div>
-          <div><code>STEP_R??</code></div>
-          <div data-da-layer="roh_segments"
-               style="color: var(--ink-dimmer);">⚪ not loaded</div>
-          <div style="color: var(--ink-dim);">per-sample ROH catalog · ROH atlas page</div>
-
-          <div><code>ancestry_q</code></div>
-          <div><code>STEP_R30..32</code></div>
-          <div data-da-layer="ancestry_q"
-               style="color: var(--ink-dimmer);">⚪ not loaded</div>
-          <div style="color: var(--ink-dim);">ancestry-Q stratification · already in page 8</div>
-
-          <div><code>kinship_matrix</code></div>
-          <div><code>STEP_R??</code></div>
-          <div data-da-layer="kinship_matrix"
-               style="color: var(--ink-dimmer);">⚪ not loaded</div>
-          <div style="color: var(--ink-dim);">relatedness · family-LD anchor</div>
-
-          <div><code>family_ld</code></div>
-          <div><code>STEP_R??</code></div>
-          <div data-da-layer="family_ld"
-               style="color: var(--ink-dimmer);">⚪ not loaded</div>
-          <div style="color: var(--ink-dim);">family-restricted LD blocks</div>
-        </div>
-        <div style="font-size: 10.5px; color: var(--ink-dim); margin-top: 12px;
-                    line-height: 1.55;">
-          Layers marked ⚪ are not loaded from the current JSON. Each layer
-          is consumed by the diversity-mode renderer for one or more pages
-          (right column). Loading any layer activates only the panels it
-          feeds; the rest stay in empty-state.
-        </div>
-      </div>
-
-      <!-- ── Section 3: Page mapping (Inversion ⇄ Diversity) ──────────── -->
-      <div style="background: var(--panel-2); border: 1px solid var(--rule);
-                  border-radius: 4px; padding: 16px 18px; margin-bottom: 18px;">
-        <div style="display: flex; justify-content: space-between; align-items: baseline;
-                    margin-bottom: 10px;">
-          <div style="font-size: 12px; font-weight: 600; color: var(--ink);">
-            Per-page mapping
-          </div>
-          <div style="font-size: 9.5px; color: var(--ink-dim); letter-spacing: 0.04em;
-                      padding: 2px 6px; border: 1px solid var(--rule); border-radius: 2px;">
-            phase B (toggle) · phase C (renderers)
-          </div>
-        </div>
-        <div style="display: grid;
-                    grid-template-columns: 0.4fr 1.4fr 1.4fr 1.0fr; gap: 6px 12px;
-                    font-size: 10.5px; align-items: baseline;">
-          <div style="font-weight: 600; color: var(--ink-dim);">tab</div>
-          <div style="font-weight: 600; color: var(--ink-dim);">Inversion mode</div>
-          <div style="font-weight: 600; color: var(--ink-dim);">Diversity mode</div>
-          <div style="font-weight: 600; color: var(--ink-dim);">notes</div>
-
-          <div>1</div>
-          <div>local PCA |z| (dosage)</div>
-          <div>local PCA θπ ← already shipped as page 12</div>
-          <div style="color: var(--ink-dim);">two scrubbers, orthogonal signals</div>
-
-          <div>2</div>
-          <div>local PCA θπ (already split out)</div>
-          <div>same — atlas-shared</div>
-          <div style="color: var(--ink-dim);">no fork</div>
-
-          <div>3</div>
-          <div>candidate focus (per inversion)</div>
-          <div>region focus (per ROH or sweep window)</div>
-          <div style="color: var(--ink-dim);">candidate ↔ region semantics</div>
-
-          <div>4</div>
-          <div>boundaries (refine inversion intervals)</div>
-          <div>ROH atlas (per-sample ROH catalog)</div>
-          <div style="color: var(--ink-dim);">structural fork</div>
-
-          <div>5</div>
-          <div>catalogue (L2 envelopes)</div>
-          <div>region catalogue (sweeps + selection scans)</div>
-          <div style="color: var(--ink-dim);">structural fork</div>
-
-          <div>6</div>
-          <div>karyotype / tier</div>
-          <div>ancestry-Q stratification view</div>
-          <div style="color: var(--ink-dim);">structural fork</div>
-
-          <div>7</div>
-          <div>popstats (Z, FST, θπ, ancestry Δ12)</div>
-          <div>same — atlas-shared</div>
-          <div style="color: var(--ink-dim);">no fork; popstats already diversity-aware</div>
-
-          <div>8</div>
-          <div>ancestry (per-window K-cluster)</div>
-          <div>same — atlas-shared</div>
-          <div style="color: var(--ink-dim);">no fork</div>
-
-          <div>9</div>
-          <div>windows table</div>
-          <div>same — atlas-shared</div>
-          <div style="color: var(--ink-dim);">no fork</div>
-
-          <div>10</div>
-          <div>confirmed candidates carousel</div>
-          <div>saved regions carousel</div>
-          <div style="color: var(--ink-dim);">structural fork</div>
-
-          <div>11</div>
-          <div>markers (PCR diagnostics)</div>
-          <div>hidden in diversity mode</div>
-          <div style="color: var(--ink-dim);">inversion-specific</div>
-
-          <div>12</div>
-          <div>help / vocabulary</div>
-          <div>same — atlas-shared</div>
-          <div style="color: var(--ink-dim);">no fork</div>
-
-          <div>13</div>
-          <div>this page (Diversity Atlas preview)</div>
-          <div>this page becomes the landing/dashboard view</div>
-          <div style="color: var(--ink-dim);">always visible</div>
-        </div>
-      </div>
-
-      <!-- ── Section 4: Top-level dashboard mockup ────────────────────── -->
-      <div style="background: var(--panel-2); border: 1px solid var(--rule);
-                  border-radius: 4px; padding: 16px 18px; margin-bottom: 18px;">
-        <div style="display: flex; justify-content: space-between; align-items: baseline;
-                    margin-bottom: 10px;">
-          <div style="font-size: 12px; font-weight: 600; color: var(--ink);">
-            Diversity dashboard — planned panels
-          </div>
-          <div style="font-size: 9.5px; color: var(--ink-dim); letter-spacing: 0.04em;
-                      padding: 2px 6px; border: 1px solid var(--rule); border-radius: 2px;">
-            phase C · per-panel work
-          </div>
-        </div>
-        <div style="font-size: 10.5px; color: var(--ink-dim); margin-bottom: 12px;
-                    line-height: 1.55;">
-          When the Diversity Atlas mode is fully built, this page becomes the
-          chromosome-level dashboard — a six-panel grid of diversity summaries.
-          Empty-slot mockups below show where each panel will sit. Click any
-          panel header to jump to the corresponding deep-dive page (when
-          rendered).
-        </div>
-        <div style="display: grid;
-                    grid-template-columns: 1fr 1fr 1fr; gap: 12px;
-                    font-size: 10.5px;">
-
-          <!-- Panel slot 1: θπ overview -->
-          <div style="background: var(--panel); border: 1px solid var(--rule);
-                      border-radius: 3px; padding: 10px 12px; min-height: 120px;
-                      display: flex; flex-direction: column;">
-            <div style="font-weight: 600; color: var(--ink); margin-bottom: 6px;">
-              θπ overview
-            </div>
-            <div style="color: var(--ink-dim); font-size: 10px; margin-bottom: 8px;
-                        flex: 0 0 auto;">
-              Genome-wide nucleotide diversity track per chromosome, with
-              high/low diversity regions flagged.
-            </div>
-            <div style="flex: 1; display: flex; align-items: center; justify-content: center;
-                        background: var(--panel-2); border: 1px dashed var(--rule);
-                        border-radius: 2px; color: var(--ink-dimmer); font-size: 9.5px;
-                        letter-spacing: 0.04em;">
-              ░░░ panel mockup ░░░
-            </div>
-            <div style="color: var(--ink-dim); font-size: 9.5px; margin-top: 6px;">
-              feeds: <code>theta_pi_per_window</code> · related: page 12, page 7
-            </div>
-          </div>
-
-          <!-- Panel slot 2: F_ROH summary -->
-          <div style="background: var(--panel); border: 1px solid var(--rule);
-                      border-radius: 3px; padding: 10px 12px; min-height: 120px;
-                      display: flex; flex-direction: column;">
-            <div style="font-weight: 600; color: var(--ink); margin-bottom: 6px;">
-              F_ROH summary
-            </div>
-            <div style="color: var(--ink-dim); font-size: 10px; margin-bottom: 8px;
-                        flex: 0 0 auto;">
-              Genome-wide F_ROH (inbreeding-from-runs-of-homozygosity) ranked
-              per sample, with cohort distribution.
-            </div>
-            <div style="flex: 1; display: flex; align-items: center; justify-content: center;
-                        background: var(--panel-2); border: 1px dashed var(--rule);
-                        border-radius: 2px; color: var(--ink-dimmer); font-size: 9.5px;
-                        letter-spacing: 0.04em;">
-              ░░░ panel mockup ░░░
-            </div>
-            <div style="color: var(--ink-dim); font-size: 9.5px; margin-top: 6px;">
-              feeds: <code>per_sample_froh</code> · related: tab 4 (in diversity mode)
-            </div>
-          </div>
-
-          <!-- Panel slot 3: ROH atlas -->
-          <div style="background: var(--panel); border: 1px solid var(--rule);
-                      border-radius: 3px; padding: 10px 12px; min-height: 120px;
-                      display: flex; flex-direction: column;">
-            <div style="font-weight: 600; color: var(--ink); margin-bottom: 6px;">
-              ROH atlas
-            </div>
-            <div style="color: var(--ink-dim); font-size: 10px; margin-bottom: 8px;
-                        flex: 0 0 auto;">
-              Per-sample ROH segments along the chromosome, stacked
-              sample × position with ROH-density heatmap.
-            </div>
-            <div style="flex: 1; display: flex; align-items: center; justify-content: center;
-                        background: var(--panel-2); border: 1px dashed var(--rule);
-                        border-radius: 2px; color: var(--ink-dimmer); font-size: 9.5px;
-                        letter-spacing: 0.04em;">
-              ░░░ panel mockup ░░░
-            </div>
-            <div style="color: var(--ink-dim); font-size: 9.5px; margin-top: 6px;">
-              feeds: <code>roh_segments</code> · related: tab 4 (in diversity mode)
-            </div>
-          </div>
-
-          <!-- Panel slot 4: Ancestry-Q stratification -->
-          <div style="background: var(--panel); border: 1px solid var(--rule);
-                      border-radius: 3px; padding: 10px 12px; min-height: 120px;
-                      display: flex; flex-direction: column;">
-            <div style="font-weight: 600; color: var(--ink); margin-bottom: 6px;">
-              Ancestry-Q stratification
-            </div>
-            <div style="color: var(--ink-dim); font-size: 10px; margin-bottom: 8px;
-                        flex: 0 0 auto;">
-              Per-window K-cluster Q values stratified by sample group;
-              identifies broodline-specific ancestry blocks.
-            </div>
-            <div style="flex: 1; display: flex; align-items: center; justify-content: center;
-                        background: var(--panel-2); border: 1px dashed var(--rule);
-                        border-radius: 2px; color: var(--ink-dimmer); font-size: 9.5px;
-                        letter-spacing: 0.04em;">
-              ░░░ panel mockup ░░░
-            </div>
-            <div style="color: var(--ink-dim); font-size: 9.5px; margin-top: 6px;">
-              feeds: <code>ancestry_q</code> · related: page 7, tab 6 (in diversity mode)
-            </div>
-          </div>
-
-          <!-- Panel slot 5: Kinship / relatedness -->
-          <div style="background: var(--panel); border: 1px solid var(--rule);
-                      border-radius: 3px; padding: 10px 12px; min-height: 120px;
-                      display: flex; flex-direction: column;">
-            <div style="font-weight: 600; color: var(--ink); margin-bottom: 6px;">
-              Kinship / relatedness
-            </div>
-            <div style="color: var(--ink-dim); font-size: 10px; margin-bottom: 8px;
-                        flex: 0 0 auto;">
-              Pairwise kinship matrix heatmap with hatchery-broodline
-              clustering; outliers (cross-broodline) flagged.
-            </div>
-            <div style="flex: 1; display: flex; align-items: center; justify-content: center;
-                        background: var(--panel-2); border: 1px dashed var(--rule);
-                        border-radius: 2px; color: var(--ink-dimmer); font-size: 9.5px;
-                        letter-spacing: 0.04em;">
-              ░░░ panel mockup ░░░
-            </div>
-            <div style="color: var(--ink-dim); font-size: 9.5px; margin-top: 6px;">
-              feeds: <code>kinship_matrix</code> · related: family overlay (existing)
-            </div>
-          </div>
-
-          <!-- Panel slot 6: Family-restricted LD -->
-          <div style="background: var(--panel); border: 1px solid var(--rule);
-                      border-radius: 3px; padding: 10px 12px; min-height: 120px;
-                      display: flex; flex-direction: column;">
-            <div style="font-weight: 600; color: var(--ink); margin-bottom: 6px;">
-              Family-restricted LD
-            </div>
-            <div style="color: var(--ink-dim); font-size: 10px; margin-bottom: 8px;
-                        flex: 0 0 auto;">
-              LD blocks that only appear within specific families;
-              detects family-private inversions or assortment patterns.
-            </div>
-            <div style="flex: 1; display: flex; align-items: center; justify-content: center;
-                        background: var(--panel-2); border: 1px dashed var(--rule);
-                        border-radius: 2px; color: var(--ink-dimmer); font-size: 9.5px;
-                        letter-spacing: 0.04em;">
-              ░░░ panel mockup ░░░
-            </div>
-            <div style="color: var(--ink-dim); font-size: 9.5px; margin-top: 6px;">
-              feeds: <code>family_ld</code> · related: tab 5 (region catalogue)
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ── Section 5: Phasing roadmap ───────────────────────────────── -->
-      <div style="background: var(--panel-2); border: 1px solid var(--rule);
-                  border-radius: 4px; padding: 16px 18px; margin-bottom: 18px;">
-        <div style="display: flex; justify-content: space-between; align-items: baseline;
-                    margin-bottom: 10px;">
-          <div style="font-size: 12px; font-weight: 600; color: var(--ink);">
-            Phasing roadmap
-          </div>
-          <div style="font-size: 9.5px; color: var(--ink-dim); letter-spacing: 0.04em;
-                      padding: 2px 6px; border: 1px solid var(--rule); border-radius: 2px;">
-            ~3-5 weeks of post-v4 work
-          </div>
-        </div>
-        <div style="display: grid;
-                    grid-template-columns: 0.5fr 1.2fr 1.4fr 0.8fr; gap: 6px 12px;
-                    font-size: 10.5px; align-items: baseline;">
-          <div style="font-weight: 600; color: var(--ink-dim);">phase</div>
-          <div style="font-weight: 600; color: var(--ink-dim);">name</div>
-          <div style="font-weight: 600; color: var(--ink-dim);">scope</div>
-          <div style="font-weight: 600; color: var(--ink-dim);">status</div>
-
-          <div>A</div>
-          <div>schema-only commitment</div>
-          <div>SCHEMA §17 + §23 documents the dual-atlas concept; this landing page is the visible commitment</div>
-          <div style="color: var(--good);">✓ shipped (this turn)</div>
-
-          <div>B</div>
-          <div>toggle button + state slot</div>
-          <div>Add atlas-mode toggle button in the top bar; <code>state.atlas</code> persists; pages re-read on flip</div>
-          <div style="color: var(--ink-dim);">⚪ next turn</div>
-
-          <div>C</div>
-          <div>per-page diversity-mode renderers</div>
-          <div>One renderer per forked page (boundaries → ROH atlas; karyotype → ancestry-Q strat; etc.). Multi-turn.</div>
-          <div style="color: var(--ink-dim);">⚪ multi-turn</div>
-
-          <div>D</div>
-          <div>catalogue + bundle forking</div>
-          <div>Inversion catalogue → region catalogue; manuscript bundles fork by atlas mode; export shapes diverge</div>
-          <div style="color: var(--ink-dim);">⚪ later</div>
-        </div>
-      </div>
-
-      <!-- ── Section 6: Cross-references ──────────────────────────────── -->
-      <div style="background: var(--panel-2); border: 1px solid var(--rule);
-                  border-radius: 4px; padding: 16px 18px; margin-bottom: 0;">
-        <div style="font-size: 12px; font-weight: 600; color: var(--ink); margin-bottom: 10px;">
-          Cross-references
-        </div>
-        <div style="font-size: 10.5px; color: var(--ink-dim); line-height: 1.7;">
-          • <b>page 12 (local PCA θπ)</b> — already-shipped diversity scrubber;
-          mirrors page 1's pipeline on per-sample θπ instead of dosage. The
-          orthogonal-validation tool that pairs with the inversion-mode page 1.<br>
-          • <b>page 7 (popstats)</b> — atlas-shared track stack including θπ,
-          FST, Hobs/Hexp, ancestry Δ12. Same panel in both atlases.<br>
-          • <b>page 8 (ancestry)</b> — atlas-shared per-window K-cluster
-          assignment + delta12 confidence. Source for the ancestry-Q
-          stratification panel above.<br>
-          • <b>SCHEMA §17</b> — atlas-mode-switching specification (state slot,
-          page mapping, what stays same vs forks).<br>
-          • <b>SCHEMA §23</b> — this page's specification (added in v4).<br>
-          • <b>Help page (tab 12)</b> — the "Atlas mode switching" entry under
-          the planned-features table summarizes the same vision in narrative form.
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- v4 turn 53: Genome Atlas scaffold (page14). Third atlas in the trio
-       (Inversion / Diversity / Genome). Targets the chromosome-scale genome
-       assembly + annotation layers. Six section cards: vision, data layers,
-       chromosome overview, panel mockups, phasing roadmap, cross-references.
-       Per-page renderers ship as cluster-side genome layers land.
-       SCHEMA §28 (this page). Color palette is warm coral/amber to signal
-       "preview, not yet wired" without conflicting with the red used for
-       NOISY_REGION verdicts elsewhere. -->
-  <div id="page14" class="page">
-    <div id="genomeAtlasContent" style="padding: 40px 32px; max-width: 1180px; margin: 0 auto;
-                                         color: var(--ink); font-family: var(--mono);
-                                         font-size: 11.5px; line-height: 1.65;">
-      <div style="font-size: 16px; font-weight: 600; margin-bottom: 4px; color: var(--ink);">
-        <span style="color: #ff8c6e;">▰</span> Genome Atlas — landing / scaffold preview
-      </div>
-      <div style="font-size: 11.5px; color: var(--ink-dim); margin-bottom: 24px;
-                  letter-spacing: 0.02em;">
-        SCHEMA §28 · layout-only · per-page renderers ship as cluster-side genome layers land
-      </div>
-
-      <!-- ── Section 1: Vision / what this atlas is for ─────────────────── -->
-      <div style="background: var(--panel-2); border: 1px solid var(--rule);
-                  border-left: 3px solid #ff8c6e; border-radius: 4px;
-                  padding: 16px 18px; margin-bottom: 18px;">
-        <div style="display: flex; justify-content: space-between; align-items: baseline;
-                    margin-bottom: 10px;">
-          <div style="font-size: 12px; font-weight: 600; color: var(--ink);">
-            The third atlas
-          </div>
-          <div style="font-size: 9.5px; color: #c97a4f; letter-spacing: 0.04em;
-                      padding: 2px 6px; border: 1px solid #c97a4f; border-radius: 2px;">
-            schema-only · phase A
-          </div>
-        </div>
-        <div style="margin-bottom: 8px;">
-          The <b>Inversion Atlas</b> reads the chromosome JSON to find structural
-          rearrangements; the <b>Diversity Atlas</b> reinterprets the same data
-          through a population-genetic-diversity lens. The <b>Genome Atlas</b>
-          is the third sibling: it grounds both in the actual reference assembly
-          + its annotations.
-        </div>
-        <div style="margin-bottom: 8px;">
-          Where the other two atlases ask "what is segregating in this cohort?",
-          the Genome Atlas asks "what is the genome itself?" — assembly quality,
-          chromosome architecture, gene content, repeat landscape, conserved
-          synteny with related Siluriformes, and the variant annotations that
-          let inversion candidates be interpreted in terms of disrupted genes
-          or regulatory elements.
-        </div>
-        <div style="color: var(--ink-dim);">
-          Three contexts the cohort lives in: this Genome Atlas (the reference)
-          — Inversion Atlas (what's polymorphic in 226 samples) — Diversity
-          Atlas (how diverse / inbred / structured the cohort is). The Genome
-          Atlas is where you cross-reference an inversion to its gene cargo
-          (phase 12) without leaving the tool.
-        </div>
-      </div>
-
-      <!-- ── Section 2: Data layers required ──────────────────────────── -->
-      <div style="background: var(--panel-2); border: 1px solid var(--rule);
-                  border-left: 3px solid #ff8c6e; border-radius: 4px;
-                  padding: 16px 18px; margin-bottom: 18px;">
-        <div style="display: flex; justify-content: space-between; align-items: baseline;
-                    margin-bottom: 10px;">
-          <div style="font-size: 12px; font-weight: 600; color: var(--ink);">
-            Required data layers
-          </div>
-          <div style="font-size: 9.5px; color: var(--ink-dim); letter-spacing: 0.04em;
-                      padding: 2px 6px; border: 1px solid var(--rule); border-radius: 2px;">
-            consumed from cluster-side genome-annotation pipeline
-          </div>
-        </div>
-        <div style="display: grid;
-                    grid-template-columns: 1.4fr 1.0fr 1.0fr 1.6fr; gap: 6px 12px;
-                    font-size: 10.5px; align-items: baseline;">
-          <div style="font-weight: 600; color: var(--ink-dim);">layer</div>
-          <div style="font-weight: 600; color: var(--ink-dim);">source</div>
-          <div style="font-weight: 600; color: var(--ink-dim);">status</div>
-          <div style="font-weight: 600; color: var(--ink-dim);">feeds</div>
-
-          <div><code>assembly_stats</code></div>
-          <div><code>BUSCO + asmstats</code></div>
-          <div data-ga-layer="assembly_stats" style="color: var(--ink-dimmer);">⚪ not loaded</div>
-          <div style="color: var(--ink-dim);">chromosome overview · QC banner</div>
-
-          <div><code>chromosome_map</code></div>
-          <div><code>FAI + AGP</code></div>
-          <div data-ga-layer="chromosome_map" style="color: var(--ink-dimmer);">⚪ not loaded</div>
-          <div style="color: var(--ink-dim);">karyotype strip · per-chrom navigation</div>
-
-          <div><code>gene_track</code></div>
-          <div><code>BRAKER / TOGA / RefSeq</code></div>
-          <div data-ga-layer="gene_track" style="color: var(--ink-dimmer);">⚪ not loaded</div>
-          <div style="color: var(--ink-dim);">gene cargo per inversion · functional context</div>
-
-          <div><code>repeat_track</code></div>
-          <div><code>RepeatMasker / EDTA</code></div>
-          <div data-ga-layer="repeat_track" style="color: var(--ink-dimmer);">⚪ not loaded</div>
-          <div style="color: var(--ink-dim);">TE landscape · breakpoint repeat enrichment</div>
-
-          <div><code>conserved_elements</code></div>
-          <div><code>Cactus / phastCons</code></div>
-          <div data-ga-layer="conserved_elements" style="color: var(--ink-dimmer);">⚪ not loaded</div>
-          <div style="color: var(--ink-dim);">UCEs · regulatory candidates</div>
-
-          <div><code>synteny_blocks</code></div>
-          <div><code>Cactus pairwise</code></div>
-          <div data-ga-layer="synteny_blocks" style="color: var(--ink-dimmer);">⚪ not loaded</div>
-          <div style="color: var(--ink-dim);">collinearity vs related Siluriformes · ancestral karyotype</div>
-
-          <div><code>centromere_telomere</code></div>
-          <div><code>tidk / centromics</code></div>
-          <div data-ga-layer="centromere_telomere" style="color: var(--ink-dimmer);">⚪ not loaded</div>
-          <div style="color: var(--ink-dim);">centromere bands · T2T completeness chip</div>
-
-          <div><code>variant_annotations</code></div>
-          <div><code>SnpEff + VEP</code></div>
-          <div data-ga-layer="variant_annotations" style="color: var(--ink-dimmer);">⚪ not loaded</div>
-          <div style="color: var(--ink-dim);">deleterious-variant overlap with inversions</div>
-        </div>
-      </div>
-
-      <!-- ── Section 3: Chromosome overview mockup ────────────────────── -->
-      <div style="background: var(--panel-2); border: 1px solid var(--rule);
-                  border-left: 3px solid #ff8c6e; border-radius: 4px;
-                  padding: 16px 18px; margin-bottom: 18px;">
-        <div style="display: flex; justify-content: space-between; align-items: baseline;
-                    margin-bottom: 10px;">
-          <div style="font-size: 12px; font-weight: 600; color: var(--ink);">
-            Chromosome overview (planned panel)
-          </div>
-          <div style="font-size: 9.5px; color: var(--ink-dim); letter-spacing: 0.04em;
-                      padding: 2px 6px; border: 1px solid var(--rule); border-radius: 2px;">
-            mockup
-          </div>
-        </div>
-        <div style="margin-bottom: 10px; color: var(--ink-dim); font-size: 10.5px;">
-          One row per chromosome, length-scaled. Each row stacks: gene density,
-          repeat density, conserved-element density, current cohort's L2
-          envelopes, current cohort's promoted candidates. Click a chromosome
-          to drill into it.
-        </div>
-        <div style="font-family: var(--mono); font-size: 10px; color: var(--ink-dim);">
-          <div style="display: grid; grid-template-columns: 60px 1fr 80px; gap: 8px;
-                      align-items: center; padding: 4px 0;">
-            <div>LG01</div>
-            <div style="background: linear-gradient(90deg, #2a1a14 0%, #4a2820 30%, #2a1a14 60%, #1a1a1a 100%);
-                        height: 14px; border-radius: 2px; opacity: 0.55;"></div>
-            <div style="text-align: right;">28.4 Mb</div>
-          </div>
-          <div style="display: grid; grid-template-columns: 60px 1fr 80px; gap: 8px;
-                      align-items: center; padding: 4px 0;">
-            <div>LG02</div>
-            <div style="background: linear-gradient(90deg, #1a1a1a 0%, #3a2418 25%, #5a3220 50%, #2a1a14 100%);
-                        height: 14px; border-radius: 2px; opacity: 0.55;"></div>
-            <div style="text-align: right;">31.2 Mb</div>
-          </div>
-          <div style="display: grid; grid-template-columns: 60px 1fr 80px; gap: 8px;
-                      align-items: center; padding: 4px 0;">
-            <div>…</div>
-            <div style="color: var(--ink-dimmer);">26 more chromosomes</div>
-            <div></div>
-          </div>
-          <div style="display: grid; grid-template-columns: 60px 1fr 80px; gap: 8px;
-                      align-items: center; padding: 4px 0;">
-            <div style="color: #ff8c6e;">LG28</div>
-            <div style="background: linear-gradient(90deg, #2a1a14 0%, #4a2820 20%, #ff8c6e44 35%, #ff8c6e88 45%, #ff8c6e44 55%, #4a2820 70%, #2a1a14 100%);
-                        height: 14px; border-radius: 2px; opacity: 0.7;"></div>
-            <div style="text-align: right; color: #ff8c6e;">19.7 Mb</div>
-          </div>
-        </div>
-        <div style="color: var(--ink-dim); font-size: 10px; margin-top: 8px;
-                    padding-top: 8px; border-top: 1px dashed var(--rule);">
-          Highlighted row = current chromosome loaded in the Inversion Atlas.
-          Mockup gradients stand in for real density tracks; all renderers ship
-          as the corresponding layers land.
-        </div>
-      </div>
-
-      <!-- ── Section 4: Panel inventory ──────────────────────────────── -->
-      <div style="background: var(--panel-2); border: 1px solid var(--rule);
-                  border-left: 3px solid #ff8c6e; border-radius: 4px;
-                  padding: 16px 18px; margin-bottom: 18px;">
-        <div style="display: flex; justify-content: space-between; align-items: baseline;
-                    margin-bottom: 10px;">
-          <div style="font-size: 12px; font-weight: 600; color: var(--ink);">
-            Planned panels
-          </div>
-          <div style="font-size: 9.5px; color: var(--ink-dim); letter-spacing: 0.04em;
-                      padding: 2px 6px; border: 1px solid var(--rule); border-radius: 2px;">
-            phase B+
-          </div>
-        </div>
-        <div style="display: grid; grid-template-columns: 1.0fr 2.0fr; gap: 6px 14px;
-                    font-size: 10.5px; align-items: baseline;">
-          <div style="color: #ff8c6e; font-weight: 600;">Assembly QC banner</div>
-          <div style="color: var(--ink-dim);">BUSCO single-copy %, contig N50, scaffold N50, gap rate, T2T completeness chip per chromosome.</div>
-
-          <div style="color: #ff8c6e; font-weight: 600;">Chromosome strip</div>
-          <div style="color: var(--ink-dim);">Length-scaled per-chromosome rows with stacked density tracks (gene / repeat / conserved). Click to drill.</div>
-
-          <div style="color: #ff8c6e; font-weight: 600;">Gene cargo overlay</div>
-          <div style="color: var(--ink-dim);">For each promoted candidate in the Inversion Atlas, list the genes inside the inversion span. Highlight deleterious-variant overlap from VESM / SIFT4G / SnpEff.</div>
-
-          <div style="color: #ff8c6e; font-weight: 600;">TE / repeat panel</div>
-          <div style="color: var(--ink-dim);">Per-class repeat density across the chromosome. Test breakpoint zones for repeat enrichment (a known mechanism for inversion fixation).</div>
-
-          <div style="color: #ff8c6e; font-weight: 600;">Synteny ribbon</div>
-          <div style="color: var(--ink-dim);">Pairwise collinearity blocks vs related Siluriformes (e.g. <i>C. macrocephalus</i>, <i>I. punctatus</i>). Ancestral karyotype reconstruction from Cactus.</div>
-
-          <div style="color: #ff8c6e; font-weight: 600;">Conserved-element atlas</div>
-          <div style="color: var(--ink-dim);">UCEs and phastCons-derived conserved elements as a sub-track. Used to score regulatory disruption when a conserved element falls in an inversion zone.</div>
-
-          <div style="color: #ff8c6e; font-weight: 600;">Variant-annotation overlay</div>
-          <div style="color: var(--ink-dim);">SnpEff impact categories (HIGH / MODERATE / LOW / MODIFIER) summarized per inversion candidate.</div>
-        </div>
-      </div>
-
-      <!-- ── Section 5: Phasing roadmap ───────────────────────────────── -->
-      <div style="background: var(--panel-2); border: 1px solid var(--rule);
-                  border-left: 3px solid #ff8c6e; border-radius: 4px;
-                  padding: 16px 18px; margin-bottom: 18px;">
-        <div style="display: flex; justify-content: space-between; align-items: baseline;
-                    margin-bottom: 10px;">
-          <div style="font-size: 12px; font-weight: 600; color: var(--ink);">
-            Phasing roadmap
-          </div>
-          <div style="font-size: 9.5px; color: var(--ink-dim); letter-spacing: 0.04em;
-                      padding: 2px 6px; border: 1px solid var(--rule); border-radius: 2px;">
-            ship-when-ready
-          </div>
-        </div>
-        <div style="display: grid; grid-template-columns: 90px 1fr; gap: 6px 14px;
-                    font-size: 10.5px;">
-          <div style="color: #ff8c6e; font-weight: 600;">phase A</div>
-          <div style="color: var(--ink-dim);">This scaffold — schema commitment, layer inventory, panel mockups. <b style="color: var(--good);">[shipped — turn 53]</b></div>
-
-          <div style="color: #ff8c6e; font-weight: 600;">phase B</div>
-          <div style="color: var(--ink-dim);">Chromosome overview renderer — one row per chrom, length-scaled, with gene-density + repeat-density tracks. Wires <code>chromosome_map</code> + <code>gene_track</code> + <code>repeat_track</code> layers.</div>
-
-          <div style="color: #ff8c6e; font-weight: 600;">phase C</div>
-          <div style="color: var(--ink-dim);">Gene-cargo overlay on candidates — for each promoted inversion, list the genes inside its span. Surfaces deleterious-variant overlap when MODULE_CONSERVATION outputs land.</div>
-
-          <div style="color: #ff8c6e; font-weight: 600;">phase D</div>
-          <div style="color: var(--ink-dim);">Synteny + ancestral karyotype — Cactus pairwise blocks rendered as a ribbon track. Cross-references the Inversion Atlas's σ-verdicts at chromosome scale.</div>
-
-          <div style="color: #ff8c6e; font-weight: 600;">phase E</div>
-          <div style="color: var(--ink-dim);">Variant-annotation overlay — SnpEff/VEP impact categories per candidate. Final piece for the "what does this inversion break?" question.</div>
-        </div>
-      </div>
-
-      <!-- ── Section 6: Cross-references ──────────────────────────────── -->
-      <div style="background: var(--panel-2); border: 1px solid var(--rule);
-                  border-left: 3px solid #ff8c6e; border-radius: 4px;
-                  padding: 16px 18px;">
-        <div style="display: flex; justify-content: space-between; align-items: baseline;
-                    margin-bottom: 10px;">
-          <div style="font-size: 12px; font-weight: 600; color: var(--ink);">
-            Cross-references
-          </div>
-          <div style="font-size: 9.5px; color: var(--ink-dim); letter-spacing: 0.04em;
-                      padding: 2px 6px; border: 1px solid var(--rule); border-radius: 2px;">
-            see also
-          </div>
-        </div>
-        <div style="color: var(--ink-dim);">
-          • <b>Inversion Atlas</b> (tabs 1–11) — the candidate-curation tool. Genome Atlas
-          contextualizes its candidates with gene cargo, repeat density at breakpoints,
-          and conserved-element overlap.<br>
-          • <b>Diversity Atlas</b> (tab 13) — the per-sample diversity / ROH / kinship
-          interpretation of the same JSON. The two non-Inversion atlases share the
-          "render-only, compute external" architecture (turn 53 architectural note).<br>
-          • <b>Population Atlas</b> (separate HTML) — sibling deliverable covering
-          Samples / QC / Families / Heterozygosity / Diversity / Inbreeding.<br>
-          • <b>SCHEMA §28</b> — this page's specification (added in turn 53).<br>
-          • <b>MODULE_CONSERVATION</b> (cluster-side) — emits the deleterious-variant
-          calls (VESM / SIFT4G / SnpEff / GERP++) that feed the gene-cargo overlay.<br>
-          • <b>Cactus alignment</b> — feeds <code>synteny_blocks</code> +
-          <code>conserved_elements</code> layers.
         </div>
       </div>
     </div>
@@ -14317,12 +13737,19 @@ const REPEAT_DENSITY_Y_MODES = ['linear', 'auto', 'q99', 'q95', 'q90', 'log'];
 const REPEAT_DENSITY_VIEW_MODES = ['full', 'zoomed'];
 // v4 turn 23: multi-bandwidth LOESS overlays. Default bandwidths fitted in JS
 // on visible-only windows so they re-fit when zooming. Each band has a label,
-// a span (alpha), and a color. Width tapers smaller→larger so all 3 are
+// a span (alpha), and a color. Width tapers smaller→larger so all 5 are
 // readable when overlaid.
+// v4 turn 73f: added 0.05 and 0.10 bands per Quentin's request; the 'custom'
+// band reads its span from state.repeatDensityPrefs.customSpan (default 0.20)
+// — clicking the "+ custom" toggle prompts for a new value.
 const REPEAT_DENSITY_LOESS_BANDS = [
+  { id: 'ultra',  label: 'ultra (0.05)',   span: 0.05, color: '#f0a35e', width: 0.9 },
+  { id: 'narrow', label: 'narrow (0.10)',  span: 0.10, color: '#e07cb0', width: 1.05 },
   { id: 'tight',  label: 'tight (0.15)',   span: 0.15, color: '#7ad3db', width: 1.2 },
   { id: 'medium', label: 'medium (0.30)',  span: 0.30, color: '#3070d0', width: 1.6 },
   { id: 'wide',   label: 'wide (0.50)',    span: 0.50, color: '#b07cf7', width: 2.0 },
+  // 'custom' span is read live from prefs.customSpan rather than this constant
+  { id: 'custom', label: 'custom',         span: 0.20, color: '#5fd49a', width: 1.4 },
 ];
 
 function _repeatDensityPrefs() {
@@ -14332,15 +13759,28 @@ function _repeatDensityPrefs() {
       viewMode: 'full',
       // v4 turn 23: which LOESS bands are enabled. Default = medium only.
       // Object keyed by band id, value is boolean. Persists across reloads.
-      loessBands: { tight: false, medium: true, wide: false },
+      // v4 turn 73f: 5 fixed bands (ultra/narrow/tight/medium/wide) + 1 custom.
+      loessBands: { ultra: false, narrow: false, tight: false, medium: true, wide: false, custom: false },
+      // v4 turn 73f: user-set custom span (used when loessBands.custom = true).
+      customSpan: 0.20,
       // activeClass per chrom is stored in state.repeatDensityActiveClass
       // (lives in the data layer, separate field for finer-grained control)
     };
   }
   // Defensive: older persisted prefs may not have loessBands; backfill.
+  // v4 turn 73f: also backfill new band ids and customSpan for old prefs.
   if (!state.repeatDensityPrefs.loessBands ||
       typeof state.repeatDensityPrefs.loessBands !== 'object') {
-    state.repeatDensityPrefs.loessBands = { tight: false, medium: true, wide: false };
+    state.repeatDensityPrefs.loessBands = { ultra: false, narrow: false, tight: false, medium: true, wide: false, custom: false };
+  } else {
+    // Backfill missing band ids without clobbering user choices on existing ones
+    const cur = state.repeatDensityPrefs.loessBands;
+    for (const id of ['ultra', 'narrow', 'tight', 'medium', 'wide', 'custom']) {
+      if (typeof cur[id] !== 'boolean') cur[id] = (id === 'medium');   // medium default-on
+    }
+  }
+  if (!Number.isFinite(state.repeatDensityPrefs.customSpan)) {
+    state.repeatDensityPrefs.customSpan = 0.20;
   }
   return state.repeatDensityPrefs;
 }
@@ -14352,7 +13792,9 @@ function _persistRepeatDensityPrefs() {
       yMode:    prefs.yMode,
       viewMode: prefs.viewMode,
       // v4 turn 23: persist LOESS band visibility
-      loessBands: prefs.loessBands || { tight: false, medium: true, wide: false },
+      // v4 turn 73f: + 5-band shape (ultra/narrow/tight/medium/wide/custom) and customSpan
+      loessBands: prefs.loessBands || { ultra: false, narrow: false, tight: false, medium: true, wide: false, custom: false },
+      customSpan: Number.isFinite(prefs.customSpan) ? prefs.customSpan : 0.20,
       activeClass: state.repeatDensityActiveClass || {},
     }));
   } catch (_) { /* fail-soft */ }
@@ -14377,6 +13819,11 @@ function _restoreRepeatDensityPrefs() {
           : (id === 'medium');   // default fallback: medium on, others off
       }
       prefs.loessBands = restored;
+    }
+    // v4 turn 73f: restore customSpan (validate range 0.01..1.0)
+    if (Number.isFinite(parsed.customSpan)
+        && parsed.customSpan >= 0.01 && parsed.customSpan <= 1.0) {
+      prefs.customSpan = parsed.customSpan;
     }
     if (parsed.activeClass && typeof parsed.activeClass === 'object') {
       state.repeatDensityActiveClass = parsed.activeClass;
@@ -14772,9 +14219,15 @@ function _renderRepeatDensityPanel() {
         b => prefs.loessBands && prefs.loessBands[b.id]
       );
       // Draw narrowest first so wide is on top (legibility)
-      const drawOrder = enabledBands.slice().sort((a, b) => a.span - b.span);
+      // v4 turn 73f: 'custom' band reads its span from prefs.customSpan so
+      // changes propagate without code edits. Effective span resolution
+      // happens here, then drawOrder sorts by effective span.
+      const _effSpan = (b) => (b.id === 'custom')
+        ? (Number.isFinite(prefs.customSpan) ? prefs.customSpan : b.span)
+        : b.span;
+      const drawOrder = enabledBands.slice().sort((a, b) => _effSpan(a) - _effSpan(b));
       for (const band of drawOrder) {
-        const fit = _loessFit(visXs, visYs, band.span);
+        const fit = _loessFit(visXs, visYs, _effSpan(band));
         const pts = [];
         for (let i = 0; i < fit.length; i++) {
           const fv = fit[i];
@@ -14835,16 +14288,27 @@ function _renderRepeatDensityPanel() {
 
   // v4 turn 23: LOESS band toggles in the meta area. Each band is a small
   // colored pill that toggles its visibility. State lives in prefs.loessBands.
+  // v4 turn 73f: 'custom' band reads its span from prefs.customSpan (default
+  // 0.20). The label dynamically reflects the current custom span.
+  const _custSpan = Number.isFinite(prefs.customSpan) ? prefs.customSpan : 0.20;
   const loessBandToggles = REPEAT_DENSITY_LOESS_BANDS.map(b => {
     const on = !!(prefs.loessBands && prefs.loessBands[b.id]);
     const baseStyle = 'border-color:' + b.color + ';color:' + b.color + ';';
     const fillStyle = on
       ? 'background:' + b.color + '20;font-weight:500;'
       : 'background:transparent;opacity:0.55;';
+    const label = (b.id === 'custom')
+      ? ('custom (' + _custSpan.toFixed(2) + ')')
+      : b.label;
+    const titleAction = (b.id === 'custom')
+      ? (on
+          ? 'Click to set a new custom span (current ' + _custSpan.toFixed(2) + ')'
+          : 'Show LOESS at custom span (currently ' + _custSpan.toFixed(2) + ')')
+      : ((on ? 'Hide ' : 'Show ') + b.label + ' LOESS band');
     return '<button class="bnd-rd-loess-toggle" data-bnd-rd-loess="' + b.id +
            '" style="' + baseStyle + fillStyle +
-           '" title="' + (on ? 'Hide' : 'Show') + ' ' + b.label + ' LOESS band">' +
-           b.label + '</button>';
+           '" title="' + titleAction + '">' +
+           label + '</button>';
   }).join('');
 
   const headerHtml =
@@ -15028,6 +14492,9 @@ function _renderRepeatDensityPanel() {
 
   // v4 turn 23: LOESS band toggles. Each pill toggles its band's visibility,
   // persists prefs, re-renders.
+  // v4 turn 73f: 'custom' band: if currently OFF, click prompts for a span
+  // value (default 0.20) then enables. If currently ON, click prompts for a
+  // new span (keeping it on); shift-click toggles off without prompting.
   const loessBtns = slot.querySelectorAll('[data-bnd-rd-loess]');
   for (const btn of loessBtns) {
     btn.addEventListener('click', (e) => {
@@ -15035,9 +14502,34 @@ function _renderRepeatDensityPanel() {
       const bandId = btn.getAttribute('data-bnd-rd-loess');
       const p = _repeatDensityPrefs();
       if (!p.loessBands || typeof p.loessBands !== 'object') {
-        p.loessBands = { tight: false, medium: true, wide: false };
+        p.loessBands = { ultra: false, narrow: false, tight: false, medium: true, wide: false, custom: false };
       }
-      p.loessBands[bandId] = !p.loessBands[bandId];
+      if (bandId === 'custom') {
+        const wasOn = !!p.loessBands.custom;
+        // Shift-click: toggle off without prompting
+        if (wasOn && e.shiftKey) {
+          p.loessBands.custom = false;
+        } else {
+          // Prompt for span; default to current value or 0.20
+          const cur = Number.isFinite(p.customSpan) ? p.customSpan : 0.20;
+          const raw = prompt(
+            'LOESS custom span (0.01 – 1.00). ' +
+            'Smaller = follows local detail; larger = smoother trend. ' +
+            'Tip: shift-click the custom button to hide without prompting.',
+            cur.toFixed(2)
+          );
+          if (raw === null) return;   // user cancelled
+          const v = parseFloat(raw);
+          if (!Number.isFinite(v) || v < 0.01 || v > 1.0) {
+            alert('Invalid span. Must be a number between 0.01 and 1.00.');
+            return;
+          }
+          p.customSpan = v;
+          p.loessBands.custom = true;
+        }
+      } else {
+        p.loessBands[bandId] = !p.loessBands[bandId];
+      }
       _persistRepeatDensityPrefs();
       _renderRepeatDensityPanel();
     });
@@ -20311,12 +19803,22 @@ function manualGroupFromBand(k) {
 }
 
 // Render the sidebar list. Idempotent — safe to call any time.
+// v4 turn 73c: dual-writes into both #manualGroupsList (sidebar) and
+// #manualGroupsListCompact (compact panel). Same HTML in both; click
+// delegation is set up on both containers in the wiring section.
 function renderManualGroupsList() {
-  const box = (typeof document !== 'undefined') ? document.getElementById('manualGroupsList') : null;
-  if (!box) return;
+  const containers = [];
+  if (typeof document !== 'undefined') {
+    const sidebar = document.getElementById('manualGroupsList');
+    const compact = document.getElementById('manualGroupsListCompact');
+    if (sidebar) containers.push(sidebar);
+    if (compact) containers.push(compact);
+  }
+  if (containers.length === 0) return;
   const groups = state.manualGroups || [];
   if (groups.length === 0) {
-    box.innerHTML = '<div class="mg-empty">No groups yet — pick samples or grab a K-band.</div>';
+    const emptyHtml = '<div class="mg-empty">No groups yet — pick samples or grab a K-band.</div>';
+    for (const box of containers) box.innerHTML = emptyHtml;
     return;
   }
   let html = '';
@@ -20334,7 +19836,7 @@ function renderManualGroupsList() {
       `<button class="mg-del" data-mgid="${g.id}" title="Remove this group">×</button>` +
       `</div>`;
   }
-  box.innerHTML = html;
+  for (const box of containers) box.innerHTML = html;
 }
 
 // Defensive HTML-escape for group names in the list
@@ -23618,8 +23120,14 @@ function clearPicks() {
   renderL3Panel();
 }
 function renderTrackedList() {
-  const el = document.getElementById('trackedList');
-  el.innerHTML = '';
+  // v4 turn 73c: refactored to dual-write into both #trackedList (sidebar)
+  // AND #trackedListCompact (compact panel). Same chip-building logic; each
+  // chip is built fresh per container because a DOM node can only belong to
+  // one parent.
+  const elSidebar = document.getElementById('trackedList');
+  const elCompact = document.getElementById('trackedListCompact');
+  if (elSidebar) elSidebar.innerHTML = '';
+  if (elCompact) elCompact.innerHTML = '';
   const ci = document.getElementById('trackedCountInfo');
   const ni = document.getElementById('trackedNInfo');
   if (ci) ci.textContent = state.tracked.length;
@@ -23645,15 +23153,16 @@ function renderTrackedList() {
   // Pre-compute per-sample spread for the current L2 once.
   const curL2 = state.windowToL2 ? state.windowToL2[state.cur] : -1;
   const sd = curL2 >= 0 ? sampleSpreadL2(curL2) : null;
-  state.tracked.forEach(si => {
+
+  // v4 turn 73c: helper to build a chip for one sample. Called twice (once
+  // for sidebar, once for compact) so each container gets its own DOM node.
+  const buildChip = (si) => {
     const s = state.data.samples[si];
     const chip = document.createElement('span');
     chip.className = 'tag on';
     let label = s.cga || s.ind;
     if (sd && isFinite(sd[si])) {
-      // Append spread σ in subtle small text. High σ = drifts between bands.
       label += ` <span style="opacity:0.6; font-size:10px;">σ${sd[si].toFixed(3)}</span>`;
-      // Visual flag: high spread (>0.05) = unstable in current L2
       if (sd[si] > 0.05) chip.style.borderColor = 'var(--bad)';
     }
     chip.innerHTML = label;
@@ -23661,7 +23170,12 @@ function renderTrackedList() {
       state.tracked = state.tracked.filter(x => x !== si);
       renderTrackedList(); drawLinesPanel(); drawPCA(); renderL3Panel();
     };
-    el.appendChild(chip);
+    return chip;
+  };
+
+  state.tracked.forEach(si => {
+    if (elSidebar) elSidebar.appendChild(buildChip(si));
+    if (elCompact) elCompact.appendChild(buildChip(si));
   });
 }
 
@@ -24667,6 +24181,194 @@ function mergeEnrichmentLayers(enrichmentData) {
   return { added, rejected_chrom_mismatch: false };
 }
 
+// =============================================================================
+// v4 turn 73f: IndexedDB persistence for loaded JSONs
+// =============================================================================
+// Per Quentin's request: "We need to keep JSON loaded between pages if possible
+// or reload the previous ones when we come back to the page automatically."
+//
+// Drag-dropped JSONs are persisted to IndexedDB (localStorage's 5 MB cap is
+// too small for ~20-30 MB chromosome JSONs). On page load, all stored JSONs
+// are restored: chromosome JSONs go into _chromCache, the most recent one is
+// activated via applyData; enrichment JSONs are merged afterwards.
+//
+// Storage keys:
+//   chromCache    : keyed by chromosome name → full chromosome JSON
+//   enrichments   : keyed by file name+timestamp → enrichment JSON
+//                   (merged onto active chrom on restore)
+//   activeChrom   : meta key holding the chromosome to re-display on load
+//
+// Failure modes are silent (logs to console). User can clear via the
+// 'clear stored JSONs' control in the sidebar Data section.
+// =============================================================================
+const _IDB_NAME = 'pca_scrubber_v3.json_cache';
+const _IDB_VERSION = 1;
+const _IDB_STORE_CHROM = 'chromCache';
+const _IDB_STORE_ENRICH = 'enrichments';
+const _IDB_STORE_META = 'meta';
+
+let _idbHandle = null;
+let _idbOpenPromise = null;
+
+function _idbOpen() {
+  if (_idbOpenPromise) return _idbOpenPromise;
+  _idbOpenPromise = new Promise((resolve, reject) => {
+    if (typeof indexedDB === 'undefined') {
+      reject(new Error('IndexedDB unavailable in this browser'));
+      return;
+    }
+    const req = indexedDB.open(_IDB_NAME, _IDB_VERSION);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(_IDB_STORE_CHROM)) {
+        db.createObjectStore(_IDB_STORE_CHROM, { keyPath: 'chrom' });
+      }
+      if (!db.objectStoreNames.contains(_IDB_STORE_ENRICH)) {
+        db.createObjectStore(_IDB_STORE_ENRICH, { keyPath: 'key' });
+      }
+      if (!db.objectStoreNames.contains(_IDB_STORE_META)) {
+        db.createObjectStore(_IDB_STORE_META, { keyPath: 'k' });
+      }
+    };
+    req.onsuccess = (e) => { _idbHandle = e.target.result; resolve(_idbHandle); };
+    req.onerror = (e) => reject(e.target.error);
+  });
+  return _idbOpenPromise;
+}
+
+function _idbPut(store, value) {
+  return _idbOpen().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readwrite');
+    const req = tx.objectStore(store).put(value);
+    req.onsuccess = () => resolve();
+    req.onerror = (e) => reject(e.target.error);
+  }));
+}
+
+function _idbGetAll(store) {
+  return _idbOpen().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readonly');
+    const req = tx.objectStore(store).getAll();
+    req.onsuccess = (e) => resolve(e.target.result || []);
+    req.onerror = (e) => reject(e.target.error);
+  }));
+}
+
+function _idbGet(store, key) {
+  return _idbOpen().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readonly');
+    const req = tx.objectStore(store).get(key);
+    req.onsuccess = (e) => resolve(e.target.result || null);
+    req.onerror = (e) => reject(e.target.error);
+  }));
+}
+
+function _idbClearAll() {
+  return _idbOpen().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction([_IDB_STORE_CHROM, _IDB_STORE_ENRICH, _IDB_STORE_META], 'readwrite');
+    tx.objectStore(_IDB_STORE_CHROM).clear();
+    tx.objectStore(_IDB_STORE_ENRICH).clear();
+    tx.objectStore(_IDB_STORE_META).clear();
+    tx.oncomplete = () => resolve();
+    tx.onerror = (e) => reject(e.target.error);
+  }));
+}
+
+// Persist a chromosome JSON (called from applyData after state.data is set).
+// Shallow-copies into a record with chrom as keyPath. Silent on failure
+// (e.g. quota exceeded — user can clear cache and retry).
+function _idbPersistChrom(data) {
+  if (!data || !data.chrom) return Promise.resolve();
+  const record = { chrom: data.chrom, data: data, savedAt: Date.now() };
+  return _idbPut(_IDB_STORE_CHROM, record).then(() => {
+    // Mark as active (last-loaded chrom restored on next page load)
+    return _idbPut(_IDB_STORE_META, { k: 'activeChrom', v: data.chrom });
+  }).catch(err => {
+    console.warn('[idb] persist chrom failed:', err && err.message ? err.message : err);
+  });
+}
+
+// Persist an enrichment file. Keyed by name + savedAt to allow multiple files
+// of the same nominal name across sessions if needed (rare).
+function _idbPersistEnrichment(name, data) {
+  const record = { key: name, name: name, data: data, savedAt: Date.now() };
+  return _idbPut(_IDB_STORE_ENRICH, record).catch(err => {
+    console.warn('[idb] persist enrichment failed:', name, err && err.message ? err.message : err);
+  });
+}
+
+// Restore everything: load all chromosome JSONs into _chromCache, then apply
+// the most-recent (or last-active) one, then merge all enrichments.
+// Returns a promise so the caller can chain on completion.
+function _idbRestoreAll() {
+  if (typeof indexedDB === 'undefined') return Promise.resolve(null);
+  return Promise.all([
+    _idbGetAll(_IDB_STORE_CHROM),
+    _idbGetAll(_IDB_STORE_ENRICH),
+    _idbGet(_IDB_STORE_META, 'activeChrom'),
+  ]).then(([chroms, enrichments, activeMeta]) => {
+    if ((!chroms || chroms.length === 0) && (!enrichments || enrichments.length === 0)) {
+      return null;   // nothing to restore
+    }
+    // Repopulate _chromCache
+    if (Array.isArray(chroms)) {
+      for (const c of chroms) {
+        if (c && c.chrom && c.data) _chromCache.set(c.chrom, c.data);
+      }
+    }
+    // Refresh chrom selector so the user can switch between cached chroms
+    if (typeof refreshChromSelect === 'function') {
+      try { refreshChromSelect(); } catch (_) {}
+    }
+    // Pick the chrom to display: last active, else most recent
+    let target = null;
+    if (activeMeta && activeMeta.v && _chromCache.has(activeMeta.v)) {
+      target = _chromCache.get(activeMeta.v);
+    } else if (chroms && chroms.length > 0) {
+      const sorted = chroms.slice().sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
+      target = sorted[0].data;
+    }
+    if (target) {
+      try {
+        applyData(target);
+      } catch (e) {
+        console.warn('[idb] applyData on restore failed:', e && e.message ? e.message : e);
+      }
+    }
+    // Merge enrichments (only if we have an active chrom)
+    if (state.data && Array.isArray(enrichments)) {
+      for (const en of enrichments) {
+        if (!en || !en.data) continue;
+        try {
+          if (typeof mergeEnrichmentLayers === 'function') {
+            mergeEnrichmentLayers(en.data);
+          }
+        } catch (e) {
+          console.warn('[idb] merge enrichment on restore failed:', en.name, e && e.message ? e.message : e);
+        }
+      }
+      // Refresh schema badge
+      const schemaBadge = document.getElementById('schemaBadge');
+      if (schemaBadge && typeof listLayers === 'function') {
+        const layerNames = listLayers();
+        schemaBadge.textContent = `schema v${state.schemaVersion || 2} · ${layerNames.length} layer${layerNames.length === 1 ? '' : 's'}`;
+        schemaBadge.title = `Schema version: v${state.schemaVersion || 2}\nLayers: ${layerNames.join(', ')}\n\nClick for full layer registry`;
+        schemaBadge.className = 'v' + (state.schemaVersion || 2);
+        schemaBadge.style.display = '';
+      }
+    }
+    return {
+      n_chroms: (chroms || []).length,
+      n_enrichments: (enrichments || []).length,
+      active: target ? target.chrom : null,
+    };
+  }).catch(err => {
+    console.warn('[idb] restore failed:', err && err.message ? err.message : err);
+    return null;
+  });
+}
+
+
 function applyData(data) {
   // Cross-chrom safety: candidate from a different chromosome is meaningless.
   // Clear it before swapping data so refreshes downstream see no stale state.
@@ -24792,6 +24494,12 @@ function applyData(data) {
   if (typeof _refreshMarkerPageActivation === 'function') _refreshMarkerPageActivation();
   if (typeof renderMarkerPage === 'function') renderMarkerPage();
   setCur(0);
+  // v4 turn 73f: persist this chromosome to IndexedDB so it survives page
+  // reloads / cross-atlas navigation. Async, fire-and-forget; failures log
+  // to console but don't block the UI.
+  if (typeof _idbPersistChrom === 'function') {
+    try { _idbPersistChrom(data); } catch (_) { /* fail-soft */ }
+  }
 }
 
 // =============================================================================
@@ -24886,7 +24594,7 @@ const _SCHEMA_REGISTRY = [
   },
   {
     phase: 'Diversity-mode tracks (Diversity Atlas, future)',
-    note: 'Loaded by the planned Diversity_atlas.html (per ADR-14).',
+    note: 'Loaded by the planned Diversity_Inversion_atlas.html (per ADR-14).',
     layers: [
       { name: 'theta_pi_panel',         desc: 'Per-sample × window θπ (legacy alias of theta_pi_per_window for diversity-mode)',          script: 'STEP_TR_A (planned)' },
       { name: 'roh_intervals',          desc: 'Per-sample ROH segment catalog (ngsF-HMM output)',                                          script: 'TBD' },
@@ -25149,6 +24857,10 @@ function loadMultipleJSONs(files) {
               const result = mergeEnrichmentLayers(data);
               if (result && result.added && result.added.length > 0) {
                 _animateFileToSchemaBadge(f.name, result.added.length);
+                // v4 turn 73f: persist this enrichment so it re-merges on reload
+                if (typeof _idbPersistEnrichment === 'function') {
+                  try { _idbPersistEnrichment(f.name, data); } catch (_) {}
+                }
                 // Refresh schema badge text
                 const schemaBadge = document.getElementById('schemaBadge');
                 if (schemaBadge && typeof listLayers === 'function') {
@@ -25493,6 +25205,11 @@ function _syncTrackedCompactUI() {
       b.style.cursor = 'not-allowed';
     }
   });
+  // v4 turn 73c: also sync the new compact extras (action button states +
+  // color-mode active class). Defined later in the file — guard with typeof.
+  if (typeof _syncTrackedCompactExtras === 'function') {
+    try { _syncTrackedCompactExtras(); } catch (_) {}
+  }
 }
 // Compact handlers — push to state, then re-call _syncTrackedCompactUI
 // to keep the sidebar in sync (its inputs read state too).
@@ -25586,6 +25303,128 @@ if (_clearPicksCompact2) _clearPicksCompact2.addEventListener('click', () => {
   clearPicks();
   _syncTrackedCompactUI();
 });
+
+// v4 turn 73c: compact-mode parity wiring. Each new button delegates to its
+// sidebar sibling via .click() — no logic duplication. Also wire color-mode
+// bar, manual-groups buttons, and add click delegation for the manual-groups
+// row actions on the compact container.
+{
+  // -- Action buttons (lock / promote / export) ----------------------------
+  const proxy = (compactId, sidebarId) => {
+    const btn = document.getElementById(compactId);
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      const target = document.getElementById(sidebarId);
+      if (target && !target.disabled) target.click();
+    });
+  };
+  proxy('lockColorsBtnCompact',       'lockColorsBtn');
+  proxy('promoteCandidateBtnCompact', 'promoteCandidateBtn');
+  proxy('exportKLabelsBtnCompact',    'exportKLabelsBtn');
+  proxy('mgAddBtnCompact',            'mgAddBtn');
+  proxy('mgClearAllBtnCompact',       'mgClearAllBtn');
+
+  // -- Color-mode picker (5 buttons) -------------------------------------
+  // [data-mode-compact] mirrors the sidebar's [data-mode] bar.
+  document.querySelectorAll('#colorModeBarCompact button[data-mode-compact]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const mode = btn.dataset.modeCompact;
+      const sidebarBtn = document.querySelector(`#colorModeBar button[data-mode="${mode}"]`);
+      if (sidebarBtn) sidebarBtn.click();
+      // Mirror active state on compact bar (sidebar will have already done so)
+      document.querySelectorAll('#colorModeBarCompact button[data-mode-compact]').forEach(b => {
+        b.classList.toggle('active', b === btn);
+      });
+    });
+  });
+
+  // -- Manual-groups row click delegation (pin / del / rename) ----------
+  // Mirrors the sidebar's existing delegation. Same handler logic; the click
+  // handler is already attached to #manualGroupsList in another wiring block,
+  // so we replicate it here for #manualGroupsListCompact.
+  const compactList = document.getElementById('manualGroupsListCompact');
+  if (compactList) {
+    compactList.addEventListener('click', (e) => {
+      const t = e.target;
+      if (!t || !t.dataset || !t.dataset.mgid) return;
+      const id = t.dataset.mgid;
+      if (t.classList.contains('mg-pin') && typeof toggleManualGroupScope === 'function') {
+        toggleManualGroupScope(id);
+      } else if (t.classList.contains('mg-del')) {
+        const g = (state.manualGroups || []).find(x => x.id === id);
+        if (g && confirm(`Delete group "${g.name}" (n=${g.members.length})?`)
+            && typeof removeManualGroup === 'function') {
+          removeManualGroup(id);
+        }
+      }
+    });
+    compactList.addEventListener('blur', (e) => {
+      const t = e.target;
+      if (!t || !t.classList || !t.classList.contains('mg-name')) return;
+      const id = t.dataset.mgid;
+      const newName = (t.textContent || '').trim();
+      if (id && newName && typeof renameManualGroup === 'function') {
+        renameManualGroup(id, newName);
+      }
+    }, true);
+    compactList.addEventListener('keydown', (e) => {
+      const t = e.target;
+      if (!t || !t.classList || !t.classList.contains('mg-name')) return;
+      if (e.key === 'Enter') { e.preventDefault(); t.blur(); }
+      else if (e.key === 'Escape') {
+        e.preventDefault();
+        const id = t.dataset.mgid;
+        const g = (state.manualGroups || []).find(x => x.id === id);
+        if (g) t.textContent = g.name;
+        t.blur();
+      }
+    });
+  }
+}
+
+// v4 turn 73c: extra sync — keep compact action buttons' enabled state and
+// active classes in lockstep with their sidebar siblings. Called from the
+// existing _syncTrackedCompactUI function (we hook into it via a sentinel
+// check that runs after the original body finishes).
+function _syncTrackedCompactExtras() {
+  // Mirror promoteCandidateBtn.disabled
+  const sidePromote = document.getElementById('promoteCandidateBtn');
+  const compactPromote = document.getElementById('promoteCandidateBtnCompact');
+  if (sidePromote && compactPromote) {
+    compactPromote.disabled = !!sidePromote.disabled;
+    if (sidePromote.title) compactPromote.title = sidePromote.title;
+  }
+  // Mirror lockColorsBtn label + accent style: when sidebar shows
+  // "🔓 unlock (frozen to ...)", the compact button mirrors the same state.
+  const sideLock = document.getElementById('lockColorsBtn');
+  const compactLock = document.getElementById('lockColorsBtnCompact');
+  if (sideLock && compactLock) {
+    // Compact has tighter labels — shorten if needed
+    const isLocked = sideLock.innerHTML.includes('🔓');
+    if (isLocked) {
+      // Extract the frozen-to id from the sidebar label
+      const m = sideLock.innerHTML.match(/frozen to ([^\)]+)/);
+      const id = m ? m[1] : '?';
+      compactLock.innerHTML = `🔓 unlock (${id})`;
+      compactLock.style.background = 'var(--accent)';
+      compactLock.style.color = '#0e1116';
+      compactLock.style.borderColor = 'var(--accent)';
+    } else {
+      compactLock.innerHTML = '🔒 lock colors';
+      compactLock.style.background = '';
+      compactLock.style.color = '';
+      compactLock.style.borderColor = '';
+    }
+  }
+  // Mirror color-mode bar active state from sidebar to compact
+  const sideActive = document.querySelector('#colorModeBar button.active');
+  const sideMode = sideActive ? sideActive.dataset.mode : null;
+  if (sideMode) {
+    document.querySelectorAll('#colorModeBarCompact button[data-mode-compact]').forEach(b => {
+      b.classList.toggle('active', b.dataset.modeCompact === sideMode);
+    });
+  }
+}
 // v3.99 turn 4: tracked-samples panel header collapse arrow. Toggles the
 // body's display between flex and none; persists across reloads.
 // v3.99 turn 9: also toggles a body attribute so CSS can shrink the panel
@@ -35169,6 +35008,60 @@ try { _wireRepeatDensityArrowNav(); } catch (_) { /* fail-soft */ }
 try { _wireRepeatDensityEscapeReset(); } catch (_) { /* fail-soft */ }
 try { _wireRepeatDensityClassCycle(); } catch (_) { /* fail-soft */ }
 
+// =============================================================================
+// v4 turn 73f: IndexedDB restore — re-load whatever JSONs were saved last
+// session so the user doesn't have to drag-drop them again. Toast briefly
+// shows what came back; click ✕ or wait 4s to dismiss.
+// =============================================================================
+if (typeof _idbRestoreAll === 'function') {
+  _idbRestoreAll().then(summary => {
+    if (!summary) return;
+    const parts = [];
+    if (summary.active) parts.push(`active: ${summary.active}`);
+    if (summary.n_chroms > 1) parts.push(`${summary.n_chroms} chroms cached`);
+    if (summary.n_enrichments > 0) parts.push(`${summary.n_enrichments} enrichment${summary.n_enrichments === 1 ? '' : 's'} merged`);
+    if (parts.length === 0) return;
+    // Lightweight toast (no dependency on other UI). Auto-dismisses.
+    const toast = document.createElement('div');
+    toast.id = 'idbRestoreToast';
+    toast.style.cssText = [
+      'position:fixed', 'bottom:20px', 'right:20px',
+      'background:var(--panel-2)', 'color:var(--ink)',
+      'border:1px solid var(--accent)', 'border-radius:4px',
+      'padding:10px 14px', 'font-family:var(--mono)', 'font-size:11px',
+      'z-index:9999', 'box-shadow:0 4px 18px rgba(0,0,0,0.5)',
+      'cursor:pointer', 'max-width:340px',
+    ].join(';') + ';';
+    toast.innerHTML = `↻ restored from cache · ${parts.join(' · ')} ` +
+                      `<span style="opacity:0.55; margin-left:8px;">(click to dismiss)</span>`;
+    toast.addEventListener('click', () => { try { toast.remove(); } catch (_) {} });
+    document.body.appendChild(toast);
+    setTimeout(() => { try { toast.remove(); } catch (_) {} }, 6000);
+  });
+}
+
+// Wire the "🗑 clear cached JSONs" button (added in the sidebar Data section).
+{
+  const clearBtn = document.getElementById('clearJsonCacheBtn');
+  if (clearBtn && typeof _idbClearAll === 'function') {
+    clearBtn.addEventListener('click', () => {
+      const ok = confirm('Clear all cached JSONs from IndexedDB?\n\n' +
+                         'This will remove every chromosome and enrichment file ' +
+                         'that was auto-saved between sessions. The currently-' +
+                         'displayed atlas stays loaded until you refresh.');
+      if (!ok) return;
+      _idbClearAll().then(() => {
+        clearBtn.textContent = '✓ cleared';
+        setTimeout(() => { clearBtn.textContent = '🗑 clear cached JSONs'; }, 1800);
+      }).catch(err => {
+        console.warn('[idb] clear failed:', err);
+        clearBtn.textContent = '× clear failed';
+        setTimeout(() => { clearBtn.textContent = '🗑 clear cached JSONs'; }, 2500);
+      });
+    });
+  }
+}
+
 // Wire the catalogue toolbar 'regimes' button to open the dialog (list mode)
 {
   const btn = document.getElementById('catRegimeRegistry');
@@ -35683,81 +35576,76 @@ _tabBtns.forEach(btn => {
 // indicator reflects it, and clicks update both state and the visible tab.
 // =============================================================================
 
-// Initialize state.atlas. Default 'inversion'; restore from localStorage if
-// present and valid.
+// Initialize state.atlas. Always 'inversion' inside this HTML — Diversity
+// and Genome are now separate files (ADR-14). Slot kept for historical
+// reasons + future-proofing (e.g. if the Inversion Atlas later acquires
+// sub-modes that genuinely live in this file).
+//
+// v4 turn 73e: localStorage value can still legitimately be 'diversity' or
+// 'genome' from a pre-split session. We DON'T auto-redirect to those files
+// (would surprise the user), but we downgrade state.atlas to 'inversion'
+// here since this HTML can't represent the other modes anymore.
 state.atlas = 'inversion';
 try {
-  const saved = localStorage.getItem('pca_scrubber_v3.atlasMode');
-  if (saved === 'inversion' || saved === 'diversity' || saved === 'genome') {
-    state.atlas = saved;
-  }
+  // Read & ignore — the slot exists, but the only valid value here is
+  // 'inversion'. Stale values from before the split are silently dropped.
+  localStorage.getItem('pca_scrubber_v3.atlasMode');
+  localStorage.setItem('pca_scrubber_v3.atlasMode', 'inversion');
 } catch (_) { /* fail-soft */ }
 
-// Map atlas mode → first-tab page id. Clicking a pill jumps here.
+// Map atlas mode → first-tab page id. Only the inversion entry is reachable
+// from inside this HTML; diversity/genome entries removed in v4 turn 73e
+// when those scaffolds were promoted to standalone files.
 const ATLAS_MODE_TO_TAB = {
   inversion: 'page1',
-  diversity: 'page13',
-  genome:    'page14',
 };
 
-// Map page id → atlas mode (for the reverse direction: tab click should
-// also update the atlas mode indicator).
+// Map page id → atlas mode. Trivial here since every tab is part of the
+// Inversion Atlas, but kept as a function for symmetry with the other
+// atlas files (each of which has its own _atlasModeForTab).
 function _atlasModeForTab(pageId) {
-  if (pageId === 'page13') return 'diversity';
-  if (pageId === 'page14') return 'genome';
-  return 'inversion';  // tabs 1-12 all → inversion
+  return 'inversion';
 }
 
-// Persist + repaint the indicator. Idempotent. Safe to call from any code
-// path that mutates state.atlas.
+// Repaint the active button. Inside this HTML state.atlas is always
+// 'inversion', so this only ever paints blue. Kept as a function so the
+// dropdown markup stays parallel with the other atlas files.
 function _setAtlasMode(mode) {
-  if (mode !== 'inversion' && mode !== 'diversity' && mode !== 'genome') return;
-  state.atlas = mode;
-  try {
-    localStorage.setItem('pca_scrubber_v3.atlasMode', mode);
-  } catch (_) { /* fail-soft */ }
-  // Repaint pill indicator
-  document.querySelectorAll('.atlas-mode-pill').forEach(p => {
-    const isActive = p.dataset.atlasMode === mode;
-    p.classList.toggle('active', isActive);
-    if (isActive) {
-      p.style.background = 'var(--panel-3)';
-      p.style.color = 'var(--ink)';
-    } else {
-      p.style.background = 'var(--panel-2)';
-      p.style.color = 'var(--ink-dim)';
+  if (mode !== 'inversion') return;
+  state.atlas = 'inversion';
+  const activeBtn = document.getElementById('atlasActiveBtn');
+  if (!activeBtn) return;
+  activeBtn.dataset.atlasMode = 'inversion';
+  activeBtn.title = 'Inversion Atlas — curate candidates, manage tracks, refine boundaries. Hover to switch atlases.';
+  activeBtn.style.background  = 'rgba(64, 144, 220, 0.18)';
+  activeBtn.style.borderColor = 'rgba(64, 144, 220, 0.55)';
+  activeBtn.innerHTML = 'Inversion Atlas <span style="opacity: 0.6; margin-left: 4px;">▾</span>';
+}
+
+// Dropdown row clicks. Three of the four rows are now <a href> to external
+// files (Diversity, Genome, Population) — no JS needed; the browser handles
+// navigation. The fourth row (Inversion) is a no-op since you're already
+// here; clicking it just closes the dropdown.
+//
+// v4 turn 73e: simplified from the previous in-app mode-switch logic.
+document.querySelectorAll('#atlasDropdown button.atlas-row[data-atlas-mode="inversion"]').forEach(row => {
+  row.addEventListener('click', (e) => {
+    e.preventDefault();
+    // Already on the Inversion Atlas — close the dropdown by briefly
+    // blanking display (CSS :hover will re-show on next pointer event).
+    const dd = document.getElementById('atlasDropdown');
+    if (dd) {
+      dd.style.display = 'none';
+      setTimeout(() => { if (dd) dd.style.display = ''; }, 200);
     }
   });
-}
-
-// Wire the pill click handlers. Each pill switches to the corresponding
-// atlas's first tab (which in turn updates the active-tab highlight via
-// the existing tab-click pipeline).
-document.querySelectorAll('.atlas-mode-pill').forEach(pill => {
-  pill.addEventListener('click', () => {
-    const mode = pill.dataset.atlasMode;
-    const targetPageId = ATLAS_MODE_TO_TAB[mode];
-    if (!targetPageId) return;
-    const tabBtn = document.querySelector(`#tabBar button[data-page="${targetPageId}"]`);
-    if (tabBtn) tabBtn.click();
-    // _setAtlasMode runs via the patched tab handler below (or here as
-    // belt-and-braces if the handler missed)
-    _setAtlasMode(mode);
-  });
 });
 
-// Also keep the indicator in sync when the user clicks a tab directly
-// (without going through the pill). Hook into the existing tab handler:
-// every tab click triggers _setAtlasMode based on the target page id.
-_tabBtns.forEach(btn => {
-  btn.addEventListener('click', () => {
-    const targetPageId = btn.dataset.page;
-    if (!targetPageId) return;
-    _setAtlasMode(_atlasModeForTab(targetPageId));
-  });
-});
+// Tab clicks no longer need to drive _setAtlasMode (state.atlas is constant
+// inside this HTML), but we keep the hook commented for documentation.
+// _tabBtns.forEach(btn => btn.addEventListener('click', () => _setAtlasMode('inversion')));
 
-// Initial paint based on whatever state.atlas was restored to.
+// Initial paint.
 _setAtlasMode(state.atlas);
 
 // =============================================================================

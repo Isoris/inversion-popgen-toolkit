@@ -1,0 +1,1353 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Population Atlas — Cohort Summary &amp; Cross-Atlas Hub</title>
+<style>
+  /* ===========================================================================
+     Population Atlas v1 — sibling deliverable to Inversion_atlas.html (v4).
+     Same CSS variable system, same tab/page chrome, same light/dark/academic
+     themes. Accent color shifted from amber (--accent: #f5a524 in scrubber)
+     to muted green so the two atlases are visually distinguishable at a
+     glance. Sample design language: dark panels, monospace numerics, serif
+     prose where useful. Standalone — no scrubber dependencies.
+     =========================================================================== */
+  :root {
+    --bg: #0e1116;
+    --panel: #151a22;
+    --panel-2: #1c2330;
+    --panel-3: #2a3242;
+    --ink: #e7edf3;
+    --ink-dim: #8a94a3;
+    --ink-dimmer: #5a6472;
+    /* v4 turn 73g: accent shifted from green to yellow (rgb 232, 196, 76)
+       to match Population's slot in the four-atlas color system. The four
+       atlases now read: blue (Inversion), green (Diversity), orange (Genome),
+       yellow (Population). Sub-theme palette correspondingly retuned. */
+    --accent: #e8c44c;
+    --accent-2: #4fa3ff;
+    --good: #5fd49a;
+    --bad: #e0555c;
+    --neutral: #8a94a3;
+    /* Population-atlas-specific palette: shades of yellow/amber for sub-themes */
+    --pop-samples: #e8c44c;     /* primary yellow */
+    --pop-qc:      #f2d570;     /* lighter yellow */
+    --pop-fam:     #c9a234;     /* darker amber */
+    --pop-het:     #d6b540;     /* warm amber */
+    --pop-div:     #ecd075;     /* pale yellow */
+    --pop-roh:     #a8821f;     /* deep gold */
+    --rule: #2a3242;
+    --mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  }
+  html[data-theme="light"] {
+    --bg:           #fafbfc;
+    --panel:        #ffffff;
+    --panel-2:      #f1f3f6;
+    --panel-3:      #e3e7ec;
+    --ink:          #1a1f26;
+    --ink-dim:      #5b6573;
+    --ink-dimmer:   #98a0ac;
+    --rule:         #d8dde3;
+    --accent:       #ca8a04;          /* amber, legible on light bg */
+    --accent-2:     #2563eb;
+    --good:         #16a34a;
+    --bad:          #dc2626;
+    --neutral:      #5b6573;
+    --pop-samples:  #ca8a04;
+    --pop-qc:       #eab308;
+    --pop-fam:      #a16207;
+    --pop-het:      #b45309;
+    --pop-div:      #facc15;
+    --pop-roh:      #713f12;
+  }
+  html[data-theme="academic"] {
+    --bg:           #f7f5ef;
+    --panel:        #fefcf6;
+    --panel-2:      #efebe0;
+    --panel-3:      #e5dfd1;
+    --ink:          #2b2d31;
+    --ink-dim:      #5e6168;
+    --ink-dimmer:   #97999f;
+    --rule:         #c9c4b6;
+    --accent:       #a87e3c;          /* muted gold for paper figures */
+    --accent-2:     #2c5d8c;
+    --good:         #4f7a4d;
+    --bad:          #8c2f2f;
+    --neutral:      #6e6f74;
+    --pop-samples:  #a87e3c;
+    --pop-qc:       #c19a55;
+    --pop-fam:      #8a6420;
+    --pop-het:      #9d7a35;
+    --pop-div:      #c5a268;
+    --pop-roh:      #6b4d18;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--mono);
+         font-size: 13px; line-height: 1.5;
+         display: flex; flex-direction: column; min-height: 100vh; }
+
+  /* ── Header (mirrors scrubber's header structure) ─────────────────────── */
+  header { padding: 10px 22px; border-bottom: 1px solid var(--rule);
+           display: flex; align-items: baseline; gap: 18px; height: 44px;
+           background: var(--panel); }
+  header h1 { font-size: 16px; font-weight: 500; margin: 0; letter-spacing: 0.02em; }
+  header .meta { color: var(--ink-dim); font-family: var(--mono); font-size: 11px; }
+  header .meta b { color: var(--ink); font-weight: 500; }
+  /* v4 turn 73f: four-atlas dropdown unifying the suite. Replaces the
+     standalone POPULATION ATLAS badge so all four atlases use the same
+     navigation widget. Yellow accent matches Population's color in the
+     four-atlas palette. */
+  header #atlasModeIndicator { position: relative; align-self: center; margin: 0 8px;
+                                font-family: var(--mono); font-size: 10.5px;
+                                flex-shrink: 0; }
+  header #atlasActiveBtn { flex-shrink: 0; }
+  header #atlasActiveBtn:hover { background: rgba(232, 196, 76, 0.30) !important;
+                                  border-color: rgba(232, 196, 76, 0.85) !important; }
+  header .meta { flex-shrink: 1; min-width: 0;
+                 overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  header #atlasModeIndicator:hover #atlasDropdown,
+  header #atlasModeIndicator:focus-within #atlasDropdown { display: block !important; }
+  header .atlas-row:hover { color: var(--ink) !important; }
+  header .atlas-row[data-color="blue"]:hover   { background: rgba(64, 144, 220, 0.18) !important; }
+  header .atlas-row[data-color="green"]:hover  { background: rgba(72, 200, 120, 0.18) !important; }
+  header .atlas-row[data-color="orange"]:hover { background: rgba(228, 138, 60, 0.18) !important; }
+  header .atlas-row[data-color="yellow"]:hover { background: rgba(232, 196, 76, 0.18) !important; }
+  header #atlasBadge {
+    align-self: center; margin-left: 8px;
+    background: var(--panel-2); border: 1px solid var(--accent); color: var(--accent);
+    padding: 3px 8px; font-family: var(--mono); font-size: 10px;
+    border-radius: 3px; line-height: 1.4; white-space: nowrap; flex-shrink: 0;
+    letter-spacing: 0.04em;
+  }
+  header #themeToggleBtn {
+    margin-left: auto; align-self: center;
+    background: var(--panel-2); border: 1px solid var(--rule); color: var(--ink);
+    padding: 4px 12px; font-family: var(--mono); font-size: 11px;
+    border-radius: 3px; cursor: pointer; line-height: 1;
+    white-space: nowrap; flex-shrink: 0;
+  }
+  header #themeToggleBtn:hover {
+    background: var(--panel-3); border-color: var(--accent);
+  }
+
+  /* ── Tab bar (mirrors scrubber's #tabBar) ─────────────────────────────── */
+  #tabBar { display: flex; gap: 0; height: 32px; padding: 0 22px;
+            background: var(--panel); border-bottom: 1px solid var(--rule);
+            align-items: stretch; flex-shrink: 0; }
+  #tabBar button { background: none; border: none; color: var(--ink-dim);
+                   font-family: var(--mono); font-size: 11px; padding: 0 16px;
+                   cursor: pointer; letter-spacing: 0.04em;
+                   border-bottom: 2px solid transparent;
+                   transition: color 0.1s, border-color 0.1s;
+                   white-space: nowrap; }
+  #tabBar button:hover { color: var(--ink); }
+  /* Active tab — yellow-tinted alpha gradient (was green prior to v4 turn 73g).
+     Same idiom (top: opaque, bottom: transparent), just hue shifted to match
+     Population's slot in the four-atlas palette. */
+  #tabBar button.active { color: var(--ink); border-bottom-color: var(--accent);
+    background: linear-gradient(to bottom,
+      rgba(232, 196, 76, 0.22) 0%,
+      rgba(232, 196, 76, 0.08) 50%,
+      rgba(232, 196, 76, 0.00) 100%); }
+  html[data-theme="light"] #tabBar button.active {
+    background: linear-gradient(to bottom,
+      rgba(202, 138, 4, 0.18) 0%,
+      rgba(202, 138, 4, 0.06) 50%,
+      rgba(202, 138, 4, 0.00) 100%); }
+  #tabBar button .num { font-family: var(--mono); color: var(--ink-dimmer);
+                        font-size: 9px; margin-right: 4px; }
+
+  /* ── Page system (mirrors scrubber's .page / .page.active) ────────────── */
+  .page { display: none; flex: 1; overflow-y: auto; }
+  .page.active { display: block; }
+
+  /* ── Scrubber link (footer in tab bar) ────────────────────────────────── */
+  #scrubberLink {
+    margin-left: auto; align-self: center;
+    background: none; border: 1px solid var(--rule); color: var(--ink-dim);
+    padding: 3px 10px; font-family: var(--mono); font-size: 10px;
+    border-radius: 3px; cursor: pointer; line-height: 1.4;
+    text-decoration: none; letter-spacing: 0.04em;
+    transition: color 0.1s, border-color 0.1s;
+  }
+  #scrubberLink:hover { color: var(--ink); border-color: var(--accent); }
+
+  /* ── Page content layout (used by every page's .page-content wrapper) ── */
+  .page-content {
+    padding: 32px 32px 48px;
+    max-width: 1180px;
+    margin: 0 auto;
+    color: var(--ink);
+    font-family: var(--mono);
+    font-size: 11.5px;
+    line-height: 1.65;
+  }
+  .page-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: var(--ink);
+  }
+  .page-subtitle {
+    font-size: 11.5px;
+    color: var(--ink-dim);
+    margin-bottom: 24px;
+    letter-spacing: 0.02em;
+  }
+  .card {
+    background: var(--panel-2);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 16px 18px;
+    margin-bottom: 18px;
+  }
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 10px;
+  }
+  .card-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .card-status {
+    font-size: 9.5px;
+    color: var(--ink-dim);
+    letter-spacing: 0.04em;
+    padding: 2px 6px;
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+  }
+  .card-status.ready { color: var(--good); border-color: var(--good); }
+  .card-status.planned { color: var(--ink-dim); }
+
+  /* Planning grids — same pattern as page13 in scrubber */
+  .pg {
+    display: grid;
+    gap: 6px 12px;
+    font-size: 10.5px;
+    align-items: baseline;
+  }
+  .pg-header {
+    font-weight: 600;
+    color: var(--ink-dim);
+  }
+  .pg code {
+    font-family: var(--mono);
+    color: var(--ink);
+    background: var(--panel-3);
+    padding: 1px 4px;
+    border-radius: 2px;
+    font-size: 10px;
+  }
+
+  /* Panel mockup placeholder — used by the 6 dashboard panels */
+  .panel-slot {
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 10px 12px;
+    min-height: 130px;
+    display: flex;
+    flex-direction: column;
+  }
+  .panel-slot-title {
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 6px;
+  }
+  .panel-slot-desc {
+    color: var(--ink-dim);
+    font-size: 10px;
+    margin-bottom: 8px;
+    flex: 0 0 auto;
+  }
+  .panel-slot-mockup {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--panel-2);
+    border: 1px dashed var(--rule);
+    border-radius: 2px;
+    color: var(--ink-dimmer);
+    font-size: 9.5px;
+    letter-spacing: 0.04em;
+  }
+  .panel-slot-foot {
+    color: var(--ink-dim);
+    font-size: 9.5px;
+    margin-top: 6px;
+  }
+
+  /* Status pill — used in data-layer status grids */
+  .status-pill {
+    color: var(--ink-dimmer);
+  }
+  .status-pill.ready {
+    color: var(--good);
+  }
+  .status-pill.partial {
+    color: var(--accent);
+  }
+
+  /* Tag stripe — the colored vertical stripe on each card to color-code by topic */
+  .tag-stripe {
+    width: 3px;
+    background: var(--accent);
+    border-radius: 1px;
+    margin-right: 8px;
+  }
+  .card-stripe-samples { border-left: 3px solid var(--pop-samples); padding-left: 16px; }
+  .card-stripe-qc      { border-left: 3px solid var(--pop-qc);      padding-left: 16px; }
+  .card-stripe-fam     { border-left: 3px solid var(--pop-fam);     padding-left: 16px; }
+  .card-stripe-het     { border-left: 3px solid var(--pop-het);     padding-left: 16px; }
+  .card-stripe-div     { border-left: 3px solid var(--pop-div);     padding-left: 16px; }
+  .card-stripe-roh     { border-left: 3px solid var(--pop-roh);     padding-left: 16px; }
+
+  /* Cross-atlas callout — green, prominent, encourages going to the Diversity Atlas */
+  .da-callout {
+    margin-top: 14px; margin-bottom: 14px;
+    background: rgba(72, 200, 120, 0.07);
+    border: 1px solid rgba(72, 200, 120, 0.55);
+    border-left: 3px solid #3cc08a;
+    border-radius: 4px;
+    padding: 14px 18px;
+    display: flex; align-items: center; gap: 14px;
+    flex-wrap: wrap;
+  }
+  .da-callout-text {
+    flex: 1 1 60%; min-width: 240px;
+    font-size: 11px; line-height: 1.55; color: var(--ink-dim);
+  }
+  .da-callout-text b { color: var(--ink); font-weight: 600; }
+  .da-callout-btn {
+    background: rgba(72, 200, 120, 0.20);
+    border: 1px solid rgba(72, 200, 120, 0.85);
+    color: var(--ink);
+    padding: 7px 14px; border-radius: 3px;
+    font-family: var(--mono); font-size: 11px;
+    text-decoration: none; white-space: nowrap;
+    transition: background 80ms;
+  }
+  .da-callout-btn:hover { background: rgba(72, 200, 120, 0.32); }
+  .da-callout-btn b { font-weight: 600; }
+
+  /* Inline list of headline numbers in the summary card */
+  .summary-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 10px 14px; margin-top: 10px;
+  }
+  .summary-cell {
+    background: var(--panel); border: 1px solid var(--rule);
+    border-radius: 3px; padding: 8px 12px;
+  }
+  .summary-cell .lbl { font-size: 9.5px; color: var(--ink-dim);
+                       letter-spacing: 0.05em; text-transform: uppercase;
+                       margin-bottom: 2px; }
+  .summary-cell .val { font-size: 14px; font-weight: 600; color: var(--ink);
+                       font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .summary-cell .sub { font-size: 9.5px; color: var(--ink-dim); margin-top: 2px; }
+
+  /* Tables — used in samples + QC pages for the planned-fields layout */
+  table.fields {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 10.5px;
+  }
+  table.fields th, table.fields td {
+    text-align: left;
+    padding: 5px 8px;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  table.fields th {
+    color: var(--ink-dim);
+    font-weight: 600;
+    font-size: 9.5px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  table.fields td.field-name {
+    font-family: var(--mono);
+    color: var(--ink);
+    width: 200px;
+  }
+  table.fields td.field-source {
+    color: var(--ink-dim);
+    width: 220px;
+    font-size: 10px;
+  }
+  table.fields code {
+    font-family: var(--mono);
+    color: var(--ink);
+    background: var(--panel-3);
+    padding: 1px 4px;
+    border-radius: 2px;
+    font-size: 10px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Population Atlas</h1>
+  <span class="meta" id="headerMeta">Cohort summary &amp; cross-atlas hub · 226-sample <i>C. gariepinus</i> hatchery cohort</span>
+
+  <div id="atlasModeIndicator" title="Active atlas — hover to see all four">
+    <button id="atlasActiveBtn"
+            data-atlas-mode="population"
+            title="Currently viewing the Population Atlas. Hover to switch atlases."
+            style="background: rgba(232, 196, 76, 0.18); color: var(--ink);
+                   border: 1px solid rgba(232, 196, 76, 0.55);
+                   border-radius: 3px; padding: 3px 12px;
+                   cursor: pointer; line-height: 1.4;
+                   font-family: var(--mono); font-size: 10.5px;
+                   letter-spacing: 0.04em; white-space: nowrap;">
+      Population Atlas <span style="opacity: 0.6; margin-left: 4px;">▾</span>
+    </button>
+    <div id="atlasDropdown"
+         style="position: absolute; top: 100%; left: 0; right: 0; min-width: 100%;
+                background: var(--panel-2); border: 1px solid var(--rule);
+                border-radius: 0 0 3px 3px; padding: 2px 0;
+                display: none; z-index: 200;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);">
+      <a data-atlas-mode="inversion" data-color="blue"
+         href="Inversion_atlas.html"
+         title="Inversion Atlas — curate candidates, manage tracks, refine boundaries."
+         class="atlas-row"
+         style="display: block; width: 100%; text-align: left; box-sizing: border-box;
+                background: transparent; color: var(--ink-dim);
+                border: none;
+                border-left: 3px solid rgba(64, 144, 220, 0.85);
+                padding: 4px 12px; cursor: pointer; text-decoration: none;
+                font-family: var(--mono); font-size: 10.5px;
+                letter-spacing: 0.04em; white-space: nowrap;
+                transition: background 80ms, color 80ms;">Inversion Atlas →</a>
+      <a data-atlas-mode="diversity" data-color="green"
+         href="Diversity_atlas.html"
+         title="Diversity Atlas — population-genetic-diversity lens (θπ, F_ROH, ROH atlas, ancestry-Q stratification, kinship/relatedness)."
+         class="atlas-row"
+         style="display: block; width: 100%; text-align: left; box-sizing: border-box;
+                background: transparent; color: var(--ink-dim);
+                border: none;
+                border-left: 3px solid rgba(72, 200, 120, 0.85);
+                padding: 4px 12px; cursor: pointer; text-decoration: none;
+                font-family: var(--mono); font-size: 10.5px;
+                letter-spacing: 0.04em; white-space: nowrap;
+                transition: background 80ms, color 80ms;">Diversity Atlas →</a>
+      <a data-atlas-mode="genome" data-color="orange"
+         href="Genome_atlas.html"
+         title="Genome Atlas — assembly + annotations lens (chromosome assembly stats, synteny, gene tracks, repeats, conserved elements)."
+         class="atlas-row"
+         style="display: block; width: 100%; text-align: left; box-sizing: border-box;
+                background: transparent; color: var(--ink-dim);
+                border: none;
+                border-left: 3px solid rgba(228, 138, 60, 0.85);
+                padding: 4px 12px; cursor: pointer; text-decoration: none;
+                font-family: var(--mono); font-size: 10.5px;
+                letter-spacing: 0.04em; white-space: nowrap;
+                transition: background 80ms, color 80ms;">Genome Atlas →</a>
+    </div>
+  </div>
+
+  <button id="themeToggleBtn" title="Toggle light / dark / academic theme">☀ light</button>
+</header>
+
+<nav id="tabBar">
+  <button data-page="page1" class="active" title="Samples — table of all 226 samples with sample_id, family, broodline, ancestry-Q top assignment, F_ROH, mean het. The orientation page: every reader starts here."><span class="num">1</span> samples</button>
+  <button data-page="page2" title="Quality Control — per-sample mean coverage, callable fraction, missingness, kinship-pruning status. Pass/fail flags."><span class="num">2</span> QC</button>
+  <button data-page="page3" title="Families & Genetic clusters — NGSadmix bar plot, NAToRA pruning diagram, family-tree relatedness, K=2/3/4 breakdowns."><span class="num">3</span> families &amp; clusters</button>
+  <button data-page="page4" title="Heterozygosity — cohort summary; deep per-sample tables and plots in the Diversity Atlas."><span class="num">4</span> heterozygosity ↗</button>
+  <button data-page="page5" title="Diversity — cohort summary; per-chromosome and per-window θπ in the Diversity Atlas."><span class="num">5</span> diversity ↗</button>
+  <button data-page="page6" title="Inbreeding — cohort summary; F_ROH atlas and ROH composition in the Diversity Atlas."><span class="num">6</span> inbreeding ↗</button>
+  <button data-page="page7" title="About this atlas — what it is, how it relates to the Local PCA Scrubber, where the data comes from, glossary."><span class="num">7</span> about</button>
+  <!-- v4 turn 73f: removed the standalone "→ Inversions Atlas" link from the
+       tab bar; navigation is now in the four-atlas dropdown in the header. -->
+</nav>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     Page 1 — Samples
+     ═══════════════════════════════════════════════════════════════════════ -->
+<div id="page1" class="page active">
+  <div class="page-content">
+    <div class="page-title">Samples</div>
+    <div class="page-subtitle">
+      226 samples · <i>Clarias gariepinus</i> · hatchery broodstock cohort · LANTA HPC · ~9× WGS
+    </div>
+
+    <div class="card card-stripe-samples">
+      <div class="card-header">
+        <div class="card-title">What this page shows</div>
+        <div class="card-status planned">scaffold · panel ships when MODULE_2B emits</div>
+      </div>
+      <div style="margin-bottom: 8px;">
+        The <b>orientation page</b>. One row per sample, sortable by any column.
+        This is where any reader starts when picking up the atlas — get
+        oriented to the cohort, then drill into the topical pages
+        (heterozygosity, diversity, inbreeding) as questions arise.
+      </div>
+      <div style="color: var(--ink-dim);">
+        Hover any row → mini-card with summary stats. Click sample ID →
+        per-sample deep-dive sub-view (planned). Filter bar at top by family,
+        broodline, ancestry-Q top class, F_ROH percentile.
+      </div>
+    </div>
+
+    <div class="card card-stripe-samples">
+      <div class="card-header">
+        <div class="card-title">Planned columns</div>
+        <div class="card-status planned">field schema · awaiting MODULE_2B JSON layer</div>
+      </div>
+      <table class="fields">
+        <thead>
+          <tr>
+            <th>field</th>
+            <th>source module</th>
+            <th>description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="field-name"><code>sample_id</code></td>
+            <td class="field-source">samples.ind</td>
+            <td>Canonical sample identifier (CGA-prefixed in this cohort).</td>
+          </tr>
+          <tr>
+            <td class="field-name"><code>family_id</code></td>
+            <td class="field-source">pedigree manifest</td>
+            <td>Family-of-origin from breeding records; matches MODULE_2B family overlay.</td>
+          </tr>
+          <tr>
+            <td class="field-name"><code>broodline</code></td>
+            <td class="field-source">pedigree manifest</td>
+            <td>Hatchery broodline (parent stock identity); typically 3-5 broodlines per cohort.</td>
+          </tr>
+          <tr>
+            <td class="field-name"><code>mean_coverage</code></td>
+            <td class="field-source">MODULE_QC mosdepth</td>
+            <td>Mean WGS coverage across callable genome (target ~9×).</td>
+          </tr>
+          <tr>
+            <td class="field-name"><code>callable_fraction</code></td>
+            <td class="field-source">MODULE_QC callable BED</td>
+            <td>Fraction of genome inside callable regions (post-mask).</td>
+          </tr>
+          <tr>
+            <td class="field-name"><code>genome_het</code></td>
+            <td class="field-source">02_heterozygosity/04_summary</td>
+            <td>Genome-wide heterozygosity (per-sample θ_W or H_obs).</td>
+          </tr>
+          <tr>
+            <td class="field-name"><code>F_ROH</code></td>
+            <td class="field-source">MODULE_3 ngsF-HMM</td>
+            <td>Genome-wide inbreeding from runs of homozygosity (ROH-derived F).</td>
+          </tr>
+          <tr>
+            <td class="field-name"><code>ancestry_Q_top</code></td>
+            <td class="field-source">MODULE_2B NGSadmix</td>
+            <td>Dominant ancestry component at K=3 (or chosen K).</td>
+          </tr>
+          <tr>
+            <td class="field-name"><code>natora_status</code></td>
+            <td class="field-source">MODULE_2B NAToRA</td>
+            <td>Kinship-pruning status (kept / removed). Two structure rounds: all 226 + 81 unrelated.</td>
+          </tr>
+          <tr>
+            <td class="field-name"><code>qc_pass</code></td>
+            <td class="field-source">MODULE_QC summary</td>
+            <td>Boolean — passes coverage / missingness / contamination thresholds.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card card-stripe-samples">
+      <div class="card-header">
+        <div class="card-title">Mock-up — what the table will look like</div>
+        <div class="card-status planned">visual stub</div>
+      </div>
+      <div style="background: var(--panel); border: 1px solid var(--rule);
+                  border-radius: 3px; padding: 10px; font-family: var(--mono);
+                  font-size: 10px; color: var(--ink-dim); overflow-x: auto;">
+<pre style="margin: 0; line-height: 1.5;">sample_id  family  brood  cov   callable  genome_het  F_ROH  Q_top   natora  qc
+─────────  ──────  ─────  ────  ────────  ──────────  ─────  ──────  ──────  ──
+CGA001     F12     B2     9.1×   97.4%     0.00321    0.041  K1=0.78  kept    ✓
+CGA002     F08     B1     8.7×   96.8%     0.00298    0.052  K2=0.82  kept    ✓
+CGA003     F12     B2     9.4×   97.6%     0.00305    0.038  K1=0.81  kept    ✓
+CGA004     F03     B3     7.2×   91.3%     —          —      —        removed ✗
+CGA005     F08     B1     9.0×   97.1%     0.00310    0.048  K2=0.79  kept    ✓
+CGA006     F15     B3     9.3×   97.3%     0.00289    0.067  K3=0.71  kept    ✓
+…          …       …      …     …          …          …      …        …       …
+                                          (~226 rows)
+</pre>
+      </div>
+      <div style="font-size: 10px; color: var(--ink-dim); margin-top: 8px;
+                  line-height: 1.55;">
+        Sortable by any column (default: sample_id ASC). Filter pills at top:
+        family · broodline · qc status · F_ROH percentile (≤25% / 25-75% / ≥75%).
+        Click any row → per-sample card with all chromosomes' het + F_ROH +
+        ancestry-Q breakdown.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     Page 2 — Quality Control
+     ═══════════════════════════════════════════════════════════════════════ -->
+<div id="page2" class="page">
+  <div class="page-content">
+    <div class="page-title">Quality Control</div>
+    <div class="page-subtitle">
+      Per-sample QC metrics · pass/fail flags · cohort-level summary
+    </div>
+
+    <div class="card card-stripe-qc">
+      <div class="card-header">
+        <div class="card-title">What this page shows</div>
+        <div class="card-status planned">scaffold</div>
+      </div>
+      <div style="margin-bottom: 8px;">
+        Per-sample QC dashboard. Three sections:
+      </div>
+      <ol style="margin: 0 0 0 18px; padding: 0; color: var(--ink-dim); line-height: 1.7;">
+        <li><b>Coverage distribution</b> — histogram of per-sample mean WGS coverage; outliers flagged</li>
+        <li><b>Callable fraction</b> — what fraction of the genome each sample contributes to the joint callable set</li>
+        <li><b>Missingness</b> — per-sample missing-genotype rate at the joint SNP set</li>
+        <li><b>Contamination</b> — VerifyBamID estimates (FREEMIX / CHIPMIX)</li>
+        <li><b>Kinship-pruning status</b> — kept / removed for the 81-sample unrelated subset</li>
+      </ol>
+    </div>
+
+    <div class="card card-stripe-qc">
+      <div class="card-header">
+        <div class="card-title">QC thresholds (cohort defaults)</div>
+        <div class="card-status planned">awaiting MODULE_QC summary</div>
+      </div>
+      <div class="pg" style="grid-template-columns: 1.4fr 1fr 1fr 1.4fr;">
+        <div class="pg-header">metric</div>
+        <div class="pg-header">threshold</div>
+        <div class="pg-header">cohort source</div>
+        <div class="pg-header">notes</div>
+
+        <div><code>mean_coverage</code></div>
+        <div>≥ 5×</div>
+        <div>mosdepth</div>
+        <div>Below 5× = excluded from joint calling.</div>
+
+        <div><code>callable_fraction</code></div>
+        <div>≥ 90%</div>
+        <div>callable BED intersect</div>
+        <div>Per-sample callable / cohort callable.</div>
+
+        <div><code>missingness_at_joint</code></div>
+        <div>≤ 10%</div>
+        <div>BEAGLE genotype matrix</div>
+        <div>Below threshold → flagged for review.</div>
+
+        <div><code>contamination_freemix</code></div>
+        <div>≤ 0.03</div>
+        <div>VerifyBamID2</div>
+        <div>FREEMIX above 3% → exclude.</div>
+
+        <div><code>natora_kinship</code></div>
+        <div>π̂ &lt; 0.0884 (3rd-degree)</div>
+        <div>ngsRelate → NAToRA</div>
+        <div>Hungarian-pruning to maximally-unrelated subset.</div>
+      </div>
+    </div>
+
+    <div class="card card-stripe-qc">
+      <div class="card-header">
+        <div class="card-title">Planned panels</div>
+        <div class="card-status planned">phase B work</div>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <div class="panel-slot">
+          <div class="panel-slot-title">Coverage histogram</div>
+          <div class="panel-slot-desc">Cohort distribution of mean WGS coverage; vertical line at threshold.</div>
+          <div class="panel-slot-mockup">░░░ histogram mockup ░░░</div>
+          <div class="panel-slot-foot">feeds: MODULE_QC mosdepth summary</div>
+        </div>
+        <div class="panel-slot">
+          <div class="panel-slot-title">Missingness vs coverage</div>
+          <div class="panel-slot-desc">Per-sample scatter — coverage on x, missingness on y; outliers flagged.</div>
+          <div class="panel-slot-mockup">░░░ scatter mockup ░░░</div>
+          <div class="panel-slot-foot">feeds: BEAGLE GP matrix + mosdepth</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     Page 3 — Families & Genetic clusters
+     ═══════════════════════════════════════════════════════════════════════ -->
+<div id="page3" class="page">
+  <div class="page-content">
+    <div class="page-title">Families &amp; Genetic clusters</div>
+    <div class="page-subtitle">
+      NGSadmix structure · NAToRA pruning · ngsRelate kinship · K=2/3/4 ancestry decomposition
+    </div>
+
+    <div class="card card-stripe-fam">
+      <div class="card-header">
+        <div class="card-title">Structure design — two rounds</div>
+        <div class="card-status planned">scaffold · awaiting MODULE_2B</div>
+      </div>
+      <div style="margin-bottom: 8px;">
+        Hatchery cohorts violate Hardy-Weinberg by construction (siblings,
+        full broodlines, related broodstock). Two-round structure analysis
+        is required:
+      </div>
+      <ol style="margin: 0 0 0 18px; padding: 0; line-height: 1.7;">
+        <li><b>Round 1</b> — all 226 samples → reflects family + broodline structure.
+            Useful for visualizing the actual cohort composition; not a population-genetic K estimate.</li>
+        <li><b>Round 2</b> — NAToRA-pruned 81 unrelated samples → cleaner K estimate
+            for the population-level structure, free of within-family signal.</li>
+      </ol>
+      <div style="color: var(--ink-dim); margin-top: 8px;">
+        K clusters in this dataset reflect <b>hatchery broodline structure</b>,
+        not species admixture. The cohort is pure <i>C. gariepinus</i>.
+      </div>
+    </div>
+
+    <div class="card card-stripe-fam">
+      <div class="card-header">
+        <div class="card-title">Planned panels</div>
+        <div class="card-status planned">phase B work</div>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <div class="panel-slot">
+          <div class="panel-slot-title">NGSadmix Q-bar plot — round 1</div>
+          <div class="panel-slot-desc">All 226 samples, K=2/3/4/5 stacked bars; sorted by dominant Q assignment.</div>
+          <div class="panel-slot-mockup">░░░ Q-bar mockup ░░░</div>
+          <div class="panel-slot-foot">feeds: MODULE_2B NGSadmix output</div>
+        </div>
+        <div class="panel-slot">
+          <div class="panel-slot-title">NGSadmix Q-bar plot — round 2</div>
+          <div class="panel-slot-desc">81 unrelated samples (NAToRA-pruned), same K range; cleaner population-level signal.</div>
+          <div class="panel-slot-mockup">░░░ Q-bar mockup ░░░</div>
+          <div class="panel-slot-foot">feeds: MODULE_2B NGSadmix on pruned subset</div>
+        </div>
+        <div class="panel-slot">
+          <div class="panel-slot-title">Kinship heatmap</div>
+          <div class="panel-slot-desc">Pairwise π̂ (ngsRelate) sample × sample, with broodline annotation.</div>
+          <div class="panel-slot-mockup">░░░ heatmap mockup ░░░</div>
+          <div class="panel-slot-foot">feeds: ngsRelate output</div>
+        </div>
+        <div class="panel-slot">
+          <div class="panel-slot-title">NAToRA pruning diagram</div>
+          <div class="panel-slot-desc">Hungarian-algorithm graph — kept/removed samples shown as connected components above π̂ threshold.</div>
+          <div class="panel-slot-mockup">░░░ graph mockup ░░░</div>
+          <div class="panel-slot-foot">feeds: NAToRA output + ngsRelate matrix</div>
+        </div>
+        <div class="panel-slot">
+          <div class="panel-slot-title">PCAngsd PCA</div>
+          <div class="panel-slot-desc">Genome-wide PC1 vs PC2 colored by family + broodline; outliers flagged.</div>
+          <div class="panel-slot-mockup">░░░ PCA mockup ░░░</div>
+          <div class="panel-slot-foot">feeds: PCAngsd genome-wide</div>
+        </div>
+        <div class="panel-slot">
+          <div class="panel-slot-title">evalAdmix residuals</div>
+          <div class="panel-slot-desc">Per-K residual heatmap; choosing K with lowest residual structure.</div>
+          <div class="panel-slot-mockup">░░░ residuals mockup ░░░</div>
+          <div class="panel-slot-foot">feeds: evalAdmix output</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     Page 4 — Heterozygosity
+     ═══════════════════════════════════════════════════════════════════════ -->
+<div id="page4" class="page">
+  <div class="page-content">
+    <div class="page-title">Heterozygosity</div>
+    <div class="page-subtitle">
+      Cohort-level summary · deep per-sample tables and plots in the <b>Diversity Atlas</b>
+    </div>
+
+    <div class="da-callout">
+      <div class="da-callout-text">
+        <b>This page is a cohort-summary lens.</b> Per-sample H, sortable
+        tables, distribution plots, K=8 cluster boxes, H × F_ROH scatter,
+        and per-chromosome H heatmaps live in the deep <b>Diversity Atlas</b>
+        — the dedicated population-genetics-reviewer-facing tool that
+        consumes the same MODULE_3 outputs.
+      </div>
+      <a class="da-callout-btn" href="Diversity_atlas.html#page1">
+        Open <b>Diversity Atlas → Samples</b> →
+      </a>
+    </div>
+
+    <div class="card card-stripe-het">
+      <div class="card-header">
+        <div class="card-title">Cohort-level headline numbers (S1 / S2)</div>
+        <div class="card-status">summary</div>
+      </div>
+      <div>
+        Genome-wide per-individual heterozygosity for the 226-broodstock
+        hatchery cohort, ANGSD folded SFS over the 576.9 Mb callable mask.
+        No outgroup polarisation (hatchery cohorts have no clean ancestral
+        state).
+      </div>
+      <div class="summary-grid">
+        <div class="summary-cell">
+          <div class="lbl">mean H</div>
+          <div class="val">4.55 × 10⁻³</div>
+          <div class="sub">SD 3.28 × 10⁻⁴</div>
+        </div>
+        <div class="summary-cell">
+          <div class="lbl">median H</div>
+          <div class="val">4.53 × 10⁻³</div>
+          <div class="sub">range 2.83–7.08 × 10⁻³</div>
+        </div>
+        <div class="summary-cell">
+          <div class="lbl">ρ(H, F_ROH)</div>
+          <div class="val">−0.704</div>
+          <div class="sub">P = 3.4 × 10⁻³⁵</div>
+        </div>
+        <div class="summary-cell">
+          <div class="lbl">KW H × K=8 (all226)</div>
+          <div class="val">P = 0.150</div>
+          <div class="sub">no ancestry differentiation</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card card-stripe-het">
+      <div class="card-header">
+        <div class="card-title">What's in the Diversity Atlas for this topic</div>
+        <div class="card-status">depth pointer</div>
+      </div>
+      <ul style="margin: 0 0 0 18px; padding: 0; line-height: 1.7;">
+        <li><b>Tab 1 — Samples</b>: 226-row sortable per-sample table with H, F_ROH, ROH bins, ancestry K=8, pruned81 status; click-to-detail card with cohort percentiles and outlier flagging</li>
+        <li><b>Tab 1 — H histogram</b> with mean/median reference lines</li>
+        <li><b>Tab 1 — H × F_ROH scatter</b>, dots coloured by K=8 (the −0.704 correlation visualised)</li>
+        <li><b>Tab 4 — H per K=8 cluster</b> box plot with strip-plot overlay of all 226 samples</li>
+      </ul>
+    </div>
+
+    <div class="card card-stripe-het">
+      <div class="card-header">
+        <div class="card-title">Caveats (preserved here for cohort-level context)</div>
+        <div class="card-status">documented for the manuscript</div>
+      </div>
+      <ul style="margin: 0 0 0 18px; padding: 0; line-height: 1.7;">
+        <li><b>Folded SFS</b> — hatchery population doesn't follow HWE and no outgroup is available for ancestral polarization</li>
+        <li><b>H is a diversity estimator, not literal H_obs</b> — derived from the per-sample SFS, equivalent to θπ under the infinite-sites model; literal H_obs would require explicit per-genotype counting</li>
+        <li><b>Family confounding</b> — siblings with elevated shared inheritance can inflate per-region H apparently; pruned81 panel cuts through this</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     Page 5 — Diversity
+     ═══════════════════════════════════════════════════════════════════════ -->
+<div id="page5" class="page">
+  <div class="page-content">
+    <div class="page-title">Diversity</div>
+    <div class="page-subtitle">
+      Cohort-level summary · per-chromosome and per-window θπ in the <b>Diversity Atlas</b>
+    </div>
+
+    <div class="da-callout">
+      <div class="da-callout-text">
+        <b>Per-chromosome θπ (28 LGs), the genome-wide θπ landscape, the 19
+        outlier hotspot windows, and the per-sample × per-hotspot heatmap
+        all live in the <b>Diversity Atlas</b></b> — that's where you go to
+        cross-reference any inversion candidate against the cohort θπ
+        signal. The Local PCA Scrubber's <i>page 12 (local PCA θπ)</i>
+        remains the per-window active-exploration tool inside the
+        Inversion Atlas.
+      </div>
+      <a class="da-callout-btn" href="Diversity_atlas.html#page2">
+        Open <b>Diversity Atlas → Chromosomes</b> →
+      </a>
+    </div>
+
+    <div class="card card-stripe-div">
+      <div class="card-header">
+        <div class="card-title">Cohort-level headline numbers (ST1 / ST3)</div>
+        <div class="card-status">summary</div>
+      </div>
+      <div>
+        Cohort-mean θπ in 500 kb non-overlapping windows across the 28
+        <i>C. gariepinus</i> pseudochromosomes. The <i>per-window</i>
+        signal carries the biology — <i>per-chromosome</i> means are
+        nearly uniform.
+      </div>
+      <div class="summary-grid">
+        <div class="summary-cell">
+          <div class="lbl">mean θπ</div>
+          <div class="val">4.50 × 10⁻³</div>
+          <div class="sub">1,895 windows</div>
+        </div>
+        <div class="summary-cell">
+          <div class="lbl">median θπ</div>
+          <div class="val">4.86 × 10⁻³</div>
+          <div class="sub">99th pct = 5.27 × 10⁻³</div>
+        </div>
+        <div class="summary-cell">
+          <div class="lbl">per-chr range</div>
+          <div class="val">4.28–4.72 × 10⁻³</div>
+          <div class="sub">28 LGs, IQR &lt; 7 × 10⁻⁴</div>
+        </div>
+        <div class="summary-cell">
+          <div class="lbl">top hotspot</div>
+          <div class="val">LG22 19.0–19.5 Mb</div>
+          <div class="sub">1.07 × 10⁻² (2.4× mean)</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card card-stripe-div">
+      <div class="card-header">
+        <div class="card-title">Available scales (from MODULE_3)</div>
+        <div class="card-status">file paths documented</div>
+      </div>
+      <div class="pg" style="grid-template-columns: 1.2fr 1fr 1.4fr 1.4fr;">
+        <div class="pg-header">scale</div>
+        <div class="pg-header">window / step</div>
+        <div class="pg-header">file pattern</div>
+        <div class="pg-header">use</div>
+
+        <div><code>chrom-scale</code></div>
+        <div>500 kb / 500 kb</div>
+        <div><code>*.win500000.step500000.pestPG</code></div>
+        <div>manuscript headline + ST1, ST3, Diversity Atlas tab 2/3</div>
+
+        <div><code>50 kb medium</code></div>
+        <div>50 kb / 10 kb</div>
+        <div><code>multiscale/*win50000.step10000*</code></div>
+        <div>candidate-region tracks · Inversion Atlas page 12</div>
+
+        <div><code>10 kb fine</code></div>
+        <div>10 kb / 2 kb</div>
+        <div><code>multiscale/*win10000.step2000*</code></div>
+        <div>fine-scale anomalies</div>
+
+        <div><code>5 kb very-fine</code></div>
+        <div>5 kb / 1 kb</div>
+        <div><code>multiscale/*win5000.step1000*</code></div>
+        <div>boundary-zone diversity (limited statistical power)</div>
+      </div>
+    </div>
+
+    <div class="card card-stripe-div">
+      <div class="card-header">
+        <div class="card-title">What's in the Diversity Atlas for this topic</div>
+        <div class="card-status">depth pointer</div>
+      </div>
+      <ul style="margin: 0 0 0 18px; padding: 0; line-height: 1.7;">
+        <li><b>Tab 2 — Chromosomes</b>: 28-LG sortable θπ table (ST1) with mean / median / IQR / Q25 / Q75 / range, plus a ranked bar chart with Q25–Q75 whiskers</li>
+        <li><b>Tab 3 — Hotspots</b>: 19 outlier windows table, auto-clustered (LG12 4.5–8.5 Mb is one localised peak of 9 windows, not 9 loci)</li>
+        <li><b>Tab 3 — Genome-wide θπ landscape</b> with all 19 outlier ticks marked at their genomic positions</li>
+        <li><b>Tab 3 — 226 × 19 hotspot heatmap</b>: per-sample θπ at every outlier window</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     Page 6 — Inbreeding
+     ═══════════════════════════════════════════════════════════════════════ -->
+<div id="page6" class="page">
+  <div class="page-content">
+    <div class="page-title">Inbreeding</div>
+    <div class="page-subtitle">
+      Cohort-level summary · F_ROH atlas, ROH composition, per-sample drill-down in the <b>Diversity Atlas</b>
+    </div>
+
+    <div class="da-callout">
+      <div class="da-callout-text">
+        <b>The full F_ROH analysis lives in the Diversity Atlas.</b> The
+        per-sample F_ROH table, per-chromosome F_ROH heatmap (S8b), ROH
+        length-class composition (S8), per-K=8 cluster F_ROH boxes,
+        ngsF-HMM convergence stability per chromosome (SZ), and the
+        all226 → pruned81 ancestry-collapse story (S5) are all in the
+        Diversity Atlas — that's the deliverable for population-genetics
+        reviewers.
+      </div>
+      <a class="da-callout-btn" href="Diversity_atlas.html#page5">
+        Open <b>Diversity Atlas → ROH</b> →
+      </a>
+    </div>
+
+    <div class="card card-stripe-roh">
+      <div class="card-header">
+        <div class="card-title">Cohort-level headline numbers (S1 / S2 / S5)</div>
+        <div class="card-status">summary</div>
+      </div>
+      <div>
+        Genomic inbreeding coefficient F_ROH (≥ 1 Mb threshold) for the
+        226-broodstock cohort, ngsF-HMM with 20 random-seed replicates
+        per chromosome.
+      </div>
+      <div class="summary-grid">
+        <div class="summary-cell">
+          <div class="lbl">mean F_ROH</div>
+          <div class="val">0.277</div>
+          <div class="sub">SD 0.053</div>
+        </div>
+        <div class="summary-cell">
+          <div class="lbl">median F_ROH</div>
+          <div class="val">0.278</div>
+          <div class="sub">range 0.018–0.407</div>
+        </div>
+        <div class="summary-cell">
+          <div class="lbl">ngsF-HMM stable</div>
+          <div class="val">26 / 28</div>
+          <div class="sub">"very_stable" across 20 seeds</div>
+        </div>
+        <div class="summary-cell">
+          <div class="lbl">KW F_ROH × K=8</div>
+          <div class="val">2.9 × 10⁻⁴ → 0.59</div>
+          <div class="sub">all226 → pruned81 collapse</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card card-stripe-roh">
+      <div class="card-header">
+        <div class="card-title">ROH bin schema</div>
+        <div class="card-status">dual-bin design from MODULE_3 · SD4</div>
+      </div>
+      <div style="margin-bottom: 8px; color: var(--ink-dim);">
+        MODULE_3 uses two bin schemes: fixed literature bins (for
+        cross-study comparability; manuscript-headline) and data-adaptive
+        empirical-quantile bins (for cohort-specific resolution). The
+        Diversity Atlas surfaces the fixed-bin decomposition (S8) directly.
+      </div>
+      <div class="pg" style="grid-template-columns: 1fr 1fr 1.6fr;">
+        <div class="pg-header">scheme</div>
+        <div class="pg-header">bins (Mb)</div>
+        <div class="pg-header">use</div>
+
+        <div><code>fixed</code></div>
+        <div>1–2, 2–4, 4–8, 8–16, &gt;16</div>
+        <div>Cross-study comparability; manuscript headline; Diversity Atlas tab 5</div>
+
+        <div><code>adaptive</code></div>
+        <div>cohort-specific quantiles</div>
+        <div>Reveals cohort-specific clustering (e.g. ROH from a recent broodline founder event)</div>
+      </div>
+    </div>
+
+    <div class="card card-stripe-roh">
+      <div class="card-header">
+        <div class="card-title">What's in the Diversity Atlas for this topic</div>
+        <div class="card-status">depth pointer</div>
+      </div>
+      <ul style="margin: 0 0 0 18px; padding: 0; line-height: 1.7;">
+        <li><b>Tab 1 — Samples</b>: 226-row sortable table including F_ROH, F_HOM, ROH count, longest tract, mean tract length, θ in / out ROH per sample</li>
+        <li><b>Tab 2 — Chromosomes</b>: per-chromosome F_ROH (S4) and the per-chromosome KW × K=8 ancestry test (S6)</li>
+        <li><b>Tab 4 — Ancestry</b>: K=8 cluster F_ROH box plot with strip-plot overlay; the all226 → pruned81 collapse and the 5 BH-adjusted pairwise contrasts (all involving K5)</li>
+        <li><b>Tab 5 — ROH composition</b>: ROH length spectrum, per-sample stacked F_ROH composition (with toggle for top60+bot60 / all-226 / top-100), and the 226 × 28 chr × sample F_ROH heatmap</li>
+        <li><b>Tab 6 — Pruning &amp; QC</b>: NAToRA pruning status (S11), ngsF-HMM stability (SZ), Spearman correlation matrix (S3), and the Retained vs Removed F_ROH box plot showing identical medians (0.278)</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     Page 7 — About
+     ═══════════════════════════════════════════════════════════════════════ -->
+<div id="page7" class="page">
+  <div class="page-content">
+    <div class="page-title">About this Atlas</div>
+    <div class="page-subtitle">
+      What it is · how it relates to the Inversions Atlas · where the data comes from · glossary
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">What this is</div>
+        <div class="card-status ready">v1 · structure committed</div>
+      </div>
+      <div style="margin-bottom: 8px;">
+        The Population Atlas is a sibling deliverable to the
+        <a href="Inversion_atlas.html" style="color: var(--accent);">Local PCA Scrubber (Inversions Atlas)</a>.
+        Same dataset (226-sample <i>C. gariepinus</i> hatchery cohort), same
+        design language, different focus.
+      </div>
+      <div style="color: var(--ink-dim);">
+        The scrubber is an exploratory tool — you scrub windows, lock colors,
+        promote candidates, test recluster modes against contingency. Active
+        analysis. This atlas is a <b>summary view</b> — you don't explore,
+        you read. Where the cohort comes from, what it looks like, what its
+        diversity / inbreeding patterns are. The two together cover the
+        population-genetic side of the thesis.
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Four-atlas family — the manuscript design (ADR-14)</div>
+        <div class="card-status">design intent</div>
+      </div>
+      <div style="margin-bottom: 8px;">
+        Four sibling HTML deliverables, one per audience. Each is one
+        focused view of the full results. Together they cover the
+        manuscript.
+      </div>
+      <div class="pg" style="grid-template-columns: 0.4fr 1.5fr 1.5fr 1fr;">
+        <div class="pg-header">atlas</div>
+        <div class="pg-header">file</div>
+        <div class="pg-header">scope</div>
+        <div class="pg-header">status</div>
+
+        <div>1/4</div>
+        <div><code>Inversion_atlas.html</code></div>
+        <div>Phase-2 inversion discovery and per-candidate refinement</div>
+        <div style="color: var(--good);">✓ shipped (v4)</div>
+
+        <div>2/4</div>
+        <div><code>Population_atlas.html</code></div>
+        <div>Cohort-summary view (this file): Samples / QC / Families / cohort-level Het / Div / Inbreeding pointers</div>
+        <div style="color: var(--good);">✓ scaffold + summaries (v1)</div>
+
+        <div>3/4</div>
+        <div><code>Diversity_atlas.html</code></div>
+        <div>Deep diversity / ROH / θπ / ancestry analysis · all 19 supp tables · 22 plots</div>
+        <div style="color: var(--good);">✓ shipped (v2)</div>
+
+        <div>4/4</div>
+        <div><code>Genome_atlas.html</code></div>
+        <div>Chromosome-scale assembly stats, synteny, gene tracks, repeats / TE landscape</div>
+        <div style="color: var(--ink-dim);">⚪ planned</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Why pages 4 / 5 / 6 are summary-only</div>
+        <div class="card-status">scope decision</div>
+      </div>
+      <div style="margin-bottom: 8px;">
+        Pages 4 (Heterozygosity), 5 (Diversity), 6 (Inbreeding) used to be
+        scaffolds promising deep deliverables. The <b>Diversity Atlas</b>
+        now ships those deliverables in production:
+      </div>
+      <ul style="margin: 0 0 0 18px; padding: 0; line-height: 1.7;">
+        <li>All 19 MODULE_3 supplementary tables loaded as JSON-backed sortable interactive views</li>
+        <li>22 SVG plots: distributions, scatters, per-chromosome bars, hotspot heatmaps, cluster boxes with strip-plot overlays, K-sweep trajectories, the genome-wide θπ landscape, the per-sample × hotspot heatmap, the ROH composition stacked plot, the chr × sample F_ROH heatmap, plus QC plots and pruning comparisons</li>
+        <li>Drill-down per sample with cohort percentiles + automatic flag notes</li>
+      </ul>
+      <div style="margin-top: 10px; color: var(--ink-dim);">
+        Two atlases, two depths, one source of truth (MODULE_3 supp
+        tables). The Population Atlas keeps its three pages as cohort-QC
+        landing cards for breeding-program collaborators who want the
+        topline numbers without diving deep — clicking the green callout
+        takes them straight to the Diversity Atlas's matching tab.
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Data sources</div>
+        <div class="card-status ready">documented</div>
+      </div>
+      <div class="pg" style="grid-template-columns: 1.4fr 1.6fr 2fr;">
+        <div class="pg-header">page</div>
+        <div class="pg-header">module</div>
+        <div class="pg-header">primary file</div>
+
+        <div>Samples</div>
+        <div>MODULE_2B + pedigree</div>
+        <div><code>01_inputs_check/samples_qcpass.txt</code> + manifest</div>
+
+        <div>QC</div>
+        <div>MODULE_QC</div>
+        <div><code>01_inputs_check/inputs_summary.txt</code> · mosdepth · VerifyBamID2</div>
+
+        <div>Families &amp; clusters</div>
+        <div>MODULE_2B</div>
+        <div>NGSadmix Q files · ngsRelate · NAToRA · PCAngsd · evalAdmix</div>
+
+        <div>Heterozygosity</div>
+        <div>MODULE_3 ANGSD pestPG</div>
+        <div><code>02_heterozygosity/04_summary/genomewide_heterozygosity.tsv</code></div>
+
+        <div>Diversity</div>
+        <div>MODULE_3 multiscale θπ</div>
+        <div><code>02_heterozygosity/03_theta/multiscale/*.pestPG</code></div>
+
+        <div>Inbreeding</div>
+        <div>MODULE_3 ngsF-HMM</div>
+        <div>per-sample F_ROH + ROH segment table</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Phasing roadmap</div>
+        <div class="card-status planned">multi-turn</div>
+      </div>
+      <div class="pg" style="grid-template-columns: 0.5fr 1.4fr 1.6fr 1fr;">
+        <div class="pg-header">phase</div>
+        <div class="pg-header">scope</div>
+        <div class="pg-header">deliverable</div>
+        <div class="pg-header">status</div>
+
+        <div>A</div>
+        <div>scaffold + page structure</div>
+        <div>This file (v1) — chrome, tabs, planning grids per page</div>
+        <div style="color: var(--good);">✓ shipped (this turn)</div>
+
+        <div>B</div>
+        <div>Samples page — wire to real data</div>
+        <div>JSON loader + sortable table; uses MODULE_2B + pedigree manifest</div>
+        <div style="color: var(--ink-dim);">⚪ next</div>
+
+        <div>B</div>
+        <div>QC page — wire to real data</div>
+        <div>Coverage histogram + missingness scatter from MODULE_QC summary</div>
+        <div style="color: var(--ink-dim);">⚪ next</div>
+
+        <div>C</div>
+        <div>Families &amp; clusters page</div>
+        <div>NGSadmix Q-bar plots + kinship heatmap from MODULE_2B</div>
+        <div style="color: var(--ink-dim);">⚪ multi-turn</div>
+
+        <div>C</div>
+        <div>Heterozygosity / Diversity / Inbreeding</div>
+        <div>One page per turn; tracks + heatmaps from MODULE_3</div>
+        <div style="color: var(--ink-dim);">⚪ multi-turn</div>
+
+        <div>D</div>
+        <div>Cross-links with Inversions Atlas</div>
+        <div>Click candidate in scrubber → jump to corresponding chromosome here, with diversity track aligned</div>
+        <div style="color: var(--ink-dim);">⚪ later</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Glossary</div>
+        <div class="card-status ready">documented</div>
+      </div>
+      <div class="pg" style="grid-template-columns: 1.4fr 3fr;">
+        <div class="pg-header">term</div>
+        <div class="pg-header">definition</div>
+
+        <div><code>broodline</code></div>
+        <div>Hatchery breeding line (parent stock identity); typically 3-5 broodlines per cohort. Each broodline contributes a distinct genetic background.</div>
+
+        <div><code>family</code></div>
+        <div>Single full-sibling group from one cross. A broodline contains multiple families.</div>
+
+        <div><code>F_ROH</code></div>
+        <div>Inbreeding coefficient estimated from runs of homozygosity. F_ROH = (sum of ROH lengths) / (callable genome length).</div>
+
+        <div><code>ROH</code></div>
+        <div>Run of homozygosity — a contiguous stretch of homozygous genotypes. Long ROH (&gt;5 Mb) indicates recent inbreeding; short ROH (&lt;1 Mb) indicates ancient.</div>
+
+        <div><code>θπ</code></div>
+        <div>Pairwise nucleotide diversity per site (Tajima's π). The pestPG <code>tP</code> column. The diversity proxy used throughout this atlas.</div>
+
+        <div><code>H_obs</code></div>
+        <div>Observed heterozygosity — fraction of genotypes that are heterozygous. Distinct from θπ but related; H_obs is a per-genotype count, θπ is a per-site expected pairwise difference.</div>
+
+        <div><code>NAToRA</code></div>
+        <div>Hungarian-algorithm kinship-pruning tool. Removes minimum samples needed so that no remaining pair has π̂ above a threshold (here 3rd-degree, π̂ ≥ 0.0884).</div>
+
+        <div><code>NGSadmix</code></div>
+        <div>Ancestry-decomposition tool that estimates per-sample Q (admixture proportions) at user-specified K from genotype likelihoods.</div>
+
+        <div><code>folded SFS</code></div>
+        <div>Site-frequency spectrum where minor and major alleles are not distinguished (no outgroup polarization). Required when no clean ancestral state is available.</div>
+
+        <div><code>callable genome</code></div>
+        <div>Genome regions where joint variant calling is statistically reliable (post-mask: low complexity, mappability, coverage thresholds).</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Cross-references</div>
+        <div class="card-status ready">documented</div>
+      </div>
+      <div style="line-height: 1.7; color: var(--ink-dim);">
+        • <b>Inversions Atlas</b> → <a href="Inversion_atlas.html" style="color: var(--accent);">Inversion_atlas.html</a> — sibling deliverable, same dataset, exploratory inversion-calling tool<br>
+        • <b>Inversions Atlas page 7 (popstats)</b> — atlas-shared track stack including θπ, FST, Hobs/Hexp, ancestry Δ12; same data, different presentation<br>
+        • <b>Inversions Atlas page 8 (ancestry)</b> — per-window K-cluster Q values; the per-window source for this atlas's chromosome-level summaries<br>
+        • <b>Inversions Atlas page 12 (local PCA θπ)</b> — exploratory diversity scrubber; pairs with this atlas's <b>page 5 (Diversity)</b> as the chromosome-level summary view<br>
+        • <b>Inversions Atlas page 13 (Diversity Atlas preview)</b> — landing page documenting the dual-mode design that this file implements
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ─────────────────────────────────────────────────────────────────────────
+  // Population Atlas v1 — minimal tab switching + theme toggle
+  // ─────────────────────────────────────────────────────────────────────────
+  // No JSON loading, no data rendering this turn — the file is layout-only
+  // scaffold. Phase B+C will wire individual pages to real data. The shell
+  // here is the structural commitment.
+
+  // Tab activation — same idiom as the scrubber: remove .active from all,
+  // add to clicked one; .page elements toggled in parallel.
+  document.querySelectorAll('#tabBar button[data-page]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = btn.getAttribute('data-page');
+      document.querySelectorAll('#tabBar button[data-page]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      const pageEl = document.getElementById(target);
+      if (pageEl) pageEl.classList.add('active');
+      // Persist last-viewed tab to localStorage so reopening the file resumes
+      try { localStorage.setItem('population_atlas_v1.activeTab', target); } catch (_) {}
+    });
+  });
+
+  // Restore last-viewed tab on load
+  try {
+    const saved = localStorage.getItem('population_atlas_v1.activeTab');
+    if (saved) {
+      const btn = document.querySelector(`#tabBar button[data-page="${saved}"]`);
+      if (btn) btn.click();
+    }
+  } catch (_) {}
+
+  // Theme toggle — cycles through dark → light → academic → dark
+  const themeBtn = document.getElementById('themeToggleBtn');
+  if (themeBtn) {
+    function applyTheme(theme) {
+      if (theme === 'dark') {
+        document.documentElement.removeAttribute('data-theme');
+        themeBtn.textContent = '☀ light';
+      } else {
+        document.documentElement.setAttribute('data-theme', theme);
+        if (theme === 'light')    themeBtn.textContent = '📜 academic';
+        if (theme === 'academic') themeBtn.textContent = '🌙 dark';
+      }
+      try { localStorage.setItem('population_atlas_v1.theme', theme); } catch (_) {}
+    }
+    // Restore theme on load
+    try {
+      const saved = localStorage.getItem('population_atlas_v1.theme');
+      if (saved && ['dark', 'light', 'academic'].includes(saved)) {
+        applyTheme(saved);
+      }
+    } catch (_) {}
+    themeBtn.addEventListener('click', () => {
+      const cur = document.documentElement.getAttribute('data-theme') || 'dark';
+      const next = cur === 'dark' ? 'light' : (cur === 'light' ? 'academic' : 'dark');
+      applyTheme(next);
+    });
+  }
+</script>
+
+</body>
+</html>

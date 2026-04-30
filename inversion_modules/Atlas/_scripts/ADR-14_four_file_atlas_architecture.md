@@ -1,6 +1,6 @@
 # ADR-14: Four-file atlas architecture (eventual)
 
-**Status:** Locked, deferred implementation
+**Status:** **Executed** (2026-04-30 — see Update at bottom)
 **Date:** April 30, 2026
 **Supersedes:** SESSION_AUDIT_apr30 §8 open question on diversity-atlas
 file-vs-mode-switch
@@ -164,3 +164,36 @@ atlas, the cross-mode toggle works fine" — point them at the token
 cost. A 1.9 MB file is fine for the user but expensive for every
 Claude session that has to load it. The split is for Claude's
 workflow, not the user's.
+
+---
+
+## Update — 2026-04-30: executed
+
+The four-file split has been executed earlier than the original "wait until
+page 3/12 stabilize" plan. Trigger: the unified header dropdown (v11) made
+the visual inconsistency between in-app modes and external file (Population)
+obvious, and the next renderer-build session was about to extend page 13's
+in-app scaffold further. Split now while it's small.
+
+Final files (all in same directory):
+
+| File | Size (apr30) | Origin |
+|---|---|---|
+| `Inversion_atlas.html` | 1.94 MB | renamed from `atlas.html`; page13 + page14 divs removed (40,825 chars total) |
+| `Diversity_atlas.html` | 33 KB | NEW; page13 scaffold migrated as `page1`; green accent palette |
+| `Genome_atlas.html` | 27 KB | NEW; page14 scaffold migrated as `page1`; orange accent palette |
+| `Population_atlas.html` | 54 KB | renamed from `population_atlas_v1.html`; content unchanged |
+
+All four files cross-link via the four-atlas hover-expanding dropdown in
+the header (v11). The Population Atlas still uses its older
+`→ Inversions Atlas` single-link tabBar pattern — retrofitting it to the
+shared dropdown is a pending follow-up.
+
+JSONs continue to live in `Atlas/json/` (only `Inversion_atlas.html`
+loads them in this version; the other three are scaffolds).
+
+Stale references inside the codebase (e.g. `RUN_ON_LANTA_theta_pi.md`
+saying "open `Atlas/atlas.html`") need a sweep. Tests under
+`scrubber_v4_turn8_handoff/` reference `pca_scrubber_v3.html` for page13
+markup that no longer exists in `Inversion_atlas.html`; those tests will
+fail until ported to check `Diversity_atlas.html` instead.

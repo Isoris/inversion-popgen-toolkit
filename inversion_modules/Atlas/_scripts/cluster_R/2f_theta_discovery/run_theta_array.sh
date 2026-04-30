@@ -46,10 +46,10 @@ mkdir -p "$THETA_D17_DIR" logs
 
 # ---- Pipeline ---------------------------------------------------------------
 echo "[$(date)] [$CHROM] === STEP_TR_A precompute ==="
-$RSCRIPT STEP_TR_A_compute_theta_matrices.R "$CHROM"
+$RSCRIPT STEP_TR_A_compute_theta_matrices.R --chrom "$CHROM"
 
 echo "[$(date)] [$CHROM] === STEP_TR_B classifier ==="
-$RSCRIPT STEP_TR_B_classify_theta.R "$CHROM"
+$RSCRIPT STEP_TR_B_classify_theta.R --chrom "$CHROM"
 
 echo "[$(date)] [$CHROM] === STEP_TR_C D17 wrapper ==="
 $RSCRIPT STEP_TR_C_theta_d17_wrapper.R \

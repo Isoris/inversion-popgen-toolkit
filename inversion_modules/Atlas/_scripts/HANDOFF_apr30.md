@@ -15,7 +15,7 @@ If you (next-Claude) only read one file: read this, then read
    `RUNBOOK_produce_phase2_jsons.md` Section 1 step-by-step. Produces
    `LG28_ghsl.json` and `LG28_theta.json`.
 
-2. **Browser smoke test**. Drag-drop the two JSONs into `Atlas/atlas.html`,
+2. **Browser smoke test**. Drag-drop the two JSONs into `Atlas/Inversion_atlas.html`,
    open browser console, verify:
    - No JS errors
    - Page 3 panels render (zone bar, color stripe, dosage L1/L2 bars, GHSL Z, GHSL lines, GHSL PCA, GHSL MDS)
