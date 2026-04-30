@@ -112,16 +112,18 @@
   header #themeToggleBtn,
   header #resetLayoutBtn,
   header #candidateModeBtn,
-  header #layoutModeBtn {
+  header #layoutModeBtn,
+  header #saveSessionBtn,
+  header #loadSessionBtn {
     align-self: center;
     background: var(--panel-2); border: 1px solid var(--rule); color: var(--ink);
     padding: 4px 12px; font-family: var(--mono); font-size: 11px;
     border-radius: 3px; cursor: pointer; line-height: 1;
-    /* v3.99 turn 9: enforce single-line button text — was wrapping to 2 lines
-       at narrow viewport widths even though the labels have no \n. The mono
-       font + standard padding forces them to expand horizontally if needed
-       (header is flex with align-items:baseline, no flex-shrink on these). */
-    white-space: nowrap; flex-shrink: 0;
+    /* nowrap + flex-shrink:0 keep button text on one line at narrow viewports.
+       v4 turn 17: added saveSessionBtn + loadSessionBtn (their inline styles
+       lacked nowrap, so emoji + word stacked vertically). display:inline-flex
+       keeps emoji and word on the same line in old browsers too. */
+    white-space: nowrap; flex-shrink: 0; display: inline-flex; align-items: center;
   }
   header #candidateModeBtn[data-active="1"] {
     background: var(--accent); color: #0e1116; border-color: var(--accent);
@@ -335,7 +337,14 @@
     flex: none;
   }
   body[data-layout-mode="free"] main#page1 #ctrlBar { min-height: 40px; }
-  body[data-layout-mode="free"] main#page1 #simPanel { min-height: 360px; }
+  /* v4 turn 14: simPanel min-height in free layout must NOT apply when the
+     sim heatmap has been moved to the sidebar minimap. Without this guard,
+     the free-mode min-height: 360px overrides the data-sim-in-minimap=1
+     "collapse to 0" rule (both are body[attr=...] #id, equal specificity →
+     later one wins, which was the 360px rule). Leaves a ~360px empty gap
+     between the toolbar and the |z| panel. The `:not()` makes the free-mode
+     rule only apply when sim is still in its main-panel position. */
+  body[data-layout-mode="free"]:not([data-sim-in-minimap="1"]) main#page1 #simPanel { min-height: 360px; }
   body[data-layout-mode="free"] main#page1 #zPanel { min-height: 200px; }
   body[data-layout-mode="free"] main#page1 #linesPanel { min-height: 200px; }
   body[data-layout-mode="free"] main#page1 #anchorStripPanel { min-height: 24px; }
@@ -1224,6 +1233,45 @@
   #page2 .verdict-badge.noisy_region { background: var(--bad); color: #fff; }
   #page2 .verdict-badge.na, #page2 .verdict-badge.undetermined {
                           background: var(--panel-3); color: var(--ink-dim); }
+  /* v4 turn 9: ancestry-confound panel */
+  #page2 .anc-confound-grid { display: grid; grid-template-columns: 1fr 1fr 1fr;
+                          gap: 12px; margin: 8px 0 14px; }
+  #page2 .anc-test-card { background: var(--panel-2); border: 1px solid var(--rule);
+                          border-radius: 4px; padding: 12px; }
+  #page2 .anc-test-card .anc-test-name { font-family: var(--mono); font-size: 10px;
+                          color: var(--ink-dim); text-transform: uppercase;
+                          letter-spacing: 0.08em; margin-bottom: 8px; }
+  #page2 .anc-test-card .anc-test-source { font-family: var(--mono); font-size: 10px;
+                          color: var(--ink-dimmer); margin-bottom: 10px; }
+  #page2 .anc-test-card .anc-test-metric { font-family: var(--mono); font-size: 11.5px;
+                          line-height: 1.7; color: var(--ink); }
+  #page2 .anc-test-card .anc-test-metric span:first-child { display: inline-block;
+                          width: 82px; color: var(--ink-dimmer); }
+  #page2 .anc-test-card .anc-test-empty { font-family: var(--mono); font-size: 11px;
+                          color: var(--ink-dimmer); font-style: italic; padding: 6px 0; }
+  #page2 .anc-verdict-pill { display: inline-block; padding: 3px 9px;
+                          font-family: var(--mono); font-size: 10.5px; font-weight: 500;
+                          border-radius: 3px; letter-spacing: 0.04em; margin-top: 10px; }
+  #page2 .anc-verdict-pill.suspect       { background: rgba(224,85,92,0.18);
+                          color: var(--bad); border: 1px solid rgba(224,85,92,0.4); }
+  #page2 .anc-verdict-pill.independent   { background: rgba(60,192,138,0.18);
+                          color: var(--good); border: 1px solid rgba(60,192,138,0.4); }
+  #page2 .anc-verdict-pill.inconclusive  { background: rgba(245,196,58,0.15);
+                          color: var(--accent); border: 1px solid rgba(245,196,58,0.35); }
+  #page2 .anc-verdict-pill.empty         { background: var(--panel-3);
+                          color: var(--ink-dimmer); border: 1px solid var(--rule); }
+  #page2 .anc-combined-row { display: flex; align-items: center; gap: 14px;
+                          padding: 10px 14px; background: var(--panel-2);
+                          border: 1px solid var(--rule); border-radius: 4px;
+                          margin-top: 6px; }
+  #page2 .anc-combined-row .anc-combined-label { font-family: var(--mono);
+                          font-size: 11px; color: var(--ink-dim);
+                          text-transform: uppercase; letter-spacing: 0.06em; }
+  #page2 .anc-combined-row .anc-combined-text { font-family: var(--mono);
+                          font-size: 11.5px; color: var(--ink); flex: 1; }
+  #page2 .anc-confound-help { font-family: var(--mono); font-size: 10px;
+                          color: var(--ink-dimmer); line-height: 1.6;
+                          margin-top: 10px; }
   /* Drifter chips */
   #page2 .drifter-chip { display: inline-block; padding: 3px 8px; margin: 3px;
                          background: var(--panel-2); border: 1px solid var(--rule);
@@ -1862,6 +1910,295 @@
   #l3Panel .l3-layout button.active {
     background: var(--accent); color: #0e1116; border-color: var(--accent);
     font-weight: 600; }
+  /* v4 turn 12a: scale-stability dropdowns + panel content */
+  #l3Panel .l3-scale-sel {
+    background: var(--panel-2); color: var(--ink);
+    border: 1px solid var(--rule); border-radius: 3px;
+    padding: 2px 6px; font-family: var(--mono);
+    font-size: 10.5px; cursor: pointer; }
+  #l3Panel .l3-scale-sel:hover { border-color: var(--ink-dim); }
+  #l3Panel .l3-scale-sel:focus { outline: none; border-color: var(--accent); }
+  #l3Panel .l3-scale-sel option:disabled {
+    color: var(--ink-dimmer); }
+  /* Scale-stability gap (between adjacent panes) — numeric contingency table */
+  #l3Panel .ss-gap {
+    border-left: 1px dashed var(--rule); border-right: 1px dashed var(--rule);
+    padding: 6px 8px; background: var(--panel-2);
+    display: flex; flex-direction: column; gap: 4px;
+    align-items: center; justify-content: center; }
+  #l3Panel .ss-gap-label { font-family: var(--mono); font-size: 9.5px;
+    color: var(--ink-dim); text-transform: uppercase; letter-spacing: 0.06em; }
+  #l3Panel .ss-ct-table { border-collapse: collapse;
+    font-family: var(--mono); font-size: 10px; }
+  #l3Panel .ss-ct-table th, #l3Panel .ss-ct-table td {
+    padding: 1px 5px; border: 1px solid var(--rule); text-align: right; }
+  #l3Panel .ss-ct-table th { background: var(--panel-3); color: var(--ink-dim);
+    font-weight: 500; }
+  #l3Panel .ss-ct-table td { color: var(--ink); background: var(--panel); }
+  #l3Panel .ss-ct-table td.zero { color: var(--ink-dimmer); }
+  #l3Panel .ss-ct-table td.heavy { background: rgba(245,165,36,0.18);
+    color: var(--ink); font-weight: 500; }
+  #l3Panel .ss-event-row { font-family: var(--mono); font-size: 10px;
+    color: var(--ink-dim); text-align: center; line-height: 1.5; }
+  #l3Panel .ss-event-row .ss-fuse { color: var(--good); }
+  #l3Panel .ss-event-row .ss-split { color: var(--bad); }
+  #l3Panel .ss-metrics { font-family: var(--mono); font-size: 10px;
+    color: var(--ink-dimmer); }
+  /* Sankey strip wrapper inside ss-gap; SVG fills width, ~80px tall */
+  #l3Panel .ss-sankey { width: 100%; max-width: 140px; }
+  #l3Panel .ss-sankey svg { display: block; height: 80px; width: 100%; }
+  #l3Panel .ss-sankey path { transition: opacity 100ms; }
+  #l3Panel .ss-sankey path:hover { opacity: 0.65; cursor: default; }
+  #l3Panel .ss-sankey rect:hover { opacity: 1; }
+  /* Verdict pill at bottom of scale-stability panel */
+  #l3Panel .ss-verdict-row {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px;
+    padding: 8px 12px; background: var(--panel-2);
+    border-top: 1px solid var(--rule); margin-top: 6px; }
+  #l3Panel .ss-verdict-pill { display: inline-block; padding: 4px 10px;
+    font-family: var(--mono); font-size: 11px; font-weight: 500;
+    border-radius: 3px; letter-spacing: 0.04em; }
+  #l3Panel .ss-verdict-pill.stable      { background: rgba(60,192,138,0.18);
+    color: var(--good); border: 1px solid rgba(60,192,138,0.4); }
+  #l3Panel .ss-verdict-pill.nested      { background: rgba(48,116,200,0.18);
+    color: #5b9bdf; border: 1px solid rgba(48,116,200,0.4); }
+  #l3Panel .ss-verdict-pill.overlap     { background: rgba(124,58,237,0.18);
+    color: #a78bfa; border: 1px solid rgba(124,58,237,0.4); }
+  #l3Panel .ss-verdict-pill.unstable    { background: rgba(224,85,92,0.18);
+    color: var(--bad); border: 1px solid rgba(224,85,92,0.4); }
+  #l3Panel .ss-verdict-text { font-family: var(--mono); font-size: 11px;
+    color: var(--ink); flex: 1; }
+  #l3Panel .ss-low-conf { display: inline-block; padding: 1px 6px;
+    font-family: var(--mono); font-size: 9.5px; color: var(--accent);
+    background: rgba(245,165,36,0.10); border: 1px solid rgba(245,165,36,0.4);
+    border-radius: 2px; margin-left: 6px; }
+  #l3Panel .ss-pane-header {
+    padding: 6px 10px; font-family: var(--mono); font-size: 11px;
+    display: flex; gap: 8px; align-items: center;
+    border-bottom: 1px solid var(--rule); }
+  #l3Panel .ss-pane-header .ss-pane-icon { font-weight: 600; color: var(--accent); }
+  #l3Panel .ss-pane-header .ss-pane-meta { color: var(--ink-dim); margin-left: auto; }
+  /* v4 turn 15b: regime registry — modeless dialog overlay */
+  .regime-overlay {
+    position: fixed; inset: 0; z-index: 1000;
+    background: rgba(0, 0, 0, 0.45);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .regime-panel {
+    background: var(--panel); color: var(--ink);
+    border: 1px solid var(--rule); border-radius: 6px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+    width: min(720px, 92vw); max-height: 80vh;
+    display: flex; flex-direction: column; overflow: hidden;
+    font-family: var(--mono); font-size: 11.5px;
+  }
+  .regime-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; border-bottom: 1px solid var(--rule);
+    background: var(--panel-2);
+  }
+  .regime-title { font-weight: 600; color: var(--ink); flex: 1; }
+  .regime-header button {
+    background: var(--panel-3); color: var(--ink); border: 1px solid var(--rule);
+    border-radius: 3px; padding: 4px 10px; font-family: var(--mono);
+    font-size: 11px; cursor: pointer;
+  }
+  .regime-header button:hover { border-color: var(--accent); color: var(--accent); }
+  .regime-header .regime-close { padding: 2px 9px; font-size: 14px; line-height: 1; }
+  .regime-header .regime-new { background: var(--accent); color: #0e1116;
+    border-color: var(--accent); font-weight: 600; }
+  .regime-header .regime-new:hover { background: var(--accent); color: #0e1116; }
+  .regime-empty { padding: 24px 14px; color: var(--ink-dim); text-align: center; }
+  .regime-table {
+    width: 100%; border-collapse: collapse; font-size: 11px;
+  }
+  .regime-table thead th {
+    text-align: left; padding: 6px 10px; font-weight: 500;
+    color: var(--ink-dim); border-bottom: 1px solid var(--rule);
+    background: var(--panel-2); position: sticky; top: 0; z-index: 1;
+  }
+  .regime-table tbody td {
+    padding: 6px 10px; border-bottom: 1px solid var(--rule);
+    vertical-align: middle;
+  }
+  .regime-table tbody tr:hover { background: var(--panel-2); }
+  .regime-table code { font-size: 10.5px; }
+  .regime-table .regime-edit, .regime-table .regime-del {
+    background: var(--panel-3); color: var(--ink-dim);
+    border: 1px solid var(--rule); border-radius: 2px;
+    padding: 2px 7px; font-family: var(--mono); font-size: 10px;
+    cursor: pointer; margin-right: 4px;
+  }
+  .regime-table .regime-edit:hover { color: var(--accent); border-color: var(--accent); }
+  .regime-table .regime-del:hover { color: var(--bad); border-color: var(--bad); }
+  .regime-dim { color: var(--ink-dimmer); }
+  .regime-form {
+    padding: 14px; overflow-y: auto;
+  }
+  .regime-form-row {
+    display: flex; gap: 12px; margin-bottom: 12px; align-items: flex-start;
+  }
+  .regime-form-row label {
+    width: 120px; flex-shrink: 0; color: var(--ink-dim);
+    font-size: 11px; padding-top: 5px;
+  }
+  .regime-input {
+    flex: 1; background: var(--panel-2); color: var(--ink);
+    border: 1px solid var(--rule); border-radius: 3px;
+    padding: 5px 8px; font-family: var(--mono); font-size: 11.5px;
+  }
+  .regime-input:focus { outline: none; border-color: var(--accent); }
+  .regime-input:disabled { color: var(--ink-dimmer); cursor: not-allowed; }
+  .regime-notes { min-height: 60px; resize: vertical; }
+  .regime-members {
+    flex: 1; display: flex; flex-wrap: wrap; gap: 4px; padding-top: 5px;
+  }
+  .regime-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: var(--panel-2); border: 1px solid var(--rule);
+    border-radius: 12px; padding: 2px 8px; font-size: 10.5px;
+  }
+  .regime-chip-x {
+    background: transparent; color: var(--ink-dim); border: none;
+    cursor: pointer; font-size: 13px; line-height: 1; padding: 0 2px;
+  }
+  .regime-chip-x:hover { color: var(--bad); }
+  .regime-form-actions {
+    display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;
+    padding-top: 12px; border-top: 1px solid var(--rule);
+  }
+  .regime-form-actions button {
+    background: var(--panel-2); color: var(--ink);
+    border: 1px solid var(--rule); border-radius: 3px;
+    padding: 6px 14px; font-family: var(--mono); font-size: 11.5px;
+    cursor: pointer;
+  }
+  .regime-form-actions .regime-save {
+    background: var(--accent); color: #0e1116;
+    border-color: var(--accent); font-weight: 600;
+  }
+  .regime-form-actions .regime-save:hover { filter: brightness(1.1); }
+  .regime-form-actions .regime-cancel:hover { border-color: var(--ink-dim); }
+  .regime-assign { padding: 14px; }
+  .regime-assign-ctx {
+    padding: 8px 10px; background: var(--panel-2); border: 1px solid var(--rule);
+    border-radius: 3px; margin-bottom: 12px; font-size: 11px;
+  }
+  /* Candidate-focus regime row */
+  .cand-regime-row {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    padding: 10px 14px; margin: 12px 0;
+    background: var(--panel-2); border: 1px solid var(--rule); border-radius: 4px;
+    font-family: var(--mono); font-size: 11.5px;
+  }
+  .cand-regime-label {
+    color: var(--ink-dim); font-weight: 500; text-transform: uppercase;
+    font-size: 9.5px; letter-spacing: 0.06em;
+  }
+  .cand-regime-none { color: var(--ink-dimmer); font-style: italic; }
+  .cand-regime-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: rgba(245, 165, 36, 0.15); color: var(--accent);
+    border: 1px solid rgba(245, 165, 36, 0.5);
+    border-radius: 3px; padding: 2px 8px; font-weight: 500;
+  }
+  .cand-regime-edit-chip {
+    background: transparent; color: var(--accent); border: none;
+    cursor: pointer; font-size: 10px; padding: 0 2px;
+    text-decoration: underline; opacity: 0.7;
+  }
+  .cand-regime-edit-chip:hover { opacity: 1; }
+  .cand-regime-assign, .cand-regime-open {
+    background: var(--panel-3); color: var(--ink);
+    border: 1px solid var(--rule); border-radius: 3px;
+    padding: 4px 10px; font-family: var(--mono); font-size: 10.5px;
+    cursor: pointer; margin-left: auto;
+  }
+  .cand-regime-assign:hover, .cand-regime-open:hover {
+    border-color: var(--accent); color: var(--accent);
+  }
+  .cand-regime-open { margin-left: 0; }
+  /* v4 turn 18: repeat density panel on boundaries page */
+  #page11 .bnd-repeat-density {
+    margin-top: 16px;
+    padding: 12px;
+    background: var(--panel-2);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+  }
+  #page11 .bnd-rd-empty {
+    color: var(--ink-dim);
+    font-size: 11px;
+    font-family: var(--mono);
+    padding: 14px 8px;
+    text-align: center;
+    line-height: 1.5;
+  }
+  #page11 .bnd-rd-empty-h {
+    color: var(--ink);
+    font-weight: 500;
+    margin-bottom: 4px;
+    font-size: 12px;
+  }
+  #page11 .bnd-rd-empty code {
+    background: var(--panel-3); padding: 1px 4px; border-radius: 2px;
+    font-size: 10.5px;
+  }
+  #page11 .bnd-rd-header {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    margin-bottom: 6px;
+    font-family: var(--mono); font-size: 11px;
+  }
+  #page11 .bnd-rd-title {
+    color: var(--ink); font-weight: 500;
+    text-transform: uppercase; letter-spacing: 0.06em; font-size: 9.5px;
+  }
+  #page11 .bnd-rd-meta { color: var(--ink-dim); }
+  #page11 .bnd-rd-meta code {
+    background: var(--panel-3); padding: 1px 4px; border-radius: 2px;
+  }
+  /* v4 turn 19+20: control row dropdowns, warn note, flash animation */
+  #page11 .bnd-rd-ctrl {
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  #page11 .bnd-rd-ctrl-label {
+    color: var(--ink-dim);
+    font-size: 9.5px;
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  #page11 .bnd-rd-ctrl select {
+    background: var(--panel-3); color: var(--ink);
+    border: 1px solid var(--rule); border-radius: 2px;
+    padding: 2px 4px; font-family: var(--mono); font-size: 10.5px;
+    cursor: pointer;
+    max-width: 220px;
+  }
+  #page11 .bnd-rd-ctrl select:focus { outline: 1px solid var(--accent); outline-offset: -1px; }
+  #page11 .bnd-rd-warn {
+    color: #d09030; font-size: 10.5px; font-style: italic;
+  }
+  #page11 .bnd-rd-empty-loaded {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--rule);
+    font-size: 10.5px;
+    color: var(--ink-dimmer);
+  }
+  /* Flash on chrom-change (Alt+arrow nav) */
+  #page11 .bnd-repeat-density.bnd-rd-flash {
+    animation: bndRdFlash 600ms ease-out;
+  }
+  @keyframes bndRdFlash {
+    0%   { box-shadow: 0 0 0 2px rgba(245, 165, 36, 0.7); }
+    100% { box-shadow: 0 0 0 2px rgba(245, 165, 36, 0); }
+  }
+  #page11 .bnd-rd-svg {
+    background: #0a0c0f;
+    border-radius: 3px;
+    display: block;
+    width: 100%;
+    max-width: 100%;
+  }
   /* Generic button-row style reused for color-mode chooser */
   .color-mode-row { display: flex; gap: 3px; flex-wrap: wrap; }
   .color-mode-row button {
@@ -2139,17 +2476,9 @@
        Quentin: "we need to add 2 buttons Load and Save. That load and
        save JSON sessions so that we dont loose our work." -->
   <button id="saveSessionBtn"
-          title="Save current session to a JSON file (candidates, favorites, active candidate, key prefs). Survives F5 / cross-machine. Pair with Load to restore."
-          style="background: var(--panel-2); color: var(--ink-dim);
-                 border: 1px solid var(--rule); border-radius: 3px;
-                 padding: 0 12px; margin-left: 8px; font-family: var(--mono);
-                 font-size: 11px; cursor: pointer; height: 24px;">💾 save</button>
+          title="Save current session to a JSON file (candidates, favorites, active candidate, key prefs). Survives F5 / cross-machine. Pair with Load to restore.">💾 save</button>
   <button id="loadSessionBtn"
-          title="Load a session from a JSON file previously saved with Save. Merges saved candidates + favorites with current state — does NOT clear existing work unless the JSON contains the same candidate IDs."
-          style="background: var(--panel-2); color: var(--ink-dim);
-                 border: 1px solid var(--rule); border-radius: 3px;
-                 padding: 0 12px; margin-left: 4px; font-family: var(--mono);
-                 font-size: 11px; cursor: pointer; height: 24px;">📂 load</button>
+          title="Load a session from a JSON file previously saved with Save. Merges saved candidates + favorites with current state — does NOT clear existing work unless the JSON contains the same candidate IDs.">📂 load</button>
   <input type="file" id="loadSessionInput" accept=".json,application/json"
          style="display: none;" />
   <!-- v3.62: layout-mode toggle. "fixed" = grid template with explicit row
@@ -3136,6 +3465,26 @@
           <button data-l3bc="draft"    title="Span of the interval currently being assembled in candidate mode (only when building one)">draft</button>
           <button data-l3bc="chrom"    title="Whole-chromosome aggregate">chrom</button>
         </div>
+        <!-- v4 turn 12a (Deliverable D): scale-stability mode toggle + pane
+             scale pickers. When the ⤢ scale button is active, the L3 carousel
+             switches from spatial neighbors of the focal L2 to three different
+             SCALES centered on the focal — fine / medium / coarse — and runs
+             cluster-comparison metrics across them. The three dropdowns let
+             the user pick each pane's unit independently (windows, SNP-bands,
+             kb-bands, L1/L2/candidate envelopes). All math helpers shipped
+             in turn 11; this row is the wiring + UI layer. -->
+        <div class="l3-layout" id="l3ScaleMode" style="margin-left: 12px;"
+             title="Scale-stability test: same focal, three different zoom levels (fine / medium / coarse). Toggle ON to swap the L3 carousel from spatial neighbors to scale neighbors. Sankey + contingency between adjacent panes shows fuse/split structure. Verdict cascade: STABLE_3BAND / STABLE_6BAND / NESTED_3IN6 / OVERLAP_BREAKS_3 / UNSTABLE.">
+          <button data-l3scale-toggle="off" class="active" title="Spatial-neighbor mode (default — existing L3 carousel)">⤢ off</button>
+          <button data-l3scale-toggle="on" title="Scale-stability mode — three panes show fine / medium / coarse on the same focal window">⤢ scale</button>
+        </div>
+        <div class="l3-layout" id="l3ScalePanes" style="margin-left: 12px; display: none;"
+             title="Three scale dropdowns. Each pane picks its own unit independently. Defaults: 5w fine / L2 medium / candidate coarse (or L1 if no candidate active).">
+          <span class="dim" style="font-size: 9px; margin-right: 4px; align-self: center;">Σ:</span>
+          <select id="l3ScaleSel0" data-l3scale-pane="0" class="l3-scale-sel"></select>
+          <select id="l3ScaleSel1" data-l3scale-pane="1" class="l3-scale-sel" style="margin-left: 4px;"></select>
+          <select id="l3ScaleSel2" data-l3scale-pane="2" class="l3-scale-sel" style="margin-left: 4px;"></select>
+        </div>
         <!-- v4.1: L3 re-clustering mode picker. Lets the user re-cluster
              each L2's samples with an alternative method before building
              the contingency table — useful when the default K=3 K-means is
@@ -3980,6 +4329,8 @@
       </select>
       <button id="catSelectAll" title="Select all currently-visible rows (respects active filters).">select all</button>
       <button id="catClearSel" title="Clear all row selections (does not affect favorites).">clear</button>
+      <button id="catRegimeRegistry" title="Open the regime registry — create, edit, or delete regime annotations (Deliverable C). Each regime is a user-curated annotation of &quot;this group of L2s belongs to inversion-system X&quot;.">🏷 regimes</button>
+      <button id="catRegimeAssignSel" title="Assign all currently-selected rows to a regime. In L2 / favorites view, each selected row contributes its L2 envelope. In L1-merged view, each selected row contributes ALL its constituent L2 envelopes. Opens the regime dialog in assign mode with the L2 IDs staged. Requires at least one row checkbox checked.">🏷 assign sel</button>
       <button id="catViewAsCandidate" class="export" title="Promote the selected interval(s) to provisional candidates and open the first one on page 2 candidate-focus">👁 view as candidate</button>
       <button id="catExportTSV" class="export" title="Export the currently-visible rows (after filter + sort) as a tab-separated file. Includes a metadata header (chromosome, species, schema version, filter+sort context, K + verdict distribution, span range, generated timestamp).">⬇ export TSV</button>
       <button id="catExportMD" class="export" title="Export the currently-visible rows as a Markdown table — handy for pasting into a manuscript or Slack. Includes a metadata blockquote header above the table.">⬇ export Markdown</button>
@@ -7280,6 +7631,1782 @@ function compareUnitHalfW() {
   }
   return null;
 }
+
+// =============================================================================
+// v4 turn 11 — Deliverable D (PART 1, math foundation): scale-stability test
+// -----------------------------------------------------------------------------
+// Pure-math helpers for the scale-stability viewer. NO UI, NO renderer changes
+// this turn — those land in Part 2 once this layer is fully tested.
+//
+// What this provides:
+//   - state.l3Mode + state.scaleStabilityPanes default initialization
+//   - Range converters: window-band, SNP-band, kb-band, L2/L1/candidate
+//   - Contingency builders + fuse/split detection
+//   - ARI (adjusted Rand index) + NMI (normalized mutual information)
+//   - Verdict cascade (STABLE_3BAND, STABLE_6BAND, NESTED_3IN6,
+//     OVERLAP_BREAKS_3, UNSTABLE)
+//   - Cache fingerprint
+//
+// All helpers are pure (no DOM, no side effects beyond state cache slots).
+// =============================================================================
+
+// Default state when missing. Called lazily so we don't blow away anything the
+// user previously set; only fills in unset fields.
+function _ensureScaleStabilityState() {
+  if (state.l3Mode == null) state.l3Mode = 'contingency';
+  if (!Array.isArray(state.scaleStabilityPanes)) {
+    state.scaleStabilityPanes = [
+      { scale: '5w',        K: 6, custom_n: null },   // pane 1 — fine
+      { scale: 'L2',        K: 6, custom_n: null },   // pane 2 — medium
+      { scale: 'candidate', K: 3, custom_n: null },   // pane 3 — coarse
+    ];
+  }
+  if (!state.scaleStabilityCache) state.scaleStabilityCache = null;
+}
+
+// -----------------------------------------------------------------------------
+// Range converters
+// -----------------------------------------------------------------------------
+// All return [s, e] inclusive window indices, or null if no resolution is
+// possible (missing data, no active candidate when 'candidate' is requested).
+
+// Symmetric SNP-band: smallest contiguous range centered on focalW whose
+// total n_snps ≥ targetSnps. Expands one window at a time on whichever side
+// has fewer SNPs absorbed so far (to keep coverage roughly symmetric).
+//
+// Edge cases:
+//   - focalW out of bounds                            → null
+//   - sum of all windows' n_snps < targetSnps         → return [0, n-1] flagged
+//   - hits chromosome boundary mid-expansion          → returns asymmetric range
+//
+// The result includes an `asymmetric` flag the UI uses to show
+// "asymmetric: 50w left only" annotation.
+function _snpBandRange(focalW, targetSnps) {
+  if (!state.data || !Array.isArray(state.data.windows)) return null;
+  const windows = state.data.windows;
+  const n = windows.length;
+  if (focalW < 0 || focalW >= n || targetSnps == null || targetSnps <= 0) return null;
+  const wSnps = (i) => {
+    const w = windows[i];
+    const v = (w && w.n_snps != null && isFinite(w.n_snps)) ? +w.n_snps : 0;
+    return v;
+  };
+  let s = focalW, e = focalW, total = wSnps(focalW);
+  let leftAbsorbed = 0, rightAbsorbed = 0;
+  let edgeForced = false;   // set true when one side is a boundary and the
+                            // other had to keep going alone
+  while (total < targetSnps) {
+    const canL = s > 0;
+    const canR = e < n - 1;
+    if (!canL && !canR) break;
+    let pickLeft;
+    if (canL && !canR)      { pickLeft = true;  edgeForced = true; }
+    else if (canR && !canL) { pickLeft = false; edgeForced = true; }
+    else                    { pickLeft = (leftAbsorbed <= rightAbsorbed); }
+    if (pickLeft) {
+      s--;
+      const v = wSnps(s); total += v; leftAbsorbed += v;
+    } else {
+      e++;
+      const v = wSnps(e); total += v; rightAbsorbed += v;
+    }
+  }
+  // "Asymmetric" only fires when the algorithm was forced to expand one-sided
+  // because the chromosome boundary cut off the other side. A tiebreak that
+  // happened to land on (s-1, e) is NOT asymmetric — it's symmetric intent.
+  const asymmetric = edgeForced;
+  const targetMet = total >= targetSnps;
+  return { s, e, total_snps: total, target: targetSnps,
+           asymmetric, target_met: targetMet,
+           left_absorbed: leftAbsorbed, right_absorbed: rightAbsorbed };
+}
+
+// Symmetric kb-band: same algorithm but on span_bp summed up.
+function _kbBandRange(focalW, targetKb) {
+  if (!state.data || !Array.isArray(state.data.windows)) return null;
+  const windows = state.data.windows;
+  const n = windows.length;
+  if (focalW < 0 || focalW >= n || targetKb == null || targetKb <= 0) return null;
+  const wSpan = (i) => {
+    const w = windows[i];
+    if (!w) return 0;
+    if (w.span_bp != null && isFinite(w.span_bp)) return +w.span_bp;
+    if (w.start_bp != null && w.end_bp != null) return Math.max(0, +w.end_bp - +w.start_bp);
+    return 0;
+  };
+  const targetBp = targetKb * 1000;
+  let s = focalW, e = focalW, total = wSpan(focalW);
+  let leftAbsorbed = 0, rightAbsorbed = 0;
+  let edgeForced = false;
+  while (total < targetBp) {
+    const canL = s > 0;
+    const canR = e < n - 1;
+    if (!canL && !canR) break;
+    let pickLeft;
+    if (canL && !canR)      { pickLeft = true;  edgeForced = true; }
+    else if (canR && !canL) { pickLeft = false; edgeForced = true; }
+    else                    { pickLeft = (leftAbsorbed <= rightAbsorbed); }
+    if (pickLeft) {
+      s--;
+      const v = wSpan(s); total += v; leftAbsorbed += v;
+    } else {
+      e++;
+      const v = wSpan(e); total += v; rightAbsorbed += v;
+    }
+  }
+  const asymmetric = edgeForced;
+  return { s, e, total_bp: total, target_bp: targetBp,
+           asymmetric, target_met: total >= targetBp,
+           left_absorbed: leftAbsorbed, right_absorbed: rightAbsorbed };
+}
+
+// Resolve a single pane's scale string to a [s, e] window range.
+// paneCfg: { scale: string, K: number, custom_n: number | null }
+//
+// Returns null when the scale cannot be resolved (e.g. 'candidate' with no
+// active candidate, 'L2' when scrubber is outside any L2 envelope).
+//
+// The `metadata` field of the return tells the UI what to show in the
+// pane header — total SNPs / total kb / windows count, asymmetric flag, etc.
+function _resolvePaneRange(focalW, paneCfg) {
+  if (!state.data || !Array.isArray(state.data.windows)) return null;
+  if (!paneCfg || !paneCfg.scale) return null;
+  const windows = state.data.windows;
+  const n = windows.length;
+  const scale = paneCfg.scale;
+  const clampS = (v) => Math.max(0, Math.min(n - 1, v | 0));
+  const clampE = (v) => Math.max(0, Math.min(n - 1, v | 0));
+
+  // -- Window-count units (centered on focal) --
+  // For `Nw` we use exactly N windows centered on focalW; if N is even we
+  // bias to the right (focalW + N/2 - 1 .. focalW + N/2) so the focal is
+  // closer to the middle.
+  function nWindowsRange(N) {
+    if (N <= 0) return null;
+    if (N === 1) return { s: focalW, e: focalW, kind: 'windows', n: 1 };
+    const halfL = Math.floor((N - 1) / 2);
+    const halfR = N - 1 - halfL;
+    return { s: clampS(focalW - halfL), e: clampE(focalW + halfR),
+             kind: 'windows', n: N };
+  }
+  if (scale === '1w')  return nWindowsRange(1);
+  if (scale === '5w')  return nWindowsRange(5);
+  if (scale === '10w') return nWindowsRange(10);
+  if (scale === '25w') return nWindowsRange(25);
+  if (scale === 'Nw') {
+    const N = (paneCfg.custom_n != null && paneCfg.custom_n > 0)
+              ? paneCfg.custom_n : (state.compareUnitN | 0);
+    return nWindowsRange(Math.max(1, N));
+  }
+
+  // -- SNP-band units --
+  if (scale === '100SNPs' || scale === '100 SNPs') {
+    const r = _snpBandRange(focalW, 100);
+    return r ? Object.assign({ kind: 'snps' }, r) : null;
+  }
+  if (scale === '500SNPs' || scale === '500 SNPs') {
+    const r = _snpBandRange(focalW, 500);
+    return r ? Object.assign({ kind: 'snps' }, r) : null;
+  }
+  if (scale === '1000SNPs' || scale === '1000 SNPs') {
+    const r = _snpBandRange(focalW, 1000);
+    return r ? Object.assign({ kind: 'snps' }, r) : null;
+  }
+
+  // -- kb-band units --
+  if (scale === '100kb' || scale === '100 kb') {
+    const r = _kbBandRange(focalW, 100);
+    return r ? Object.assign({ kind: 'kb' }, r) : null;
+  }
+  if (scale === '500kb' || scale === '500 kb') {
+    const r = _kbBandRange(focalW, 500);
+    return r ? Object.assign({ kind: 'kb' }, r) : null;
+  }
+
+  // -- Envelope units --
+  if (scale === 'L2') {
+    const l2Idx = state.windowToL2 ? state.windowToL2[focalW] : -1;
+    if (l2Idx == null || l2Idx < 0) return null;
+    const env = (state.data.l2_envelopes || [])[l2Idx];
+    if (!env) return null;
+    return { s: env._s0, e: env._e0, kind: 'L2', l2idx: l2Idx };
+  }
+  if (scale === 'L1') {
+    const l1Idx = state.windowToL1 ? state.windowToL1[focalW] : -1;
+    if (l1Idx == null || l1Idx < 0) return null;
+    const env = (state.data.l1_envelopes || [])[l1Idx];
+    if (!env) return null;
+    return { s: env._s0, e: env._e0, kind: 'L1', l1idx: l1Idx };
+  }
+  if (scale === 'candidate') {
+    const c = state.candidate;
+    if (!c || c.start_w == null || c.end_w == null) return null;
+    return { s: c.start_w, e: c.end_w, kind: 'candidate', cand_id: c.id };
+  }
+  return null;
+}
+
+// -----------------------------------------------------------------------------
+// Contingency + cluster-comparison metrics
+// -----------------------------------------------------------------------------
+
+// Build a (KA × KB) contingency matrix from two parallel label arrays.
+// Labels are integer indices in [0, KA) and [0, KB). Out-of-range labels
+// (e.g. -1 sentinel) are silently dropped.
+function _buildContingency(labelsA, labelsB, KA, KB) {
+  if (!Array.isArray(labelsA) || !Array.isArray(labelsB)) return null;
+  if (labelsA.length !== labelsB.length) return null;
+  if (!(KA > 0) || !(KB > 0)) return null;
+  const M = Array.from({ length: KA }, () => new Array(KB).fill(0));
+  let n = 0;
+  for (let i = 0; i < labelsA.length; i++) {
+    const a = labelsA[i], b = labelsB[i];
+    if (a < 0 || a >= KA || b < 0 || b >= KB) continue;
+    M[a][b]++; n++;
+  }
+  return { M, KA, KB, n };
+}
+
+// Fuse-event detection: for each coarse cluster c, find all fine clusters f
+// where ≥ thresh fraction of f's samples land in c. If two or more such fine
+// clusters exist for one coarse cluster, that's a fuse event.
+//
+// Args:
+//   ct = { M: KA×KB matrix, KA, KB, n } from _buildContingency
+//        (fine = rows / KA, coarse = cols / KB by convention here)
+//   opts.thresh: default 0.80 — minimum fine→coarse mapping fraction
+//
+// Output: array of { fine_clusters: int[], coarse_cluster: int }
+function _detectFuseEvents(ct, opts) {
+  if (!ct || !ct.M) return [];
+  const t = (opts && opts.thresh != null) ? +opts.thresh : 0.80;
+  const { M, KA, KB } = ct;
+  // Row sums (per fine cluster)
+  const rowSum = new Array(KA).fill(0);
+  for (let a = 0; a < KA; a++) for (let b = 0; b < KB; b++) rowSum[a] += M[a][b];
+  // For each coarse cluster, list which fine clusters have ≥t fraction in it
+  const fuses = [];
+  for (let b = 0; b < KB; b++) {
+    const fineList = [];
+    for (let a = 0; a < KA; a++) {
+      if (rowSum[a] === 0) continue;
+      if (M[a][b] / rowSum[a] >= t) fineList.push(a);
+    }
+    if (fineList.length >= 2) fuses.push({ fine_clusters: fineList, coarse_cluster: b });
+  }
+  return fuses;
+}
+
+// Split-event detection: for each fine cluster f, find coarse clusters that
+// each receive ≥ thresh fraction of f's samples. If two or more such coarse
+// clusters exist, that's a split event.
+//
+// Output: array of { fine_cluster: int, coarse_clusters: int[] }
+function _detectSplitEvents(ct, opts) {
+  if (!ct || !ct.M) return [];
+  const t = (opts && opts.thresh != null) ? +opts.thresh : 0.20;
+  const { M, KA, KB } = ct;
+  const splits = [];
+  for (let a = 0; a < KA; a++) {
+    let rowS = 0;
+    for (let b = 0; b < KB; b++) rowS += M[a][b];
+    if (rowS === 0) continue;
+    const coarseList = [];
+    for (let b = 0; b < KB; b++) if (M[a][b] / rowS >= t) coarseList.push(b);
+    if (coarseList.length >= 2) splits.push({ fine_cluster: a, coarse_clusters: coarseList });
+  }
+  return splits;
+}
+
+// Adjusted Rand Index between two label arrays of equal length.
+// ARI = (sum C(n_ij, 2) - E) / (max - E)
+// where E = (sum C(a_i, 2) * sum C(b_j, 2)) / C(n, 2)
+// and max = (sum C(a_i, 2) + sum C(b_j, 2)) / 2.
+// Returns NaN when n < 2 or only one cluster on either side.
+function _computeARI(labelsA, labelsB) {
+  if (!Array.isArray(labelsA) || labelsA.length !== labelsB.length) return NaN;
+  const n = labelsA.length;
+  if (n < 2) return NaN;
+  // Build contingency dynamically (don't require KA/KB)
+  const cellByKey = new Map();
+  const rowByA = new Map();
+  const colByB = new Map();
+  for (let i = 0; i < n; i++) {
+    const a = labelsA[i], b = labelsB[i];
+    const key = a + '|' + b;
+    cellByKey.set(key, (cellByKey.get(key) || 0) + 1);
+    rowByA.set(a, (rowByA.get(a) || 0) + 1);
+    colByB.set(b, (colByB.get(b) || 0) + 1);
+  }
+  const C2 = (k) => k * (k - 1) / 2;
+  let sumCellPairs = 0;
+  for (const v of cellByKey.values()) sumCellPairs += C2(v);
+  let sumRowPairs = 0;
+  for (const v of rowByA.values()) sumRowPairs += C2(v);
+  let sumColPairs = 0;
+  for (const v of colByB.values()) sumColPairs += C2(v);
+  const totalPairs = C2(n);
+  if (totalPairs === 0) return NaN;
+  const expected = (sumRowPairs * sumColPairs) / totalPairs;
+  const max = (sumRowPairs + sumColPairs) / 2;
+  if (max === expected) return 1; // both partitions identical (single cluster)
+  return (sumCellPairs - expected) / (max - expected);
+}
+
+// Normalized Mutual Information (NMI) between two label arrays.
+// NMI = 2 * I(A;B) / (H(A) + H(B))  with natural log; ranges 0..1.
+// Returns NaN on length mismatch / n<2.
+function _computeNMI(labelsA, labelsB) {
+  if (!Array.isArray(labelsA) || labelsA.length !== labelsB.length) return NaN;
+  const n = labelsA.length;
+  if (n < 2) return NaN;
+  const cellByKey = new Map();
+  const rowByA = new Map();
+  const colByB = new Map();
+  for (let i = 0; i < n; i++) {
+    const a = labelsA[i], b = labelsB[i];
+    cellByKey.set(a + '|' + b, (cellByKey.get(a + '|' + b) || 0) + 1);
+    rowByA.set(a, (rowByA.get(a) || 0) + 1);
+    colByB.set(b, (colByB.get(b) || 0) + 1);
+  }
+  let HA = 0, HB = 0, I = 0;
+  for (const ca of rowByA.values()) {
+    const p = ca / n;
+    if (p > 0) HA -= p * Math.log(p);
+  }
+  for (const cb of colByB.values()) {
+    const p = cb / n;
+    if (p > 0) HB -= p * Math.log(p);
+  }
+  for (const [key, cab] of cellByKey) {
+    const [aStr, bStr] = key.split('|');
+    const ca = rowByA.get(+aStr) || rowByA.get(aStr);
+    const cb = colByB.get(+bStr) || colByB.get(bStr);
+    const pab = cab / n;
+    const pa  = ca / n;
+    const pb  = cb / n;
+    if (pab > 0 && pa > 0 && pb > 0) I += pab * Math.log(pab / (pa * pb));
+  }
+  if (HA + HB === 0) return 1;     // both partitions = single cluster → identical
+  return (2 * I) / (HA + HB);
+}
+
+// -----------------------------------------------------------------------------
+// Scale-stability verdict cascade
+// -----------------------------------------------------------------------------
+// Triggers (handoff thresholds, all configurable via opts):
+//   STABLE_3BAND       all 3 panes K=3, no fuses, no splits, ARI≥0.85 pairwise
+//   STABLE_6BAND       all 3 panes K=6, no fuses, no splits, ARI≥0.85 pairwise
+//   NESTED_3IN6        K=6 fine, K=3 coarse, exactly 3 fuses, 0 splits, no
+//                      crossing fuses (each fine cluster maps to ONE coarse)
+//   OVERLAP_BREAKS_3   K=3 fine AND K=3 coarse, K=6 medium, fuses+splits at
+//                      the medium boundary (ribbons reshuffle middle, restore
+//                      at edges). Heuristic: pane1↔pane3 ARI≥0.7 (edges agree)
+//                      AND pane2 introduces fuses+splits relative to both
+//                      neighbors.
+//   UNSTABLE           otherwise (low ARI somewhere, or noisy / random)
+//
+// Inputs:
+//   panes:    [{ K, ok, ... }, { K, ok, ... }, { K, ok, ... }]
+//   pairwise: [{ contingency, fuseEvents, splitEvents, ari, nmi },
+//              { contingency, fuseEvents, splitEvents, ari, nmi }]
+//   opts:     { ari_stable: 0.85, ari_edge: 0.70 }
+function _scaleStabilityVerdict(panes, pairwise, opts) {
+  const t = Object.assign({ ari_stable: 0.85, ari_edge: 0.70 }, opts || {});
+  if (!Array.isArray(panes) || panes.length !== 3) return 'UNSTABLE';
+  if (!Array.isArray(pairwise) || pairwise.length !== 2) return 'UNSTABLE';
+  const allOk = panes.every(p => p && p.ok !== false);
+  if (!allOk) return 'UNSTABLE';
+  const Ks = panes.map(p => p.K | 0);
+  const ari12 = pairwise[0] && isFinite(pairwise[0].ari) ? pairwise[0].ari : NaN;
+  const ari23 = pairwise[1] && isFinite(pairwise[1].ari) ? pairwise[1].ari : NaN;
+  const nFuse12  = (pairwise[0] && pairwise[0].fuseEvents)  ? pairwise[0].fuseEvents.length  : 0;
+  const nFuse23  = (pairwise[1] && pairwise[1].fuseEvents)  ? pairwise[1].fuseEvents.length  : 0;
+  const nSplit12 = (pairwise[0] && pairwise[0].splitEvents) ? pairwise[0].splitEvents.length : 0;
+  const nSplit23 = (pairwise[1] && pairwise[1].splitEvents) ? pairwise[1].splitEvents.length : 0;
+
+  // ARI < 0.5 anywhere → UNSTABLE (the "crossing/braided" signature),
+  // BUT NOT when fuses or splits explain the disagreement. A clean K=6→K=3
+  // collapse (NESTED_3IN6) has ARI ~0.4 by construction — labels can't agree
+  // fully when one pane has 6 distinct labels and the other has 3. Fuses are
+  // positive evidence of nested structure that the ARI floor would misread.
+  // Only treat low ARI as UNSTABLE when there are NO fuse or split events
+  // explaining the disagreement.
+  const lowAri12  = isFinite(ari12) && ari12 < 0.5;
+  const lowAri23  = isFinite(ari23) && ari23 < 0.5;
+  const explained12 = (nFuse12 + nSplit12) > 0;
+  const explained23 = (nFuse23 + nSplit23) > 0;
+  if (lowAri12 && !explained12) return 'UNSTABLE';
+  if (lowAri23 && !explained23) return 'UNSTABLE';
+
+  const allK3 = Ks[0] === 3 && Ks[1] === 3 && Ks[2] === 3;
+  const allK6 = Ks[0] === 6 && Ks[1] === 6 && Ks[2] === 6;
+  const noFuse  = (nFuse12 === 0  && nFuse23 === 0);
+  const noSplit = (nSplit12 === 0 && nSplit23 === 0);
+  const ariStable = isFinite(ari12) && isFinite(ari23) &&
+                    ari12 >= t.ari_stable && ari23 >= t.ari_stable;
+
+  if (allK3 && noFuse && noSplit && ariStable) return 'STABLE_3BAND';
+  if (allK6 && noFuse && noSplit && ariStable) return 'STABLE_6BAND';
+
+  // NESTED_3IN6: K=6 at fine, K=3 at coarse. The middle pane can be either
+  // (the verdict is about the cross-pane fuse pattern, not the middle K).
+  // Concrete: check the FIRST pairwise transition that crosses 6→3, expect
+  // exactly 3 fuses and 0 splits.
+  const isNestedTransition = (KA, KB, fuses, splits) =>
+    KA === 6 && KB === 3 && fuses === 3 && splits === 0;
+  if (Ks[0] === 6 && Ks[2] === 3) {
+    // 6→3 collapse can happen in either pane gap (or both)
+    const t12 = isNestedTransition(Ks[0], Ks[1], nFuse12, nSplit12);
+    const t23 = isNestedTransition(Ks[1], Ks[2], nFuse23, nSplit23);
+    // If middle is K=6: collapse happens at 1↔2 boundary (no, that's 6→6)
+    //                   or at 2↔3 boundary (6→3, expect t23)
+    // If middle is K=3: collapse at 1↔2 boundary (6→3, expect t12); 2↔3 is 3→3
+    if ((Ks[1] === 6 && t23) || (Ks[1] === 3 && t12)) return 'NESTED_3IN6';
+  }
+
+  // OVERLAP_BREAKS_3: edges (panes 1, 3) BOTH at K=3 AND middle (pane 2) at K=6
+  // AND pane1↔pane3 agreement is high (edges agree) BUT both pairwise gaps
+  // show fuses+splits (middle introduces structure).
+  if (Ks[0] === 3 && Ks[2] === 3 && Ks[1] === 6) {
+    // For pane1↔pane3 ARI we'd need an extra pairwise — Part 2 will compute
+    // it. Here we approximate from the available pairwise pair.
+    const middleHasStructure = (nFuse12 > 0 || nSplit12 > 0) &&
+                               (nFuse23 > 0 || nSplit23 > 0);
+    if (middleHasStructure) return 'OVERLAP_BREAKS_3';
+  }
+
+  return 'UNSTABLE';
+}
+
+// Cache fingerprint — composes the parameters that fully determine the
+// scale-stability output. Any change forces re-clustering of the affected
+// pane(s). The fingerprint includes pane scale + K + custom_n, plus the
+// scrubber's focal window, plus any setting that affects K-means
+// (aggMethod, minNGroup).
+function _scaleStabilityFingerprint(s) {
+  if (!s) s = state;
+  const panes = Array.isArray(s.scaleStabilityPanes) ? s.scaleStabilityPanes : [];
+  const paneFp = panes.map(p =>
+    `${p.scale || ''}|K=${p.K | 0}|N=${p.custom_n || 0}`
+  ).join('::');
+  const candFp = (s.candidate && s.candidate.id) ? s.candidate.id : '';
+  return [
+    s.cur | 0,
+    paneFp,
+    s.aggMethod || '',
+    (s.minNGroup | 0),
+    candFp,
+    (s.data && s.data.chrom) || '',
+  ].join('//');
+}
+
+// -----------------------------------------------------------------------------
+// Scale-stability data collection (Part 2 wiring on top of Part 1 math)
+// -----------------------------------------------------------------------------
+// Builds the full per-pane + pairwise summary used by renderL3PanelScaleStability.
+// Cached by _scaleStabilityFingerprint so repeated renders are cheap.
+//
+// Returns: {
+//   panes:    [{ range:[s,e], K, labels:Int8Array, n_per_group, ok, why,
+//                meta:{kind, ...}, lowConf:bool }, ...],
+//   pairwise: [{ from, to, contingency, ari, nmi, fuseEvents, splitEvents }, ...],
+//   verdict:  enum,
+//   ok:       bool,
+//   why:      string,
+// }
+function _scaleStabilityCompute() {
+  _ensureScaleStabilityState();
+  const fp = _scaleStabilityFingerprint(state);
+  if (state.scaleStabilityCache && state.scaleStabilityCache.fingerprint === fp) {
+    return state.scaleStabilityCache;
+  }
+
+  const out = { fingerprint: fp, panes: [], pairwise: [], verdict: 'UNSTABLE', ok: false, why: '' };
+  if (!state.data || state.cur == null) {
+    out.why = 'no data or no focal';
+    state.scaleStabilityCache = out;
+    return out;
+  }
+  const focalW = state.cur;
+
+  // Build each pane: resolve range, run getSlabClusterAt with the pane's K
+  for (let i = 0; i < 3; i++) {
+    const cfg = state.scaleStabilityPanes[i];
+    const rangeMeta = _resolvePaneRange(focalW, cfg);
+    if (!rangeMeta) {
+      out.panes.push({ ok: false, why: 'unresolved scale: ' + cfg.scale,
+                       K: cfg.K, range: null, meta: null });
+      continue;
+    }
+    let cl = null;
+    try { cl = getSlabClusterAt(rangeMeta.s, rangeMeta.e, cfg.K); }
+    catch (e) { /* fall through */ }
+    if (!cl || !cl.labels) {
+      out.panes.push({ ok: false, why: 'cluster failed', K: cfg.K,
+                       range: [rangeMeta.s, rangeMeta.e], meta: rangeMeta });
+      continue;
+    }
+    // Low-confidence flag: when ANY cluster has < 5 samples (per spec note —
+    // single-window K-means is noisy)
+    const lowConf = Array.isArray(cl.n_per_group) &&
+                    cl.n_per_group.some(n => n < 5);
+    out.panes.push({
+      ok: cl.ok !== false,
+      why: cl.reason || '',
+      K: cfg.K,
+      range: [rangeMeta.s, rangeMeta.e],
+      labels: cl.labels,
+      n_per_group: cl.n_per_group,
+      meta: rangeMeta,
+      lowConf: lowConf,
+    });
+  }
+
+  // Pairwise: 0↔1 and 1↔2
+  for (const [a, b] of [[0, 1], [1, 2]]) {
+    const pa = out.panes[a], pb = out.panes[b];
+    if (!pa.ok || !pb.ok || !pa.labels || !pb.labels) {
+      out.pairwise.push({ from: a, to: b, ok: false, why: 'pane failed' });
+      continue;
+    }
+    if (pa.labels.length !== pb.labels.length) {
+      out.pairwise.push({ from: a, to: b, ok: false, why: 'label-length mismatch' });
+      continue;
+    }
+    const ct = _buildContingency(Array.from(pa.labels), Array.from(pb.labels), pa.K, pb.K);
+    if (!ct) {
+      out.pairwise.push({ from: a, to: b, ok: false, why: 'contingency failed' });
+      continue;
+    }
+    const fuses  = _detectFuseEvents(ct);
+    const splits = _detectSplitEvents(ct);
+    const ari = _computeARI(Array.from(pa.labels), Array.from(pb.labels));
+    const nmi = _computeNMI(Array.from(pa.labels), Array.from(pb.labels));
+    out.pairwise.push({
+      from: a, to: b, ok: true,
+      contingency: ct, fuseEvents: fuses, splitEvents: splits,
+      ari, nmi,
+    });
+  }
+
+  // Verdict
+  out.verdict = _scaleStabilityVerdict(out.panes, out.pairwise);
+  out.ok = out.panes.every(p => p.ok) && out.pairwise.every(p => p.ok);
+  state.scaleStabilityCache = out;
+  return out;
+}
+
+// Verdict explanation strings — same vocabulary as SCHEMA §27.
+function _scaleStabilityVerdictText(verdict) {
+  return ({
+    'STABLE_3BAND':
+      'STABLE 3-band — K=3 holds across all three scales with no fuses or splits. ' +
+      'Classic single-inversion signature.',
+    'STABLE_6BAND':
+      'STABLE 6-band — K=6 holds across all three scales. ' +
+      'Stable multiband architecture; needs band-tree to decide single vs compound.',
+    'NESTED_3IN6':
+      'NESTED 3-in-6 — K=6 fine collapses cleanly into K=3 coarse with 3 fuse events ' +
+      'and 0 splits. 3-band inversion with substructure visible only at fine scale.',
+    'OVERLAP_BREAKS_3':
+      'OVERLAP — edges hold K=3 but the medium scale shows reshuffled bands ' +
+      '(fuses + splits). Possible two overlapping inversions; flank regions show ' +
+      'one axis each.',
+    'UNSTABLE':
+      'UNSTABLE — clustering disagrees across scales (low ARI somewhere, or ' +
+      'crossing/braided ribbons). Treat as artifact-suspect; do not force a ' +
+      'biological call.',
+  })[verdict] || 'UNKNOWN';
+}
+
+function _scaleStabilityVerdictCss(verdict) {
+  return ({
+    'STABLE_3BAND': 'stable',
+    'STABLE_6BAND': 'stable',
+    'NESTED_3IN6': 'nested',
+    'OVERLAP_BREAKS_3': 'overlap',
+    'UNSTABLE': 'unstable',
+  })[verdict] || 'unstable';
+}
+
+// Pane-header label: Σ₁ fine · 5w · K=6 (with low-conf chip if applicable)
+function _scaleStabilityPaneLabel(paneIdx, paneCfg, paneResult) {
+  const sigma = ['Σ₁', 'Σ₂', 'Σ₃'][paneIdx] || 'Σ';
+  const tag   = ['fine', 'medium', 'coarse'][paneIdx] || '';
+  const scaleLabel = ({
+    '1w': '1w', '5w': '5w', '10w': '10w', '25w': '25w', 'Nw': 'Nw',
+    '100SNPs': '100 SNPs', '500SNPs': '500 SNPs', '1000SNPs': '1000 SNPs',
+    '100kb': '100 kb', '500kb': '500 kb',
+    'L2': 'L2', 'L1': 'L1', 'candidate': 'candidate',
+  })[paneCfg.scale] || paneCfg.scale;
+  let extra = '';
+  if (paneResult && paneResult.meta) {
+    const m = paneResult.meta;
+    if (m.kind === 'snps' && m.total_snps != null) extra = ' (' + m.total_snps + ' SNPs)';
+    else if (m.kind === 'kb' && m.total_bp != null) extra = ' (' + (m.total_bp / 1000).toFixed(1) + ' kb)';
+    else if (m.kind === 'windows' && m.n != null) extra = ' (' + m.n + 'w)';
+    else if (m.kind === 'L2') extra = ' (' + (m.l2idx + 1) + ')';
+    else if (m.kind === 'L1') extra = ' (' + (m.l1idx + 1) + ')';
+    if (m.asymmetric) extra += ' asym';
+    if (m.target_met === false) extra += ' partial';
+  }
+  return sigma + ' ' + tag + ' · ' + scaleLabel + extra + ' · K=' + paneCfg.K;
+}
+
+// HTML for a numeric contingency table per gap.
+// ct = { M: KA×KB, KA, KB, n }
+// Marks cells "heavy" when they hold ≥ 50% of their fine row.
+function _ssContingencyTableHtml(ct) {
+  if (!ct || !ct.M) return '<div class="ss-event-row" style="color:var(--ink-dimmer);">no contingency</div>';
+  const { M, KA, KB } = ct;
+  const rowSums = M.map(r => r.reduce((s, v) => s + v, 0));
+  let html = '<table class="ss-ct-table"><thead><tr><th></th>';
+  for (let b = 0; b < KB; b++) html += '<th>c' + b + '</th>';
+  html += '</tr></thead><tbody>';
+  for (let a = 0; a < KA; a++) {
+    html += '<tr><th>f' + a + '</th>';
+    for (let b = 0; b < KB; b++) {
+      const v = M[a][b];
+      const heavy = rowSums[a] > 0 && (v / rowSums[a]) >= 0.5;
+      const cls = (v === 0) ? 'zero' : (heavy ? 'heavy' : '');
+      html += '<td' + (cls ? ' class="' + cls + '"' : '') + '>' + (v || '') + '</td>';
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  return html;
+}
+
+// SVG Sankey ribbons for one gap (between two adjacent panes).
+// ct = { M: KA×KB, KA, KB, n }
+// Layout: two vertical bars (left = KA fine clusters, right = KB coarse
+// clusters), each segment height proportional to cluster size, colored
+// via groupColor. Ribbons are cubic Bézier paths from fine cluster i to
+// coarse cluster j with width proportional to M[i][j].
+//
+// Geometry choices (kept minimal so the SVG fits the ~140 px gap column):
+//   - viewBox 140 × 80 (units = px); CSS width:100% scales to gap width
+//   - Bar width: 5 px each side
+//   - Bar X: left=8, right=132   (so ribbons span ~119 px of horizontal)
+//   - Bars top y=6, bottom y=74   (68 px of vertical bar height)
+//   - Cubic curve control points: midX = (leftX + rightX) / 2 for both ends
+//     (creates a clean S-curve regardless of vertical offset)
+//
+// Returns the inner SVG string (no outer container — caller wraps it).
+function _ssSankeyHtml(ct) {
+  if (!ct || !ct.M) return '';
+  const { M, KA, KB } = ct;
+  // Margin / sizing constants — kept here so the SVG is self-contained
+  const W  = 140, H = 80;
+  const barW   = 5;
+  const xL     = 8;
+  const xR     = W - barW - xL;        // = 127
+  const yTop   = 6;
+  const yBot   = H - 6;
+  const barH   = yBot - yTop;          // = 68
+  const midX   = (xL + barW + xR) / 2;
+
+  // Total mass + per-side totals
+  const rowSum = new Array(KA).fill(0);
+  const colSum = new Array(KB).fill(0);
+  let total = 0;
+  for (let a = 0; a < KA; a++) {
+    for (let b = 0; b < KB; b++) {
+      rowSum[a] += M[a][b];
+      colSum[b] += M[a][b];
+      total     += M[a][b];
+    }
+  }
+  if (total === 0) return '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" preserveAspectRatio="none"></svg>';
+
+  // 1 px gap between adjacent bar segments so they read distinctly
+  const gapPx  = 1;
+  const lTotalGap = (KA - 1) * gapPx;
+  const rTotalGap = (KB - 1) * gapPx;
+  const lUsable = barH - lTotalGap;
+  const rUsable = barH - rTotalGap;
+  // Pre-compute the absolute y-band for each fine and coarse cluster
+  const lBand = [];   // [{ y0, y1, h }] for fine i = 0..KA-1
+  {
+    let y = yTop;
+    for (let a = 0; a < KA; a++) {
+      const h = (lUsable * rowSum[a]) / total;
+      lBand.push({ y0: y, y1: y + h, h });
+      y += h + (a < KA - 1 ? gapPx : 0);
+    }
+  }
+  const rBand = [];
+  {
+    let y = yTop;
+    for (let b = 0; b < KB; b++) {
+      const h = (rUsable * colSum[b]) / total;
+      rBand.push({ y0: y, y1: y + h, h });
+      y += h + (b < KB - 1 ? gapPx : 0);
+    }
+  }
+
+  // Bars
+  let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" preserveAspectRatio="none" ' +
+            'style="display:block;">';
+  for (let a = 0; a < KA; a++) {
+    if (rowSum[a] === 0) continue;
+    svg += '<rect x="' + xL + '" y="' + lBand[a].y0.toFixed(2) +
+           '" width="' + barW + '" height="' + lBand[a].h.toFixed(2) +
+           '" fill="' + groupColor(a) + '" opacity="0.85">' +
+           '<title>f' + a + ': ' + rowSum[a] + ' samples</title></rect>';
+  }
+  for (let b = 0; b < KB; b++) {
+    if (colSum[b] === 0) continue;
+    svg += '<rect x="' + xR + '" y="' + rBand[b].y0.toFixed(2) +
+           '" width="' + barW + '" height="' + rBand[b].h.toFixed(2) +
+           '" fill="' + groupColor(b) + '" opacity="0.85">' +
+           '<title>c' + b + ': ' + colSum[b] + ' samples</title></rect>';
+  }
+
+  // Ribbons. We walk the contingency in a deterministic order so left and
+  // right pile up the same way: outer loop over fine i (top → bottom), inner
+  // loop over coarse j (top → bottom). For each cell we draw a closed path
+  // from (xL_right_edge, leftY1..leftY2) to (xR_left_edge, rightY1..rightY2).
+  // leftCursor[a] tracks how much of fine cluster a has already been emitted;
+  // rightCursor[b] tracks how much of coarse cluster b has been received.
+  const leftCursor  = new Array(KA).fill(0);
+  const rightCursor = new Array(KB).fill(0);
+  // Ribbons get colored by their fine (left-side) cluster — the "where this
+  // sample came from at the finer scale" reading. This makes nested 6→3
+  // collapses easy to read: ribbons of color c0+c1+c2 all flow into the
+  // same coarse bar, so you see the "fan-in" by hue.
+  const ribbonStartXL = xL + barW;
+  const ribbonStartXR = xR;
+  const cells = [];
+  for (let a = 0; a < KA; a++) {
+    for (let b = 0; b < KB; b++) {
+      const v = M[a][b];
+      if (v === 0) continue;
+      cells.push({ a, b, v });
+    }
+  }
+  for (const cell of cells) {
+    const { a, b, v } = cell;
+    const lFrac = rowSum[a] > 0 ? (v / rowSum[a]) : 0;
+    const rFrac = colSum[b] > 0 ? (v / colSum[b]) : 0;
+    const lH = lBand[a].h * lFrac;
+    const rH = rBand[b].h * rFrac;
+    const lY1 = lBand[a].y0 + lBand[a].h * leftCursor[a];
+    const lY2 = lY1 + lH;
+    const rY1 = rBand[b].y0 + rBand[b].h * rightCursor[b];
+    const rY2 = rY1 + rH;
+    leftCursor[a]  += lFrac;
+    rightCursor[b] += rFrac;
+
+    // Path: closed band from left edge to right edge
+    //   M xL,lY1 C midX,lY1 midX,rY1 xR,rY1
+    //   L xR,rY2 C midX,rY2 midX,lY2 xL,lY2 Z
+    const path = [
+      'M', ribbonStartXL.toFixed(2), lY1.toFixed(2),
+      'C', midX.toFixed(2), lY1.toFixed(2),
+           midX.toFixed(2), rY1.toFixed(2),
+           ribbonStartXR.toFixed(2), rY1.toFixed(2),
+      'L', ribbonStartXR.toFixed(2), rY2.toFixed(2),
+      'C', midX.toFixed(2), rY2.toFixed(2),
+           midX.toFixed(2), lY2.toFixed(2),
+           ribbonStartXL.toFixed(2), lY2.toFixed(2),
+      'Z'
+    ].join(' ');
+    const tooltip = 'f' + a + ' → c' + b + ': ' + v + ' samples ' +
+                    '(' + (lFrac * 100).toFixed(0) + '% of f' + a + ', ' +
+                    (rFrac * 100).toFixed(0) + '% of c' + b + ')';
+    svg += '<path d="' + path + '" fill="' + groupColor(a) +
+           '" opacity="0.32" stroke="none">' +
+           '<title>' + tooltip + '</title></path>';
+  }
+  svg += '</svg>';
+  return svg;
+}
+
+// HTML for the fuse/split event row below the contingency table.
+function _ssEventRowHtml(pairwise) {
+  if (!pairwise || !pairwise.ok) return '<div class="ss-event-row" style="color:var(--ink-dimmer);">—</div>';
+  const f = pairwise.fuseEvents.length, s = pairwise.splitEvents.length;
+  return '<div class="ss-event-row">' +
+         '<span class="ss-fuse">fuse: ' + f + '</span> · ' +
+         '<span class="ss-split">split: ' + s + '</span></div>' +
+         '<div class="ss-metrics">ARI ' + (isFinite(pairwise.ari) ? pairwise.ari.toFixed(2) : '—') +
+         ' · NMI ' + (isFinite(pairwise.nmi) ? pairwise.nmi.toFixed(2) : '—') + '</div>';
+}
+
+// Main renderer — replaces renderL3PanelSlab when l3Mode === 'scale_stability'.
+function renderL3PanelScaleStability() {
+  const d = state.data;
+  const body = document.getElementById('l3Body');
+  const metaEl = document.getElementById('l3Meta');
+  if (!body) return;
+
+  if (!d) {
+    body.innerHTML = '<div class="l3-col"><div class="dim" style="padding:12px;">no data</div></div>';
+    return;
+  }
+
+  const result = _scaleStabilityCompute();
+  if (metaEl) {
+    metaEl.innerHTML = 'scale-stability mode · focal window ' + (state.cur + 1) +
+      ' · verdict <b>' + result.verdict + '</b>';
+  }
+
+  // Layout: 3 panes + 2 inter-pane "gap" columns (numeric contingency tables)
+  // Total 5 columns: pane | gap | pane | gap | pane
+  body.style.gridTemplateColumns =
+    'minmax(180px,1fr) minmax(120px,160px) minmax(180px,1fr) minmax(120px,160px) minmax(180px,1fr)';
+  body.innerHTML = '';
+
+  // Append a column helper
+  function appendCol(html, classes) {
+    const col = document.createElement('div');
+    col.className = (classes || 'l3-col');
+    col.innerHTML = html;
+    body.appendChild(col);
+    return col;
+  }
+
+  for (let i = 0; i < 3; i++) {
+    const cfg  = state.scaleStabilityPanes[i];
+    const pane = result.panes[i] || { ok: false, why: 'missing' };
+    const label = _scaleStabilityPaneLabel(i, cfg, pane);
+    let paneHtml = '<div class="ss-pane-header">' +
+                   '<span class="ss-pane-icon">' + ['Σ₁','Σ₂','Σ₃'][i] + '</span>' +
+                   '<span>' + label.replace(/^Σ[₁₂₃]\s/, '') + '</span>';
+    if (pane.lowConf) paneHtml += '<span class="ss-low-conf">low conf</span>';
+    paneHtml += '</div>';
+    if (!pane.ok) {
+      paneHtml += '<div class="dim" style="padding:12px;font-family:var(--mono);font-size:11px;">— ' +
+                  (pane.why || 'unavailable') + ' —</div>';
+    } else {
+      const range = pane.range ? ('w' + (pane.range[0] + 1) + '–w' + (pane.range[1] + 1)) : '';
+      const counts = pane.n_per_group ? pane.n_per_group.join(' · ') : '';
+      paneHtml += '<div style="padding:10px 12px;font-family:var(--mono);font-size:11px;line-height:1.6;">' +
+                  '<div class="dim">range: ' + range + '</div>' +
+                  '<div class="dim">cluster sizes: ' + counts + '</div>' +
+                  '</div>';
+    }
+    appendCol(paneHtml);
+
+    // Gap (between this pane and the next, but not after the last)
+    if (i < 2) {
+      const pw = result.pairwise[i];
+      let gapHtml = '<div class="ss-gap-label">' + ['Σ₁→Σ₂','Σ₂→Σ₃'][i] + '</div>';
+      // v4 turn 12b: SVG Sankey ribbons sit ABOVE the numeric contingency
+      // table. Visual headline (fan-in / parallel ribbons / reshuffle) reads
+      // first, the numeric backup follows.
+      if (pw && pw.ok) {
+        gapHtml += '<div class="ss-sankey">' + _ssSankeyHtml(pw.contingency) + '</div>';
+      }
+      gapHtml += pw && pw.ok ? _ssContingencyTableHtml(pw.contingency) :
+                               '<div class="ss-event-row" style="color:var(--ink-dimmer);">—</div>';
+      gapHtml += _ssEventRowHtml(pw);
+      appendCol(gapHtml, 'ss-gap');
+    }
+  }
+
+  // Verdict row spans all columns
+  const verdictRow = document.createElement('div');
+  verdictRow.className = 'ss-verdict-row';
+  const cssCls = _scaleStabilityVerdictCss(result.verdict);
+  verdictRow.innerHTML =
+    '<span class="ss-verdict-pill ' + cssCls + '">' + result.verdict + '</span>' +
+    '<span class="ss-verdict-text">' + _scaleStabilityVerdictText(result.verdict) + '</span>';
+  body.appendChild(verdictRow);
+}
+
+// =============================================================================
+// v4 turn 15a — Deliverable C (PART 1, data layer): regime registry
+// -----------------------------------------------------------------------------
+// User-curated annotations: "this group of L2 envelopes belongs to inversion-
+// system X". Each regime carries:
+//   id              user-assignable, default 'R<n>' from auto-id counter
+//   label           free-text human description
+//   axis_topology   SCHEMA §26 vocab; user-chosen, never auto-assigned
+//   l2_ids          array of L2 envelope IDs claimed by this regime
+//   candidate_ids   optional links to candidates (Deliverable B / catalogue)
+//   notes           free-text scratchpad
+//   created_at,
+//   updated_at      ISO timestamps
+//
+// State shape:
+//   state.regimeRegistry = {
+//     regimes:  [...],
+//     next_id:  number,        // for auto-id generation
+//     version:  1,             // schema version, bumped on incompatible changes
+//   }
+//
+// Persistence: localStorage key 'pca_scrubber_v3.regimeRegistry'. Saved on
+// every CRUD call. Restored on page load via _restoreRegimeRegistry().
+// =============================================================================
+
+// SCHEMA §26 axis_topology vocabulary. User-chosen; never auto-assigned by
+// the scale-stability verdict (which only suggests). Listed in display order
+// for the dropdown.
+const REGIME_AXIS_TOPOLOGY = [
+  { value: 'unspecified',
+    label: 'Unspecified',
+    tooltip: 'Default. The user has not yet assigned a topology to this regime.' },
+  { value: 'one_axis_3band',
+    label: 'One axis · 3 bands',
+    tooltip: 'Single inversion axis with the canonical 3-band signature (homo1 / het / homo2). Most common for confirmed inversions.' },
+  { value: 'one_axis_nested',
+    label: 'One axis · nested',
+    tooltip: 'Single inversion axis with internal substructure visible at fine scale (K=6 collapses cleanly to K=3 at coarse scale, NESTED_3IN6 from scale-stability test).' },
+  { value: 'two_axes_independent',
+    label: 'Two axes · independent',
+    tooltip: 'Two overlapping inversions on independent axes. Edges show one axis each, the overlap region shows reshuffled clusters (OVERLAP_BREAKS_3 from scale-stability).' },
+  { value: 'two_axes_correlated',
+    label: 'Two axes · correlated',
+    tooltip: 'Two inversions on the same chromosome that co-segregate (e.g. via a tagging haplotype). Distinguish from one_axis_nested by absence of clean K=6→K=3 collapse.' },
+  { value: 'multiband_stable',
+    label: 'Multi-band · stable',
+    tooltip: 'K=6 holds across all scales (STABLE_6BAND from scale-stability). May be one inversion with many haplotype groups, or compound architecture; needs band-tree to discriminate.' },
+  { value: 'artifact_suspect',
+    label: 'Artifact-suspect',
+    tooltip: 'Low ARI across scales, crossing/braided ribbons (UNSTABLE from scale-stability). Likely artifact — recombination breakdown, family structure, or technical noise.' },
+];
+
+const REGIME_AXIS_VALUES = REGIME_AXIS_TOPOLOGY.map(a => a.value);
+
+function _ensureRegimeRegistry() {
+  if (!state.regimeRegistry || typeof state.regimeRegistry !== 'object') {
+    state.regimeRegistry = { regimes: [], next_id: 1, version: 1 };
+  }
+  if (!Array.isArray(state.regimeRegistry.regimes)) {
+    state.regimeRegistry.regimes = [];
+  }
+  if (!(state.regimeRegistry.next_id > 0)) {
+    state.regimeRegistry.next_id = 1;
+  }
+  if (state.regimeRegistry.version == null) {
+    state.regimeRegistry.version = 1;
+  }
+  return state.regimeRegistry;
+}
+
+// Persist on every CRUD call. Fail-soft: localStorage may be disabled or full.
+function _persistRegimeRegistry() {
+  _ensureRegimeRegistry();
+  try {
+    localStorage.setItem('pca_scrubber_v3.regimeRegistry',
+      JSON.stringify(state.regimeRegistry));
+  } catch (_) { /* fail-soft */ }
+}
+
+// Restore on page load. Validates shape; if corrupt, leaves the default empty
+// registry in place (safer than restoring partial garbage).
+function _restoreRegimeRegistry() {
+  _ensureRegimeRegistry();
+  try {
+    const raw = localStorage.getItem('pca_scrubber_v3.regimeRegistry');
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return;
+    if (!Array.isArray(parsed.regimes)) return;
+    // Defensive validation per regime — drop any malformed entries silently
+    const valid = [];
+    for (const r of parsed.regimes) {
+      if (!r || typeof r !== 'object') continue;
+      if (!r.id || typeof r.id !== 'string') continue;
+      // Ensure required fields with safe defaults
+      if (!Array.isArray(r.l2_ids)) r.l2_ids = [];
+      if (!Array.isArray(r.candidate_ids)) r.candidate_ids = [];
+      if (!REGIME_AXIS_VALUES.includes(r.axis_topology)) r.axis_topology = 'unspecified';
+      if (typeof r.label !== 'string') r.label = '';
+      if (typeof r.notes !== 'string') r.notes = '';
+      valid.push(r);
+    }
+    state.regimeRegistry.regimes  = valid;
+    state.regimeRegistry.next_id  = (parsed.next_id  > 0) ? parsed.next_id  : 1;
+    state.regimeRegistry.version  = (parsed.version  > 0) ? parsed.version  : 1;
+  } catch (_) { /* fail-soft, keep defaults */ }
+}
+
+// Auto-id generator. Skips ids already in use (defensive: user might have
+// imported a registry with sparse ids). Guaranteed unique.
+function _nextRegimeId() {
+  const reg = _ensureRegimeRegistry();
+  const used = new Set(reg.regimes.map(r => r.id));
+  let n = reg.next_id | 0;
+  while (used.has('R' + n)) n++;
+  reg.next_id = n + 1;
+  return 'R' + n;
+}
+
+// CRUD: create. Args object can supply explicit id, label, axis_topology,
+// l2_ids, candidate_ids, notes — all optional. Returns the new regime object.
+// Throws on duplicate id.
+function _createRegime(args) {
+  const reg = _ensureRegimeRegistry();
+  args = args || {};
+  let id = args.id;
+  if (!id) id = _nextRegimeId();
+  if (typeof id !== 'string' || !id) throw new Error('regime id must be a non-empty string');
+  if (reg.regimes.some(r => r.id === id)) throw new Error('duplicate regime id: ' + id);
+  const now = new Date().toISOString();
+  const regime = {
+    id,
+    label: typeof args.label === 'string' ? args.label : '',
+    axis_topology: REGIME_AXIS_VALUES.includes(args.axis_topology) ? args.axis_topology : 'unspecified',
+    l2_ids: Array.isArray(args.l2_ids) ? args.l2_ids.slice() : [],
+    candidate_ids: Array.isArray(args.candidate_ids) ? args.candidate_ids.slice() : [],
+    notes: typeof args.notes === 'string' ? args.notes : '',
+    created_at: now,
+    updated_at: now,
+  };
+  reg.regimes.push(regime);
+  _persistRegimeRegistry();
+  return regime;
+}
+
+// CRUD: update. Patches the regime in place. Returns the updated regime, or
+// null if the id doesn't exist. Bumps updated_at.
+function _updateRegime(id, patch) {
+  const reg = _ensureRegimeRegistry();
+  const idx = reg.regimes.findIndex(r => r.id === id);
+  if (idx < 0) return null;
+  const r = reg.regimes[idx];
+  patch = patch || {};
+  if (typeof patch.label === 'string') r.label = patch.label;
+  if (typeof patch.notes === 'string') r.notes = patch.notes;
+  if (REGIME_AXIS_VALUES.includes(patch.axis_topology)) r.axis_topology = patch.axis_topology;
+  if (Array.isArray(patch.l2_ids)) r.l2_ids = patch.l2_ids.slice();
+  if (Array.isArray(patch.candidate_ids)) r.candidate_ids = patch.candidate_ids.slice();
+  r.updated_at = new Date().toISOString();
+  _persistRegimeRegistry();
+  return r;
+}
+
+// CRUD: delete. Returns true if removed, false if id not found.
+function _deleteRegime(id) {
+  const reg = _ensureRegimeRegistry();
+  const idx = reg.regimes.findIndex(r => r.id === id);
+  if (idx < 0) return false;
+  reg.regimes.splice(idx, 1);
+  _persistRegimeRegistry();
+  return true;
+}
+
+// Membership: add an L2 ID to a regime. Idempotent — if already present,
+// no-op (no duplicate added). Returns true on success, false if regime not
+// found. Bumps updated_at on real changes.
+function _addL2ToRegime(regimeId, l2Id) {
+  const reg = _ensureRegimeRegistry();
+  const r = reg.regimes.find(x => x.id === regimeId);
+  if (!r) return false;
+  if (typeof l2Id !== 'string' || !l2Id) return false;
+  if (r.l2_ids.indexOf(l2Id) < 0) {
+    r.l2_ids.push(l2Id);
+    r.updated_at = new Date().toISOString();
+    _persistRegimeRegistry();
+  }
+  return true;
+}
+
+// Membership: remove an L2 ID from a regime. Returns true if removed, false
+// if regime not found OR L2 not in regime. Bumps updated_at on real changes.
+function _removeL2FromRegime(regimeId, l2Id) {
+  const reg = _ensureRegimeRegistry();
+  const r = reg.regimes.find(x => x.id === regimeId);
+  if (!r) return false;
+  const idx = r.l2_ids.indexOf(l2Id);
+  if (idx < 0) return false;
+  r.l2_ids.splice(idx, 1);
+  r.updated_at = new Date().toISOString();
+  _persistRegimeRegistry();
+  return true;
+}
+
+// Reverse lookup: which regimes claim this L2 ID? Returns array of regime
+// objects (could be empty). Used by the catalogue 'regimes' column.
+function _regimesForL2(l2Id) {
+  const reg = _ensureRegimeRegistry();
+  if (typeof l2Id !== 'string' || !l2Id) return [];
+  return reg.regimes.filter(r => Array.isArray(r.l2_ids) && r.l2_ids.includes(l2Id));
+}
+
+// Catalogue cell formatter: "R1,R3" or '' when no regimes claim this L2.
+// Sorted by regime id for stable display.
+function _regimesCellForL2(l2Id) {
+  const claims = _regimesForL2(l2Id);
+  if (claims.length === 0) return '';
+  return claims.map(r => r.id).sort().join(',');
+}
+
+// v4 turn 16 — Catalogue bulk-assign helper.
+// Walks catState.selected (a Set of l2_idx integers) and resolves them to the
+// L2 IDs (candidate_id strings, matching what the registry stores).
+//
+// Behavior across catalogue view modes:
+//   - L2 / fav modes: each selected row contributes ITS l2_idx → 1 L2 ID
+//   - L1-merged mode: each selected row's row.l2_indices is the constituent
+//     list, so 1 selected row contributes N L2 IDs (the merge children)
+//
+// Defensive against:
+//   - Missing state.data or l2_envelopes
+//   - Selected indices that don't map to a row (filtered selection edge case)
+//   - Missing catState global (returns empty)
+//   - Duplicates across multi-row L1-merged selections (deduplicated via Set)
+//
+// Returns an array of unique L2 IDs in stable l2_idx order. Used by the
+// catalogue 'assign sel' button to seed the regime-dialog assign mode.
+function _resolveSelectedL2Ids() {
+  if (typeof catState === 'undefined' || !catState || !(catState.selected instanceof Set)) return [];
+  if (!state.data || !Array.isArray(state.data.l2_envelopes)) return [];
+  const out = new Set();
+  // Sort indices for deterministic output — order = l2_idx ascending
+  const sorted = Array.from(catState.selected).sort((a, b) => a - b);
+  // Pre-build a row lookup if we're in L1-merged mode (rows aggregate)
+  const rowByIdx = new Map();
+  if (catState.viewMode === 'L1' && Array.isArray(catState.rows)) {
+    for (const r of catState.rows) {
+      if (typeof r.l2_idx === 'number') rowByIdx.set(r.l2_idx, r);
+    }
+  }
+  for (const idx of sorted) {
+    if (catState.viewMode === 'L1') {
+      // Merged row: get all constituent L2 indices, look up their candidate_ids
+      const row = rowByIdx.get(idx);
+      if (!row || !Array.isArray(row.l2_indices)) {
+        // Fallback: treat as a single L2 (degraded but safe)
+        const env = state.data.l2_envelopes[idx];
+        if (env && env.candidate_id) out.add(env.candidate_id);
+        continue;
+      }
+      for (const li of row.l2_indices) {
+        const env = state.data.l2_envelopes[li];
+        if (env && env.candidate_id) out.add(env.candidate_id);
+      }
+    } else {
+      // L2 / fav modes: idx maps to a single envelope
+      const env = state.data.l2_envelopes[idx];
+      if (env && env.candidate_id) out.add(env.candidate_id);
+    }
+  }
+  return Array.from(out);
+}
+
+// =============================================================================
+// v4 turn 15b — Deliverable C (PART 2, UI layer): regime registry dialog
+// -----------------------------------------------------------------------------
+// Build-on-demand modeless dialog (single instance, attached to document.body
+// the first time it opens). The dialog provides:
+//   - Regime list (id · label · axis · L2 count · edit · delete)
+//   - Create form (id auto-generated, label, axis dropdown, notes)
+//   - Edit form (same shape, with Save / Cancel)
+//   - "Assign L2(s) to regime" mode (when opened with opts.stagedL2Ids)
+//
+// Open via _openRegimeDialog({mode, stagedL2Ids, stagedCandId}).
+// Close via _closeRegimeDialog() or click outside the panel / Escape.
+//
+// Container DOM: created once, cached on state._regimeDialogEl. State updates
+// are pushed via _renderRegimeDialog() which re-paints the panel content. CRUD
+// goes through the Part 1 helpers (_createRegime, etc.), which auto-persist.
+// =============================================================================
+
+// Build the dialog DOM tree on first call. Subsequent calls return cached el.
+function _ensureRegimeDialogEl() {
+  if (state._regimeDialogEl && document.body.contains(state._regimeDialogEl)) {
+    return state._regimeDialogEl;
+  }
+  const overlay = document.createElement('div');
+  overlay.id = 'regimeDialogOverlay';
+  overlay.className = 'regime-overlay';
+  overlay.style.display = 'none';
+  // Click on overlay (outside the panel) closes the dialog
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) _closeRegimeDialog();
+  });
+  // Escape closes too — bound on document, but only fires when overlay visible
+  if (!state._regimeDialogEscBound) {
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && overlay.style.display !== 'none') {
+        _closeRegimeDialog();
+      }
+    });
+    state._regimeDialogEscBound = true;
+  }
+  const panel = document.createElement('div');
+  panel.className = 'regime-panel';
+  panel.id = 'regimeDialogPanel';
+  overlay.appendChild(panel);
+  document.body.appendChild(overlay);
+  state._regimeDialogEl = overlay;
+  return overlay;
+}
+
+// Open the dialog. opts:
+//   mode: 'list' | 'create' | 'edit' | 'assign'  (default 'list')
+//   editId: regime id to load into edit form (when mode='edit')
+//   stagedL2Ids: array of L2 IDs to assign (when mode='assign')
+//   stagedCandId: candidate id (for context display, when mode='assign')
+function _openRegimeDialog(opts) {
+  _ensureRegimeRegistry();
+  const overlay = _ensureRegimeDialogEl();
+  state._regimeDialogState = Object.assign(
+    { mode: 'list', editId: null, stagedL2Ids: [], stagedCandId: null },
+    opts || {}
+  );
+  overlay.style.display = '';
+  _renderRegimeDialog();
+}
+
+function _closeRegimeDialog() {
+  const overlay = state._regimeDialogEl;
+  if (overlay) overlay.style.display = 'none';
+  state._regimeDialogState = null;
+}
+
+// Re-paint the panel content from current state.
+function _renderRegimeDialog() {
+  const overlay = state._regimeDialogEl;
+  if (!overlay) return;
+  const panel = overlay.querySelector('.regime-panel');
+  if (!panel) return;
+  const ds = state._regimeDialogState || { mode: 'list' };
+  const reg = _ensureRegimeRegistry();
+
+  // Header bar (always present)
+  let html = '<div class="regime-header">';
+  html += '<span class="regime-title">Regime registry</span>';
+  if (ds.mode !== 'list') {
+    html += '<button class="regime-back" data-rg-action="back">← back to list</button>';
+  } else {
+    html += '<button class="regime-new" data-rg-action="new">+ new regime</button>';
+  }
+  html += '<button class="regime-close" data-rg-action="close" title="Close (Esc)">×</button>';
+  html += '</div>';
+
+  if (ds.mode === 'list') {
+    html += _regimeListHtml(reg);
+  } else if (ds.mode === 'create') {
+    html += _regimeFormHtml(null, ds.stagedL2Ids, ds.stagedCandId);
+  } else if (ds.mode === 'edit') {
+    const r = reg.regimes.find(x => x.id === ds.editId);
+    html += _regimeFormHtml(r);
+  } else if (ds.mode === 'assign') {
+    html += _regimeAssignHtml(reg, ds.stagedL2Ids, ds.stagedCandId);
+  }
+
+  panel.innerHTML = html;
+  _wireRegimeDialogButtons(panel);
+}
+
+function _regimeListHtml(reg) {
+  if (reg.regimes.length === 0) {
+    return '<div class="regime-empty">No regimes yet. Click <b>+ new regime</b> to create one.</div>';
+  }
+  let html = '<table class="regime-table"><thead><tr>' +
+             '<th>ID</th><th>Label</th><th>Axis topology</th>' +
+             '<th>L2 count</th><th>Cand count</th><th>Updated</th><th></th>' +
+             '</tr></thead><tbody>';
+  for (const r of reg.regimes) {
+    const axisLabel = (REGIME_AXIS_TOPOLOGY.find(a => a.value === r.axis_topology) || {}).label || r.axis_topology;
+    const updatedShort = r.updated_at ? r.updated_at.slice(0, 10) : '—';
+    html += '<tr data-rg-id="' + _esc(r.id) + '">' +
+            '<td><code>' + _esc(r.id) + '</code></td>' +
+            '<td>' + _esc(r.label || '—') + '</td>' +
+            '<td>' + _esc(axisLabel) + '</td>' +
+            '<td>' + (r.l2_ids ? r.l2_ids.length : 0) + '</td>' +
+            '<td>' + (r.candidate_ids ? r.candidate_ids.length : 0) + '</td>' +
+            '<td class="regime-dim">' + _esc(updatedShort) + '</td>' +
+            '<td>' +
+              '<button class="regime-edit" data-rg-action="edit" data-rg-id="' + _esc(r.id) + '">edit</button>' +
+              '<button class="regime-del" data-rg-action="del" data-rg-id="' + _esc(r.id) + '">del</button>' +
+            '</td></tr>';
+  }
+  html += '</tbody></table>';
+  return html;
+}
+
+function _regimeFormHtml(r, stagedL2Ids, stagedCandId) {
+  const isEdit = !!r;
+  const id    = r ? r.id : '';
+  const label = r ? r.label : '';
+  const axis  = r ? r.axis_topology : 'unspecified';
+  const notes = r ? r.notes : '';
+  const l2_ids = r ? r.l2_ids.slice() : (stagedL2Ids || []).slice();
+  const cand_ids = r ? r.candidate_ids.slice() : (stagedCandId ? [stagedCandId] : []);
+
+  let html = '<div class="regime-form">';
+  html += '<div class="regime-form-row">' +
+            '<label>ID</label>' +
+            '<input type="text" class="regime-input" data-rg-field="id"' +
+              ' value="' + _esc(id) + '"' + (isEdit ? ' disabled' : '') +
+              ' placeholder="auto (R&lt;n&gt;)" />' +
+          '</div>';
+  html += '<div class="regime-form-row">' +
+            '<label>Label</label>' +
+            '<input type="text" class="regime-input" data-rg-field="label"' +
+              ' value="' + _esc(label) + '" placeholder="LG28 inversion 1" />' +
+          '</div>';
+  html += '<div class="regime-form-row">' +
+            '<label>Axis topology</label>' +
+            '<select class="regime-input" data-rg-field="axis_topology">';
+  for (const a of REGIME_AXIS_TOPOLOGY) {
+    html += '<option value="' + _esc(a.value) + '"' +
+            (a.value === axis ? ' selected' : '') +
+            ' title="' + _esc(a.tooltip) + '">' + _esc(a.label) + '</option>';
+  }
+  html += '</select></div>';
+  html += '<div class="regime-form-row">' +
+            '<label>Notes</label>' +
+            '<textarea class="regime-input regime-notes" data-rg-field="notes"' +
+              ' placeholder="Free text notes...">' + _esc(notes) + '</textarea>' +
+          '</div>';
+  // Member L2 list (read-only display + remove buttons)
+  html += '<div class="regime-form-row">' +
+            '<label>L2 members (' + l2_ids.length + ')</label>' +
+            '<div class="regime-members">';
+  if (l2_ids.length === 0) {
+    html += '<span class="regime-dim">none</span>';
+  } else {
+    for (const lid of l2_ids) {
+      html += '<span class="regime-chip"><code>' + _esc(lid) + '</code>' +
+              (isEdit ? '<button class="regime-chip-x" data-rg-action="rmL2" data-rg-l2id="' + _esc(lid) + '">×</button>' : '') +
+              '</span>';
+    }
+  }
+  html += '</div></div>';
+  // Action row
+  html += '<div class="regime-form-actions">';
+  html += '<button class="regime-cancel" data-rg-action="back">cancel</button>';
+  html += '<button class="regime-save" data-rg-action="save">' +
+          (isEdit ? 'save changes' : 'create regime') + '</button>';
+  html += '</div>';
+  // Hidden field with staged ids for create mode (to round-trip into _createRegime)
+  if (!isEdit && (l2_ids.length > 0 || cand_ids.length > 0)) {
+    html += '<input type="hidden" data-rg-field="staged_l2_ids" value="' + _esc(l2_ids.join(',')) + '" />';
+    html += '<input type="hidden" data-rg-field="staged_candidate_ids" value="' + _esc(cand_ids.join(',')) + '" />';
+  }
+  html += '</div>';
+  return html;
+}
+
+function _regimeAssignHtml(reg, stagedL2Ids, stagedCandId) {
+  let html = '<div class="regime-assign">';
+  const ctx = stagedCandId
+    ? '<span class="regime-dim">candidate <code>' + _esc(stagedCandId) + '</code> · </span>'
+    : '';
+  html += '<div class="regime-assign-ctx">' + ctx +
+          (stagedL2Ids.length === 1
+            ? 'L2: <code>' + _esc(stagedL2Ids[0]) + '</code>'
+            : (stagedL2Ids.length + ' L2 envelopes')) + '</div>';
+  if (reg.regimes.length === 0) {
+    html += '<div class="regime-empty">No regimes yet. Create one first.</div>';
+    html += '<div class="regime-form-actions">' +
+              '<button class="regime-cancel" data-rg-action="close">cancel</button>' +
+              '<button class="regime-save" data-rg-action="new-from-assign">+ create new regime with these L2s</button>' +
+            '</div>';
+  } else {
+    html += '<div class="regime-form-row">' +
+              '<label>Add to existing regime</label>' +
+              '<select class="regime-input" data-rg-field="assign_target">';
+    for (const r of reg.regimes) {
+      const axisLabel = (REGIME_AXIS_TOPOLOGY.find(a => a.value === r.axis_topology) || {}).label || '';
+      html += '<option value="' + _esc(r.id) + '">' +
+              _esc(r.id) + ' · ' + _esc(r.label || '(unlabeled)') +
+              ' · ' + _esc(axisLabel) + ' · ' + (r.l2_ids ? r.l2_ids.length : 0) + ' L2s' +
+              '</option>';
+    }
+    html += '</select></div>';
+    html += '<div class="regime-form-actions">' +
+              '<button class="regime-cancel" data-rg-action="close">cancel</button>' +
+              '<button class="regime-save" data-rg-action="new-from-assign">+ new regime instead</button>' +
+              '<button class="regime-save" data-rg-action="assign-confirm">add to selected</button>' +
+            '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+// HTML-escape helper. Used inside templates to defend against label / id
+// strings carrying HTML special characters.
+function _esc(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                  .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// Wire the buttons / links in the rendered panel.
+function _wireRegimeDialogButtons(panel) {
+  panel.querySelectorAll('[data-rg-action]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const action = btn.dataset.rgAction;
+      const id = btn.dataset.rgId;
+      if (action === 'close')      return _closeRegimeDialog();
+      if (action === 'back')       { state._regimeDialogState.mode = 'list'; _renderRegimeDialog(); return; }
+      if (action === 'new')        { state._regimeDialogState.mode = 'create'; _renderRegimeDialog(); return; }
+      if (action === 'edit')       { state._regimeDialogState.mode = 'edit'; state._regimeDialogState.editId = id; _renderRegimeDialog(); return; }
+      if (action === 'del') {
+        if (confirm('Delete regime ' + id + '? This cannot be undone.')) {
+          _deleteRegime(id);
+          _renderRegimeDialog();
+          if (typeof renderCatalogue === 'function') renderCatalogue();
+          if (typeof renderCandidateMetadata === 'function') renderCandidateMetadata();
+        }
+        return;
+      }
+      if (action === 'rmL2') {
+        const editId = state._regimeDialogState.editId;
+        const l2id = btn.dataset.rgL2id;
+        if (editId && l2id) {
+          _removeL2FromRegime(editId, l2id);
+          _renderRegimeDialog();
+          if (typeof renderCatalogue === 'function') renderCatalogue();
+          if (typeof renderCandidateMetadata === 'function') renderCandidateMetadata();
+        }
+        return;
+      }
+      if (action === 'save') {
+        _onRegimeFormSave(panel);
+        return;
+      }
+      if (action === 'assign-confirm') {
+        _onRegimeAssignConfirm(panel);
+        return;
+      }
+      if (action === 'new-from-assign') {
+        // Pivot from assign mode to create mode, carrying staged L2/cand IDs
+        const ds = state._regimeDialogState;
+        ds.mode = 'create';
+        // stagedL2Ids / stagedCandId are already in ds; _regimeFormHtml reads them
+        _renderRegimeDialog();
+        return;
+      }
+    });
+  });
+}
+
+function _onRegimeFormSave(panel) {
+  const ds = state._regimeDialogState;
+  const fields = {};
+  panel.querySelectorAll('[data-rg-field]').forEach(el => {
+    fields[el.dataset.rgField] = el.value;
+  });
+  if (ds.mode === 'edit' && ds.editId) {
+    const patch = {
+      label: fields.label || '',
+      axis_topology: fields.axis_topology || 'unspecified',
+      notes: fields.notes || '',
+    };
+    _updateRegime(ds.editId, patch);
+  } else {
+    // Create mode: id is optional (auto-generated if empty)
+    const args = {
+      label: fields.label || '',
+      axis_topology: fields.axis_topology || 'unspecified',
+      notes: fields.notes || '',
+    };
+    if (fields.id) args.id = fields.id;
+    if (fields.staged_l2_ids) args.l2_ids = fields.staged_l2_ids.split(',').filter(Boolean);
+    if (fields.staged_candidate_ids) args.candidate_ids = fields.staged_candidate_ids.split(',').filter(Boolean);
+    try {
+      _createRegime(args);
+    } catch (e) {
+      alert('Could not create regime: ' + e.message);
+      return;
+    }
+  }
+  // Return to list view
+  state._regimeDialogState.mode = 'list';
+  state._regimeDialogState.editId = null;
+  _renderRegimeDialog();
+  if (typeof renderCatalogue === 'function') renderCatalogue();
+  if (typeof renderCandidateMetadata === 'function') renderCandidateMetadata();
+}
+
+function _onRegimeAssignConfirm(panel) {
+  const ds = state._regimeDialogState;
+  const targetSel = panel.querySelector('[data-rg-field="assign_target"]');
+  if (!targetSel) return;
+  const targetId = targetSel.value;
+  const stagedL2Ids = ds.stagedL2Ids || [];
+  for (const l2id of stagedL2Ids) _addL2ToRegime(targetId, l2id);
+  // Also add the candidate if provided
+  if (ds.stagedCandId) {
+    const r = _ensureRegimeRegistry().regimes.find(x => x.id === targetId);
+    if (r && Array.isArray(r.candidate_ids) && !r.candidate_ids.includes(ds.stagedCandId)) {
+      r.candidate_ids.push(ds.stagedCandId);
+      _persistRegimeRegistry();
+    }
+  }
+  _closeRegimeDialog();
+  if (typeof renderCatalogue === 'function') renderCatalogue();
+  if (typeof renderCandidateMetadata === 'function') renderCandidateMetadata();
+}
+
+// Build the candidate-focus tab's regime strip. Shows current regime
+// memberships + a "+ assign to regime" button. Always returns a string;
+// empty when no candidate is active (caller handles).
+function candidateRegimeRowHtml(c) {
+  if (!c) return '';
+  // Collect all L2 IDs this candidate covers. Prefer c.l2_indices when
+  // available (numeric indices into d.l2_envelopes); fall back to c.l2_ids
+  // if the candidate carries those directly.
+  const l2Ids = _candidateL2Ids(c);
+  const claimedSet = new Set();
+  for (const lid of l2Ids) {
+    for (const r of _regimesForL2(lid)) claimedSet.add(r.id);
+  }
+  const claimedIds = Array.from(claimedSet).sort();
+  let html = '<div class="cand-regime-row">';
+  html += '<span class="cand-regime-label">regimes:</span>';
+  if (claimedIds.length === 0) {
+    html += '<span class="cand-regime-none">— none —</span>';
+  } else {
+    for (const rid of claimedIds) {
+      html += '<span class="cand-regime-chip">' + _esc(rid) +
+              '<button class="cand-regime-edit-chip" data-cand-regime-edit="' + _esc(rid) +
+              '" title="Edit regime ' + _esc(rid) + '">edit</button></span>';
+    }
+  }
+  html += '<button class="cand-regime-assign" data-cand-regime-action="assign"' +
+          ' title="Assign this candidate&#39;s L2 envelopes to a regime">+ assign to regime</button>';
+  html += '<button class="cand-regime-open" data-cand-regime-action="open"' +
+          ' title="Open the regime registry">⚙ registry</button>';
+  html += '</div>';
+  return html;
+}
+
+// Resolve the L2 IDs for a candidate. Tries multiple shapes since candidates
+// from different sources (catalogue promotion, draft commit) carry different
+// fields. Returns a deduplicated array.
+function _candidateL2Ids(c) {
+  if (!c) return [];
+  const out = new Set();
+  if (Array.isArray(c.l2_ids)) {
+    for (const id of c.l2_ids) if (id) out.add(id);
+  }
+  if (Array.isArray(c.l2_indices) && state.data && Array.isArray(state.data.l2_envelopes)) {
+    for (const li of c.l2_indices) {
+      const env = state.data.l2_envelopes[li];
+      if (env && env.candidate_id) out.add(env.candidate_id);
+    }
+  }
+  return Array.from(out);
+}
+
+function _wireCandidateRegimeRow(c) {
+  if (!c) return;
+  document.querySelectorAll('[data-cand-regime-action]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const action = btn.dataset.candRegimeAction;
+      if (action === 'open') {
+        _openRegimeDialog({ mode: 'list' });
+      } else if (action === 'assign') {
+        const l2Ids = _candidateL2Ids(c);
+        _openRegimeDialog({ mode: 'assign', stagedL2Ids: l2Ids, stagedCandId: c.id });
+      }
+    });
+  });
+  document.querySelectorAll('[data-cand-regime-edit]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const rid = btn.dataset.candRegimeEdit;
+      _openRegimeDialog({ mode: 'edit', editId: rid });
+    });
+  });
+}
+
+
+// =============================================================================
+// v4 turn 18 — Repeat density panel: data layer
+// -----------------------------------------------------------------------------
+// Consumes the v2 JSON output of aggregate_repeat_density.R, which is
+// pre-binned at the scrubber's window grid (binning_source = "scrubber_windows")
+// so densities[k] is parallel to the scrubber's windows[k]. One JSON per
+// chromosome; user attaches via the standard precomp file picker. Detected
+// by version === 2 and binning_source === "scrubber_windows".
+//
+// State:
+//   state.repeatDensity = {
+//     <chrom>: {
+//       version, species, precomp_chrom, n_classes, classes[], default_class,
+//       loess_span, generated_at,
+//       chrom_block: { chrom, n_windows, window_centers_mb[], window_start_bp[],
+//                      window_end_bp[], by_class: { <cls>: {densities[], loess[],
+//                      max_density, loess_span} } }
+//     }
+//   }
+//
+// localStorage persistence: per-chrom keyed
+//   pca_scrubber_v3.repeatDensity.<chrom>
+// One key per chrom keeps each entry under quota (~1 MB per chrom × 28 chroms
+// would exceed the 5 MB localStorage quota if stored as a single key, but
+// per-chrom keys let users selectively clear via dev-tools or just re-load).
+// Restore on page load runs through localStorage keys looking for the prefix.
+// =============================================================================
+
+const REPEAT_DENSITY_LS_PREFIX = 'pca_scrubber_v3.repeatDensity.';
+
+// Detector — runs in the precomp file loader to route v2 JSONs separately
+// from chromosome JSONs and other auxiliary data.
+function _isRepeatDensityJSON(data) {
+  return !!(
+    data &&
+    data.version === 2 &&
+    data.binning_source === 'scrubber_windows' &&
+    Array.isArray(data.chromosomes) &&
+    data.chromosomes.length > 0
+  );
+}
+
+// Validate one chromosome block from a v2 JSON. Returns true if it has the
+// shape we need; logs a warn if not. Defensive against partial / corrupted
+// JSONs from interrupted R runs.
+function _validateRepeatDensityChrom(block) {
+  if (!block || typeof block !== 'object') return false;
+  if (typeof block.chrom !== 'string' || !block.chrom) return false;
+  if (typeof block.n_windows !== 'number' || block.n_windows <= 0) return false;
+  // Need parallel window arrays of the right length
+  const need = ['window_centers_mb', 'window_start_bp', 'window_end_bp'];
+  for (const k of need) {
+    if (!Array.isArray(block[k]) || block[k].length !== block.n_windows) {
+      console.warn('[repeatDensity] chrom', block.chrom, 'missing/wrong-length', k);
+      return false;
+    }
+  }
+  if (!block.by_class || typeof block.by_class !== 'object') return false;
+  // Each class must have densities[] of length n_windows. loess[] is
+  // technically optional (could be NaN-filled if class had <4 points) but
+  // we still expect the field to be present.
+  for (const cls of Object.keys(block.by_class)) {
+    const info = block.by_class[cls];
+    if (!info || !Array.isArray(info.densities) || info.densities.length !== block.n_windows) {
+      console.warn('[repeatDensity] class', cls, 'on', block.chrom, 'has wrong densities length');
+      return false;
+    }
+  }
+  return true;
+}
+
+// Store a parsed v2 JSON onto state.repeatDensity, indexed by chrom.
+// Returns the chrom name on success, null on validation failure.
+function _storeRepeatDensity(parsed) {
+  if (!_isRepeatDensityJSON(parsed)) return null;
+  const block = parsed.chromosomes[0];   // v2 currently emits one chrom per file
+  if (!_validateRepeatDensityChrom(block)) return null;
+  const chrom = block.chrom;
+  if (!state.repeatDensity || typeof state.repeatDensity !== 'object') {
+    state.repeatDensity = {};
+  }
+  state.repeatDensity[chrom] = {
+    version:        parsed.version,
+    species:        parsed.species || 'unknown',
+    precomp_chrom:  parsed.precomp_chrom || chrom,
+    n_classes:      parsed.n_classes || Object.keys(block.by_class).length,
+    classes:        Array.isArray(parsed.classes) ? parsed.classes.slice() : Object.keys(block.by_class),
+    default_class:  parsed.default_class || 'repeat_fragment',
+    loess_span:     typeof parsed.loess_span === 'number' ? parsed.loess_span : 0.3,
+    generated_at:   parsed.generated_at || null,
+    chrom_block:    block,
+  };
+  return chrom;
+}
+
+// Persist one chrom's repeat density JSON to localStorage. Stores the parsed
+// object as JSON so we can round-trip identically. Returns true on success.
+// Failure (quota exceeded, etc.) is logged but not thrown.
+function _persistRepeatDensity(chrom) {
+  if (!state.repeatDensity || !state.repeatDensity[chrom]) return false;
+  try {
+    // Reconstruct the original JSON shape (minus the unwrapping into chrom_block)
+    const entry = state.repeatDensity[chrom];
+    const obj = {
+      version: entry.version,
+      species: entry.species,
+      binning_source: 'scrubber_windows',
+      precomp_chrom: entry.precomp_chrom,
+      n_chromosomes: 1,
+      n_classes: entry.n_classes,
+      classes: entry.classes,
+      default_class: entry.default_class,
+      loess_span: entry.loess_span,
+      generated_at: entry.generated_at,
+      chromosomes: [entry.chrom_block],
+    };
+    localStorage.setItem(REPEAT_DENSITY_LS_PREFIX + chrom, JSON.stringify(obj));
+    return true;
+  } catch (e) {
+    // Quota exceeded is the most common failure for ~1 MB payloads
+    console.warn('[repeatDensity] persist failed for', chrom, ':', e.message);
+    return false;
+  }
+}
+
+// Restore all repeat-density JSONs from localStorage. Walks all keys matching
+// the prefix and stores each on state.repeatDensity. Per-key fail-soft.
+function _restoreRepeatDensity() {
+  if (!state.repeatDensity || typeof state.repeatDensity !== 'object') {
+    state.repeatDensity = {};
+  }
+  let n = 0;
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || !k.startsWith(REPEAT_DENSITY_LS_PREFIX)) continue;
+      try {
+        const raw = localStorage.getItem(k);
+        if (!raw) continue;
+        const parsed = JSON.parse(raw);
+        if (_storeRepeatDensity(parsed)) n++;
+      } catch (_) { /* skip individual failures */ }
+    }
+  } catch (_) { /* localStorage might be disabled in private mode */ }
+  if (n > 0) console.info('[repeatDensity] restored', n, 'chromosome(s) from localStorage');
+}
+
+// Forget one chrom's repeat density data. Used by a future "clear" UI button
+// (not wired this turn) and by tests.
+function _clearRepeatDensity(chrom) {
+  if (state.repeatDensity && state.repeatDensity[chrom]) {
+    delete state.repeatDensity[chrom];
+  }
+  try { localStorage.removeItem(REPEAT_DENSITY_LS_PREFIX + chrom); } catch (_) {}
+}
+
+// Look up the entry for a chrom, returning null if not loaded.
+function _getRepeatDensity(chrom) {
+  if (!state.repeatDensity) return null;
+  return state.repeatDensity[chrom] || null;
+}
+
+// Resolve which class to display for a chrom. Honors a user pref (state-level,
+// not implemented as user-facing UI this turn — the dropdown ships next turn)
+// then falls back to the JSON's default_class, then to 'repeat_fragment',
+// then to the first available class.
+function _resolveRepeatDensityClass(chrom) {
+  const entry = _getRepeatDensity(chrom);
+  if (!entry) return null;
+  // Future hook: state.repeatDensityActiveClass[chrom] for user override
+  if (state.repeatDensityActiveClass && state.repeatDensityActiveClass[chrom]) {
+    if (entry.chrom_block.by_class[state.repeatDensityActiveClass[chrom]]) {
+      return state.repeatDensityActiveClass[chrom];
+    }
+  }
+  if (entry.default_class && entry.chrom_block.by_class[entry.default_class]) {
+    return entry.default_class;
+  }
+  if (entry.chrom_block.by_class['repeat_fragment']) return 'repeat_fragment';
+  const cls = Object.keys(entry.chrom_block.by_class);
+  return cls.length > 0 ? cls[0] : null;
+}
+
+// Set the active class for a chrom (for a future dropdown). Idempotent;
+// callers must persist the choice via _persistRepeatDensityActiveClass.
+function _setRepeatDensityActiveClass(chrom, cls) {
+  if (!state.repeatDensityActiveClass || typeof state.repeatDensityActiveClass !== 'object') {
+    state.repeatDensityActiveClass = {};
+  }
+  state.repeatDensityActiveClass[chrom] = cls;
+}
+
 
 // =============================================================================
 // Slab-vs-slab comparison API (v3.45 sub-step B)
@@ -10607,6 +12734,482 @@ function _bndRefreshUI() {
   _bndUpdateRadiusButtons();
   _bndUpdateSaveButton();
   _bndUpdateStatusSelect();
+  // v4 turn 18: repeat density panel — independent of candidate selection
+  // (renders chromosome-wide), so always refresh it
+  try { _renderRepeatDensityPanel(); } catch (e) { console.warn('repeatDensity panel:', e.message); }
+}
+
+// =============================================================================
+// v4 turn 19+20 — Repeat density panel renderer (extended)
+// -----------------------------------------------------------------------------
+// Renders chromosome-wide (or candidate-zoomed) repeat element density.
+// Style: scatter primary (small grey points, alpha 0.45) + LOESS guide line
+// (blue, alpha 0.85). x-axis in Mb. Highlights the active candidate's scan
+// range with an amber band (full-chrom view only — in zoomed view the whole
+// canvas IS the scan range).
+//
+// Mounts into #bndRepeatDensity. Empty state when no v2 JSON is loaded for
+// the current chrom. Updates when:
+//   - Repeat density JSON loaded (loader hook)
+//   - Candidate selection changes (so the highlight band moves)
+//   - Boundaries page is re-rendered (existing _bndRefreshUI hook)
+//
+// Header dropdowns (turn 19):
+//   - class:    pick which TE class to display
+//   - y-axis:   linear[0,1] / auto-scale / log
+//   - view:     full chrom / zoomed to candidate
+//
+// Multi-chrom (turn 20):
+//   - chrom picker shown when >1 chrom has data loaded
+//   - Alt+← / Alt+→ cycle chroms (via the existing chromSelect, since
+//     each chrom-switch rebuilds state.data and refreshes the panel)
+// =============================================================================
+
+// Pref bag — all panel-level user choices live here. Persisted as a single
+// JSON blob in localStorage (small payload, atomic write/read).
+const REPEAT_DENSITY_PREFS_LS_KEY = 'pca_scrubber_v3.repeatDensity.prefs';
+const REPEAT_DENSITY_Y_MODES = ['linear', 'auto', 'log'];
+const REPEAT_DENSITY_VIEW_MODES = ['full', 'zoomed'];
+
+function _repeatDensityPrefs() {
+  if (!state.repeatDensityPrefs || typeof state.repeatDensityPrefs !== 'object') {
+    state.repeatDensityPrefs = {
+      yMode: 'linear',
+      viewMode: 'full',
+      // activeClass per chrom is stored in state.repeatDensityActiveClass
+      // (lives in the data layer, separate field for finer-grained control)
+    };
+  }
+  return state.repeatDensityPrefs;
+}
+
+function _persistRepeatDensityPrefs() {
+  try {
+    const prefs = _repeatDensityPrefs();
+    localStorage.setItem(REPEAT_DENSITY_PREFS_LS_KEY, JSON.stringify({
+      yMode:    prefs.yMode,
+      viewMode: prefs.viewMode,
+      activeClass: state.repeatDensityActiveClass || {},
+    }));
+  } catch (_) { /* fail-soft */ }
+}
+
+function _restoreRepeatDensityPrefs() {
+  try {
+    const raw = localStorage.getItem(REPEAT_DENSITY_PREFS_LS_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return;
+    const prefs = _repeatDensityPrefs();
+    if (REPEAT_DENSITY_Y_MODES.includes(parsed.yMode))      prefs.yMode = parsed.yMode;
+    if (REPEAT_DENSITY_VIEW_MODES.includes(parsed.viewMode)) prefs.viewMode = parsed.viewMode;
+    if (parsed.activeClass && typeof parsed.activeClass === 'object') {
+      state.repeatDensityActiveClass = parsed.activeClass;
+    }
+  } catch (_) { /* fail-soft, keep defaults */ }
+}
+
+// List of chroms with repeat density loaded. Sorted alphabetically.
+function _repeatDensityChromList() {
+  if (!state.repeatDensity) return [];
+  return Object.keys(state.repeatDensity).sort();
+}
+
+// Find the chrom select dropdown in the document. The scrubber's main chrom
+// selector is #chromSelect (handled elsewhere). We'll dispatch a change to
+// it from the Alt+arrow handler.
+function _switchChromViaMainSelect(chrom) {
+  const sel = document.getElementById('chromSelect');
+  if (!sel) return false;
+  let found = false;
+  for (const opt of sel.options) {
+    if (opt.value === chrom) { found = true; break; }
+  }
+  if (!found) return false;
+  sel.value = chrom;
+  // Dispatch the change event so the existing wiring re-applies data
+  sel.dispatchEvent(new Event('change', { bubbles: true }));
+  return true;
+}
+
+function _renderRepeatDensityPanel() {
+  const slot = document.getElementById('bndRepeatDensity');
+  if (!slot) return;
+
+  // Need a chrom loaded
+  const chrom = state.data && state.data.chrom;
+  if (!chrom) {
+    slot.innerHTML = '';
+    return;
+  }
+  const entry = _getRepeatDensity(chrom);
+  if (!entry) {
+    // Empty state. List which chroms DO have data, so the user knows
+    // what's available without re-checking the file picker.
+    const loadedList = _repeatDensityChromList();
+    const loadedHint = loadedList.length > 0
+      ? '<div class="bnd-rd-empty-loaded">Loaded for: ' +
+        loadedList.map(c => '<code>' + _esc(c) + '</code>').join(', ') +
+        ' — switch to one of those chromosomes to see its panel.</div>'
+      : '';
+    slot.innerHTML =
+      '<div class="bnd-rd-empty">' +
+        '<div class="bnd-rd-empty-h">Repeat density: not loaded for ' + _esc(chrom) + '</div>' +
+        'Attach a v2 repeat-density JSON via the file picker to see this panel. ' +
+        'Generate with <code>aggregate_repeat_density.R</code> using this chrom\u2019s precomp JSON.' +
+        loadedHint +
+      '</div>';
+    return;
+  }
+
+  const cls = _resolveRepeatDensityClass(chrom);
+  if (!cls || !entry.chrom_block.by_class[cls]) {
+    slot.innerHTML = '<div class="bnd-rd-empty">No data for class on ' + _esc(chrom) + '.</div>';
+    return;
+  }
+  const block = entry.chrom_block;
+  const info = block.by_class[cls];
+  const wc = block.window_centers_mb;
+  const dens = info.densities;
+  const loess = info.loess;
+  const prefs = _repeatDensityPrefs();
+  const yMode = prefs.yMode || 'linear';
+  const viewMode = prefs.viewMode || 'full';
+
+  // Layout dimensions
+  const wrapW = Math.max(500, slot.clientWidth || 900);
+  const margins = { top: 20, right: 20, bottom: 32, left: 50 };
+  const W = wrapW - 12;
+  const H = 160;
+  const innerW = W - margins.left - margins.right;
+  const innerH = H - margins.top - margins.bottom;
+
+  // Determine x-range based on viewMode. Zoomed mode uses the active
+  // candidate's scan range; falls back to full-chrom if no candidate active.
+  let xMin = wc.length > 0 ? wc[0] : 0;
+  let xMax = wc.length > 0 ? wc[wc.length - 1] : 1;
+  let zoomFallback = false;   // true if user wants zoomed but no candidate
+  let scanRangeMb = null;     // {sMb, eMb} when computed for highlight or zoom
+
+  // Try to read active candidate scan range
+  try {
+    const bs = (typeof _ensureBoundariesState === 'function') ? _ensureBoundariesState() : null;
+    if (bs && bs.active_cand_id != null) {
+      const cand = (typeof _bndFindCandidate === 'function') ? _bndFindCandidate(bs.active_cand_id) : null;
+      if (cand) {
+        const chromLenBp = (state.data && state.data.n_bp) || null;
+        const scan = (typeof _boundaryScanRange === 'function')
+          ? _boundaryScanRange(cand, bs.scan_radius_bp, chromLenBp) : null;
+        if (scan && Number.isFinite(scan.start_bp) && Number.isFinite(scan.end_bp)) {
+          scanRangeMb = { sMb: scan.start_bp / 1e6, eMb: scan.end_bp / 1e6 };
+        }
+      }
+    }
+  } catch (_) { /* fail-soft */ }
+
+  if (viewMode === 'zoomed') {
+    if (scanRangeMb) {
+      // Zoom in. Pad by 5% on each side so points right at the edge are
+      // not clipped against the plot border.
+      const span = scanRangeMb.eMb - scanRangeMb.sMb;
+      const pad = span * 0.05;
+      xMin = Math.max(wc[0] || 0, scanRangeMb.sMb - pad);
+      xMax = Math.min(wc[wc.length - 1] || xMax, scanRangeMb.eMb + pad);
+    } else {
+      // No candidate active — fall back to full but flag for header note
+      zoomFallback = true;
+    }
+  }
+  const xRange = xMax - xMin || 1;
+  const toX = (mb) => margins.left + ((mb - xMin) / xRange) * innerW;
+
+  // Y-axis transform depends on yMode. Auto-scale and log need access to
+  // the data range, so compute that here.
+  // Effective y-axis upper bound for scaling.
+  let yUpper = 1.0;
+  if (yMode === 'auto') {
+    yUpper = Math.max(0.05, info.max_density || 0.05);   // floor at 5% so very-low classes still get a y-axis
+  }
+
+  // Y transforms — return SVG y for a given density.
+  // For log mode, we use log10(density + epsilon) where epsilon is a small
+  // floor so 0 doesn't blow up. The mapped range becomes [log10(eps), log10(1)].
+  const LOG_EPS = 0.001;
+  let toY;
+  let yTicks;          // array of density values for grid lines
+  let yLabelFmt;       // function to format a tick label
+  if (yMode === 'log') {
+    const yMinLog = Math.log10(LOG_EPS);
+    const yMaxLog = Math.log10(1.0);
+    toY = (d) => {
+      const dc = Math.max(LOG_EPS, Math.min(1, d));
+      const lv = Math.log10(dc);
+      const norm = (lv - yMinLog) / (yMaxLog - yMinLog);
+      return margins.top + (1 - norm) * innerH;
+    };
+    yTicks = [0.001, 0.01, 0.1, 1.0];
+    yLabelFmt = (v) => v < 0.01 ? v.toFixed(3) : (v < 1 ? v.toFixed(2) : '1.00');
+  } else if (yMode === 'auto') {
+    toY = (d) => {
+      const dc = Math.max(0, Math.min(yUpper, d));
+      return margins.top + (1 - dc / yUpper) * innerH;
+    };
+    // 4 ticks at 25% / 50% / 75% / 100% of yUpper
+    yTicks = [0.25 * yUpper, 0.5 * yUpper, 0.75 * yUpper, yUpper];
+    yLabelFmt = (v) => v < 0.01 ? v.toFixed(4) : (v < 0.1 ? v.toFixed(3) : v.toFixed(2));
+  } else {
+    // linear [0, 1]
+    toY = (d) => margins.top + (1 - Math.max(0, Math.min(1, d))) * innerH;
+    yTicks = [0.25, 0.5, 0.75, 1.0];
+    yLabelFmt = (v) => v.toFixed(2);
+  }
+
+  // Candidate scan-range overlay — only meaningful in full-chrom view.
+  // (In zoomed view, the whole canvas IS the scan range.)
+  let candHighlight = '';
+  if (viewMode === 'full' && scanRangeMb) {
+    const x1 = toX(scanRangeMb.sMb);
+    const x2 = toX(scanRangeMb.eMb);
+    if (Number.isFinite(x1) && Number.isFinite(x2) && x2 > x1) {
+      candHighlight =
+        '<rect x="' + x1.toFixed(1) + '" y="' + margins.top +
+        '" width="' + (x2 - x1).toFixed(1) + '" height="' + innerH +
+        '" fill="#f5a524" fill-opacity="0.12" stroke="#f5a524" stroke-opacity="0.4" stroke-width="1" />';
+    }
+  }
+
+  // Y-axis grid lines
+  let gridLines = '';
+  for (const yv of yTicks) {
+    const y = toY(yv);
+    gridLines +=
+      '<line x1="' + margins.left + '" x2="' + (margins.left + innerW) +
+      '" y1="' + y.toFixed(1) + '" y2="' + y.toFixed(1) +
+      '" stroke="#2a2f37" stroke-width="0.5" stroke-dasharray="2,3" />';
+    gridLines +=
+      '<text x="' + (margins.left - 6) + '" y="' + (y + 3).toFixed(1) +
+      '" text-anchor="end" font-size="9" fill="#9097a3" font-family="ui-monospace, monospace">' +
+      yLabelFmt(yv) + '</text>';
+  }
+  // x-axis ticks. Adapt step to xRange (tighter steps when zoomed).
+  let xTicks = '';
+  let tickStep;
+  if (xRange > 50)      tickStep = 10;
+  else if (xRange > 20) tickStep = 5;
+  else if (xRange > 5)  tickStep = 2;
+  else if (xRange > 1)  tickStep = 0.5;
+  else                  tickStep = 0.1;
+  const tickStart = Math.ceil(xMin / tickStep) * tickStep;
+  for (let mb = tickStart; mb <= xMax + 1e-9; mb += tickStep) {
+    const x = toX(mb);
+    xTicks +=
+      '<line x1="' + x.toFixed(1) + '" x2="' + x.toFixed(1) +
+      '" y1="' + (margins.top + innerH) + '" y2="' + (margins.top + innerH + 4) +
+      '" stroke="#9097a3" stroke-width="0.8" />';
+    const labelTxt = tickStep < 1 ? mb.toFixed(1) : String(Math.round(mb));
+    xTicks +=
+      '<text x="' + x.toFixed(1) + '" y="' + (margins.top + innerH + 14) +
+      '" text-anchor="middle" font-size="9" fill="#9097a3" font-family="ui-monospace, monospace">' +
+      labelTxt + '</text>';
+  }
+  // x-axis label
+  xTicks +=
+    '<text x="' + (margins.left + innerW / 2) + '" y="' + (H - 4) +
+    '" text-anchor="middle" font-size="10" fill="#9097a3" font-family="ui-monospace, monospace">Position (Mb)</text>';
+
+  // Plot border
+  const border =
+    '<rect x="' + margins.left + '" y="' + margins.top +
+    '" width="' + innerW + '" height="' + innerH +
+    '" fill="none" stroke="#3a3f47" stroke-width="0.8" />';
+
+  // Scatter — primary visual. Skip points outside the visible x range (cheaper
+  // when zoomed), and skip y-out-of-range too.
+  let scatter = '';
+  for (let i = 0; i < dens.length; i++) {
+    const d = dens[i];
+    if (!Number.isFinite(d) || d < 0) continue;
+    const xMb = wc[i];
+    if (xMb < xMin - 0.001 || xMb > xMax + 0.001) continue;   // off-canvas — skip
+    const x = toX(xMb);
+    const y = toY(d);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    if (y < margins.top - 1 || y > margins.top + innerH + 1) continue;
+    scatter += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) +
+               '" r="1.6" fill="#7a7a7a" fill-opacity="0.45" />';
+  }
+
+  // LOESS — blue line
+  let loessPath = '';
+  if (Array.isArray(loess) && loess.length === wc.length) {
+    const pts = [];
+    for (let i = 0; i < loess.length; i++) {
+      const d = loess[i];
+      if (!Number.isFinite(d)) continue;
+      const xMb = wc[i];
+      if (xMb < xMin - 0.001 || xMb > xMax + 0.001) continue;
+      const x = toX(xMb);
+      const y = toY(d);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+      pts.push(x.toFixed(1) + ',' + y.toFixed(1));
+    }
+    if (pts.length >= 2) {
+      loessPath = '<polyline points="' + pts.join(' ') +
+                  '" fill="none" stroke="#3070d0" stroke-width="1.6" stroke-opacity="0.85" />';
+    }
+  }
+
+  // -------- Header HTML with dropdowns --------
+  // Class options (sorted, with active marked)
+  const classOpts = entry.classes.map(c =>
+    '<option value="' + _esc(c) + '"' + (c === cls ? ' selected' : '') + '>' + _esc(c) + '</option>'
+  ).join('');
+  // Y-mode options
+  const yModeOpts = REPEAT_DENSITY_Y_MODES.map(m => {
+    const labels = { linear: 'linear [0,1]', auto: 'auto-scale', log: 'log' };
+    return '<option value="' + m + '"' + (m === yMode ? ' selected' : '') + '>' + labels[m] + '</option>';
+  }).join('');
+  // View mode options
+  const viewModeOpts = REPEAT_DENSITY_VIEW_MODES.map(m => {
+    const labels = { full: 'full chrom', zoomed: 'zoomed to candidate' };
+    return '<option value="' + m + '"' + (m === viewMode ? ' selected' : '') + '>' + labels[m] + '</option>';
+  }).join('');
+  // Chrom picker (only shown when >1 chrom loaded)
+  const allChroms = _repeatDensityChromList();
+  let chromPicker = '';
+  if (allChroms.length > 1) {
+    const opts = allChroms.map(c =>
+      '<option value="' + _esc(c) + '"' + (c === chrom ? ' selected' : '') + '>' + _esc(c) + '</option>'
+    ).join('');
+    chromPicker =
+      '<label class="bnd-rd-ctrl">' +
+        '<span class="bnd-rd-ctrl-label">chrom</span>' +
+        '<select id="bndRdChromSelect" title="Switch to a chromosome with loaded repeat density (Alt+\u2190 / Alt+\u2192 also work)">' + opts + '</select>' +
+      '</label>';
+  }
+  const zoomedNote = (viewMode === 'zoomed' && zoomFallback)
+    ? '<span class="bnd-rd-warn">(no candidate active — showing full chrom)</span>'
+    : '';
+
+  const headerHtml =
+    '<div class="bnd-rd-header">' +
+      '<span class="bnd-rd-title">repeat element density</span>' +
+      '<label class="bnd-rd-ctrl">' +
+        '<span class="bnd-rd-ctrl-label">class</span>' +
+        '<select id="bndRdClassSelect" title="Pick which TE class to display">' + classOpts + '</select>' +
+      '</label>' +
+      '<label class="bnd-rd-ctrl">' +
+        '<span class="bnd-rd-ctrl-label">y-axis</span>' +
+        '<select id="bndRdYModeSelect" title="linear [0,1] for narrow peaks; auto-scale to class max for low-density classes; log for cross-class comparison">' + yModeOpts + '</select>' +
+      '</label>' +
+      '<label class="bnd-rd-ctrl">' +
+        '<span class="bnd-rd-ctrl-label">view</span>' +
+        '<select id="bndRdViewModeSelect" title="full chrom = manuscript view; zoomed = aligned with boundary tracks above">' + viewModeOpts + '</select>' +
+      '</label>' +
+      chromPicker +
+      '<span class="bnd-rd-meta">' +
+        'max ' + (info.max_density != null ? info.max_density.toFixed(3) : '?') + ' · ' +
+        'span ' + entry.loess_span +
+      '</span>' +
+      zoomedNote +
+    '</div>';
+
+  // Y-axis title (rotated)
+  const yLabel =
+    '<text x="' + 12 + '" y="' + (margins.top + innerH / 2) +
+    '" text-anchor="middle" font-size="9" fill="#9097a3" font-family="ui-monospace, monospace" ' +
+    'transform="rotate(-90 12 ' + (margins.top + innerH / 2) + ')">Repeat element density' +
+    (yMode === 'log' ? ' (log)' : (yMode === 'auto' ? ' (auto)' : '')) +
+    '</text>';
+
+  const svg =
+    '<svg class="bnd-rd-svg" xmlns="http://www.w3.org/2000/svg" ' +
+    'viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '">' +
+    candHighlight +
+    gridLines + xTicks + yLabel +
+    scatter + loessPath +
+    border +
+    '</svg>';
+
+  slot.innerHTML = headerHtml + svg;
+
+  // Wire up the dropdowns
+  const clsSel = document.getElementById('bndRdClassSelect');
+  if (clsSel) {
+    clsSel.addEventListener('change', () => {
+      _setRepeatDensityActiveClass(chrom, clsSel.value);
+      _persistRepeatDensityPrefs();
+      _renderRepeatDensityPanel();
+    });
+  }
+  const yModeSel = document.getElementById('bndRdYModeSelect');
+  if (yModeSel) {
+    yModeSel.addEventListener('change', () => {
+      const v = yModeSel.value;
+      if (REPEAT_DENSITY_Y_MODES.includes(v)) {
+        _repeatDensityPrefs().yMode = v;
+        _persistRepeatDensityPrefs();
+        _renderRepeatDensityPanel();
+      }
+    });
+  }
+  const viewSel = document.getElementById('bndRdViewModeSelect');
+  if (viewSel) {
+    viewSel.addEventListener('change', () => {
+      const v = viewSel.value;
+      if (REPEAT_DENSITY_VIEW_MODES.includes(v)) {
+        _repeatDensityPrefs().viewMode = v;
+        _persistRepeatDensityPrefs();
+        _renderRepeatDensityPanel();
+      }
+    });
+  }
+  const chromSel = document.getElementById('bndRdChromSelect');
+  if (chromSel) {
+    chromSel.addEventListener('change', () => {
+      _switchChromViaMainSelect(chromSel.value);
+    });
+  }
+}
+
+// Alt+Arrow chrom navigation. Bound globally but only acts when the
+// boundaries page is the active one AND repeat density has multiple chroms.
+// Doesn't conflict with the |z| panel's arrow keys (those are unmodified).
+function _wireRepeatDensityArrowNav() {
+  if (state._repeatDensityArrowNavBound) return;
+  document.addEventListener('keydown', (e) => {
+    // Only handle Alt+Arrow when:
+    //   - boundaries page is visible
+    //   - we have repeat density loaded for >1 chroms
+    //   - target is not an input/textarea
+    if (!e.altKey) return;
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    const tag = (e.target && e.target.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    const page = document.getElementById('page11');
+    if (!page || !page.classList.contains('active')) return;
+    const list = _repeatDensityChromList();
+    if (list.length <= 1) return;
+    const cur = state.data && state.data.chrom;
+    let idx = list.indexOf(cur);
+    if (idx < 0) idx = 0;
+    const next = e.key === 'ArrowRight'
+      ? list[(idx + 1) % list.length]
+      : list[(idx - 1 + list.length) % list.length];
+    if (_switchChromViaMainSelect(next)) {
+      e.preventDefault();
+      // Flash the panel border briefly so the eye catches the chrom switch
+      _flashRepeatDensityPanel();
+    }
+  });
+  state._repeatDensityArrowNavBound = true;
+}
+
+function _flashRepeatDensityPanel() {
+  const slot = document.getElementById('bndRepeatDensity');
+  if (!slot) return;
+  slot.classList.add('bnd-rd-flash');
+  setTimeout(() => { slot.classList.remove('bnd-rd-flash'); }, 600);
 }
 
 // Build the page DOM into #page11Content. Idempotent — re-runs cleanly.
@@ -10687,6 +13290,9 @@ function renderBoundariesPage() {
       <div class="bnd-info" id="bndInfo">No candidate selected.</div>
       <div class="bnd-tracks" id="bndTracks"></div>
       <div class="bnd-summary" id="bndSummary"></div>
+      <!-- v4 turn 18: repeat density panel. Renders when state.repeatDensity
+           has data for the current chrom. Empty state when not loaded. -->
+      <div class="bnd-repeat-density" id="bndRepeatDensity"></div>
     `;
     // Wire events
     const candSel = document.getElementById('bndCandSelect');
@@ -12239,9 +14845,15 @@ function drawZ() {
     // v3.99 t14e+ continue: candidate bar above L1/L2 (was below boundaries
     // in old strip placement). Slightly thinner here than in non-collapsed
     // mode since vertical space is constrained; ★ glyph still fits at h=5.
+    // v4 turn 13 (Deliverable B): when overlapping candidates require N>1
+    // lanes, the bar's TOTAL height is N × candBarH so each lane gets the
+    // same per-lane height as the single-lane case.
     const candBarH = 5;
     const candGap  = 1;
-    const zoneTop  = pad.t + candBarH + candGap;
+    const _candLanes = (typeof _assignCandidateLanes === 'function')
+      ? _assignCandidateLanes(state.candidateList || []).n_lanes : 1;
+    const candBarTotal = candBarH * _candLanes;
+    const zoneTop  = pad.t + candBarTotal + candGap;
     const plotW = w - pad.l - pad.r;
     const _mbR = currentMbRange();
     const mbMin = _mbR.mbMin, mbMax = _mbR.mbMax;
@@ -12249,7 +14861,7 @@ function drawZ() {
     const xOfWin = (wi) => toX(d.windows[wi].center_mb);
     // v3.99 t14e+ continue: Candidate bar — pending grey + confirmed gold ★
     // sitting ABOVE the L1/L2 zone bars
-    drawCandidateBar(ctx, d, toX, pad.t, candBarH);
+    drawCandidateBar(ctx, d, toX, pad.t, candBarTotal);
     // v4 turn 1 ask 5: "cand" label to the left of the candidate strip,
     // mirroring the L1/L2 label pattern below. Quentin: "the candidate
     // track is missing L3 or Candidate label to the left." Using "cand"
@@ -12261,7 +14873,7 @@ function drawZ() {
     ctx.font = '8px ui-monospace, monospace';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
-    ctx.fillText('cand', pad.l - 4, pad.t + candBarH / 2);
+    ctx.fillText('cand', pad.l - 4, pad.t + candBarTotal / 2);
     // L1 zone bars (top half of zoneH, deeper blue — v3.99 turn 13 ask 3)
     if (Array.isArray(d.l1_envelopes)) {
       const y0 = zoneTop, hzone = zoneH / 2 - 1;
@@ -12308,10 +14920,19 @@ function drawZ() {
       ctx.textBaseline = 'middle';
       ctx.fillText('L2', pad.l - 4, y0 + hzone / 2);
     }
+    // v4 turn 10: W-row (per-window candidate-draft strip), collapsed mode.
+    // Sits directly below the L2 zone bar; only visible when in candidate mode.
+    const _wBandC = _wRowBand({ collapsed: true, zoneTop, zoneH });
+    if (_wBandC) {
+      _drawWRow(ctx, d, toX, xOfWin, _wBandC);
+    }
     // Boundary arrows (just below zone bars)
     if (Array.isArray(d.l2_boundaries)) {
-      const yArrowTop  = zoneTop + zoneH + 1;
-      const yArrowBase = zoneTop + zoneH + peaksH - 1;
+      // v4 turn 10: when W-row is visible, push the arrow band down by its
+      // height + gap so it doesn't overlap the W-row.
+      const _wExtra = _wBandC ? (_wBandC.h + _wBandC.gap) : 0;
+      const yArrowTop  = zoneTop + zoneH + _wExtra + 1;
+      const yArrowBase = zoneTop + zoneH + _wExtra + peaksH - 1;
       const halfW = 3;
       for (const b of d.l2_boundaries) {
         const wi = (b.boundary_w | 0) - 1;
@@ -12329,12 +14950,14 @@ function drawZ() {
     }
     // Cursor — extends from pad.t (top of candidate bar) through L1/L2 down
     // to the bottom of the boundary-arrow band.
+    // v4 turn 10: include W-row in cursor extent when W-row is visible.
+    const _wExtraCur = _wBandC ? (_wBandC.h + _wBandC.gap) : 0;
     const xCur = toX(d.windows[state.cur].center_mb);
     ctx.strokeStyle = '#f5a524';
     ctx.lineWidth = 1.2;
     ctx.beginPath();
     ctx.moveTo(xCur + 0.5, pad.t);
-    ctx.lineTo(xCur + 0.5, zoneTop + zoneH + peaksH);
+    ctx.lineTo(xCur + 0.5, zoneTop + zoneH + _wExtraCur + peaksH);
     ctx.stroke();
     return;
   }
@@ -12362,10 +14985,26 @@ function drawZ() {
   // strip from the L1 bar below it. Total top-band cost: candBarH + 2 px.
   const candBarH = 7;
   const candGap  = 2;
-  // Effective top of L1 bar shifts down by (candBarH + candGap)
-  const zoneTop = pad.t + candBarH + candGap;
+  // v4 turn 13 (Deliverable B): when overlapping candidates require N>1
+  // lanes, the bar's TOTAL height is N × candBarH so each lane gets the
+  // same per-lane height as the single-lane case. zoneTop and plotH both
+  // adjust to keep L1/L2/W-row/peaks/scatter visually in the same place
+  // relative to the cand bar's BOTTOM.
+  const _candLanes = (typeof _assignCandidateLanes === 'function')
+    ? _assignCandidateLanes(state.candidateList || []).n_lanes : 1;
+  const candBarTotal = candBarH * _candLanes;
+  // Effective top of L1 bar shifts down by (candBarTotal + candGap)
+  const zoneTop = pad.t + candBarTotal + candGap;
+  // v4 turn 10: reserve a per-window draft strip between the L2 zone bar and
+  // the boundary-arrow band when in candidate mode. _wExtra captures both the
+  // row height and its top gap; everything below it (boundary arrows, plot,
+  // toY ladder) shifts down by this amount so the layout doesn't collide.
+  // _wRowBand returns null when the row is not visible — in that case
+  // _wExtra evaluates to 0 and the layout is identical to pre-v4-turn-10.
+  const _wRowEx = _wRowBand({ collapsed: false, zoneTop, zoneH });
+  const _wExtra = _wRowEx ? (_wRowEx.h + _wRowEx.gap) : 0;
   const plotW = w - pad.l - pad.r;
-  const plotH = h - pad.t - pad.b - candBarH - candGap - zoneH - peaksH;
+  const plotH = h - pad.t - pad.b - candBarTotal - candGap - zoneH - _wExtra - peaksH;
 
   const mbs = d.windows.map(w0 => w0.center_mb);
   // v3.41: signed-or-absolute Z values per state.zValueMode
@@ -12396,7 +15035,8 @@ function drawZ() {
   const toX = (mb) => pad.l + ((mb - mbMin) / (mbMax - mbMin)) * plotW;
   // v3.61: z-scatter starts at zoneTop + zoneH + peaksH (below boundary-arrows)
   // v3.99 t14e+ continue: zoneTop = pad.t + candBarH + candGap (was pad.t)
-  const toY = (z)  => zoneTop + zoneH + peaksH + plotH - ((z - zMin) / (zMax - zMin)) * plotH;
+  // v4 turn 10: + _wExtra so the W-row sits between the L2 bar and the arrows.
+  const toY = (z)  => zoneTop + zoneH + _wExtra + peaksH + plotH - ((z - zMin) / (zMax - zMin)) * plotH;
   const xOfWin = (wi) => toX(d.windows[wi].center_mb);
 
   // L1 zone bars (top half of zoneH, deeper blue per Quentin's request).
@@ -12458,7 +15098,8 @@ function drawZ() {
   for (let i = 0; i <= 4; i++) {
     // v3.61: gridlines start at top of z-scatter (after zone bars + peaks band)
     // v3.99 t14e+ continue: zoneTop replaces pad.t (candidate bar offset)
-    const y = zoneTop + zoneH + peaksH + (i / 4) * plotH;
+    // v4 turn 10: + _wExtra so gridlines stay aligned with toY when W-row visible.
+    const y = zoneTop + zoneH + _wExtra + peaksH + (i / 4) * plotH;
     ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(pad.l + plotW, y); ctx.stroke();
   }
   const ths = [
@@ -12496,7 +15137,7 @@ function drawZ() {
   ctx.fillStyle = themeColor('ink-dim');
   ctx.font = '9px ui-monospace, monospace';
   ctx.textAlign = 'left';
-  ctx.fillText(zMode_val === 'signed' ? 'Z' : '|Z|', 4, zoneTop + zoneH + peaksH + 9);
+  ctx.fillText(zMode_val === 'signed' ? 'Z' : '|Z|', 4, zoneTop + zoneH + _wExtra + peaksH + 9);
 
   // ---------------------------------------------------------------------------
   // Z dot coloring — switchable mode (state.zColorMode):
@@ -12580,9 +15221,16 @@ function drawZ() {
   // between the L2 zone bar and the z-scatter (was filled circles at the
   // bottom of the plot area, on the dashed yellow line). Triangles point up
   // so they read as "boundary marker tied to the L1/L2 envelope above".
+  // v4 turn 10: W-row (per-window candidate-draft strip), expanded mode.
+  // Sits directly below the L2 zone bar; only visible when in candidate mode.
+  // _wRowEx was computed up front so plotH already accounts for this band.
+  if (_wRowEx) {
+    _drawWRow(ctx, d, toX, xOfWin, _wRowEx);
+  }
   if (Array.isArray(d.l2_boundaries)) {
-    const yArrowTop  = zoneTop + zoneH + 2;          // pointed tip touches just below zone bars
-    const yArrowBase = zoneTop + zoneH + peaksH - 1;  // triangle base
+    // v4 turn 10: + _wExtra so arrows sit below the W-row, not on top of it.
+    const yArrowTop  = zoneTop + zoneH + _wExtra + 2;          // pointed tip touches just below zone bars (or W-row)
+    const yArrowBase = zoneTop + zoneH + _wExtra + peaksH - 1; // triangle base
     const halfW      = 3;
     for (const b of d.l2_boundaries) {
       const wi = (b.boundary_w | 0) - 1;
@@ -12603,7 +15251,9 @@ function drawZ() {
   // shiny gold + ★. Drawn at pad.t (top of canvas plot area, before the
   // L1/L2 zone bars at zoneTop). The old strip-below-boundary-arrows
   // location has been removed.
-  drawCandidateBar(ctx, d, toX, pad.t, candBarH);
+  // v4 turn 13: candBarTotal = candBarH × n_lanes (lane-stacking when
+  // overlapping candidates exist; identical to candBarH when n_lanes=1).
+  drawCandidateBar(ctx, d, toX, pad.t, candBarTotal);
   // v4 turn 1 ask 5: "cand" label to the left of the candidate strip,
   // mirroring the L1/L2 label pattern. Same amber color, same right-
   // aligned at pad.l - 4 anchor. See the compact-mode call site above
@@ -12612,7 +15262,7 @@ function drawZ() {
   ctx.font = '8px ui-monospace, monospace';
   ctx.textAlign = 'right';
   ctx.textBaseline = 'middle';
-  ctx.fillText('cand', pad.l - 4, pad.t + candBarH / 2);
+  ctx.fillText('cand', pad.l - 4, pad.t + candBarTotal / 2);
 
   // Axes labels
   // v3.50: previous code rendered an integer label at EVERY z from 0..zMax,
@@ -12626,7 +15276,8 @@ function drawZ() {
     const y = toY(z);
     // Stay below the zone-bar + peaks strip (v3.61)
     // v3.99 t14e+ continue: use zoneTop instead of pad.t
-    if (y < zoneTop + zoneH + peaksH - 2) continue;
+    // v4 turn 10: + _wExtra so guard tracks toY in W-row mode.
+    if (y < zoneTop + zoneH + _wExtra + peaksH - 2) continue;
     // Use 1 decimal for fractional ticks (e.g. 2.5), no decimals for integers
     const lbl = (Math.abs(z - Math.round(z)) < 1e-9) ? z.toFixed(0) : z.toFixed(1);
     ctx.fillText(lbl, pad.l - 5, y + 3);
@@ -12635,7 +15286,8 @@ function drawZ() {
   const mbTicks = niceTicks(mbMin, mbMax, 6);
   for (const mb of mbTicks) {
     const x = toX(mb);
-    ctx.fillText(mb.toFixed(0), x, zoneTop + zoneH + peaksH + plotH + 14);
+    // v4 turn 10: + _wExtra so mb-axis labels stay aligned with plot bottom.
+    ctx.fillText(mb.toFixed(0), x, zoneTop + zoneH + _wExtra + peaksH + plotH + 14);
   }
   // v3.99 turn 13 ask 5: chromosome name + "(Mb)" label moved from the
   // right edge to the left edge of the X-axis.
@@ -12651,12 +15303,13 @@ function drawZ() {
   // v3.99 t14e+ continue: cursor extends from pad.t (top — through candidate
   // bar) all the way down to plot bottom, so it visually links the candidate
   // strip with the L1/L2 bars and the z-scatter as one continuous indicator.
+  // v4 turn 10: + _wExtra so the cursor reaches plot bottom in W-row mode too.
   const xCur = toX(d.windows[state.cur].center_mb);
   ctx.strokeStyle = '#f5a524';
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.moveTo(xCur + 0.5, pad.t);
-  ctx.lineTo(xCur + 0.5, zoneTop + zoneH + peaksH + plotH);
+  ctx.lineTo(xCur + 0.5, zoneTop + zoneH + _wExtra + peaksH + plotH);
   ctx.stroke();
 }
 // v3.99 t14e+ continue: drawCandidateBar replaces drawCandidateStrip per
@@ -12686,6 +15339,81 @@ function drawZ() {
 //   y0        — bar top y in canvas coords
 //   h         — bar height in px (typically 6–8)
 //   opts      — optional { showStar: bool, dimAlpha: number } for compact-mode tweaks
+// =============================================================================
+// v4 turn 13 — Deliverable B: overlapping candidates lane-stacking (SCHEMA §25)
+// -----------------------------------------------------------------------------
+// When two or more candidates overlap in window-space, the candidate bar grows
+// vertically to N lanes. Greedy lane packing: sort by start_w, place each
+// candidate in the lowest-numbered lane whose previous occupant ended before
+// this candidate starts.
+//
+// API contract:
+//   assignments: Map(cand.id -> lane index, 0-based, 0 = topmost)
+//   n_lanes:     total number of lanes needed (>= 1)
+//   When all candidates are non-overlapping → n_lanes = 1 → renderer is
+//   byte-identical to the pre-v4-turn-13 single-row behavior.
+// =============================================================================
+
+function _assignCandidateLanes(candList) {
+  if (!Array.isArray(candList) || candList.length === 0) {
+    return { assignments: new Map(), n_lanes: 1 };
+  }
+  // Sort a copy by start_w (then by id for stable order on ties)
+  const sorted = candList.slice().filter(c => c && c.start_w != null && c.end_w != null)
+    .sort((a, b) => {
+      if (a.start_w !== b.start_w) return a.start_w - b.start_w;
+      return String(a.id || '').localeCompare(String(b.id || ''));
+    });
+  // lanes[i] = end_w of last candidate placed in lane i; -Infinity = lane unused
+  const lanes = [];
+  const assignments = new Map();
+  for (const c of sorted) {
+    let placed = -1;
+    for (let i = 0; i < lanes.length; i++) {
+      // Strict overlap test: this candidate's start_w must be > last lane's
+      // end_w. If start_w === end_w of previous, they touch but don't overlap;
+      // we reuse the lane (same as L1/L2 rendering convention which uses _s0
+      // and _e0 as inclusive endpoints).
+      if (c.start_w > lanes[i]) {
+        lanes[i] = c.end_w;
+        placed = i;
+        break;
+      }
+    }
+    if (placed < 0) {
+      lanes.push(c.end_w);
+      placed = lanes.length - 1;
+    }
+    assignments.set(c.id, placed);
+  }
+  return { assignments, n_lanes: Math.max(1, lanes.length) };
+}
+
+// Hit-test for the candidate bar in 2D. Returns the candidate whose lane
+// the click landed in (the topmost match if multiple overlap the click x).
+// Args: x = canvas x-coord, y = canvas y-coord, y0 = top of candBar region,
+// h_total = total bar height (n_lanes × per-lane), toX = Mb→px function.
+// Returns null if click not inside any candidate.
+function _candidateAtClick(x, y, y0, h_total, toX, d) {
+  const candList = Array.isArray(state.candidateList) ? state.candidateList : [];
+  if (candList.length === 0) return null;
+  if (!d || !Array.isArray(d.windows)) return null;
+  const layout = _assignCandidateLanes(candList);
+  if (y < y0 || y > y0 + h_total) return null;
+  const laneH = h_total / Math.max(1, layout.n_lanes);
+  const laneIdx = Math.floor((y - y0) / laneH);
+  if (laneIdx < 0 || laneIdx >= layout.n_lanes) return null;
+  // Find the candidate in this lane whose [start_w, end_w] contains the click x
+  for (const c of candList) {
+    if (!c || c.start_w == null || c.end_w == null) continue;
+    if (layout.assignments.get(c.id) !== laneIdx) continue;
+    const x0 = toX(d.windows[c.start_w].center_mb);
+    const x1 = toX(d.windows[c.end_w].center_mb);
+    if (x >= x0 && x <= x1) return c;
+  }
+  return null;
+}
+
 function drawCandidateBar(ctx, d, toX, y0, h, opts) {
   opts = opts || {};
   const showStar = opts.showStar !== false;   // default true
@@ -12693,19 +15421,36 @@ function drawCandidateBar(ctx, d, toX, y0, h, opts) {
 
   if (!d || !Array.isArray(d.windows) || d.windows.length === 0) return;
 
-  // Faint baseline strip so the empty bar is still visible (tells the user
-  // "this region of the canvas is reserved for candidates"). Very subtle
-  // ink-dim grey at low alpha.
+  const candList = Array.isArray(state.candidateList) ? state.candidateList : [];
+
+  // v4 turn 13 (Deliverable B): lane-stack overlapping candidates. When all
+  // candidates are non-overlapping (or empty), n_lanes === 1 and the layout
+  // is byte-identical to the pre-v4-turn-13 single-row rendering.
+  const layout = _assignCandidateLanes(candList);
+  const n_lanes = layout.n_lanes;
+  const laneH = h / n_lanes;
+
+  // Faint baseline strip — stays at full bar height regardless of lane count
   ctx.fillStyle = `rgba(160, 168, 180, ${0.10 * dimAlpha})`;
   const xLeft  = toX(d.windows[0].center_mb);
   const xRight = toX(d.windows[d.n_windows - 1].center_mb);
   ctx.fillRect(xLeft, y0, xRight - xLeft, h);
 
-  const candList = Array.isArray(state.candidateList) ? state.candidateList : [];
+  // Thin lane separators when stacked (1 px dim line between adjacent lanes)
+  if (n_lanes > 1) {
+    ctx.fillStyle = `rgba(160, 168, 180, ${0.20 * dimAlpha})`;
+    for (let i = 1; i < n_lanes; i++) {
+      ctx.fillRect(xLeft, y0 + i * laneH - 0.5, xRight - xLeft, 1);
+    }
+  }
 
-  // Pass 1: pending (grey) — drawn first so confirmed (gold) sits on top
-  // visually if any happen to overlap (rare but possible if user flips
-  // confirmed flags or if windows touch).
+  // Helper: get this candidate's per-lane (y0, h) tuple
+  const laneYHt = (c) => {
+    const li = layout.assignments.has(c.id) ? layout.assignments.get(c.id) : 0;
+    return { yLane: y0 + li * laneH, hLane: laneH };
+  };
+
+  // Pass 1: pending (grey)
   ctx.fillStyle = `rgba(120, 130, 145, ${0.55 * dimAlpha})`;
   for (const c of candList) {
     if (!c || c.confirmed) continue;
@@ -12715,7 +15460,8 @@ function drawCandidateBar(ctx, d, toX, y0, h, opts) {
     if (s0 > e0) continue;
     const x0 = toX(d.windows[s0].center_mb);
     const x1 = toX(d.windows[e0].center_mb);
-    ctx.fillRect(x0, y0, Math.max(2, x1 - x0), h);
+    const { yLane, hLane } = laneYHt(c);
+    ctx.fillRect(x0, yLane, Math.max(2, x1 - x0), hLane);
   }
 
   // Pass 2: confirmed (shiny gold gradient + ★)
@@ -12728,28 +15474,29 @@ function drawCandidateBar(ctx, d, toX, y0, h, opts) {
     const x0 = toX(d.windows[s0].center_mb);
     const x1 = toX(d.windows[e0].center_mb);
     const w  = Math.max(2, x1 - x0);
+    const { yLane, hLane } = laneYHt(c);
 
     // Vertical gradient — light gold at top, deeper gold at bottom, with
     // a brighter highlight band near the top for the "shiny" feel.
-    const grad = ctx.createLinearGradient(0, y0, 0, y0 + h);
+    const grad = ctx.createLinearGradient(0, yLane, 0, yLane + hLane);
     grad.addColorStop(0,    `rgba(255, 230, 130, ${0.95 * dimAlpha})`);  // pale shine
     grad.addColorStop(0.35, `rgba(245, 200, 60,  ${0.95 * dimAlpha})`);  // mid-gold
     grad.addColorStop(1,    `rgba(190, 145, 25,  ${0.95 * dimAlpha})`);  // deep gold
     ctx.fillStyle = grad;
-    ctx.fillRect(x0, y0, w, h);
+    ctx.fillRect(x0, yLane, w, hLane);
 
     // Thin warm outline so the gold reads as solid against the panel bg
     ctx.strokeStyle = `rgba(140, 95, 10, ${0.85 * dimAlpha})`;
     ctx.lineWidth = 1;
-    ctx.strokeRect(x0 + 0.5, y0 + 0.5, w - 1, h - 1);
+    ctx.strokeRect(x0 + 0.5, yLane + 0.5, w - 1, hLane - 1);
 
     // ★ glyph centered in the bar, only if the bar is wide enough
     // to actually display it (≥ 12 px). Drawn in white with a subtle
     // dark drop shadow for legibility against the gold gradient.
-    if (showStar && w >= 12 && h >= 6) {
+    if (showStar && w >= 12 && hLane >= 6) {
       const cx = x0 + w / 2;
-      const cy = y0 + h / 2 + 0.5;   // +0.5 for visual centering of ★
-      const fontPx = Math.min(h + 2, Math.max(8, h));
+      const cy = yLane + hLane / 2 + 0.5;   // +0.5 for visual centering of ★
+      const fontPx = Math.min(hLane + 2, Math.max(8, hLane));
       ctx.font = `${fontPx}px serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -12766,6 +15513,8 @@ function drawCandidateBar(ctx, d, toX, y0, h, opts) {
   // signals "you're shaping a candidate but haven't promoted it yet".
   // Sits ON TOP of pending/confirmed bars so the user can see the active
   // edit position even if it overlaps existing candidates.
+  // The draft always renders at FULL bar height (across all lanes) so it
+  // reads as the active edit, not just one lane.
   if (state.candidateMode && state.l3Draft && Array.isArray(d.l2_envelopes)) {
     const draft = state.l3Draft;
     const lo = d.l2_envelopes[draft.l2_left];
@@ -15721,6 +18470,14 @@ function renderL3Panel() {
   const d = state.data;
   if (!d) return;
 
+  // v4 turn 12a (Deliverable D): scale-stability mode short-circuits both
+  // the L2 path AND the slab path. When state.l3Mode === 'scale_stability'
+  // the carousel shows three different SCALES (fine / medium / coarse) on
+  // the same focal window, with cross-scale fuse/split detection.
+  if (state.l3Mode === 'scale_stability') {
+    return renderL3PanelScaleStability();
+  }
+
   // v3.45: slab mode short-circuits the L2-based path. compareUnit ≠ 'L2'
   // means each pane represents a slab of W windows, not an L2 envelope.
   // Sub-step A: render only the focal slab pane; neighbor panes show
@@ -18318,6 +21075,7 @@ function onZClick(evt) {
   const rect = canvas.getBoundingClientRect();
   const pad = { l: 44, r: 16 };
   const x = evt.clientX - rect.left;
+  const y = evt.clientY - rect.top;     // v4 turn 10: track y for W-row hit-test
   const plotW = rect.width - pad.l - pad.r;
   const frac = Math.max(0, Math.min(1, (x - pad.l) / plotW));
   const d = state.data;
@@ -18329,6 +21087,44 @@ function onZClick(evt) {
     const dd = Math.abs(d.windows[i].center_mb - targetMb);
     if (dd < bestD) { bestD = dd; bestI = i; }
   }
+  // v4 turn 10: if the click landed inside the W-row, treat it as a window-
+  // resolution draft edit instead of a setCur jump. The W-row's y-band is
+  // computed from the same layout constants drawZ uses.
+  // We need to mirror drawZ's collapsed/expanded layout choice here:
+  //   collapsed mode uses padT=2, candBarH=5, candGap=1, zoneH=14
+  //   expanded mode uses padT=14, candBarH=7, candGap=2, zoneH=14
+  // _wRowBand returns null when the W-row isn't visible, so we fall through
+  // to setCur in those cases.
+  // v4 turn 13 (Deliverable B): account for multi-lane candBar height
+  // (candBarTotal = candBarH × n_lanes). The candidate-click hit-test runs
+  // BEFORE the W-row test so clicks on stacked candidate bars route to
+  // candidate selection rather than setCur.
+  const collapsed = !!state.zCollapsed;
+  const padT     = collapsed ? 2 : 14;
+  const candBarH = collapsed ? 5 : 7;
+  const candGap  = collapsed ? 1 : 2;
+  const _candLanes = (typeof _assignCandidateLanes === 'function')
+    ? _assignCandidateLanes(state.candidateList || []).n_lanes : 1;
+  const candBarTotal = candBarH * _candLanes;
+  const zoneTop  = padT + candBarTotal + candGap;
+  const zoneH    = 14;
+  // Mb→px function matching drawZ's
+  const toX_click = (mb) => pad.l + ((mb - mbMin) / (mbMax - mbMin)) * plotW;
+  // v4 turn 13: candidate hit-test (lane-aware) — sets active candidate on hit
+  if (typeof _candidateAtClick === 'function') {
+    const hit = _candidateAtClick(x, y, padT, candBarTotal, toX_click, d);
+    if (hit) {
+      state.candidate = hit;
+      try { localStorage.setItem('pca_scrubber_v3.activeCandidateId', hit.id || ''); } catch (_) {}
+      // Trigger a re-render so the new active candidate's downstream views
+      // (candidate-focus tab, scale-stability "candidate" scale) update.
+      if (typeof drawZ === 'function') drawZ();
+      if (typeof renderL3Panel === 'function') renderL3Panel();
+      if (typeof renderCandidateMetadata === 'function') renderCandidateMetadata();
+      return;
+    }
+  }
+  if (_wRowHandleClick(y, bestI, { collapsed, zoneTop, zoneH })) return;
   setCur(bestI);
 }
 function onPCAClick(evt) {
@@ -18987,6 +21783,10 @@ function detectSchemaAndLayers(data) {
         case 'ancestry_window':      ok = !!data.ancestry_window && Array.isArray(data.ancestry_window.start_bp); break;
         case 'ancestry_sample':      ok = !!data.ancestry_sample && Array.isArray(data.ancestry_sample.samples); break;
         case 'ancestry_q_means':     ok = !!data.ancestry_q_means && !!data.ancestry_q_means.q_means; break;
+        // v4 turn 9: ancestry-confound layers
+        case 'ancestry_q_global':    ok = !!data.ancestry_q_global && Array.isArray(data.ancestry_q_global.samples) && Array.isArray(data.ancestry_q_global.q); break;
+        case 'ancestry_q_chrom':     ok = !!data.ancestry_q_chrom && Array.isArray(data.ancestry_q_chrom.samples) && Array.isArray(data.ancestry_q_chrom.q); break;
+        case 'snp_q_support':        ok = !!data.snp_q_support && Array.isArray(data.snp_q_support.snps); break;
         case 'relatedness':          ok = !!data.relatedness && Array.isArray(data.relatedness.samples) &&
                                           Array.isArray(data.relatedness.hub_id_1st); break;
         // Phase 4b
@@ -19167,6 +21967,10 @@ function mergeEnrichmentLayers(enrichmentData) {
       case 'ancestry_window':      if (enrichmentData.ancestry_window)      state.data.ancestry_window = enrichmentData.ancestry_window; break;
       case 'ancestry_sample':      if (enrichmentData.ancestry_sample)      state.data.ancestry_sample = enrichmentData.ancestry_sample; break;
       case 'ancestry_q_means':     if (enrichmentData.ancestry_q_means)     state.data.ancestry_q_means = enrichmentData.ancestry_q_means; break;
+      // v4 turn 9: ancestry-confound layers
+      case 'ancestry_q_global':    if (enrichmentData.ancestry_q_global)    state.data.ancestry_q_global = enrichmentData.ancestry_q_global; break;
+      case 'ancestry_q_chrom':     if (enrichmentData.ancestry_q_chrom)     state.data.ancestry_q_chrom = enrichmentData.ancestry_q_chrom; break;
+      case 'snp_q_support':        if (enrichmentData.snp_q_support)        state.data.snp_q_support = enrichmentData.snp_q_support; break;
       case 'relatedness':          if (enrichmentData.relatedness)          state.data.relatedness = enrichmentData.relatedness; break;
       // Phase 4b
       case 'cluster_labels_theta': if (enrichmentData.cluster_labels_theta) state.data.cluster_labels_theta = enrichmentData.cluster_labels_theta; break;
@@ -19407,6 +22211,24 @@ function loadMultipleJSONs(files) {
     reader.onload = (e) => {
       try {
         const data = JSON.parse(e.target.result);
+        // v4 turn 18: route v2 repeat density JSONs to their own handler
+        // BEFORE the chromosome path, since they don't carry the n_windows /
+        // windows[] shape that _isChromosomeJSON looks for.
+        if (_isRepeatDensityJSON(data)) {
+          const chrom = _storeRepeatDensity(data);
+          if (chrom) {
+            _persistRepeatDensity(chrom);
+            console.info('[repeatDensity] loaded', chrom,
+                         '·', data.n_classes || '?', 'classes');
+            // If the boundaries page is currently rendered, refresh it so
+            // the panel picks up the new data.
+            try {
+              if (typeof _bndDrawTracks === 'function') _bndDrawTracks();
+            } catch (_) {}
+          }
+          next();
+          return;
+        }
         const chrom = data.chrom || f.name.replace(/\.json$/, '');
         data.chrom = chrom;
         _chromCache.set(chrom, data);
@@ -20014,6 +22836,11 @@ function candidateToJSON(cand) {
     created_at:    cand.created_at,
     notes:         cand.notes || '',
     confirmed:     !!cand.confirmed,           // v3.47: user-flagged "confirmed" candidates
+    // v4 turn 10 (SCHEMA §24): window-resolution + L3-cuts round-trip.
+    // Old candidates without these fields read back as resolution='L2' and
+    // l3_cuts=[] in candidateFromJSON, preserving back-compat.
+    resolution:    cand.resolution || 'L2',
+    l3_cuts:       Array.isArray(cand.l3_cuts) ? cand.l3_cuts.slice() : [],
   };
 }
 
@@ -20035,6 +22862,10 @@ function candidateFromJSON(obj) {
     created_at:    obj.created_at || Date.now(),
     notes:         obj.notes || '',
     confirmed:     !!obj.confirmed,
+    // v4 turn 10 (SCHEMA §24): default to L2 resolution for old candidates
+    // that don't carry these fields. Empty l3_cuts list preserves "no cuts".
+    resolution:    (obj.resolution === 'W') ? 'W' : 'L2',
+    l3_cuts:       Array.isArray(obj.l3_cuts) ? obj.l3_cuts.slice() : [],
   };
 }
 
@@ -20662,6 +23493,382 @@ function renderMarkerPage() {
   if ('innerHTML' in slot) slot.innerHTML = html;
 }
 
+// =============================================================================
+// v4 turn 9: ANCESTRY-CONFOUND PANEL  (Item 0 from handoff)
+// -----------------------------------------------------------------------------
+// Three independent tests + one combined synthesis verdict, asking:
+//   Test 1 (genome-wide):     do the candidate's K-band assignments track the
+//                             samples' genome-wide Q? (whole-genome ancestry)
+//   Test 2 (focal-chrom):     do they track the samples' Q on THIS chromosome
+//                             only? (catches per-chrom inheritance differences
+//                             that genome-wide Q smooths over)
+//   Test 3 (SNP-level):       are the SNPs INSIDE the candidate's span anchored
+//                             to one Q component, or ancestry-mixed?
+//
+// All three tests render an empty state when their layer is absent. Tests 1+2
+// require: state.data.ancestry_q_global / .ancestry_q_chrom (sample × K
+// matrices, from MODULE_2B q_global.tsv / q_chromosome.tsv).
+// Test 3 requires: state.data.snp_q_support (per-SNP × K loadings, from
+// MODULE_2C q_support_per_snp.tsv).
+// SCHEMA additions documented in SCHEMA_v2_25_DRAFT.md (will be promoted to
+// SCHEMA §28 once panel ships).
+// =============================================================================
+
+// --- Pure-math helpers (mirror /tmp/w2/_prep_ancestry_confound.js, 14/14 tests) ---
+
+function _ancCramersV(labelsA, labelsB) {
+  if (!Array.isArray(labelsA) || !Array.isArray(labelsB))      return { v: NaN, ok: false, why: 'inputs not arrays' };
+  if (labelsA.length !== labelsB.length)                       return { v: NaN, ok: false, why: 'length mismatch' };
+  const n = labelsA.length;
+  if (n < 2)                                                   return { v: NaN, ok: false, why: 'n<2' };
+  const valsA = Array.from(new Set(labelsA)).sort((x, y) => x - y);
+  const valsB = Array.from(new Set(labelsB)).sort((x, y) => x - y);
+  const rA = valsA.length, rB = valsB.length;
+  if (rA < 2 || rB < 2)                                        return { v: 0, ok: false, why: 'one-class' };
+  const idxA = new Map(valsA.map((v, i) => [v, i]));
+  const idxB = new Map(valsB.map((v, i) => [v, i]));
+  const obs = Array.from({ length: rA }, () => new Array(rB).fill(0));
+  for (let i = 0; i < n; i++) obs[idxA.get(labelsA[i])][idxB.get(labelsB[i])]++;
+  const rowSum = obs.map(r => r.reduce((s, v) => s + v, 0));
+  const colSum = new Array(rB).fill(0);
+  for (let i = 0; i < rA; i++) for (let j = 0; j < rB; j++) colSum[j] += obs[i][j];
+  let chi2 = 0;
+  for (let i = 0; i < rA; i++) {
+    for (let j = 0; j < rB; j++) {
+      const exp = (rowSum[i] * colSum[j]) / n;
+      if (exp > 0) { const d = obs[i][j] - exp; chi2 += (d * d) / exp; }
+    }
+  }
+  const v = Math.sqrt(chi2 / (n * Math.min(rA - 1, rB - 1)));
+  return { v, chi2, n, rA, rB, ok: true, why: '' };
+}
+
+function _ancPearson(x, y) {
+  const n = x.length;
+  if (n < 2) return NaN;
+  let sx = 0, sy = 0;
+  for (let i = 0; i < n; i++) { sx += x[i]; sy += y[i]; }
+  const mx = sx / n, my = sy / n;
+  let num = 0, dx2 = 0, dy2 = 0;
+  for (let i = 0; i < n; i++) {
+    const a = x[i] - mx, b = y[i] - my;
+    num += a * b; dx2 += a * a; dy2 += b * b;
+  }
+  const denom = Math.sqrt(dx2 * dy2);
+  if (denom === 0) return 0;
+  return num / denom;
+}
+
+function _ancMaxAbsBandQCorr(labels, Q) {
+  if (!Array.isArray(labels) || !Array.isArray(Q))             return { maxAbs: NaN, byBand: {}, ok: false, why: 'inputs not arrays' };
+  const n = labels.length;
+  if (n < 2 || Q.length !== n)                                 return { maxAbs: NaN, byBand: {}, ok: false, why: 'length mismatch or n<2' };
+  const K = Q[0] && Q[0].length;
+  if (!K || K < 1)                                             return { maxAbs: NaN, byBand: {}, ok: false, why: 'no Q columns' };
+  const bands = Array.from(new Set(labels)).sort((a, b) => a - b);
+  let maxAbs = 0;
+  const byBand = {};
+  for (const b of bands) {
+    const indicator = labels.map(L => (L === b ? 1 : 0));
+    let bestK = -1, bestR = 0, bestAbs = 0;
+    for (let k = 0; k < K; k++) {
+      const col = new Array(n);
+      for (let i = 0; i < n; i++) col[i] = Q[i][k];
+      const r = _ancPearson(indicator, col);
+      const ar = Math.abs(r);
+      if (ar > bestAbs) { bestAbs = ar; bestR = r; bestK = k; }
+    }
+    byBand[b] = { Qk: bestK, r: bestR };
+    if (bestAbs > maxAbs) maxAbs = bestAbs;
+  }
+  return { maxAbs, byBand, ok: true, why: '' };
+}
+
+function _ancVerdictSampleLevel(v, maxAbs, opts) {
+  const t = Object.assign({
+    suspect_v: 0.6, suspect_corr: 0.7, indep_v: 0.3, indep_corr: 0.4,
+  }, opts || {});
+  if (!isFinite(v) || !isFinite(maxAbs)) return 'INCONCLUSIVE';
+  if (v >= t.suspect_v || maxAbs >= t.suspect_corr) return 'BAND_TRACKS_ANCESTRY';
+  if (v < t.indep_v && maxAbs < t.indep_corr)       return 'BAND_INDEPENDENT_OF_ANCESTRY';
+  return 'INCONCLUSIVE';
+}
+
+// --- Test 3 helper: SNP-level coherence + dominant-Q distribution ---
+// Input: snps[] each with { chrom, pos, best_Q (1..K), support: [K] }
+// Output: { coherence, dominantQ, dominantFrac, entropy, n, ok, why }
+//   coherence    = max(P(best_Q)), i.e. fraction of SNPs whose dominant Q
+//                  matches the modal best_Q
+//   dominantQ    = the modal best_Q label
+//   entropy      = Shannon entropy of best_Q distribution (bits)
+//   n            = SNP count
+function _ancSnpCoherence(snps) {
+  if (!Array.isArray(snps))                                    return { ok: false, why: 'no snps array' };
+  const n = snps.length;
+  if (n < 5)                                                   return { ok: false, why: `n<5 (got ${n})`, n };
+  const counts = new Map();
+  let total = 0;
+  for (const s of snps) {
+    if (!s || s.best_Q == null) continue;
+    const k = s.best_Q;
+    counts.set(k, (counts.get(k) || 0) + 1);
+    total++;
+  }
+  if (total === 0)                                             return { ok: false, why: 'no best_Q values', n };
+  let dominantQ = -1, dominantN = 0;
+  for (const [k, c] of counts) if (c > dominantN) { dominantN = c; dominantQ = k; }
+  const dominantFrac = dominantN / total;
+  let entropy = 0;
+  for (const c of counts.values()) {
+    const p = c / total;
+    if (p > 0) entropy -= p * Math.log2(p);
+  }
+  return { coherence: dominantFrac, dominantQ, dominantFrac, entropy, n: total, ok: true, why: '' };
+}
+
+function _ancVerdictSnpLevel(coh, opts) {
+  const t = Object.assign({ coherent: 0.65, mixed: 0.40 }, opts || {});
+  if (!coh || !coh.ok) return 'INCONCLUSIVE';
+  if (coh.coherence >= t.coherent) return 'Q_COHERENT';
+  if (coh.coherence < t.mixed)     return 'Q_MIXED';
+  return 'Q_PARTIAL';
+}
+
+// --- Combined synthesis verdict ---
+// Distinguishes patterns rather than just AND-ing the three tests:
+//   ALL_THREE_SUSPECT  : both sample-level tests fire AND SNPs anchor on the
+//                        same Q the bands track. Strongest ancestry-artifact case.
+//   GENOME_ONLY        : genome-wide bands track Q but focal-chrom doesn't.
+//                        Candidate is on a chromosome that breaks the
+//                        cohort-level pattern.
+//   FOCAL_ONLY         : focal-chrom Q tracks but genome-wide doesn't. Most
+//                        interesting case — real chromosomal segregation
+//                        with one broodline, NOT genome-wide ancestry artifact.
+//   SAMPLE_INDEPENDENT : both sample-level tests come back INDEPENDENT.
+//                        Strongest "real local biology" case.
+//   PARTIAL            : mixed signals, sample-level inconclusive
+//   EMPTY              : no Q layers loaded
+function _ancCombinedVerdict(t1, t2, t3) {
+  const have1 = t1 && t1.ok, have2 = t2 && t2.ok, have3 = t3 && t3.ok;
+  if (!have1 && !have2 && !have3) return 'EMPTY';
+  const v1 = have1 ? t1.verdict : null;
+  const v2 = have2 ? t2.verdict : null;
+  const v3 = have3 ? t3.verdict : null;
+  const susp1 = v1 === 'BAND_TRACKS_ANCESTRY';
+  const susp2 = v2 === 'BAND_TRACKS_ANCESTRY';
+  const indep1 = v1 === 'BAND_INDEPENDENT_OF_ANCESTRY';
+  const indep2 = v2 === 'BAND_INDEPENDENT_OF_ANCESTRY';
+  const coherent = v3 === 'Q_COHERENT';
+  if (have1 && have2 && susp1 && susp2 && coherent)            return 'ALL_THREE_SUSPECT';
+  if (have1 && have2 && susp1 && !susp2)                       return 'GENOME_ONLY';
+  if (have1 && have2 && !susp1 && susp2)                       return 'FOCAL_ONLY';
+  if (have1 && have2 && indep1 && indep2)                      return 'SAMPLE_INDEPENDENT';
+  if ((susp1 || susp2) && !coherent && have3)                  return 'PARTIAL';
+  return 'PARTIAL';
+}
+
+// --- Layer accessors ---
+// Each accessor returns null when the layer is absent or malformed.
+// Shape returned: { K, samples: string[], q: number[][], source: string }
+function _ancGetGlobalQ(stateData) {
+  const L = stateData && stateData.ancestry_q_global;
+  if (!L || !Array.isArray(L.samples) || !Array.isArray(L.q)) return null;
+  return { K: L.K, samples: L.samples, q: L.q, source: 'q_global.tsv (genome-wide, all chroms)' };
+}
+function _ancGetChromQ(stateData) {
+  const L = stateData && stateData.ancestry_q_chrom;
+  if (!L || !Array.isArray(L.samples) || !Array.isArray(L.q)) return null;
+  return { K: L.K, samples: L.samples, q: L.q, chrom: L.chrom,
+           source: 'q_chromosome.tsv (focal chrom: ' + (L.chrom || '?') + ')' };
+}
+function _ancGetSnpSupport(stateData, startBp, endBp) {
+  const L = stateData && stateData.snp_q_support;
+  if (!L || !Array.isArray(L.snps)) return null;
+  const inSpan = L.snps.filter(s => s && s.pos >= startBp && s.pos <= endBp);
+  return { K: L.K, snps: inSpan, total_in_layer: L.snps.length,
+           source: 'q_support_per_snp.tsv (n=' + inSpan.length + ' SNPs in candidate span)' };
+}
+
+// --- Align candidate.locked_labels to Q.samples ordering ---
+// state.data.samples may not match the Q layer's sample order. Build per-Q-row
+// labels by looking up each Q-sample-name in state.data.samples and reading
+// the corresponding locked_labels entry.
+function _ancAlignLabels(c, qLayer) {
+  if (!c || !c.locked_labels || !qLayer || !qLayer.samples) return null;
+  const dataSamples = state.data && state.data.samples;
+  if (!dataSamples) return null;
+  const nameToIdx = new Map();
+  for (let i = 0; i < dataSamples.length; i++) {
+    const nm = (dataSamples[i].cga || dataSamples[i].ind);
+    if (nm) nameToIdx.set(String(nm), i);
+  }
+  const labels = [];
+  const Q = [];
+  let nMissing = 0;
+  for (let qi = 0; qi < qLayer.samples.length; qi++) {
+    const nm = String(qLayer.samples[qi]);
+    const di = nameToIdx.get(nm);
+    if (di == null) { nMissing++; continue; }
+    const lbl = c.locked_labels[di];
+    if (lbl == null || lbl < 0) continue;
+    labels.push(lbl);
+    Q.push(qLayer.q[qi]);
+  }
+  return { labels, Q, n: labels.length, n_missing: nMissing };
+}
+
+// --- Run a sample-level test (Test 1 or Test 2) ---
+function _ancRunSampleTest(c, qLayer) {
+  if (!qLayer) return { ok: false, why: 'layer absent' };
+  const aligned = _ancAlignLabels(c, qLayer);
+  if (!aligned || aligned.n < 10) {
+    return { ok: false, why: 'insufficient overlap (n=' + (aligned ? aligned.n : 0) + ')' };
+  }
+  const argmaxQ = aligned.Q.map(qVec => {
+    let bestK = 0, bestV = -Infinity;
+    for (let k = 0; k < qVec.length; k++) if (qVec[k] > bestV) { bestV = qVec[k]; bestK = k; }
+    return bestK;
+  });
+  const cv = _ancCramersV(aligned.labels, argmaxQ);
+  const corr = _ancMaxAbsBandQCorr(aligned.labels, aligned.Q);
+  const verdict = _ancVerdictSampleLevel(cv.v, corr.maxAbs);
+  return {
+    ok: true, n: aligned.n, n_missing: aligned.n_missing,
+    cramersV: cv.v, maxAbsCorr: corr.maxAbs,
+    byBand: corr.byBand, verdict, source: qLayer.source, K: qLayer.K,
+  };
+}
+
+// --- HTML builder ---
+function candidateAncestryConfoundHtml(c) {
+  if (!c) return '';
+  const sd = state.data || {};
+
+  // Load the three layers
+  const globalQ = _ancGetGlobalQ(sd);
+  const chromQ  = _ancGetChromQ(sd);
+  const snpSup  = _ancGetSnpSupport(sd, c.start_bp, c.end_bp);
+
+  // Run the three tests
+  const t1 = _ancRunSampleTest(c, globalQ);
+  const t2 = _ancRunSampleTest(c, chromQ);
+  let t3 = { ok: false, why: 'layer absent' };
+  if (snpSup && Array.isArray(snpSup.snps)) {
+    const coh = _ancSnpCoherence(snpSup.snps);
+    if (coh.ok) {
+      t3 = Object.assign({}, coh, {
+        ok: true,
+        verdict: _ancVerdictSnpLevel(coh),
+        source: snpSup.source, K: snpSup.K,
+      });
+    } else {
+      t3 = { ok: false, why: coh.why || 'snp coherence failed', source: snpSup.source };
+    }
+  }
+
+  const combined = _ancCombinedVerdict(t1, t2, t3);
+
+  // Test card renderers
+  function pillFor(verdict) {
+    const cls = ({
+      'BAND_TRACKS_ANCESTRY':         'suspect',
+      'BAND_INDEPENDENT_OF_ANCESTRY': 'independent',
+      'INCONCLUSIVE':                 'inconclusive',
+      'Q_COHERENT':                   'suspect',
+      'Q_MIXED':                      'independent',
+      'Q_PARTIAL':                    'inconclusive',
+    })[verdict] || 'empty';
+    return '<span class="anc-verdict-pill ' + cls + '">' + verdict + '</span>';
+  }
+  function emptyCard(name, why) {
+    return '<div class="anc-test-card">' +
+           '<div class="anc-test-name">' + name + '</div>' +
+           '<div class="anc-test-empty">layer not loaded — ' + why + '</div>' +
+           '<span class="anc-verdict-pill empty">NO DATA</span>' +
+           '</div>';
+  }
+  function sampleCard(name, t) {
+    if (!t.ok) return '<div class="anc-test-card">' +
+                      '<div class="anc-test-name">' + name + '</div>' +
+                      '<div class="anc-test-empty">' + t.why + '</div>' +
+                      '<span class="anc-verdict-pill empty">N/A</span>' +
+                      '</div>';
+    return '<div class="anc-test-card">' +
+           '<div class="anc-test-name">' + name + '</div>' +
+           '<div class="anc-test-source">' + t.source + ' · K=' + t.K + '</div>' +
+           '<div class="anc-test-metric">' +
+              '<div><span>Cramér V</span><b>' + t.cramersV.toFixed(3) + '</b></div>' +
+              '<div><span>max |corr|</span><b>' + t.maxAbsCorr.toFixed(3) + '</b></div>' +
+              '<div><span>n samples</span>' + t.n + (t.n_missing ? ' (' + t.n_missing + ' unmatched)' : '') + '</div>' +
+           '</div>' +
+           pillFor(t.verdict) +
+           '</div>';
+  }
+  function snpCard(name, t) {
+    if (!t.ok) return '<div class="anc-test-card">' +
+                      '<div class="anc-test-name">' + name + '</div>' +
+                      '<div class="anc-test-empty">' + t.why + '</div>' +
+                      '<span class="anc-verdict-pill empty">N/A</span>' +
+                      '</div>';
+    return '<div class="anc-test-card">' +
+           '<div class="anc-test-name">' + name + '</div>' +
+           '<div class="anc-test-source">' + t.source + '</div>' +
+           '<div class="anc-test-metric">' +
+              '<div><span>coherence</span><b>' + (t.coherence * 100).toFixed(1) + '%</b></div>' +
+              '<div><span>dominant Q</span>Q' + t.dominantQ + '</div>' +
+              '<div><span>entropy</span>' + t.entropy.toFixed(2) + ' bits</div>' +
+              '<div><span>n biSNPs</span>' + t.n + '</div>' +
+           '</div>' +
+           pillFor(t.verdict) +
+           '</div>';
+  }
+
+  const card1 = (t1.ok || globalQ) ? sampleCard('Test 1 · genome-wide ancestry confound', t1)
+                                   : emptyCard('Test 1 · genome-wide ancestry confound',
+                                               'state.data.ancestry_q_global missing (apply R-side patch + re-run export)');
+  const card2 = (t2.ok || chromQ)  ? sampleCard('Test 2 · focal-chrom ancestry confound', t2)
+                                   : emptyCard('Test 2 · focal-chrom ancestry confound',
+                                               'state.data.ancestry_q_chrom missing (apply R-side patch + re-run export)');
+  const card3 = (t3.ok || snpSup)  ? snpCard('Test 3 · SNP-level Q coherence', t3)
+                                   : emptyCard('Test 3 · SNP-level Q coherence',
+                                               'state.data.snp_q_support missing (run MODULE_2C + add to ancestry export)');
+
+  // Combined verdict text
+  const combinedText = ({
+    'ALL_THREE_SUSPECT':  'STRONG SUSPECT — bands track Q both genome-wide AND on this chromosome, AND the SNPs in this candidate anchor to a single Q component. Most likely ancestry/broodline artifact rather than a real inversion.',
+    'GENOME_ONLY':        'PARTIAL — bands track genome-wide ancestry but NOT focal-chrom ancestry. Candidate may sit on a chromosome that breaks the cohort-level pattern. Worth examining alongside the focal-chrom Q distribution.',
+    'FOCAL_ONLY':         'INTERESTING — bands track focal-chromosome ancestry but NOT genome-wide ancestry. Consistent with real chromosomal structure where one broodline contributed THIS chromosome, even though samples are mixed elsewhere. Not a generic ancestry artifact.',
+    'SAMPLE_INDEPENDENT': 'CLEAN — bands do NOT track sample ancestry at either scale. Strong "real local biology" signal. Cross-validate with Test 3 SNP coherence: mixed SNPs strengthens the call.',
+    'PARTIAL':            'PARTIAL — mixed signals across the three tests. Examine each card; weigh genome-wide vs focal-chrom carefully if they disagree.',
+    'EMPTY':              'NO DATA — none of the three Q layers loaded. Apply the R-side export patch and re-run export_ancestry_to_json_v1.R to enable the panel.',
+  })[combined] || 'PARTIAL — see individual cards.';
+
+  return '<div class="cand-section" id="candAncestryConfoundSec">' +
+         '<div class="cand-eyebrow">ancestry-confound assessment</div>' +
+         '<h4 class="cand-h4">do these K-bands track sample ancestry?</h4>' +
+         '<div class="anc-confound-grid">' + card1 + card2 + card3 + '</div>' +
+         '<div class="anc-combined-row">' +
+           '<span class="anc-combined-label">combined</span>' +
+           '<span class="anc-combined-text">' + combinedText + '</span>' +
+         '</div>' +
+         '<div class="anc-confound-help">' +
+           'Three tests. Test 1+2 use Cramér\'s V (categorical association of K-bands vs argmax-Q) and max ' +
+           '|Pearson correlation| (band indicator vs Q column); thresholds suspect&nbsp;V≥0.6 or |corr|≥0.7, ' +
+           'independent V&lt;0.3 and |corr|&lt;0.4. Test 3 measures the modal best-Q fraction across SNPs ' +
+           'in the candidate\'s span; ≥65% coherent, &lt;40% mixed. Combined synthesis prefers the ' +
+           'discordance pattern over a flat AND. Not a publication-ready threshold — verdicts are decision ' +
+           'support, not validated calls.' +
+         '</div>' +
+         '</div>';
+}
+
+function wireCandidateAncestryConfound(c) {
+  // Currently the panel is read-only (no interactive elements). This wirer
+  // exists for symmetry with the rest of the candidate page and to hold
+  // future interactions (threshold sliders, Q-source picker, etc.).
+  void c;
+}
+
 function renderCandidateMetadata() {
   // Full deep-dive view (Turn B). Composes:
   //   - candidate header (chrom, span, source, K, action buttons)
@@ -20696,6 +23903,8 @@ function renderCandidateMetadata() {
     candidateProfileHtml(c, profile) +
     candidateSigmaChartHtml(c, profile) +
     candidateBandsHtml(c, bands) +
+    candidateAncestryConfoundHtml(c) +     // v4 turn 9: ancestry-confound panel
+    candidateRegimeRowHtml(c) +            // v4 turn 15b: regime registry strip
     candidateNotesHtml(c);
 
   // Wire interactions after DOM insertion
@@ -20704,6 +23913,8 @@ function renderCandidateMetadata() {
   if (typeof _wireCandidateBlockChips === 'function') {
     try { _wireCandidateBlockChips(); } catch (e) { console.warn('_wireCandidateBlockChips:', e.message); }
   }
+  try { wireCandidateAncestryConfound(c); } catch (e) { console.warn('wireCandidateAncestryConfound:', e.message); }
+  try { _wireCandidateRegimeRow(c); } catch (e) { console.warn('_wireCandidateRegimeRow:', e.message); }
   drawCandidateLocationStrip(c);           // v3.47: simdat / L1 / karyogram minis
   // v3.48: ready-data analysis panels
   requestAnimationFrame(() => {
@@ -26257,9 +29468,191 @@ function setCandidateMode(b) {
   }
 }
 
-// Initialize the focal L2's draft when the user first hits arrow-up. The
-// draft is anchored at the current focal L2 (the ◆ pane in the L3 carousel)
-// and extends rightward by one neighbor per arrow-up press.
+// =============================================================================
+// v4 turn 10 — Deliverable A: per-window row in candidate strip (SCHEMA §24)
+// -----------------------------------------------------------------------------
+// A third zone-bar slot below the existing L2 zone bar, visible only in
+// candidate mode. Lets the user pick a window-resolution span instead of
+// using whole-L2 envelopes (which average ~90 windows / ~10 Mb in this cohort
+// and over-call when the inversion is a 3-Mb peak inside one L2).
+//
+// Visual layout of the W-row (8 px high) inside the focal L2's window range:
+//   - faint baseline strip across the focal L2's width
+//   - 1 px ticks at every window boundary
+//   - if draft.resolution === 'W': filled amber block from start_w..end_w
+//     plus 3 px-wide amber drag handles at the edges
+//
+// State: state.l3Draft.{resolution, start_w, end_w, l3_cuts} per SCHEMA §24.
+// Old saved candidates default to resolution='L2' on read.
+// =============================================================================
+
+// Layout constants — kept in one place so drawZ + onZClick agree.
+const W_ROW_H_EXPANDED  = 8;
+const W_ROW_GAP_EXPANDED = 2;
+const W_ROW_H_COLLAPSED = 6;
+const W_ROW_GAP_COLLAPSED = 1;
+
+// Should the W-row be visible right now? Yes only if (a) candidate mode is
+// active and (b) we have data. The row's content is rendered against the
+// focal L2's window range — we still draw a faint baseline even when no
+// draft exists yet, so the user knows the row is there to interact with.
+function _wRowVisible() {
+  return !!(state.candidateMode && state.data && Array.isArray(state.data.l2_envelopes));
+}
+
+// Compute the W-row's y-band in canvas coordinates given the layout context.
+// Returns null when the row isn't visible.
+//   ctx:  { collapsed: bool, zoneTop: number, zoneH: number }
+function _wRowBand(layoutCtx) {
+  if (!_wRowVisible()) return null;
+  const collapsed = !!(layoutCtx && layoutCtx.collapsed);
+  const wRowH = collapsed ? W_ROW_H_COLLAPSED : W_ROW_H_EXPANDED;
+  const wRowGap = collapsed ? W_ROW_GAP_COLLAPSED : W_ROW_GAP_EXPANDED;
+  // W-row sits BELOW the L2 zone bar = below (zoneTop + zoneH).
+  const y0 = layoutCtx.zoneTop + layoutCtx.zoneH + wRowGap;
+  const y1 = y0 + wRowH;
+  return { y0, y1, h: wRowH, gap: wRowGap };
+}
+
+// Render the W-row at the given y-band.
+// Args:
+//   ctx     : 2D canvas context
+//   d       : state.data
+//   toX     : Mb -> px function from drawZ
+//   xOfWin  : window index -> px function from drawZ
+//   band    : { y0, y1, h } from _wRowBand
+function _drawWRow(ctx, d, toX, xOfWin, band) {
+  if (!band) return;
+  const draft = state.l3Draft;
+  // Choose the window-range to highlight — focal L2's range (or whole draft
+  // L2 span when the draft already covers multiple L2s).
+  let s0Win = -1, e0Win = -1;
+  if (draft && Array.isArray(d.l2_envelopes)) {
+    const lo = d.l2_envelopes[draft.l2_left];
+    const hi = d.l2_envelopes[draft.l2_right];
+    if (lo && hi) { s0Win = lo._s0; e0Win = hi._e0; }
+  } else if (state.cur != null && state.windowToL2) {
+    const focalL2 = state.windowToL2[state.cur];
+    const env = (focalL2 != null && focalL2 >= 0) ? d.l2_envelopes[focalL2] : null;
+    if (env) { s0Win = env._s0; e0Win = env._e0; }
+  }
+
+  // Faint baseline strip — drawn either across the L2 range, or the full
+  // visible range if no L2 is in focus. The full-range case helps locate
+  // the row visually before any draft exists.
+  if (s0Win >= 0 && e0Win >= 0) {
+    const xL = xOfWin(s0Win);
+    const xR = xOfWin(e0Win);
+    ctx.fillStyle = 'rgba(160, 168, 180, 0.10)';
+    ctx.fillRect(xL, band.y0, Math.max(2, xR - xL), band.h);
+
+    // Per-window tick marks — at each window boundary inside the L2 range.
+    // We tick at center_mb because the window object is positioned by its
+    // center; this matches how the rest of drawZ orients things.
+    ctx.fillStyle = 'rgba(160, 168, 180, 0.30)';
+    for (let wi = s0Win; wi <= e0Win && wi < d.n_windows; wi++) {
+      const x = xOfWin(wi);
+      ctx.fillRect(Math.round(x), band.y0, 1, band.h);
+    }
+  } else {
+    // Fallback: faint full-range strip when no L2 is in focus.
+    const _mbR = currentMbRange();
+    const xL = toX(_mbR.mbMin);
+    const xR = toX(_mbR.mbMax);
+    ctx.fillStyle = 'rgba(160, 168, 180, 0.06)';
+    ctx.fillRect(xL, band.y0, Math.max(2, xR - xL), band.h);
+  }
+
+  // The "W" label on the left, mirroring L1/L2/cand pattern.
+  ctx.fillStyle = 'rgba(245, 165, 36, 0.85)';
+  ctx.font = '8px ui-monospace, monospace';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('W', toX(currentMbRange().mbMin) - 4, band.y0 + band.h / 2);
+
+  // Active W-resolution draft: filled amber block + handles.
+  if (draft && draft.resolution === 'W' &&
+      draft.start_w != null && draft.end_w != null &&
+      draft.start_w >= 0 && draft.end_w < d.n_windows &&
+      draft.start_w <= draft.end_w) {
+    const xL = xOfWin(draft.start_w);
+    const xR = xOfWin(draft.end_w);
+    const w  = Math.max(2, xR - xL);
+    // Filled block (more saturated than the baseline)
+    ctx.fillStyle = draft.has_warning
+      ? 'rgba(224, 85, 92, 0.55)'
+      : 'rgba(245, 165, 36, 0.60)';
+    ctx.fillRect(xL, band.y0 + 1, w, band.h - 2);
+    // Drag handles — 3 px boxes at left and right edges
+    ctx.fillStyle = draft.has_warning
+      ? 'rgba(224, 85, 92, 0.95)'
+      : 'rgba(245, 165, 36, 0.95)';
+    ctx.fillRect(xL - 1, band.y0, 3, band.h);
+    ctx.fillRect(xR - 1, band.y0, 3, band.h);
+  }
+
+  // L3 cuts — user-placed vertical cuts inside the draft span. Render as
+  // 1-px dark-amber lines so they read as "explicit dividers" rather than
+  // window-boundary ticks.
+  if (draft && Array.isArray(draft.l3_cuts) && draft.l3_cuts.length > 0) {
+    ctx.fillStyle = 'rgba(245, 165, 36, 0.95)';
+    for (const wi of draft.l3_cuts) {
+      if (wi < 0 || wi >= d.n_windows) continue;
+      const x = xOfWin(wi);
+      ctx.fillRect(Math.round(x), band.y0 - 1, 1, band.h + 2);
+    }
+  }
+}
+
+// Click router: did the click fall inside the W-row?
+// If yes, handle it and return true; if no, return false so the caller can
+// route the click to its existing handler (setCur).
+//
+// Args:
+//   yClick     : the click's y-coordinate in canvas px
+//   targetWin  : the window index nearest the click's x-coord (already
+//                computed by onZClick from x)
+//   layoutCtx  : { collapsed, zoneTop, zoneH } — the same context passed to
+//                _wRowBand by drawZ
+function _wRowHandleClick(yClick, targetWin, layoutCtx) {
+  const band = _wRowBand(layoutCtx);
+  if (!band) return false;
+  if (yClick < band.y0 || yClick > band.y1) return false;
+  if (!state.candidateMode) return false;
+  const d = state.data;
+  if (!d) return false;
+  // Make sure we have a draft to extend
+  const draft = _ensureL3Draft();
+  if (!draft) return false;
+  // First-time flip: stamp start_w/end_w from the current L2 span
+  if (draft.resolution !== 'W') {
+    const lo = d.l2_envelopes[draft.l2_left];
+    const hi = d.l2_envelopes[draft.l2_right];
+    if (!lo || !hi) return false;
+    draft.resolution = 'W';
+    draft.start_w = lo._s0;
+    draft.end_w   = hi._e0;
+  }
+  // Extend or shrink to include the clicked window
+  if (targetWin < draft.start_w) {
+    draft.start_w = targetWin;
+  } else if (targetWin > draft.end_w) {
+    draft.end_w = targetWin;
+  } else {
+    // Click is INSIDE the draft span — interpret as "set the nearer edge to
+    // this window". This lets the user pull either edge in toward the click.
+    const distLeft  = targetWin - draft.start_w;
+    const distRight = draft.end_w - targetWin;
+    if (distLeft <= distRight) draft.start_w = targetWin;
+    else                       draft.end_w   = targetWin;
+  }
+  // Repaint
+  if (typeof drawZ === 'function') { try { drawZ(); } catch (e) {} }
+  if (typeof renderL3Panel === 'function') { try { renderL3Panel(); } catch (e) {} }
+  return true;
+}
+
+
 function _ensureL3Draft() {
   if (state.l3Draft) return state.l3Draft;
   const focalL2 = (state.windowToL2 && state.cur != null)
@@ -26270,6 +29663,11 @@ function _ensureL3Draft() {
     l2_left:  focalL2,
     l2_right: focalL2,
     has_warning: false,
+    // v4 turn 10 — SCHEMA §24 fields, all optional
+    resolution: 'L2',     // 'L2' | 'W' — UI mode for the active draft
+    start_w:    null,     // integer window index when resolution='W'
+    end_w:      null,
+    l3_cuts:    [],       // user-placed cut window indices inside the draft
   };
   return state.l3Draft;
 }
@@ -26341,6 +29739,23 @@ function commitL3Draft() {
   const lo = envs[draft.l2_left];
   const hi = envs[draft.l2_right];
   if (!lo || !hi) return false;
+  // v4 turn 10 (Deliverable A, SCHEMA §24): when resolution='W', the draft
+  // already carries window-precision start_w/end_w that may be tighter than
+  // the L2 envelope range. Use those as the candidate's span; otherwise fall
+  // back to the L2 envelope ends as before. Either way, l2_indices stays as
+  // the supporting-interval list (catalogue / band-diagnostics consume it).
+  const useW = draft.resolution === 'W' &&
+               draft.start_w != null && draft.end_w != null &&
+               draft.start_w >= 0 && draft.end_w < state.data.n_windows &&
+               draft.start_w <= draft.end_w;
+  const cand_start_w = useW ? draft.start_w : lo._s0;
+  const cand_end_w   = useW ? draft.end_w   : hi._e0;
+  const cand_start_bp = useW
+    ? (state.data.windows[cand_start_w] && state.data.windows[cand_start_w].start_bp)
+    : lo.start_bp;
+  const cand_end_bp = useW
+    ? (state.data.windows[cand_end_w] && state.data.windows[cand_end_w].end_bp)
+    : hi.end_bp;
   // v3.80: build the supporting-interval list from l2_left..l2_right inclusive.
   const support_l2s = [];
   for (let i = draft.l2_left; i <= draft.l2_right; i++) support_l2s.push(i);
@@ -26379,18 +29794,22 @@ function commitL3Draft() {
   const cand = {
     id: (typeof makeCandidateId === 'function') ? makeCandidateId() : `l3draft_${Date.now()}`,
     chrom: state.data.chrom,
-    start_w: lo._s0,
-    end_w: hi._e0,
-    start_bp: lo.start_bp,
-    end_bp: hi.end_bp,
+    start_w: cand_start_w,
+    end_w: cand_end_w,
+    start_bp: cand_start_bp,
+    end_bp: cand_end_bp,
     K: state.k,
     confirmed: false,
     provisional: !!draft.has_warning,
-    source: 'l3_draft',
+    source: useW ? 'l3_draft_w' : 'l3_draft',
     notes: draft.has_warning
       ? `built in candidate mode; spans L2 ${draft.l2_left}..${draft.l2_right} with at least one non-MERGE join`
       : `built in candidate mode; spans L2 ${draft.l2_left}..${draft.l2_right} (all MERGE joins)`,
     created_at: Date.now(),
+    // v4 turn 10 (SCHEMA §24): persist the resolution mode + l3_cuts. Old
+    // candidates without these fields read back as 'L2' / [] via candidateFromJSON.
+    resolution: useW ? 'W' : 'L2',
+    l3_cuts: Array.isArray(draft.l3_cuts) ? draft.l3_cuts.slice() : [],
     // v3.80: two-level promotion fields
     l2_indices: support_l2s.slice(),
     ref_l2: refL2,
@@ -26775,6 +30194,170 @@ try {
       b.classList.toggle('active', b.dataset.l3bc === savedBc));
   }
 } catch (_) {}
+
+// =============================================================================
+// v4 turn 12a (Deliverable D): scale-stability toolbar wiring
+// -----------------------------------------------------------------------------
+// (1) Populate the three pane-scale dropdowns with the unit vocabulary.
+// (2) Wire the ⤢ off / ⤢ scale toggle.
+// (3) Wire the dropdown change handlers (cache invalidation + re-render).
+// (4) Restore saved state on page load.
+// =============================================================================
+
+// Unit vocabulary — order matters for dropdown UX.
+// 'candidate' is included always but disabled when no active candidate.
+const _SCALE_UNIT_OPTS = [
+  { value: '1w',        label: '1 window',          group: 'windows' },
+  { value: '5w',        label: '5 windows',         group: 'windows' },
+  { value: '10w',       label: '10 windows',        group: 'windows' },
+  { value: '25w',       label: '25 windows',        group: 'windows' },
+  { value: 'Nw',        label: 'N w (custom)',      group: 'windows' },
+  { value: '100SNPs',   label: '100 SNPs',          group: 'snps' },
+  { value: '500SNPs',   label: '500 SNPs',          group: 'snps' },
+  { value: '1000SNPs',  label: '1000 SNPs',         group: 'snps' },
+  { value: '100kb',     label: '100 kb',            group: 'kb' },
+  { value: '500kb',     label: '500 kb',            group: 'kb' },
+  { value: 'L2',        label: 'L2 envelope',       group: 'envelopes' },
+  { value: 'L1',        label: 'L1 envelope',       group: 'envelopes' },
+  { value: 'candidate', label: 'active candidate',  group: 'envelopes' },
+];
+
+function _populateScalePaneDropdowns() {
+  _ensureScaleStabilityState();
+  const haveCand = !!(state.candidate && state.candidate.start_w != null);
+  for (let i = 0; i < 3; i++) {
+    const sel = document.getElementById('l3ScaleSel' + i);
+    if (!sel) continue;
+    const cur = (state.scaleStabilityPanes[i] || {}).scale;
+    sel.innerHTML = '';
+    for (const opt of _SCALE_UNIT_OPTS) {
+      const o = document.createElement('option');
+      o.value = opt.value;
+      o.textContent = opt.label;
+      if (opt.value === 'candidate' && !haveCand) o.disabled = true;
+      if (opt.value === cur) o.selected = true;
+      sel.appendChild(o);
+    }
+  }
+}
+
+function _onScaleStabilityToggle(mode) {
+  _ensureScaleStabilityState();
+  state.l3Mode = (mode === 'on') ? 'scale_stability' : 'contingency';
+  // Toggle button active states
+  document.querySelectorAll('#l3ScaleMode button').forEach(b =>
+    b.classList.toggle('active', b.dataset.l3scaleToggle === mode));
+  // Show/hide the dropdown row
+  const panesEl = document.getElementById('l3ScalePanes');
+  if (panesEl) panesEl.style.display = (mode === 'on') ? '' : 'none';
+  // When turning on, hide the existing compareUnit selector to avoid confusion
+  const cuEl = document.getElementById('l3CompareUnit');
+  if (cuEl) cuEl.style.display = (mode === 'on') ? 'none' : '';
+  // Cache invalidation
+  state.scaleStabilityCache = null;
+  // Persist + re-render
+  try { localStorage.setItem('pca_scrubber_v3.l3Mode', state.l3Mode); } catch (_) {}
+  if (mode === 'on') _populateScalePaneDropdowns();
+  if (typeof _l3CacheInvalidate === 'function') _l3CacheInvalidate();
+  if (typeof renderL3Panel === 'function') renderL3Panel();
+}
+
+document.querySelectorAll('#l3ScaleMode button').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    if (btn.disabled) return;
+    e.stopPropagation();
+    _onScaleStabilityToggle(btn.dataset.l3scaleToggle);
+  });
+});
+
+// Dropdown change handlers — invalidate cache + re-render
+function _wireScalePaneSelect(idx) {
+  const sel = document.getElementById('l3ScaleSel' + idx);
+  if (!sel) return;
+  sel.addEventListener('change', () => {
+    _ensureScaleStabilityState();
+    if (!state.scaleStabilityPanes[idx]) state.scaleStabilityPanes[idx] = { K: 6, custom_n: null };
+    state.scaleStabilityPanes[idx].scale = sel.value;
+    state.scaleStabilityCache = null;
+    try {
+      localStorage.setItem('pca_scrubber_v3.scaleStabilityPanes',
+        JSON.stringify(state.scaleStabilityPanes));
+    } catch (_) {}
+    if (state.l3Mode === 'scale_stability' && typeof renderL3Panel === 'function') {
+      renderL3Panel();
+    }
+  });
+}
+_wireScalePaneSelect(0);
+_wireScalePaneSelect(1);
+_wireScalePaneSelect(2);
+
+// Restore saved state on page load
+try {
+  const savedMode = localStorage.getItem('pca_scrubber_v3.l3Mode');
+  if (savedMode === 'scale_stability') {
+    _ensureScaleStabilityState();
+    // Restore pane configs if persisted
+    try {
+      const savedPanes = localStorage.getItem('pca_scrubber_v3.scaleStabilityPanes');
+      if (savedPanes) {
+        const arr = JSON.parse(savedPanes);
+        if (Array.isArray(arr) && arr.length === 3) state.scaleStabilityPanes = arr;
+      }
+    } catch (_) {}
+    _populateScalePaneDropdowns();
+    _onScaleStabilityToggle('on');
+  } else {
+    _ensureScaleStabilityState();
+    _populateScalePaneDropdowns();
+  }
+} catch (_) { _ensureScaleStabilityState(); }
+
+// =============================================================================
+// v4 turn 15a — Deliverable C: regime registry restore-on-load
+// -----------------------------------------------------------------------------
+// Page-load restore for state.regimeRegistry from the localStorage key
+// 'pca_scrubber_v3.regimeRegistry'. Fail-soft: if missing or corrupt, leaves
+// the empty default in place. CRUD calls auto-persist on every mutation.
+// =============================================================================
+try { _restoreRegimeRegistry(); } catch (_) { _ensureRegimeRegistry(); }
+try { _restoreRepeatDensity(); } catch (_) { /* fail-soft */ }
+try { _restoreRepeatDensityPrefs(); } catch (_) { /* fail-soft */ }
+try { _wireRepeatDensityArrowNav(); } catch (_) { /* fail-soft */ }
+
+// Wire the catalogue toolbar 'regimes' button to open the dialog (list mode)
+{
+  const btn = document.getElementById('catRegimeRegistry');
+  if (btn) {
+    btn.addEventListener('click', () => {
+      try { _openRegimeDialog({ mode: 'list' }); } catch (e) { console.warn('open regime dialog:', e.message); }
+    });
+  }
+}
+
+// v4 turn 16: Wire catalogue 'assign sel' button — opens the regime dialog
+// in assign mode with selected rows' L2 IDs staged. Empty-selection nudge
+// uses alert() so the user understands what's expected (consistent with
+// catViewAsCandidate and catExportTSV which use the same pattern).
+{
+  const btn = document.getElementById('catRegimeAssignSel');
+  if (btn) {
+    btn.addEventListener('click', () => {
+      try {
+        if (typeof catState === 'undefined' || catState.selected.size === 0) {
+          alert('Select at least one row first (checkbox in the leftmost column), then click 🏷 assign sel.');
+          return;
+        }
+        const l2Ids = _resolveSelectedL2Ids();
+        if (l2Ids.length === 0) {
+          alert('Could not resolve any L2 envelopes from the selection. (No data loaded yet?)');
+          return;
+        }
+        _openRegimeDialog({ mode: 'assign', stagedL2Ids: l2Ids, stagedCandId: null });
+      } catch (e) { console.warn('catRegimeAssignSel:', e.message); }
+    });
+  }
+}
 
 // Compare-unit toolbar (v3.45) — switches L3 panes between L2-envelope mode
 // and slab mode. Mutates state.compareUnit; the focal pane's render branches
@@ -28895,13 +32478,22 @@ const CAT_COLS_BASE = [
     tooltip: 'σ-band-diagnostics verdict per the band-diagnostics module (§11). Values: TWO_INVERSIONS (true two-inversion signature), CROSSOVER_ARTIFACTS (recombination breakdown not real inversion), NOISY_REGION (low signal-to-noise), NA (K≤3 not enough bands), UNDETERMINED (diagnostics inconclusive).' },
   { key: 'cluster_ok',    label: 'Power',        type: 'str',
     tooltip: 'Statistical power flag: whether the smallest K cluster has enough samples (≥ minNGroup) for the K-means and downstream tests to be reliable. "ok" = passes; "low" = at least one regime has too few samples for trustworthy clustering.' },
+  // v4 turn 13 (Deliverable B/C bridge): regime registry placeholder column.
+  // Empty for now (renders as '—' via the formatter); will be populated by
+  // Deliverable C's regime registry CRUD. Column exists so the catalogue
+  // schema stays stable when C lands and so users can sort by regime count
+  // once it's wired. The cell shows the comma-separated list of regime
+  // identifiers attached to this L2 (e.g. "R1,R3").
+  { key: 'regimes',       label: 'Regimes',      type: 'str',
+    fmt: v => (v != null && v !== '') ? String(v) : '—',
+    tooltip: 'Regime-registry tags attached to this L2 envelope (Deliverable C). Empty until you assign one or more regimes via the regime registry. A regime is a user-curated annotation of "this L2 belongs to inversion-system X". Filled by Deliverable C; placeholder for now.' },
 ];
 
 // v3.99 turn 12 ask 3: columns considered "secondary" — hidden in
 // catState.displayMode === 'simple'. The rest (chr, span, span_mb, k_used,
 // conservation, verdict) stay visible because they're the most commonly
 // scanned during catalogue review.
-const CAT_COLS_SECONDARY = new Set(['parent_l1', 'silhouette', 'coherence', 'fam_purity', 'cluster_ok', 'n_windows']);
+const CAT_COLS_SECONDARY = new Set(['parent_l1', 'silhouette', 'coherence', 'fam_purity', 'cluster_ok', 'n_windows', 'regimes']);
 
 function getCatCols() {
   // v3.99 turn 14b: dynamic columns also carry `tooltip` for header
@@ -29020,6 +32612,11 @@ function buildCatalogueRows() {
       // v3.99 turn 12: null when not in any confirmed candidate; otherwise
       // the candidate's id. Used to tint the row green + show ✓ + cand id.
       confirmed_cand_id: l2ToConfirmedId.get(l2idx) || null,
+      // v4 turn 15a (Deliverable C): regime-registry membership. Cell is
+      // empty string when no regimes claim this L2; otherwise a sorted
+      // comma-separated list of regime IDs ('R1,R3' style). The column's
+      // formatter renders '' as '—'.
+      regimes:       (typeof _regimesCellForL2 === 'function') ? _regimesCellForL2(env.candidate_id || `L2_${l2idx}`) : '',
     });
   }
   return rows;
@@ -29116,6 +32713,18 @@ function buildCatalogueRowsL1Merged() {
           if (cand) { confirmed_cand_id = cand.id; break; }
         }
       }
+      // v4 turn 15a (Deliverable C): merged-row regimes = sorted-unique union
+      // of constituent L2s' regimes. If any constituent is claimed by R1 and
+      // any other by R3, the merged row reads 'R1,R3'. Empty string if no
+      // constituent is claimed.
+      let regimesCell = '';
+      if (typeof _regimesForL2 === 'function') {
+        const allIds = new Set();
+        for (const lid of ids) {
+          for (const r of _regimesForL2(lid)) allIds.add(r.id);
+        }
+        regimesCell = Array.from(allIds).sort().join(',');
+      }
       merged.push({
         l2_idx:          idxs[Math.floor(idxs.length / 2)],   // representative for jump
         l2_indices:      idxs,
@@ -29135,6 +32744,7 @@ function buildCatalogueRowsL1Merged() {
         cluster_ok,
         n_L2_merged:     idxs.length,
         confirmed_cand_id,
+        regimes:         regimesCell,
       });
     };
     for (let i = 1; i < arr.length; i++) {
