@@ -1,0 +1,66 @@
+{
+  "metadata": {
+    "panel_name": "F_ROH \u00d7 H plane \u2014 hatchery health (demo / illustrative)",
+    "date": "2026-04-30",
+    "framework": "diversity-contextualised F_ROH (F_ROH | H)",
+    "notes": "F_ROH computed from long-tract ROH (>=1 Mb). H_per_site is mean per-site heterozygosity (folded SFS). H_ref is the species wild-population baseline (single number per species). Quadrant cuts are computed from the median F_ROH and median H/H_ref of loaded cohorts.",
+    "citation_caveat": "Comparator H_ref and H_per_site values for non-catfish species in this demo file are illustrative only and should be replaced with values from the cited source before publication."
+  },
+  "cohorts": [
+    {
+      "cohort": "this study (226 broodstock)",
+      "species": "C. gariepinus",
+      "is_focal": true,
+      "F_ROH": 0.277,
+      "H_per_site": 0.00455,
+      "H_ref": 0.0156,
+      "ref_url": "Diversity_atlas.html#page1",
+      "notes": "Thai hatchery, 9x WGS, ngsF-HMM tracts >=1 Mb. F_ROH from master_summary.tsv (cohort 2). H from ANGSD folded SFS, mean across 226 samples."
+    },
+    {
+      "cohort": "Nigerian wild C. gariepinus",
+      "species": "C. gariepinus",
+      "F_ROH": 0.05,
+      "H_per_site": 0.0156,
+      "H_ref": 0.0156,
+      "citation": "Sanda 2026 (illustrative)",
+      "notes": "Wild-caught reference cohort. Used as the H_ref baseline for C. gariepinus."
+    },
+    {
+      "cohort": "Nigerian farmed C. gariepinus",
+      "species": "C. gariepinus",
+      "F_ROH": 0.18,
+      "H_per_site": 0.0095,
+      "H_ref": 0.0156,
+      "citation": "Sanda 2026 (illustrative)",
+      "notes": "African farmed cohort, less-eroded than this study."
+    },
+    {
+      "cohort": "rainbow trout (commercial)",
+      "species": "O. mykiss",
+      "F_ROH": 0.20,
+      "H_per_site": 0.0030,
+      "H_ref": 0.0050,
+      "citation": "D'Ambrosio 2019 (illustrative)",
+      "notes": "Commercial salmonid line. Comparator for managed-aquaculture inbreeding pattern."
+    },
+    {
+      "cohort": "American alligator (managed)",
+      "species": "A. mississippiensis",
+      "F_ROH": 0.08,
+      "H_per_site": 0.0040,
+      "H_ref": 0.0080,
+      "citation": "Glenn et al. (illustrative)",
+      "notes": "Reptile conservation comparator. Low F_ROH on a moderately-eroded background."
+    },
+    {
+      "cohort": "Iberian lynx (bottleneck)",
+      "species": "L. pardinus",
+      "F_ROH": 0.32,
+      "H_per_site": 0.0008,
+      "H_ref": 0.0080,
+      "citation": "Casas-Marce 2017 (illustrative)",
+      "notes": "Severely-bottlenecked conservation case. Sits in the caution corner of the plane (high F_ROH on heavily-eroded background) \u2014 outcrossing within the stock cannot recover diversity."
+    }
+  ]
+}

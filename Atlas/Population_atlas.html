@@ -37,6 +37,7 @@
     --pop-het:     #d6b540;     /* warm amber */
     --pop-div:     #ecd075;     /* pale yellow */
     --pop-roh:     #a8821f;     /* deep gold */
+    --pop-breed:   #d4a838;     /* breeding accent (medium amber) */
     --rule: #2a3242;
     --mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
     --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
@@ -61,6 +62,7 @@
     --pop-het:      #b45309;
     --pop-div:      #facc15;
     --pop-roh:      #713f12;
+    --pop-breed:    #b45309;
   }
   html[data-theme="academic"] {
     --bg:           #f7f5ef;
@@ -82,6 +84,7 @@
     --pop-het:      #9d7a35;
     --pop-div:      #c5a268;
     --pop-roh:      #6b4d18;
+    --pop-breed:    #9d7a35;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; height: 100%; }
@@ -309,6 +312,7 @@
   .card-stripe-het     { border-left: 3px solid var(--pop-het);     padding-left: 16px; }
   .card-stripe-div     { border-left: 3px solid var(--pop-div);     padding-left: 16px; }
   .card-stripe-roh     { border-left: 3px solid var(--pop-roh);     padding-left: 16px; }
+  .card-stripe-breed   { border-left: 3px solid var(--pop-breed);   padding-left: 16px; }
 
   /* Cross-atlas callout — green, prominent, encourages going to the Diversity Atlas */
   .da-callout {
@@ -391,6 +395,237 @@
     border-radius: 2px;
     font-size: 10px;
   }
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     Breeding page (page 8) — sample highlights table with traffic-light status.
+     Simple/detailed toggle. Manual upload of breeding_highlights.json plus
+     auto-derivation hooks ready to fire when other pages eventually load
+     their JSON layers.
+     ═══════════════════════════════════════════════════════════════════════ */
+  .bp-toolbar {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+  .bp-tb-spacer { flex: 1; }
+  .bp-view-toggle {
+    display: inline-flex; border: 1px solid var(--rule); border-radius: 3px;
+    overflow: hidden;
+  }
+  .bp-view-toggle button {
+    background: var(--panel-2); color: var(--ink-dim); border: none;
+    padding: 5px 12px; font-family: var(--mono); font-size: 10.5px;
+    cursor: pointer; border-right: 1px solid var(--rule);
+  }
+  .bp-view-toggle button:last-child { border-right: none; }
+  .bp-view-toggle button.active {
+    background: var(--panel-3); color: var(--ink);
+  }
+  .bp-view-toggle button:hover:not(.active) { color: var(--ink); }
+  .bp-tb-btn {
+    padding: 5px 11px; border-radius: 3px;
+    background: var(--panel-3); color: var(--ink); border: 1px solid var(--rule);
+    font-family: var(--mono); font-size: 10.5px; cursor: pointer;
+  }
+  .bp-tb-btn:hover { border-color: var(--accent); }
+  .bp-tb-label {
+    font-size: 10.5px; color: var(--ink-dim); font-family: var(--mono);
+    display: flex; align-items: center; gap: 5px;
+  }
+  .bp-tb-label select {
+    background: var(--panel-2); color: var(--ink); border: 1px solid var(--rule);
+    border-radius: 3px; padding: 3px 6px; font-family: var(--mono); font-size: 10.5px;
+  }
+
+  .bp-table {
+    width: 100%; border-collapse: collapse;
+    font-family: var(--mono); font-size: 11px;
+    background: var(--panel-2);
+    border: 1px solid var(--rule); border-radius: 4px;
+    margin-bottom: 14px;
+  }
+  .bp-table th {
+    text-align: left; padding: 9px 12px; font-weight: 600;
+    color: var(--ink); border-bottom: 1px solid var(--rule);
+    background: var(--panel-3); font-size: 10px; letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .bp-table td {
+    padding: 10px 12px; vertical-align: middle;
+    border-bottom: 1px solid var(--rule);
+    color: var(--ink); line-height: 1.5;
+  }
+  .bp-table tbody tr:last-child td { border-bottom: none; }
+  .bp-table tbody tr:hover td { background: var(--panel-3); }
+  .bp-table .bp-sample {
+    font-weight: 600; color: var(--ink); white-space: nowrap;
+  }
+  .bp-table .bp-value {
+    color: var(--ink-dim); font-size: 10.5px;
+  }
+  .bp-table .bp-source {
+    color: var(--ink-dim); font-size: 10.5px;
+  }
+  .bp-table .bp-source a {
+    color: var(--accent-2); text-decoration: none;
+  }
+  .bp-table .bp-source a:hover { text-decoration: underline; }
+  /* Traffic-light status dots */
+  .bp-dot {
+    display: inline-block; width: 12px; height: 12px; border-radius: 50%;
+    vertical-align: middle; margin-right: 6px;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
+  }
+  .bp-dot.bp-green  { background: var(--good); }
+  .bp-dot.bp-yellow { background: var(--accent); }
+  .bp-dot.bp-red    { background: var(--bad); }
+  .bp-dot-label {
+    font-size: 10.5px; color: var(--ink-dim); vertical-align: middle;
+  }
+
+  /* Detailed view: extra cells for value detail / dataset / status text */
+  .bp-table.bp-detailed .bp-detail-only { display: table-cell; }
+  .bp-table.bp-simple   .bp-detail-only { display: none; }
+  .bp-table .bp-notes {
+    color: var(--ink-dimmer); font-size: 9.5px; margin-top: 3px;
+    line-height: 1.4;
+  }
+
+  .bp-empty {
+    padding: 22px; text-align: center; color: var(--ink-dimmer);
+    font-family: var(--mono); font-size: 11px; font-style: italic;
+    border: 1px dashed var(--rule); border-radius: 4px;
+    margin-bottom: 14px;
+  }
+
+  /* Legend strip */
+  .bp-legend {
+    display: flex; gap: 18px; flex-wrap: wrap;
+    padding: 10px 14px; margin-bottom: 12px;
+    background: var(--panel); border: 1px solid var(--rule); border-radius: 3px;
+    font-family: var(--mono); font-size: 10.5px;
+  }
+  .bp-legend-item {
+    display: flex; align-items: center; gap: 6px;
+    color: var(--ink-dim);
+  }
+  .bp-legend-item b { color: var(--ink); font-weight: 600; }
+
+  /* Cards counting by source */
+  .bp-source-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 8px; margin-bottom: 12px;
+  }
+  .bp-source-card {
+    background: var(--panel); border: 1px solid var(--rule); border-radius: 3px;
+    padding: 9px 12px;
+  }
+  .bp-source-card .bp-sc-value {
+    font-size: 18px; font-weight: 600; color: var(--ink); font-family: var(--mono);
+  }
+  .bp-source-card .bp-sc-label {
+    font-size: 10px; color: var(--ink-dim); font-family: var(--mono); margin-top: 2px;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     Hatchery health page (page 9, visible label "7 hatchery health") —
+     F_ROH × H plane. Colored verdict text only (per user spec); cohort name
+     and numeric values stay normal ink.
+     ═══════════════════════════════════════════════════════════════════════ */
+  /* The three verdict colors. Re-use the same tokens that the rest of the
+     atlas uses for traffic-light status so dark/light/academic themes
+     all work without extra CSS. */
+  .fhh-good    { color: var(--good);   font-weight: 600; }
+  .fhh-review  { color: var(--accent); font-weight: 600; }
+  .fhh-caution { color: var(--bad);    font-weight: 600; }
+  .fhh-neutral { color: var(--ink-dim); font-weight: 600; font-style: italic; }
+
+  /* Scatter plot wrapper — SVG inline rendered by _fhhRenderPlot(). */
+  .fhh-plot-svg { display: block; max-width: 100%; height: auto; }
+  .fhh-plot-axis { stroke: var(--rule); stroke-width: 1; fill: none; }
+  .fhh-plot-axis-label { fill: var(--ink-dim); font-family: var(--mono); font-size: 10px; }
+  .fhh-plot-tick { fill: var(--ink-dimmer); font-family: var(--mono); font-size: 9px; }
+  .fhh-plot-quadrant-line { stroke: var(--ink-dimmer); stroke-width: 1; stroke-dasharray: 3 3; }
+  .fhh-plot-quadrant-label { fill: var(--ink-dimmer); font-family: var(--mono); font-size: 9px; font-style: italic; }
+  .fhh-plot-point { stroke: var(--panel); stroke-width: 1.2; }
+  .fhh-plot-point.fhh-good    { fill: var(--good);   }
+  .fhh-plot-point.fhh-review  { fill: var(--accent); }
+  .fhh-plot-point.fhh-caution { fill: var(--bad);    }
+  .fhh-plot-point.fhh-neutral { fill: var(--ink-dim); }
+  .fhh-plot-point.fhh-focal   { stroke: var(--ink); stroke-width: 2; }
+  .fhh-plot-label { fill: var(--ink); font-family: var(--mono); font-size: 9px; }
+  .fhh-plot-label-focal { fill: var(--ink); font-weight: 700; }
+  /* Cohort table — keep look-and-feel consistent with breeding page table. */
+  .fhh-table {
+    width: 100%; border-collapse: collapse;
+    font-family: var(--mono); font-size: 11px;
+    background: var(--panel-2);
+    border: 1px solid var(--rule); border-radius: 4px;
+  }
+  .fhh-table th {
+    text-align: left; padding: 9px 12px; font-weight: 600; color: var(--ink);
+    border-bottom: 1px solid var(--rule); background: var(--panel-3);
+    font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase;
+  }
+  .fhh-table td {
+    padding: 8px 12px; vertical-align: top;
+    border-bottom: 1px solid var(--rule);
+    color: var(--ink); line-height: 1.45;
+  }
+  .fhh-table tbody tr:last-child td { border-bottom: none; }
+  .fhh-table tbody tr:hover td { background: var(--panel-3); }
+  .fhh-table .fhh-cohort {
+    font-weight: 600; color: var(--ink); white-space: nowrap;
+  }
+  .fhh-table .fhh-focal-marker {
+    background: var(--accent); color: var(--bg); padding: 0 5px; border-radius: 2px;
+    font-size: 9px; margin-right: 5px; letter-spacing: 0.04em;
+  }
+  .fhh-table .fhh-num {
+    color: var(--ink); font-variant-numeric: tabular-nums; font-size: 10.5px;
+  }
+  .fhh-table .fhh-citation {
+    color: var(--ink-dimmer); font-size: 9.5px; font-style: italic;
+  }
+  .fhh-empty {
+    padding: 22px; text-align: center; color: var(--ink-dimmer);
+    font-family: var(--mono); font-size: 11px; font-style: italic;
+    border: 1px dashed var(--rule); border-radius: 4px;
+  }
+
+  /* Caution banner — used at the top of the hatchery health page to flag
+     that F_ROH | H is a NEW framework with no published comparator
+     baseline. Amber theme to mean "informational, requires care", not a
+     blocking error. The banner sits between the page subtitle and the
+     first content card. */
+  .caution-banner {
+    display: flex; gap: 12px; align-items: flex-start;
+    background: rgba(245, 165, 36, 0.08);
+    border: 1px solid rgba(245, 165, 36, 0.5);
+    border-left: 4px solid var(--accent);
+    border-radius: 4px;
+    padding: 12px 14px;
+    margin: 0 0 16px 0;
+    font-size: 11.5px;
+    line-height: 1.55;
+    color: var(--ink);
+  }
+  .caution-banner-icon {
+    font-size: 18px; line-height: 1.2;
+    color: var(--accent);
+    flex-shrink: 0;
+  }
+  .caution-banner-body { flex: 1; min-width: 0; }
+  .caution-banner-title {
+    font-weight: 600; color: var(--accent);
+    font-family: var(--mono); font-size: 11px;
+    letter-spacing: 0.04em; text-transform: uppercase;
+    margin-bottom: 5px;
+  }
+  body.light-theme .caution-banner {
+    background: rgba(245, 165, 36, 0.10);
+  }
+
 </style>
 </head>
 <body>
@@ -466,7 +701,19 @@
   <button data-page="page4" title="Heterozygosity — cohort summary; deep per-sample tables and plots in the Diversity Atlas."><span class="num">4</span> heterozygosity ↗</button>
   <button data-page="page5" title="Diversity — cohort summary; per-chromosome and per-window θπ in the Diversity Atlas."><span class="num">5</span> diversity ↗</button>
   <button data-page="page6" title="Inbreeding — cohort summary; F_ROH atlas and ROH composition in the Diversity Atlas."><span class="num">6</span> inbreeding ↗</button>
-  <button data-page="page7" title="About this atlas — what it is, how it relates to the Local PCA Scrubber, where the data comes from, glossary."><span class="num">7</span> about</button>
+  <!-- v1.3: Hatchery health page (page9). F_ROH × H plane scatter + verdict
+       text. Each cohort point sits in 2D (F_ROH, H/H_ref) space; the
+       quadrant determines a colored status verdict (healthy / inbreeding-
+       only / eroded-only / both — the last is the worst case). The novel
+       framework introduced in the manuscript Discussion as "diversity-
+       contextualised F_ROH" or "F_ROH × H plane". The atlas's contribution
+       is to make the framework operational with a comparator panel and a
+       colored verdict text per cohort point. Lives between Inbreeding and
+       Breeding so the visual flow is: how inbred → how is the stock doing
+       overall → which fish to act on. -->
+  <button data-page="page9" title="Hatchery health — F_ROH × H plane. Each stock placed in 2D space defined by autozygosity burden (F_ROH) and species-baseline-referenced heterozygosity (H/H_ref). Quadrant-based verdict: healthy (low F_ROH, high H/H_ref) · inbreeding-only · erosion-only · caution (high F_ROH, low H/H_ref). New framework introduced in the manuscript Discussion as 'diversity-contextualised F_ROH'."><span class="num">7</span> hatchery health</button>
+  <button data-page="page8" title="Breeding — sample highlights table for breeding review. One row per sample with a notable diversity, relatedness, inversion, burden, or marker-control feature. Auto-derives from atlas state + accepts breeding_highlights.json upload. Simple/detailed toggle."><span class="num">8</span> breeding</button>
+  <button data-page="page7" title="About this atlas — what it is, how it relates to the Local PCA Scrubber, where the data comes from, glossary."><span class="num">9</span> about</button>
   <!-- v4 turn 73f: removed the standalone "→ Inversions Atlas" link from the
        tab bar; navigation is now in the four-atlas dropdown in the header. -->
 </nav>
@@ -1060,6 +1307,370 @@ CGA006     F15     B3     9.3×   97.3%     0.00289    0.067  K3=0.71  kept    �
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════════════════
+     Page 8 — Breeding (sample highlights for breeding review)
+     ═══════════════════════════════════════════════════════════════════════ -->
+<div id="page8" class="page">
+  <div class="page-content">
+    <div class="page-title">Sample highlights for breeding review</div>
+    <div class="page-subtitle">
+      Selected broodstock samples with notable diversity, relatedness,
+      inversion, burden, or marker-control features &middot; one row = one
+      sample-level reason to inspect or preserve that fish
+    </div>
+
+    <div class="card card-stripe-breed">
+      <div class="card-header">
+        <div class="card-title">What this page shows</div>
+        <div class="card-status planned" id="bpStatusBadge">scaffold &middot; load <code>breeding_highlights.json</code> to populate</div>
+      </div>
+      <div style="margin-bottom: 8px;">
+        A short, committee-friendly list of <b>flagged broodstock samples</b>.
+        Each row is one fish that stands out for one specific reason
+        (high inbreeding, member of a large family cluster, rare inversion
+        haplotype carrier, marker-validation control, etc.). The page
+        deliberately keeps interpretation minimal &mdash; it is a
+        <b>visual highlight list</b>, not a decision table.
+      </div>
+      <div style="color: var(--ink-dim);">
+        Default view shows 4 columns: <code>Sample</code> &middot;
+        <code>Highlight</code> &middot; <code>Value</code> &middot;
+        <code>Source</code> with a traffic-light status dot. Toggle to
+        <i>detailed</i> view to see the dataset path, raw values, and
+        per-row notes.
+      </div>
+    </div>
+
+    <div class="bp-legend">
+      <div class="bp-legend-item">
+        <span class="bp-dot bp-green"></span>
+        <span><b>useful / preserve</b> &middot; high diversity, rare carrier, validated control</span>
+      </div>
+      <div class="bp-legend-item">
+        <span class="bp-dot bp-yellow"></span>
+        <span><b>review / balance</b> &middot; moderate concern, member of large family cluster</span>
+      </div>
+      <div class="bp-legend-item">
+        <span class="bp-dot bp-red"></span>
+        <span><b>caution</b> &middot; high inbreeding, high deleterious burden, top-1% concerning</span>
+      </div>
+    </div>
+
+    <div class="bp-source-cards" id="bpSourceCards">
+      <!-- Auto-populated counts per source category. Empty until rows load. -->
+    </div>
+
+    <div class="bp-toolbar">
+      <div class="bp-view-toggle" id="bpViewToggle" role="group" aria-label="View mode">
+        <button id="bpViewSimpleBtn" class="active" type="button">Simple</button>
+        <button id="bpViewDetailedBtn" type="button">Detailed</button>
+      </div>
+      <label class="bp-tb-label">Status
+        <select id="bpFilterStatus">
+          <option value="all">all</option>
+          <option value="green">🟢 useful</option>
+          <option value="yellow">🟡 review</option>
+          <option value="red">🔴 caution</option>
+        </select>
+      </label>
+      <label class="bp-tb-label">Source
+        <select id="bpFilterSource">
+          <option value="all">all sources</option>
+        </select>
+      </label>
+      <div class="bp-tb-spacer"></div>
+      <button class="bp-tb-btn" id="bpLoadBtn" title="Upload a breeding_highlights.json or .tsv with manually curated rows.">load highlights&hellip;</button>
+      <input type="file" id="bpLoadInput" style="display:none" accept=".json,.tsv,.txt">
+      <button class="bp-tb-btn" id="bpExportCsvBtn" title="Download the current table as CSV.">export CSV</button>
+      <button class="bp-tb-btn" id="bpResetBtn" title="Drop user upload; re-derive from atlas state only.">reset</button>
+    </div>
+
+    <div id="bpTableSlot">
+      <!-- Table renders here. Empty-state message appears when no rows are loaded. -->
+    </div>
+
+    <div class="card card-stripe-breed" id="bpDataSourcesCard">
+      <div class="card-header">
+        <div class="card-title">Where rows come from</div>
+        <div class="card-status planned">5 source categories</div>
+      </div>
+      <div style="margin-bottom: 10px; color: var(--ink-dim);">
+        Rows are <b>auto-derived</b> from atlas state when the relevant data
+        layer is loaded; otherwise rows can be added <b>manually</b> via a
+        <code>breeding_highlights.json</code> upload. The five source
+        categories:
+      </div>
+      <div class="pg" style="grid-template-columns: 1.0fr 0.8fr 1.7fr 0.6fr;">
+        <div class="pg-header">source</div>
+        <div class="pg-header">criterion</div>
+        <div class="pg-header">where it comes from</div>
+        <div class="pg-header">default dot</div>
+
+        <div><code>Diversity</code></div>
+        <div>top-1% F_ROH / π / H</div>
+        <div>Diversity Atlas tab 1 (per-sample) when JSON layer loads</div>
+        <div>red (F_ROH) · green (π / H)</div>
+
+        <div><code>Relatedness</code></div>
+        <div>member of largest family cluster</div>
+        <div>Population Atlas page 3 (NAToRA + family-tree JSON)</div>
+        <div>yellow</div>
+
+        <div><code>Burden</code></div>
+        <div>top-1% deleterious burden</div>
+        <div>MODULE_CONSERVATION (SIFT4G + VESM_650M) per-sample summary</div>
+        <div>red</div>
+
+        <div><code>Inversions</code></div>
+        <div>rare-haplotype carrier</div>
+        <div>Inversion Atlas page 18 marker panel + page 1 karyotype assignments</div>
+        <div>green</div>
+
+        <div><code>Markers</code></div>
+        <div>positive / negative validation control</div>
+        <div>Inversion Atlas page 18 <code>marker_panel.json</code> controls block</div>
+        <div>green</div>
+      </div>
+    </div>
+
+    <div class="card card-stripe-breed">
+      <div class="card-header">
+        <div class="card-title">Upload format — <code>breeding_highlights.json</code></div>
+        <div class="card-status">overlay schema</div>
+      </div>
+      <div style="margin-bottom: 8px; color: var(--ink-dim);">
+        Same file accepted as <code>.json</code> or <code>.tsv</code>. Each
+        row carries the four required fields plus optional metadata for the
+        detailed view. The <code>status</code> field maps directly to the
+        traffic-light dot.
+      </div>
+      <pre style="background: var(--panel-3); padding: 10px 12px; border-radius: 3px; font-size: 10px; line-height: 1.55; color: var(--ink); overflow-x: auto;">{
+  "metadata": { "panel_name": "Breeding committee Q2 review", "date": "..." },
+  "rows": [
+    { "sample": "CGA001",
+      "highlight": "High inbreeding on Chr17",
+      "value": "top 1% F_ROH",
+      "source": "Diversity",
+      "status": "red",
+      "notes": "F_ROH = 0.387, chr17 ROH segment 12.4 Mb",
+      "ref_url": "Diversity_atlas.html#page1" },
+    { "sample": "CGA044",
+      "highlight": "Rare inversion haplotype carrier",
+      "value": "INV_LG05_002",
+      "source": "Inversions",
+      "status": "green",
+      "ref_url": "Inversion_atlas.html#page18" }
+  ]
+}</pre>
+      <div style="color: var(--ink-dim); font-size: 10.5px;">
+        TSV variant: header row with columns <code>sample</code> &middot;
+        <code>highlight</code> &middot; <code>value</code> &middot;
+        <code>source</code> &middot; <code>status</code> &middot; (optional)
+        <code>notes</code> &middot; <code>ref_url</code>.
+      </div>
+    </div>
+
+    <div class="card card-stripe-breed">
+      <div class="card-header">
+        <div class="card-title">Methods note</div>
+        <div class="card-status">manuscript-ready</div>
+      </div>
+      <div style="color: var(--ink-dim); font-size: 10.5px; line-height: 1.55;">
+        Sample highlights are surfaced from the cohort's per-sample population
+        statistics (F_ROH, mean &theta;<sub>&pi;</sub>, mean heterozygosity,
+        deleterious burden) and from the inversion atlas's karyotype
+        assignments + marker-control set. Top-1% thresholds are computed from
+        the 226-sample empirical distribution per metric. <b>Highlights are a
+        review aid, not a breeding-decision table</b>; final pairing
+        decisions should be made by the breeding committee with reference to
+        pedigree records, the full Diversity Atlas drill-downs, and the
+        Inversion Atlas marker validation status.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     Page 9 (visible label "7 hatchery health") — F_ROH × H plane.
+     The novel framework: each stock occupies a 2D point in (F_ROH, H/H_ref)
+     space; the quadrant gives a verdict for stock-level inbreeding+diversity
+     state. Manuscript Discussion calls this "diversity-contextualised F_ROH".
+     Drives the breeding-page hatchery-health row via shared state.
+     ═══════════════════════════════════════════════════════════════════════ -->
+<div id="page9" class="page">
+  <div class="page-content">
+    <div class="page-title">Hatchery health <span style="color: var(--ink-dimmer); font-size: 13px; font-weight: normal; margin-left: 8px;">F_ROH × H plane &middot; diversity-contextualised inbreeding</span></div>
+    <div class="page-subtitle">
+      Stock-level verdict combining autozygosity (F_ROH) and species-baseline-referenced heterozygosity (H / H<sub>ref</sub>) &middot; the quadrant determines the verdict
+    </div>
+
+    <!-- Caution banner: F_ROH | H is a NEW framework introduced in this
+         manuscript. There is no published baseline cohort to compare it
+         against. The banner makes that explicit so users don't read the
+         verdicts as field-validated standards. -->
+    <div class="caution-banner" role="note" aria-label="New feature notice">
+      <div class="caution-banner-icon" aria-hidden="true">&#9888;</div>
+      <div class="caution-banner-body">
+        <div class="caution-banner-title">New feature &middot; no comparator baseline yet</div>
+        <div>
+          <b>F_ROH | H</b> (diversity-contextualised F_ROH) is a <b>novel framework</b>
+          introduced in this manuscript. It has <b>no published comparator dataset</b> against
+          which a cohort's quadrant verdict can be externally validated. The four verdict
+          labels (Healthy / Recent inbreeding only / Diversity erosion only / Caution)
+          are interpretive aids derived from the F_ROH and H values alone, not
+          field-validated thresholds. Quadrant cuts are computed from the median of
+          loaded cohorts, so adding or removing comparators changes them. Use the verdicts
+          as a structured way to think about your stock&mdash;not as a regulatory or
+          conservation-grade classification.
+        </div>
+      </div>
+    </div>
+
+    <div class="card card-stripe-roh">
+      <div class="card-header">
+        <div class="card-title">Why both numbers, not just F_ROH?</div>
+        <div class="card-status">framework</div>
+      </div>
+      <div style="margin-bottom: 8px;">
+        F_ROH alone is ambiguous across studies. A cohort with F_ROH = 0.30 on a
+        diversity-replete background reflects <b>recent close-kin inbreeding only</b>
+        and is manageable by outcrossing. The same F_ROH = 0.30 layered on top of
+        already-eroded heterozygosity reflects <b>sustained demographic decline</b>
+        — outcrossing within the stock cannot recover the missing diversity because
+        the non-ROH genome itself is depleted.
+      </div>
+      <div style="color: var(--ink-dim);">
+        Reporting F_ROH and H jointly resolves this ambiguity. Every stock becomes
+        a point in 2D space; the position tells you which biological process is
+        driving the inbreeding signal and which management response is appropriate.
+        The four quadrants of the plane and their verdicts are shown below.
+      </div>
+    </div>
+
+    <div class="bp-source-cards" id="fhhSummaryCards">
+      <!-- Auto-populated by _fhhRender(): 4 quadrant counts + n_cohorts loaded. -->
+    </div>
+
+    <div class="card card-stripe-roh">
+      <div class="card-header">
+        <div class="card-title">Quadrants of the F_ROH × H plane</div>
+        <div class="card-status">verdict map</div>
+      </div>
+      <div class="pg" style="grid-template-columns: 0.6fr 0.6fr 1.4fr 0.6fr;">
+        <div class="pg-header">F_ROH</div>
+        <div class="pg-header">H / H<sub>ref</sub></div>
+        <div class="pg-header">verdict (colored text)</div>
+        <div class="pg-header">interpretation</div>
+
+        <div>low</div><div>high</div>
+        <div><span class="fhh-good">Healthy &mdash; outbred on diversity-replete background</span></div>
+        <div>baseline state; preserve</div>
+
+        <div>high</div><div>high</div>
+        <div><span class="fhh-review">Recent inbreeding only &mdash; outcrossable</span></div>
+        <div>recent close-kin events; manageable by pair selection</div>
+
+        <div>low</div><div>low</div>
+        <div><span class="fhh-review">Diversity erosion only &mdash; bottlenecked but not inbred</span></div>
+        <div>old founder bottleneck; current pairings ok but limited gene pool</div>
+
+        <div>high</div><div>low</div>
+        <div><span class="fhh-caution">Caution &mdash; historical erosion + recent inbreeding</span></div>
+        <div>worst case; outcrossing within stock cannot recover diversity</div>
+      </div>
+    </div>
+
+    <div class="card card-stripe-roh">
+      <div class="card-header">
+        <div class="card-title">F_ROH × H plane</div>
+        <div class="card-status" id="fhhStatusBadge">scaffold &middot; load <code>hatchery_health.json</code> to plot</div>
+      </div>
+      <div id="fhhPlotSlot" style="margin: 14px 0;">
+        <!-- Auto-populated SVG scatter or empty-state message. -->
+      </div>
+      <div style="color: var(--ink-dim); font-size: 10.5px;">
+        Each point is one cohort. Vertical axis: H per site. Horizontal axis: F_ROH (genomic
+        fraction in ROH ≥ 1 Mb). The dashed lines mark the median across loaded cohorts &mdash;
+        they define the four quadrants. The cohort name is plain ink; the colored verdict
+        beside it is the quadrant assignment.
+      </div>
+    </div>
+
+    <div class="card card-stripe-roh">
+      <div class="card-header">
+        <div class="card-title">Loaded cohorts</div>
+        <div class="card-status" id="fhhTableBadge">populated when JSON loads</div>
+      </div>
+      <div id="fhhTableSlot">
+        <!-- Auto-populated table or empty-state message. -->
+      </div>
+      <div class="bp-toolbar" style="margin-top: 12px;">
+        <div class="bp-tb-spacer"></div>
+        <button class="bp-tb-btn" id="fhhLoadBtn" title="Upload a hatchery_health.json or .tsv with cohort entries (cohort, species, F_ROH, H_per_site, optional H_ref).">load hatchery_health&hellip;</button>
+        <input type="file" id="fhhLoadInput" style="display:none" accept=".json,.tsv,.txt">
+        <button class="bp-tb-btn" id="fhhExportCsvBtn" title="Download the loaded cohort table as CSV.">export CSV</button>
+        <button class="bp-tb-btn" id="fhhResetBtn" title="Drop all loaded cohorts.">reset</button>
+      </div>
+    </div>
+
+    <div class="card card-stripe-roh">
+      <div class="card-header">
+        <div class="card-title">Upload format &mdash; <code>hatchery_health.json</code></div>
+        <div class="card-status">cohort schema</div>
+      </div>
+      <div style="margin-bottom: 8px; color: var(--ink-dim);">
+        One row per cohort. <code>F_ROH</code> is the genomic fraction in ROH (long-tract
+        cutoff, typically &ge;1 Mb). <code>H_per_site</code> is mean per-site heterozygosity
+        (folded SFS, ANGSD or equivalent). <code>H_ref</code> is the species-baseline reference
+        H (a single number per species; if omitted, the page falls back to the cohort with
+        the highest H as the reference).
+      </div>
+      <pre style="background: var(--panel-3); padding: 10px 12px; border-radius: 3px; font-size: 10px; line-height: 1.55; color: var(--ink); overflow-x: auto;">{
+  "metadata": { "panel_name": "F_ROH \u00d7 H plane", "date": "..." },
+  "cohorts": [
+    { "cohort": "this study (226 broodstock)",
+      "species": "C. gariepinus",
+      "is_focal": true,
+      "F_ROH": 0.277,
+      "H_per_site": 0.00455,
+      "H_ref": 0.0156,
+      "ref_url": "Diversity_atlas.html#page1",
+      "notes": "Thai hatchery, 9x WGS, ngsF-HMM \u22651 Mb" },
+    { "cohort": "Nigerian wild C. gariepinus",
+      "species": "C. gariepinus",
+      "F_ROH": 0.05,
+      "H_per_site": 0.0156,
+      "H_ref": 0.0156,
+      "citation": "Sanda 2026" }
+  ]
+}</pre>
+      <div style="color: var(--ink-dim); font-size: 10.5px;">
+        TSV variant: header <code>cohort &middot; species &middot; F_ROH &middot; H_per_site &middot; H_ref</code> (optional <code>citation</code>, <code>notes</code>, <code>is_focal</code>).
+      </div>
+    </div>
+
+    <div class="card card-stripe-roh">
+      <div class="card-header">
+        <div class="card-title">Methods note</div>
+        <div class="card-status">manuscript-ready</div>
+      </div>
+      <div style="color: var(--ink-dim); font-size: 10.5px; line-height: 1.55;">
+        We propose that interpretation of F_ROH in managed populations requires explicit
+        reference to baseline heterozygosity, a framing we term <b>diversity-contextualised F_ROH</b>
+        (F_ROH | H). Under this framing, an F_ROH value is reported together with the cohort's
+        per-site H expressed as a fraction of a reference or wild-population estimate; populations
+        with identical F_ROH but different H | H_ref ratios reflect distinct underlying processes
+        rather than equivalent inbreeding states. The four quadrants of the plane (low/high F_ROH
+        \u00d7 low/high H | H_ref) provide a stock-level health verdict that distinguishes recent
+        pedigree events (high F_ROH at preserved H) from sustained demographic erosion
+        (high F_ROH at depleted H). The hatchery-health verdict is exported to the
+        <a href="#page8" style="color: var(--accent-2);">Breeding page</a> as a Diversity-source
+        row so the breeding committee can see stock-level context alongside per-sample flags.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
      Page 7 — About
      ═══════════════════════════════════════════════════════════════════════ -->
 <div id="page7" class="page">
@@ -1279,11 +1890,43 @@ CGA006     F15     B3     9.3×   97.3%     0.00289    0.067  K3=0.71  kept    �
       </div>
       <div style="line-height: 1.7; color: var(--ink-dim);">
         • <b>Inversions Atlas</b> → <a href="Inversion_atlas.html" style="color: var(--accent);">Inversion_atlas.html</a> — sibling deliverable, same dataset, exploratory inversion-calling tool<br>
-        • <b>Inversions Atlas page 7 (popstats)</b> — atlas-shared track stack including θπ, FST, Hobs/Hexp, ancestry Δ12; same data, different presentation<br>
-        • <b>Inversions Atlas page 8 (ancestry)</b> — per-window K-cluster Q values; the per-window source for this atlas's chromosome-level summaries<br>
-        • <b>Inversions Atlas page 12 (local PCA θπ)</b> — exploratory diversity scrubber; pairs with this atlas's <b>page 5 (Diversity)</b> as the chromosome-level summary view<br>
-        • <b>Inversions Atlas page 13 (Diversity Atlas preview)</b> — landing page documenting the dual-mode design that this file implements
+        • <b>Inversions Atlas tab 7 (popstats)</b> — atlas-shared track stack including θπ, FST, Hobs/Hexp, ancestry Δ12; same data, different presentation<br>
+        • <b>Inversions Atlas tab 8 (ancestry)</b> — per-window K-cluster Q values; the per-window source for this atlas's chromosome-level summaries<br>
+        • <b>Inversions Atlas tab 2 (local PCA θπ)</b> — exploratory diversity scrubber; pairs with this atlas's <b>page 5 (Diversity)</b> as the chromosome-level summary view<br>
+        • <b>Inversions Atlas tab 12 (cross-species)</b> — Cgar↔Cmac wfmash macro-synteny + breakpoint catalogue<br>
+        • <b>Inversions Atlas tab 13 (stats profile)</b> — comparative inversion-phenotype synthesis table<br>
+        • <b>Inversions Atlas tab 14 (marker panel)</b> — private-indel marker readiness with positive/negative + cross-species controls; linked from the breeding page's Marker rows
       </div>
+    </div>
+
+    <div class="card card-stripe-breed">
+      <div class="card-header">
+        <div class="card-title">What&rsquo;s new in v1.3</div>
+        <div class="card-status ready">v1.3 · turn 81</div>
+      </div>
+      <div style="margin-bottom: 8px;">
+        One addition since v1.2:
+      </div>
+      <ul style="margin: 0 0 8px 18px; padding: 0; line-height: 1.7;">
+        <li><b>Page 7 — Hatchery health</b> (new tab, between Inbreeding and Breeding). Operationalises the manuscript&rsquo;s <b>F_ROH × H plane</b> framework (introduced in the Discussion as <i>diversity-contextualised F_ROH</i>, F_ROH | H). Each cohort sits in 2D (F_ROH, H/H_ref) space; the quadrant determines a colored verdict: <span class="fhh-good">Healthy</span> / <span class="fhh-review">Recent inbreeding only</span> / <span class="fhh-review">Diversity erosion only</span> / <span class="fhh-caution">Caution — historical erosion + recent inbreeding</span>. Inline SVG scatter, comparator panel, JSON/TSV upload. The focal cohort&rsquo;s verdict is surfaced as a Diversity-source row on the breeding page so the committee sees stock-level health alongside per-sample flags. Coloring rule: only the verdict text is colored — cohort names, F_ROH, and H values stay in normal ink. Breeding renumbered 7&nbsp;→&nbsp;8; About renumbered 8&nbsp;→&nbsp;9.</li>
+      </ul>
+      <div style="color: var(--ink-dim); font-size: 10.5px;">
+        See the hatchery health page&rsquo;s in-page documentation for the framework rationale, quadrant verdicts, and JSON schema.
+      </div>
+    </div>
+
+    <div class="card card-stripe-breed">
+      <div class="card-header">
+        <div class="card-title">What&rsquo;s new in v1.2</div>
+        <div class="card-status">v1.2 · turn 79</div>
+      </div>
+      <div style="margin-bottom: 8px;">
+        Two additions in v1.2 (the cross-link hub release):
+      </div>
+      <ul style="margin: 0 0 8px 18px; padding: 0; line-height: 1.7;">
+        <li><b>Page 7 — Breeding</b> (new tab, since renumbered to 8 by v1.3). Sample highlights table for breeding committee review. One row = one sample-level reason to inspect or preserve that fish (high inbreeding, family cluster member, rare inversion carrier, marker control, top-1% diversity / burden). Three traffic-light statuses (🟢 useful / 🟡 review / 🔴 caution). Default 4-column simple view with detailed-view toggle. Auto-derives rows from cohort state when JSON layers load; accepts <code>breeding_highlights.json</code>/.tsv overlay.</li>
+        <li><b>Hash routing</b>. <code>Population_atlas.html#page8</code> now lands on the breeding page directly. The Inversion Atlas got the same treatment so cross-atlas deep links work both ways. Bogus hashes fall back gracefully.</li>
+      </ul>
     </div>
   </div>
 </div>
@@ -1320,6 +1963,29 @@ CGA006     F15     B3     9.3×   97.3%     0.00289    0.067  K3=0.71  kept    �
     }
   } catch (_) {}
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // Hash routing — cross-atlas deep links land on the right tab
+  // ─────────────────────────────────────────────────────────────────────────
+  // Inversion_atlas.html links here as `Population_atlas.html#page8` (breeding)
+  // or `#page3` (families & clusters); Diversity_atlas.html does the same.
+  // Without hash routing, those links would open the file but always land on
+  // whatever tab was last visited via localStorage. This block:
+  //   1. On initial load, prefers location.hash over localStorage when the
+  //      hash matches a real data-page value.
+  //   2. Listens for `hashchange` so in-page navigation also switches tabs.
+  //   3. Falls back gracefully when the hash is missing or invalid.
+  function _popRouteFromHash() {
+    const h = (location.hash || '').replace(/^#/, '').trim();
+    if (!h) return false;
+    const btn = document.querySelector(`#tabBar button[data-page="${h}"]`);
+    if (btn) { btn.click(); return true; }
+    return false;
+  }
+  window.addEventListener('hashchange', () => { _popRouteFromHash(); });
+  // Initial routing — runs after the localStorage restore above so a hash in
+  // the URL takes precedence over the last-viewed tab.
+  _popRouteFromHash();
+
   // Theme toggle — cycles through dark → light → academic → dark
   const themeBtn = document.getElementById('themeToggleBtn');
   if (themeBtn) {
@@ -1347,6 +2013,1062 @@ CGA006     F15     B3     9.3×   97.3%     0.00289    0.067  K3=0.71  kept    �
       applyTheme(next);
     });
   }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Breeding page (page 8) — sample highlights with traffic-light status
+  // ─────────────────────────────────────────────────────────────────────────
+  // One row per flagged sample. Five source categories:
+  //   Diversity / Relatedness / Burden / Inversions / Markers
+  // Three statuses (traffic-light): green (useful) · yellow (review) · red (caution)
+  //
+  // Rows come from two paths, merged at render time:
+  //   1. AUTO-DERIVED from atlas state. The hooks below are defensive: each
+  //      reads from a window-level state slot that doesn't exist yet in this
+  //      scaffold-only atlas. As future modules emit JSON layers
+  //      (per-sample F_ROH from MODULE_3, family clusters from MODULE_2B,
+  //      burden from MODULE_CONSERVATION, inversion karyotypes from
+  //      Inversion_atlas page 1, marker controls from Inversion_atlas page
+  //      18), the corresponding _bpAuto* functions start producing rows.
+  //   2. USER-UPLOADED via breeding_highlights.json (same file accepted as
+  //      .tsv). User rows are merged by `row.sample + row.source` so a user
+  //      can override an auto-derived row by uploading the same key.
+
+  // The shared atlas-state container. Created here if missing so other
+  // future modules can read/write `window.state.*` cleanly.
+  if (typeof window.state === 'undefined') window.state = {};
+
+  // ── Empirical thresholds for "top-1%" auto-flagging ────────────────────
+  const BP_TOP_QUANTILE = 0.99;        // top 1%
+  const BP_BOTTOM_QUANTILE = 0.01;     // bottom 1% (used for low-π flagging)
+
+  // ── Source styling ─────────────────────────────────────────────────────
+  // Each source has a default status when not explicitly set on the row.
+  // Used both for the source filter dropdown and for auto-derivation
+  // defaults.
+  const BP_SOURCE_DEFS = {
+    'Diversity':   { default_status: 'green',  ref_url: 'Diversity_atlas.html#page1' },
+    'Relatedness': { default_status: 'yellow', ref_url: '#page3' },
+    'Burden':      { default_status: 'red',    ref_url: null },
+    'Inversions':  { default_status: 'green',  ref_url: 'Inversion_atlas.html#page18' },
+    'Markers':     { default_status: 'green',  ref_url: 'Inversion_atlas.html#page18' },
+  };
+
+  const BP_STATUS_LABELS = {
+    'green':  'useful',
+    'yellow': 'review',
+    'red':    'caution',
+  };
+
+  function _bpEnsureState() {
+    if (!window.state._breedingPage) {
+      window.state._breedingPage = {
+        view_mode: 'simple',          // 'simple' | 'detailed'
+        filter_status: 'all',
+        filter_source: 'all',
+        user_rows: [],                // from breeding_highlights.json upload
+        derived_rows: [],             // from auto-derivation hooks
+        metadata: {},
+      };
+    }
+    return window.state._breedingPage;
+  }
+
+  // ── Auto-derivation hooks ─────────────────────────────────────────────
+  // Each hook returns an array of row objects (possibly empty). Rows merge
+  // into the table via _bpDerivedRows(). When a hook's required state is
+  // not loaded yet, it returns []. This is the "defensive scaffold" pattern
+  // — the breeding page works the moment any data layer is loaded, without
+  // refactoring.
+
+  // Top-1% F_ROH samples (caution: high inbreeding)
+  function _bpAutoDiversityRows() {
+    const ps = window.state.perSampleStats;   // expected shape: array of { sample, F_ROH, theta_pi, het, ... }
+    if (!Array.isArray(ps) || ps.length === 0) return [];
+    const out = [];
+    // Top-1% F_ROH (caution)
+    const frohValid = ps.filter(s => typeof s.F_ROH === 'number');
+    if (frohValid.length > 0) {
+      const sorted = frohValid.slice().sort((a, b) => a.F_ROH - b.F_ROH);
+      const cutIdx = Math.floor(sorted.length * BP_TOP_QUANTILE);
+      const cut = sorted[Math.min(cutIdx, sorted.length - 1)].F_ROH;
+      for (const s of frohValid) {
+        if (s.F_ROH >= cut && s.F_ROH > 0) {
+          out.push({
+            sample: s.sample,
+            highlight: 'High inbreeding' + (s.F_ROH_top_chrom ? ' on ' + s.F_ROH_top_chrom : ''),
+            value: 'F_ROH = ' + s.F_ROH.toFixed(3) + ' (top 1%)',
+            source: 'Diversity',
+            status: 'red',
+            notes: 'top-1% F_ROH cut = ' + cut.toFixed(3),
+            ref_url: 'Diversity_atlas.html#page5',
+            _origin: 'auto:froh_top',
+          });
+        }
+      }
+    }
+    // Top-1% θπ (preserve: very high diversity)
+    const piValid = ps.filter(s => typeof s.theta_pi === 'number');
+    if (piValid.length > 0) {
+      // Ascending sort + cut at floor(N * 0.99) for symmetry with F_ROH path.
+      // The cut is INCLUSIVE: any sample whose theta_pi >= cut is flagged.
+      // For N=100, cutIdx=99 → cut = sorted[99] = the largest value;
+      // only that sample (or ties at the max) gets flagged.
+      const sorted = piValid.slice().sort((a, b) => a.theta_pi - b.theta_pi);
+      const cutIdx = Math.floor(sorted.length * BP_TOP_QUANTILE);
+      const cut = sorted[Math.min(cutIdx, sorted.length - 1)].theta_pi;
+      for (const s of piValid) {
+        if (s.theta_pi >= cut) {
+          out.push({
+            sample: s.sample,
+            highlight: 'Very high nucleotide diversity',
+            value: 'θπ = ' + s.theta_pi.toFixed(5) + ' (top 1%)',
+            source: 'Diversity',
+            status: 'green',
+            notes: 'top-1% θπ cut = ' + cut.toFixed(5),
+            ref_url: 'Diversity_atlas.html#page2',
+            _origin: 'auto:pi_top',
+          });
+        }
+      }
+    }
+    return out;
+  }
+
+  // Largest family clusters → yellow (review for genetic balance)
+  function _bpAutoRelatednessRows() {
+    const fc = window.state.familyClusters;
+    // expected shape: { largest_cluster_size: 38, clusters: [{ cluster_id, members: [<sample>] }] }
+    if (!fc || !Array.isArray(fc.clusters) || fc.clusters.length === 0) return [];
+    const sorted = fc.clusters.slice().sort((a, b) => (b.members || []).length - (a.members || []).length);
+    const top = sorted[0];
+    if (!top || !Array.isArray(top.members) || top.members.length < 2) return [];
+    const n = top.members.length;
+    return top.members.map(sample => ({
+      sample,
+      highlight: 'Member of largest family cluster',
+      value: 'family size = ' + n,
+      source: 'Relatedness',
+      status: 'yellow',
+      notes: 'cluster_id = ' + (top.cluster_id || '?'),
+      ref_url: '#page3',
+      _origin: 'auto:family_largest',
+    }));
+  }
+
+  // Top-1% deleterious burden → red
+  function _bpAutoBurdenRows() {
+    const ps = window.state.perSampleStats;
+    if (!Array.isArray(ps) || ps.length === 0) return [];
+    const valid = ps.filter(s => typeof s.deleterious_burden === 'number');
+    if (valid.length === 0) return [];
+    const sorted = valid.slice().sort((a, b) => a.deleterious_burden - b.deleterious_burden);
+    const cutIdx = Math.floor(sorted.length * BP_TOP_QUANTILE);
+    const cut = sorted[Math.min(cutIdx, sorted.length - 1)].deleterious_burden;
+    const out = [];
+    for (const s of valid) {
+      if (s.deleterious_burden >= cut) {
+        out.push({
+          sample: s.sample,
+          highlight: 'High deleterious load' + (s.burden_top_chrom ? ' on ' + s.burden_top_chrom : ''),
+          value: 'burden = ' + s.deleterious_burden.toFixed(2) + ' (top 1%)',
+          source: 'Burden',
+          status: 'red',
+          notes: 'SIFT4G + VESM_650M score',
+          ref_url: null,
+          _origin: 'auto:burden_top',
+        });
+      }
+    }
+    return out;
+  }
+
+  // Rare inversion haplotype carriers → green (preserve)
+  function _bpAutoInversionRows() {
+    const ic = window.state.inversionCarriers;
+    // expected shape: array of { sample, inversion_id, frequency_in_cohort }
+    if (!Array.isArray(ic) || ic.length === 0) return [];
+    const out = [];
+    for (const e of ic) {
+      if (typeof e.frequency_in_cohort === 'number' && e.frequency_in_cohort <= 0.05 && e.sample && e.inversion_id) {
+        out.push({
+          sample: e.sample,
+          highlight: 'Rare inversion haplotype carrier',
+          value: e.inversion_id + ' (cohort freq = ' + (e.frequency_in_cohort * 100).toFixed(1) + '%)',
+          source: 'Inversions',
+          status: 'green',
+          notes: e.notes || '',
+          ref_url: 'Inversion_atlas.html#page18',
+          _origin: 'auto:inv_rare',
+        });
+      }
+    }
+    return out;
+  }
+
+  // Marker validation controls → green (useful as positive/negative control)
+  function _bpAutoMarkerRows() {
+    const mc = window.state.markerControls;
+    // expected shape: array of { sample, marker_id, role: 'positive_INV' | 'positive_HET' | 'negative_STD' }
+    if (!Array.isArray(mc) || mc.length === 0) return [];
+    const roleLabel = {
+      'positive_INV': 'Marker positive control',
+      'positive_HET': 'Marker heterozygote control',
+      'negative_STD': 'Marker negative control',
+    };
+    const valueLabel = {
+      'positive_INV': 'INV/INV',
+      'positive_HET': 'STD/INV (HET)',
+      'negative_STD': 'STD/STD',
+    };
+    return mc.map(e => ({
+      sample: e.sample,
+      highlight: roleLabel[e.role] || 'Marker control',
+      value: (e.marker_id || '?') + ' ' + (valueLabel[e.role] || ''),
+      source: 'Markers',
+      status: 'green',
+      notes: e.notes || '',
+      ref_url: 'Inversion_atlas.html#page18',
+      _origin: 'auto:marker_' + (e.role || 'control'),
+    })).filter(r => r.sample);
+  }
+
+  // v1.3: cohort-level hatchery health verdict, surfaced from the F_ROH × H
+  // plane (page 9). The focal cohort's verdict appears in the breeding
+  // table as a Diversity-source row so the committee sees stock-level
+  // status alongside per-sample flags. The verdict text is colored
+  // (green/amber/red) inline via `highlight_html`, matching the same
+  // colored-text convention used on the F_ROH × H plane page.
+  function _bpAutoHatcheryHealthRow() {
+    if (typeof _fhhEnsureState !== 'function') return [];
+    const fhh = _fhhEnsureState();
+    if (!fhh.cohorts || fhh.cohorts.length === 0) return [];
+    const focal = (typeof _fhhFocalCohort === 'function') ? _fhhFocalCohort() : null;
+    if (!focal) return [];
+    const cls = _fhhClassify(focal, fhh.cohorts);
+    if (!cls.verdict) return [];
+    const verdictDef = window.FHH_VERDICTS[cls.verdict];
+    if (!verdictDef) return [];
+    // Map verdict to traffic-light status for the breeding-page dot.
+    const statusMap = {
+      'good':              'green',
+      'review_inbreeding': 'yellow',
+      'review_erosion':    'yellow',
+      'caution':           'red',
+    };
+    const status = statusMap[cls.verdict] || 'yellow';
+    // Colored verdict text: inline span class for the same fhh-good /
+    // fhh-review / fhh-caution palette used on page 9.
+    const highlightHtml = '<span class="' + verdictDef.klass + '">' +
+      _bpEsc(verdictDef.label) + '</span>';
+    const ratioStr = (typeof cls.h_ratio === 'number') ? cls.h_ratio.toFixed(2) : '—';
+    const value = 'F_ROH ' + cls.F_ROH.toFixed(3) +
+      ' \u00b7 H/H_ref ' + ratioStr +
+      (cls.h_ref ? ' (H_ref ' + cls.h_ref.toExponential(2) + ')' : '');
+    return [{
+      sample: focal.cohort,    // cohort name in the Sample column
+      highlight: verdictDef.label,
+      highlight_html: highlightHtml,
+      value,
+      source: 'Diversity',
+      status,
+      notes: 'F_ROH \u00d7 H plane verdict (cohort-level, focal cohort). ' +
+             (focal.notes || ''),
+      ref_url: '#page9',
+      _origin: 'auto:hatchery_health',
+    }];
+  }
+
+  function _bpDerivedRows() {
+    const out = []
+      .concat(_bpAutoDiversityRows())
+      .concat(_bpAutoRelatednessRows())
+      .concat(_bpAutoBurdenRows())
+      .concat(_bpAutoInversionRows())
+      .concat(_bpAutoMarkerRows())
+      .concat(_bpAutoHatcheryHealthRow());
+    return out;
+  }
+
+  // Merge derived rows + user rows. User rows override derived rows on
+  // (sample, source) match. User-only rows (no derived match) append.
+  function _bpAllRows() {
+    const ui = _bpEnsureState();
+    const derived = _bpDerivedRows();
+    const userKey = r => (r.sample || '') + '||' + (r.source || '');
+    const userMap = new Map(ui.user_rows.map(r => [userKey(r), r]));
+    const out = [];
+    for (const r of derived) {
+      const k = userKey(r);
+      if (userMap.has(k)) {
+        out.push(Object.assign({}, r, userMap.get(k), { _origin: 'overlaid' }));
+        userMap.delete(k);
+      } else {
+        out.push(r);
+      }
+    }
+    // Remaining user rows (no derived match)
+    for (const r of userMap.values()) {
+      out.push(Object.assign({}, r, { _origin: r._origin || 'user' }));
+    }
+    return out;
+  }
+
+  // ── Upload parsing ────────────────────────────────────────────────────
+  function _bpIsValidJson(parsed) {
+    return parsed && typeof parsed === 'object' && Array.isArray(parsed.rows);
+  }
+  function _bpParseTsv(text) {
+    const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+    if (lines.length < 2) return null;
+    const header = lines[0].split('\t').map(s => s.trim().toLowerCase());
+    const idx = name => header.indexOf(name);
+    const rows = [];
+    for (let i = 1; i < lines.length; i++) {
+      const parts = lines[i].split('\t');
+      const get = name => idx(name) >= 0 ? (parts[idx(name)] || '').trim() : '';
+      rows.push({
+        sample:    get('sample') || get('sample_id'),
+        highlight: get('highlight'),
+        value:     get('value'),
+        source:    get('source'),
+        status:    (get('status') || '').toLowerCase(),
+        notes:     get('notes'),
+        ref_url:   get('ref_url'),
+      });
+    }
+    return { metadata: {}, rows };
+  }
+
+  function _bpIngestText(text, filename) {
+    const ui = _bpEnsureState();
+    let parsed = null;
+    if (filename && /\.tsv$|\.txt$/i.test(filename)) {
+      parsed = _bpParseTsv(text);
+    } else {
+      try { parsed = JSON.parse(text); } catch (_) {
+        try { parsed = _bpParseTsv(text); } catch (__) { parsed = null; }
+      }
+    }
+    if (!parsed) { console.warn('[breedingPage] could not parse', filename); return; }
+    if (!_bpIsValidJson(parsed)) {
+      console.warn('[breedingPage] file does not match schema (expected `rows` array)');
+      return;
+    }
+    // Validate each row & coerce status
+    const validRows = [];
+    for (const r of parsed.rows) {
+      if (!r.sample || !r.highlight) continue;
+      const src = r.source || '';
+      const status = (r.status || '').toLowerCase();
+      const validStatus = ['green', 'yellow', 'red'].includes(status)
+        ? status
+        : ((BP_SOURCE_DEFS[src] && BP_SOURCE_DEFS[src].default_status) || 'green');
+      validRows.push({
+        sample: r.sample,
+        highlight: r.highlight,
+        value: r.value || '',
+        source: src,
+        status: validStatus,
+        notes: r.notes || '',
+        ref_url: r.ref_url || (BP_SOURCE_DEFS[src] && BP_SOURCE_DEFS[src].ref_url) || null,
+        _origin: 'user',
+      });
+    }
+    ui.user_rows = validRows;
+    if (parsed.metadata) ui.metadata = Object.assign({}, ui.metadata, parsed.metadata);
+    _bpRender();
+  }
+
+  // ── Filtering ─────────────────────────────────────────────────────────
+  function _bpFilteredRows(rows, ui) {
+    return rows.filter(r => {
+      if (ui.filter_status !== 'all' && r.status !== ui.filter_status) return false;
+      if (ui.filter_source !== 'all' && r.source !== ui.filter_source) return false;
+      return true;
+    });
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────
+  function _bpEsc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function _bpRenderSourceCards(rows) {
+    const counts = { Diversity: 0, Relatedness: 0, Burden: 0, Inversions: 0, Markers: 0, _other: 0 };
+    for (const r of rows) {
+      if (counts.hasOwnProperty(r.source)) counts[r.source] += 1;
+      else counts._other += 1;
+    }
+    const cards = ['Diversity','Relatedness','Burden','Inversions','Markers'].map(src =>
+      '<div class="bp-source-card">' +
+        '<div class="bp-sc-value">' + counts[src] + '</div>' +
+        '<div class="bp-sc-label">' + src + '</div>' +
+      '</div>'
+    );
+    cards.push('<div class="bp-source-card">' +
+      '<div class="bp-sc-value">' + rows.length + '</div>' +
+      '<div class="bp-sc-label">total rows</div>' +
+    '</div>');
+    const slot = document.getElementById('bpSourceCards');
+    if (slot) slot.innerHTML = cards.join('');
+  }
+
+  function _bpRenderTable(rows, ui) {
+    const slot = document.getElementById('bpTableSlot');
+    if (!slot) return;
+    const filtered = _bpFilteredRows(rows, ui);
+    if (filtered.length === 0) {
+      const msg = (rows.length === 0)
+        ? 'No rows yet. Load a <code>breeding_highlights.json</code> via the toolbar, or wait for the cohort\u2019s per-sample F_ROH / family-cluster / burden / inversion-carrier / marker-control JSON layers to populate auto-rows.'
+        : 'No rows match the current filters.';
+      slot.innerHTML = '<div class="bp-empty">' + msg + '</div>';
+      return;
+    }
+    // Sort: red first, then yellow, then green (by severity); within status, by sample id
+    const statusOrder = { 'red': 0, 'yellow': 1, 'green': 2 };
+    const sorted = filtered.slice().sort((a, b) => {
+      const sa = statusOrder[a.status] != null ? statusOrder[a.status] : 9;
+      const sb = statusOrder[b.status] != null ? statusOrder[b.status] : 9;
+      if (sa !== sb) return sa - sb;
+      return String(a.sample).localeCompare(String(b.sample));
+    });
+    const isDetailed = ui.view_mode === 'detailed';
+    const head = '<thead><tr>' +
+      '<th>Sample</th>' +
+      '<th>Highlight</th>' +
+      '<th>Value</th>' +
+      '<th>Source</th>' +
+      (isDetailed ? '<th class="bp-detail-only">Status</th>' : '') +
+      (isDetailed ? '<th class="bp-detail-only">Notes / origin</th>' : '') +
+      '</tr></thead>';
+    const body = sorted.map(r => {
+      const dotClass = 'bp-' + (r.status || 'green');
+      const sourceCell = r.ref_url
+        ? '<a href="' + _bpEsc(r.ref_url) + '">' + _bpEsc(r.source) + '</a>'
+        : _bpEsc(r.source);
+      const sourceWithDot = '<span class="bp-dot ' + dotClass + '"></span>' + sourceCell;
+      // Optional `highlight_html` field — used by the hatchery-health auto
+      // row so it can carry inline `<span class="fhh-caution">…</span>` for
+      // colored verdict text. Falls back to the escaped plain `highlight`
+      // when no HTML override is present.
+      const highlightCell = (typeof r.highlight_html === 'string' && r.highlight_html)
+        ? r.highlight_html
+        : _bpEsc(r.highlight);
+      const valueCell = '<div>' + _bpEsc(r.value) + '</div>' +
+        (isDetailed && r.notes ? '<div class="bp-notes">' + _bpEsc(r.notes) + '</div>' : '');
+      return '<tr>' +
+        '<td class="bp-sample">' + _bpEsc(r.sample) + '</td>' +
+        '<td>' + highlightCell + '</td>' +
+        '<td class="bp-value">' + valueCell + '</td>' +
+        '<td class="bp-source">' + sourceWithDot + '</td>' +
+        (isDetailed ? '<td class="bp-detail-only"><span class="bp-dot-label">' +
+                       _bpEsc(BP_STATUS_LABELS[r.status] || r.status) + '</span></td>' : '') +
+        (isDetailed ? '<td class="bp-detail-only bp-notes">' + _bpEsc(r._origin || '') + '</td>' : '') +
+        '</tr>';
+    }).join('');
+    const tableClass = 'bp-table ' + (isDetailed ? 'bp-detailed' : 'bp-simple');
+    slot.innerHTML = '<table class="' + tableClass + '">' + head + '<tbody>' + body + '</tbody></table>';
+  }
+
+  function _bpRefreshSourceFilter(rows) {
+    const $sel = document.getElementById('bpFilterSource');
+    if (!$sel) return;
+    const ui = _bpEnsureState();
+    const present = new Set(rows.map(r => r.source).filter(s => s));
+    const ordered = ['Diversity','Relatedness','Burden','Inversions','Markers']
+      .filter(s => present.has(s))
+      .concat(Array.from(present).filter(s => !['Diversity','Relatedness','Burden','Inversions','Markers'].includes(s)));
+    const opts = ['<option value="all">all sources</option>']
+      .concat(ordered.map(s => '<option value="' + _bpEsc(s) + '"' +
+        (s === ui.filter_source ? ' selected' : '') + '>' + _bpEsc(s) + '</option>'));
+    $sel.innerHTML = opts.join('');
+  }
+
+  function _bpRender() {
+    const ui = _bpEnsureState();
+    const rows = _bpAllRows();
+    ui.derived_rows = _bpDerivedRows();
+    _bpRenderSourceCards(rows);
+    _bpRefreshSourceFilter(rows);
+    _bpRenderTable(rows, ui);
+    // Update the status badge on the "What this page shows" card
+    const badge = document.getElementById('bpStatusBadge');
+    if (badge) {
+      if (rows.length === 0) {
+        badge.textContent = 'scaffold · 0 rows · load breeding_highlights.json or upstream JSON layers to populate';
+        badge.classList.add('planned');
+        badge.classList.remove('ready');
+      } else {
+        badge.textContent = rows.length + ' rows · ' +
+          ui.derived_rows.length + ' auto-derived · ' +
+          ui.user_rows.length + ' user-supplied';
+        badge.classList.remove('planned');
+        badge.classList.add('ready');
+      }
+    }
+    // Update the active class on the view toggle
+    const $simple = document.getElementById('bpViewSimpleBtn');
+    const $detail = document.getElementById('bpViewDetailedBtn');
+    if ($simple && $detail) {
+      $simple.classList.toggle('active', ui.view_mode === 'simple');
+      $detail.classList.toggle('active', ui.view_mode === 'detailed');
+    }
+  }
+
+  function _bpExportCsv() {
+    const ui = _bpEnsureState();
+    const rows = _bpFilteredRows(_bpAllRows(), ui);
+    const header = ['sample','highlight','value','source','status','notes','ref_url','origin'];
+    const csvCell = v => {
+      if (v == null) return '';
+      const s = String(v);
+      if (/[",\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+      return s;
+    };
+    const lines = [header.join(',')];
+    for (const r of rows) {
+      lines.push([r.sample, r.highlight, r.value, r.source, r.status, r.notes, r.ref_url, r._origin]
+        .map(csvCell).join(','));
+    }
+    const blob = new Blob([lines.join('\n') + '\n'], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'breeding_highlights.csv';
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 250);
+  }
+
+  // ── Wire toolbar (one-time on first render of page8) ──────────────────
+  let _bpWired = false;
+  function _bpWire() {
+    if (_bpWired) return;
+    _bpWired = true;
+    const ui = _bpEnsureState();
+    const $simple = document.getElementById('bpViewSimpleBtn');
+    const $detail = document.getElementById('bpViewDetailedBtn');
+    if ($simple) $simple.addEventListener('click', () => { ui.view_mode = 'simple'; _bpRender(); });
+    if ($detail) $detail.addEventListener('click', () => { ui.view_mode = 'detailed'; _bpRender(); });
+    const $fs = document.getElementById('bpFilterStatus');
+    if ($fs) $fs.addEventListener('change', () => { ui.filter_status = $fs.value; _bpRender(); });
+    const $fsrc = document.getElementById('bpFilterSource');
+    if ($fsrc) $fsrc.addEventListener('change', () => { ui.filter_source = $fsrc.value; _bpRender(); });
+    const $load = document.getElementById('bpLoadBtn');
+    const $input = document.getElementById('bpLoadInput');
+    if ($load && $input) {
+      $load.addEventListener('click', () => $input.click());
+      $input.addEventListener('change', e => {
+        const f = e.target.files && e.target.files[0];
+        if (!f) return;
+        const r = new FileReader();
+        r.onload = ev => _bpIngestText(ev.target.result, f.name);
+        r.readAsText(f);
+        $input.value = '';
+      });
+    }
+    const $csv = document.getElementById('bpExportCsvBtn');
+    if ($csv) $csv.addEventListener('click', _bpExportCsv);
+    const $reset = document.getElementById('bpResetBtn');
+    if ($reset) $reset.addEventListener('click', () => {
+      ui.user_rows = [];
+      _bpRender();
+    });
+  }
+
+  // Hook the breeding page render into the existing tab-switch dispatcher
+  document.querySelectorAll('#tabBar button[data-page="page8"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      requestAnimationFrame(() => {
+        try { _bpWire(); _bpRender(); }
+        catch (e) { console.warn('[breedingPage] render failed:', e); }
+      });
+    });
+  });
+
+  // Expose hooks for tests + future modules
+  window._bpRender = _bpRender;
+  window._bpEnsureState = _bpEnsureState;
+  window._bpAllRows = _bpAllRows;
+  window._bpDerivedRows = _bpDerivedRows;
+  window._bpAutoDiversityRows = _bpAutoDiversityRows;
+  window._bpAutoRelatednessRows = _bpAutoRelatednessRows;
+  window._bpAutoBurdenRows = _bpAutoBurdenRows;
+  window._bpAutoInversionRows = _bpAutoInversionRows;
+  window._bpAutoMarkerRows = _bpAutoMarkerRows;
+  window._bpAutoHatcheryHealthRow = _bpAutoHatcheryHealthRow;
+  window._bpIngestText = _bpIngestText;
+  window._bpFilteredRows = _bpFilteredRows;
+  window._bpExportCsv = _bpExportCsv;
+  window._bpIsValidJson = _bpIsValidJson;
+  window._bpParseTsv = _bpParseTsv;
+  // BP_SOURCE_DEFS / labels also exposed for tests
+  window.BP_SOURCE_DEFS = BP_SOURCE_DEFS;
+  window.BP_STATUS_LABELS = BP_STATUS_LABELS;
+
+  // Initial render so the page is ready even before user clicks the tab
+  // (e.g. when localStorage restores tab=page8 on load)
+  try { _bpWire(); _bpRender(); }
+  catch (e) { console.warn('[breedingPage] initial render failed:', e); }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Hatchery health page (page 9) — F_ROH × H plane
+  // ─────────────────────────────────────────────────────────────────────────
+  // Each cohort is one point in 2D (F_ROH, H_per_site / H_ref) space.
+  // The four quadrants give a verdict:
+  //   low F_ROH + high H/H_ref  → "Healthy" (green)
+  //   high F_ROH + high H/H_ref → "Recent inbreeding only" (review, amber)
+  //   low F_ROH + low H/H_ref   → "Diversity erosion only" (review, amber)
+  //   high F_ROH + low H/H_ref  → "Caution — historical erosion + recent inbreeding" (red)
+  //
+  // The atlas's contribution is operational: a comparator panel + a colored
+  // verdict per cohort + a one-row hand-off to the breeding page so the
+  // committee sees stock-level health alongside per-sample flags.
+  // -----------------------------------------------------------------------
+  // The focal cohort (this study) is the one with `is_focal: true` in the
+  // uploaded JSON. If none is marked, the page treats the highest-F_ROH
+  // cohort as focal (the most-likely candidate for hatchery review).
+
+  const FHH_VERDICTS = {
+    'good':    { label: 'Healthy \u2014 outbred on diversity-replete background',         klass: 'fhh-good'    },
+    'review_inbreeding': { label: 'Recent inbreeding only \u2014 outcrossable',            klass: 'fhh-review'  },
+    'review_erosion':    { label: 'Diversity erosion only \u2014 bottlenecked but not inbred', klass: 'fhh-review'  },
+    'caution': { label: 'Caution \u2014 historical erosion + recent inbreeding',           klass: 'fhh-caution' },
+  };
+
+  function _fhhEnsureState() {
+    if (!window.state._hatcheryHealth) {
+      window.state._hatcheryHealth = {
+        cohorts: [],         // array of { cohort, species, F_ROH, H_per_site, H_ref?, is_focal?, citation?, notes?, ref_url? }
+        metadata: {},
+      };
+    }
+    return window.state._hatcheryHealth;
+  }
+
+  // Resolve H_ref for a cohort: prefer the per-cohort H_ref, fall back to
+  // the maximum H_per_site across loaded cohorts of the same species, then
+  // global maximum if no species match. This makes the page useful even
+  // when only one cohort has H_ref filled in (the others auto-reference
+  // against the highest-H peer).
+  function _fhhResolveHRef(cohort, allCohorts) {
+    if (typeof cohort.H_ref === 'number' && cohort.H_ref > 0) return cohort.H_ref;
+    if (cohort.species) {
+      const peers = allCohorts.filter(c =>
+        c.species === cohort.species && typeof c.H_per_site === 'number');
+      if (peers.length > 0) {
+        const peerHRef = peers.reduce((m, c) => Math.max(m, c.H_per_site), 0);
+        if (peerHRef > 0) return peerHRef;
+      }
+    }
+    const allH = allCohorts.map(c => c.H_per_site).filter(v => typeof v === 'number');
+    if (allH.length > 0) return Math.max.apply(null, allH);
+    return null;
+  }
+
+  // Quadrant assignment. Cuts at the median F_ROH and median H/H_ref of
+  // currently-loaded cohorts; if only one cohort is loaded, fall back to
+  // fixed published thresholds so the verdict still works (F_ROH=0.10 is
+  // the conventional "moderate inbreeding" cutoff; H/H_ref=0.5 means the
+  // cohort retains ≥50% of reference diversity).
+  function _fhhClassify(cohort, allCohorts) {
+    const hRef = _fhhResolveHRef(cohort, allCohorts);
+    const ratio = (typeof cohort.H_per_site === 'number' && hRef && hRef > 0)
+      ? (cohort.H_per_site / hRef) : null;
+    const froh = cohort.F_ROH;
+    if (typeof froh !== 'number' || ratio == null) {
+      return { verdict: null, h_ratio: ratio, F_ROH: froh, h_ref: hRef };
+    }
+    // Compute medians over loaded cohorts when there are multiple; else use
+    // fixed thresholds (F_ROH=0.10, H/H_ref=0.5).
+    let frohCut = 0.10, ratioCut = 0.5;
+    const valid = allCohorts.filter(c =>
+      typeof c.F_ROH === 'number' && typeof c.H_per_site === 'number');
+    if (valid.length >= 2) {
+      const frohs = valid.map(c => c.F_ROH).sort((a, b) => a - b);
+      const ratios = valid.map(c => {
+        const ref = _fhhResolveHRef(c, allCohorts);
+        return (ref && ref > 0) ? c.H_per_site / ref : null;
+      }).filter(v => v != null).sort((a, b) => a - b);
+      const med = arr => arr[Math.floor(arr.length / 2)];
+      if (frohs.length > 0)  frohCut  = med(frohs);
+      if (ratios.length > 0) ratioCut = med(ratios);
+    }
+    const highFroh = froh >= frohCut;
+    const highH = ratio >= ratioCut;
+    let verdict;
+    if (!highFroh && highH)       verdict = 'good';
+    else if ( highFroh && highH)  verdict = 'review_inbreeding';
+    else if (!highFroh && !highH) verdict = 'review_erosion';
+    else                          verdict = 'caution';
+    return { verdict, h_ratio: ratio, F_ROH: froh, h_ref: hRef, frohCut, ratioCut };
+  }
+
+  function _fhhIsValidJson(parsed) {
+    return parsed && typeof parsed === 'object' && Array.isArray(parsed.cohorts);
+  }
+
+  function _fhhParseTsv(text) {
+    const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+    if (lines.length < 2) return null;
+    const header = lines[0].split('\t').map(s => s.trim().toLowerCase());
+    const idx = name => header.indexOf(name);
+    const cohorts = [];
+    for (let i = 1; i < lines.length; i++) {
+      const parts = lines[i].split('\t');
+      const get = name => idx(name) >= 0 ? (parts[idx(name)] || '').trim() : '';
+      const num = name => { const v = get(name); return (v === '' || v === 'NA') ? null : Number(v); };
+      cohorts.push({
+        cohort:    get('cohort'),
+        species:   get('species'),
+        F_ROH:     num('f_roh'),
+        H_per_site: num('h_per_site'),
+        H_ref:     num('h_ref'),
+        citation:  get('citation'),
+        notes:     get('notes'),
+        is_focal:  get('is_focal').toLowerCase() === 'true' || get('is_focal') === '1',
+      });
+    }
+    return { metadata: {}, cohorts };
+  }
+
+  function _fhhIngestText(text, filename) {
+    const ui = _fhhEnsureState();
+    let parsed = null;
+    if (filename && /\.tsv$|\.txt$/i.test(filename)) {
+      parsed = _fhhParseTsv(text);
+    } else {
+      try { parsed = JSON.parse(text); } catch (_) {
+        try { parsed = _fhhParseTsv(text); } catch (__) { parsed = null; }
+      }
+    }
+    if (!parsed) { console.warn('[fhh] could not parse', filename); return; }
+    if (!_fhhIsValidJson(parsed)) {
+      console.warn('[fhh] expected `cohorts` array');
+      return;
+    }
+    // Validate / coerce
+    ui.cohorts = parsed.cohorts.map(c => ({
+      cohort:     c.cohort || c.name || 'unnamed',
+      species:    c.species || null,
+      F_ROH:      typeof c.F_ROH === 'number' ? c.F_ROH : null,
+      H_per_site: typeof c.H_per_site === 'number' ? c.H_per_site : null,
+      H_ref:      typeof c.H_ref === 'number' ? c.H_ref : null,
+      citation:   c.citation || null,
+      notes:      c.notes || null,
+      is_focal:   c.is_focal === true,
+      ref_url:    c.ref_url || null,
+    })).filter(c => typeof c.F_ROH === 'number' && typeof c.H_per_site === 'number');
+    if (parsed.metadata) ui.metadata = Object.assign({}, ui.metadata, parsed.metadata);
+    _fhhRender();
+    // Re-render the breeding page so the new auto-row appears
+    if (typeof _bpRender === 'function') {
+      try { _bpRender(); } catch (e) { console.warn('[fhh] breeding refresh failed:', e); }
+    }
+  }
+
+  function _fhhEsc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  // The focal cohort: prefer is_focal flag, else the cohort with the highest
+  // F_ROH (most likely the one under hatchery review).
+  function _fhhFocalCohort() {
+    const ui = _fhhEnsureState();
+    if (!ui.cohorts || ui.cohorts.length === 0) return null;
+    const flagged = ui.cohorts.filter(c => c.is_focal);
+    if (flagged.length > 0) return flagged[0];
+    const sorted = ui.cohorts.slice().sort((a, b) => (b.F_ROH || 0) - (a.F_ROH || 0));
+    return sorted[0];
+  }
+
+  function _fhhRenderSummaryCards() {
+    const ui = _fhhEnsureState();
+    const slot = document.getElementById('fhhSummaryCards');
+    if (!slot) return;
+    if (ui.cohorts.length === 0) { slot.innerHTML = ''; return; }
+    const counts = { good: 0, review_inbreeding: 0, review_erosion: 0, caution: 0 };
+    for (const c of ui.cohorts) {
+      const r = _fhhClassify(c, ui.cohorts);
+      if (r.verdict) counts[r.verdict] = (counts[r.verdict] || 0) + 1;
+    }
+    const card = (label, value, klass) =>
+      '<div class="bp-source-card">' +
+        '<div class="bp-sc-value ' + klass + '">' + value + '</div>' +
+        '<div class="bp-sc-label">' + label + '</div>' +
+      '</div>';
+    slot.innerHTML =
+      card('Healthy', counts.good, 'fhh-good') +
+      card('Recent inbreeding', counts.review_inbreeding, 'fhh-review') +
+      card('Diversity erosion', counts.review_erosion, 'fhh-review') +
+      card('Caution', counts.caution, 'fhh-caution') +
+      card('Cohorts loaded', ui.cohorts.length, '');
+  }
+
+  // SVG scatter of the F_ROH × H plane. Compact, no external deps.
+  function _fhhRenderPlot() {
+    const ui = _fhhEnsureState();
+    const slot = document.getElementById('fhhPlotSlot');
+    if (!slot) return;
+    if (ui.cohorts.length === 0) {
+      slot.innerHTML = '<div class="fhh-empty">No cohorts loaded yet. ' +
+        'Upload a <code>hatchery_health.json</code> via the toolbar below ' +
+        'to plot points on the F_ROH \u00d7 H plane.</div>';
+      return;
+    }
+    // Plot setup
+    const W = 720, H = 420;
+    const pad = { l: 60, r: 180, t: 20, b: 50 };
+    const innerW = W - pad.l - pad.r;
+    const innerH = H - pad.t - pad.b;
+    // Scale: F_ROH on X (0..max+0.05), H/H_ref on Y (0..max+0.1). H/H_ref >= 0
+    // and typically <= 1, but allow a bit of headroom for cohorts with H >
+    // their declared H_ref.
+    let maxFroh = 0.05, maxRatio = 0.5;
+    for (const c of ui.cohorts) {
+      const r = _fhhClassify(c, ui.cohorts);
+      if (typeof r.F_ROH === 'number') maxFroh = Math.max(maxFroh, r.F_ROH);
+      if (typeof r.h_ratio === 'number') maxRatio = Math.max(maxRatio, r.h_ratio);
+    }
+    maxFroh = Math.min(1.0, Math.ceil(maxFroh * 10) / 10 + 0.05);  // round up to nearest 0.1
+    maxRatio = Math.min(1.5, Math.ceil(maxRatio * 10) / 10 + 0.1);
+    const xScale = v => pad.l + (v / maxFroh) * innerW;
+    const yScale = v => pad.t + innerH - (v / maxRatio) * innerH;
+    // Quadrant cut lines (median over loaded cohorts; same logic as classify)
+    let frohCut = 0.10, ratioCut = 0.5;
+    const valid = ui.cohorts.filter(c =>
+      typeof c.F_ROH === 'number' && typeof c.H_per_site === 'number');
+    if (valid.length >= 2) {
+      const frohs = valid.map(c => c.F_ROH).sort((a, b) => a - b);
+      const ratios = valid.map(c => _fhhClassify(c, ui.cohorts).h_ratio)
+        .filter(v => v != null).sort((a, b) => a - b);
+      const med = arr => arr[Math.floor(arr.length / 2)];
+      if (frohs.length > 0)  frohCut  = med(frohs);
+      if (ratios.length > 0) ratioCut = med(ratios);
+    }
+    // Build SVG
+    const tickFmt = v => (v < 0.01 ? v.toFixed(3) : v.toFixed(2));
+    let svg = '<svg class="fhh-plot-svg" viewBox="0 0 ' + W + ' ' + H +
+              '" preserveAspectRatio="xMidYMid meet" role="img" aria-label="F_ROH \u00d7 H plane scatter">';
+    // Axes
+    svg += '<line class="fhh-plot-axis" x1="' + pad.l + '" y1="' + (H - pad.b) +
+           '" x2="' + (W - pad.r) + '" y2="' + (H - pad.b) + '" />';
+    svg += '<line class="fhh-plot-axis" x1="' + pad.l + '" y1="' + pad.t +
+           '" x2="' + pad.l + '" y2="' + (H - pad.b) + '" />';
+    // X ticks
+    for (let i = 0; i <= 5; i++) {
+      const v = (maxFroh / 5) * i;
+      const x = xScale(v);
+      svg += '<line class="fhh-plot-axis" x1="' + x + '" y1="' + (H - pad.b) +
+             '" x2="' + x + '" y2="' + (H - pad.b + 4) + '" />';
+      svg += '<text class="fhh-plot-tick" x="' + x + '" y="' + (H - pad.b + 16) +
+             '" text-anchor="middle">' + tickFmt(v) + '</text>';
+    }
+    // Y ticks
+    for (let i = 0; i <= 5; i++) {
+      const v = (maxRatio / 5) * i;
+      const y = yScale(v);
+      svg += '<line class="fhh-plot-axis" x1="' + (pad.l - 4) + '" y1="' + y +
+             '" x2="' + pad.l + '" y2="' + y + '" />';
+      svg += '<text class="fhh-plot-tick" x="' + (pad.l - 8) + '" y="' + (y + 3) +
+             '" text-anchor="end">' + v.toFixed(2) + '</text>';
+    }
+    // Axis labels
+    svg += '<text class="fhh-plot-axis-label" x="' + (pad.l + innerW / 2) +
+           '" y="' + (H - 10) + '" text-anchor="middle">F_ROH</text>';
+    svg += '<text class="fhh-plot-axis-label" x="' + 14 + '" y="' + (pad.t + innerH / 2) +
+           '" transform="rotate(-90,14,' + (pad.t + innerH / 2) + ')" text-anchor="middle">H / H_ref</text>';
+    // Quadrant cut lines
+    svg += '<line class="fhh-plot-quadrant-line" x1="' + xScale(frohCut) + '" y1="' + pad.t +
+           '" x2="' + xScale(frohCut) + '" y2="' + (H - pad.b) + '" />';
+    svg += '<line class="fhh-plot-quadrant-line" x1="' + pad.l + '" y1="' + yScale(ratioCut) +
+           '" x2="' + (W - pad.r) + '" y2="' + yScale(ratioCut) + '" />';
+    // Quadrant labels (corners)
+    svg += '<text class="fhh-plot-quadrant-label" x="' + (pad.l + 8) + '" y="' + (pad.t + 14) + '">healthy</text>';
+    svg += '<text class="fhh-plot-quadrant-label" x="' + (W - pad.r - 8) + '" y="' + (pad.t + 14) + '" text-anchor="end">recent inbreeding</text>';
+    svg += '<text class="fhh-plot-quadrant-label" x="' + (pad.l + 8) + '" y="' + (H - pad.b - 8) + '">erosion only</text>';
+    svg += '<text class="fhh-plot-quadrant-label" x="' + (W - pad.r - 8) + '" y="' + (H - pad.b - 8) + '" text-anchor="end">caution</text>';
+    // Points
+    for (const c of ui.cohorts) {
+      const r = _fhhClassify(c, ui.cohorts);
+      if (!r.verdict) continue;
+      const x = xScale(r.F_ROH);
+      const y = yScale(r.h_ratio);
+      const klass = FHH_VERDICTS[r.verdict].klass;
+      const focal = c.is_focal ? ' fhh-focal' : '';
+      svg += '<circle class="fhh-plot-point ' + klass + focal + '" cx="' + x +
+             '" cy="' + y + '" r="' + (c.is_focal ? 7 : 5) + '">' +
+             '<title>' + _fhhEsc(c.cohort) + ' \u2014 F_ROH ' + r.F_ROH.toFixed(3) +
+             ', H/H_ref ' + r.h_ratio.toFixed(2) + ' \u2014 ' + FHH_VERDICTS[r.verdict].label +
+             '</title></circle>';
+      // Label to the right of the point (offset by radius + 5)
+      const labelClass = 'fhh-plot-label' + (c.is_focal ? ' fhh-plot-label-focal' : '');
+      svg += '<text class="' + labelClass + '" x="' + (x + (c.is_focal ? 10 : 8)) +
+             '" y="' + (y + 3) + '">' + _fhhEsc(c.cohort) + '</text>';
+    }
+    svg += '</svg>';
+    slot.innerHTML = svg;
+  }
+
+  function _fhhRenderTable() {
+    const ui = _fhhEnsureState();
+    const slot = document.getElementById('fhhTableSlot');
+    if (!slot) return;
+    if (ui.cohorts.length === 0) {
+      slot.innerHTML = '<div class="fhh-empty">No cohorts loaded.</div>';
+      return;
+    }
+    const head = '<thead><tr>' +
+      '<th>Cohort</th>' +
+      '<th>Species</th>' +
+      '<th>F_ROH</th>' +
+      '<th>H per site</th>' +
+      '<th>H / H_ref</th>' +
+      '<th>Verdict</th>' +
+      '</tr></thead>';
+    const body = ui.cohorts.map(c => {
+      const r = _fhhClassify(c, ui.cohorts);
+      const verdict = r.verdict ? FHH_VERDICTS[r.verdict] : null;
+      const verdictCell = verdict
+        ? '<span class="' + verdict.klass + '">' + _fhhEsc(verdict.label) + '</span>'
+        : '<span class="fhh-neutral">\u2014</span>';
+      const focalMarker = c.is_focal
+        ? '<span class="fhh-focal-marker">FOCAL</span>'
+        : '';
+      const ratioStr = (typeof r.h_ratio === 'number')
+        ? r.h_ratio.toFixed(2) +
+          (r.h_ref ? '<br><span class="fhh-citation">H_ref ' + r.h_ref.toExponential(2) + '</span>' : '')
+        : '<span class="fhh-citation">no H_ref</span>';
+      const citation = c.citation
+        ? '<br><span class="fhh-citation">' + _fhhEsc(c.citation) + '</span>'
+        : '';
+      return '<tr>' +
+        '<td class="fhh-cohort">' + focalMarker + _fhhEsc(c.cohort) + citation + '</td>' +
+        '<td>' + (c.species ? '<i>' + _fhhEsc(c.species) + '</i>' : '\u2014') + '</td>' +
+        '<td class="fhh-num">' + (typeof r.F_ROH === 'number' ? r.F_ROH.toFixed(3) : '\u2014') + '</td>' +
+        '<td class="fhh-num">' + (typeof c.H_per_site === 'number' ? c.H_per_site.toExponential(2) : '\u2014') + '</td>' +
+        '<td class="fhh-num">' + ratioStr + '</td>' +
+        '<td>' + verdictCell + '</td>' +
+        '</tr>';
+    }).join('');
+    slot.innerHTML = '<table class="fhh-table">' + head + '<tbody>' + body + '</tbody></table>';
+  }
+
+  function _fhhRender() {
+    const ui = _fhhEnsureState();
+    _fhhRenderSummaryCards();
+    _fhhRenderPlot();
+    _fhhRenderTable();
+    const badge = document.getElementById('fhhStatusBadge');
+    const tableBadge = document.getElementById('fhhTableBadge');
+    if (badge) {
+      if (ui.cohorts.length === 0) {
+        badge.textContent = 'scaffold \u00b7 load hatchery_health.json to plot';
+        badge.classList.add('planned');
+        badge.classList.remove('ready');
+      } else {
+        const focal = _fhhFocalCohort();
+        const verdict = focal ? _fhhClassify(focal, ui.cohorts).verdict : null;
+        const verdictLabel = verdict ? FHH_VERDICTS[verdict].label : 'no focal verdict';
+        badge.innerHTML = ui.cohorts.length + ' cohorts plotted \u00b7 focal: ' +
+          (verdict ? '<span class="' + FHH_VERDICTS[verdict].klass + '">' + _fhhEsc(verdictLabel) + '</span>' : verdictLabel);
+        badge.classList.remove('planned');
+        badge.classList.add('ready');
+      }
+    }
+    if (tableBadge) {
+      tableBadge.textContent = ui.cohorts.length + ' cohort' +
+        (ui.cohorts.length === 1 ? '' : 's') + ' loaded';
+    }
+  }
+
+  function _fhhExportCsv() {
+    const ui = _fhhEnsureState();
+    if (ui.cohorts.length === 0) return;
+    const header = ['cohort','species','F_ROH','H_per_site','H_ref','H_ratio','verdict','verdict_label','citation','notes','is_focal'];
+    const csvCell = v => {
+      if (v == null) return '';
+      const s = String(v);
+      if (/[",\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+      return s;
+    };
+    const lines = [header.join(',')];
+    for (const c of ui.cohorts) {
+      const r = _fhhClassify(c, ui.cohorts);
+      const verdict = r.verdict ? FHH_VERDICTS[r.verdict] : null;
+      lines.push([
+        c.cohort, c.species, c.F_ROH, c.H_per_site, c.H_ref,
+        r.h_ratio != null ? r.h_ratio.toFixed(4) : '',
+        r.verdict || '', verdict ? verdict.label : '',
+        c.citation, c.notes, c.is_focal ? 'true' : 'false',
+      ].map(csvCell).join(','));
+    }
+    const blob = new Blob([lines.join('\n') + '\n'], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'hatchery_health.csv';
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 250);
+  }
+
+  // Wire toolbar (idempotent)
+  let _fhhWired = false;
+  function _fhhWire() {
+    if (_fhhWired) return;
+    _fhhWired = true;
+    const $load  = document.getElementById('fhhLoadBtn');
+    const $input = document.getElementById('fhhLoadInput');
+    if ($load && $input) {
+      $load.addEventListener('click', () => $input.click());
+      $input.addEventListener('change', e => {
+        const f = e.target.files && e.target.files[0];
+        if (!f) return;
+        const r = new FileReader();
+        r.onload = ev => _fhhIngestText(ev.target.result, f.name);
+        r.readAsText(f);
+        $input.value = '';
+      });
+    }
+    const $csv = document.getElementById('fhhExportCsvBtn');
+    if ($csv) $csv.addEventListener('click', _fhhExportCsv);
+    const $reset = document.getElementById('fhhResetBtn');
+    if ($reset) $reset.addEventListener('click', () => {
+      const ui = _fhhEnsureState();
+      ui.cohorts = [];
+      _fhhRender();
+      if (typeof _bpRender === 'function') {
+        try { _bpRender(); } catch (e) { console.warn('[fhh] breeding refresh failed:', e); }
+      }
+    });
+  }
+
+  // Hook page9 tab activation
+  document.querySelectorAll('#tabBar button[data-page="page9"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      requestAnimationFrame(() => {
+        try { _fhhWire(); _fhhRender(); }
+        catch (e) { console.warn('[fhh] render failed:', e); }
+      });
+    });
+  });
+
+  // Expose for tests + cross-page hand-off
+  window._fhhRender = _fhhRender;
+  window._fhhEnsureState = _fhhEnsureState;
+  window._fhhClassify = _fhhClassify;
+  window._fhhFocalCohort = _fhhFocalCohort;
+  window._fhhResolveHRef = _fhhResolveHRef;
+  window._fhhIngestText = _fhhIngestText;
+  window._fhhExportCsv = _fhhExportCsv;
+  window._fhhParseTsv = _fhhParseTsv;
+  window._fhhIsValidJson = _fhhIsValidJson;
+  window.FHH_VERDICTS = FHH_VERDICTS;
+
+  // Initial render
+  try { _fhhWire(); _fhhRender(); }
+  catch (e) { console.warn('[fhh] initial render failed:', e); }
 </script>
 
 </body>

@@ -1,0 +1,206 @@
+{
+  "metadata": {
+    "analysis_name": "Inversion statistical profile",
+    "species_1": "C. gariepinus",
+    "species_2": "C. macrocephalus",
+    "date": "2026-04-30",
+    "notes": "DEMO file. Replace each result block with values from your own analyses. Rows whose `derive_from` is set in SP_DEFAULT_ROWS will be auto-populated from atlas state (cs_breakpoints, candidate list) and don't need to appear here unless you want to override the derivation."
+  },
+  "summary_rows": [
+    {
+      "id": "gene_density_inversions",
+      "category": "Genomic composition",
+      "statistic": "Gene density inside inversions",
+      "test": "Wilcoxon rank-sum (size-matched intervals)",
+      "null_comparison": "size-matched random intervals on same chromosomes",
+      "african_result": {
+        "effect": "lower_than_background",
+        "observed": 14.2,
+        "expected": 18.7,
+        "unit": "genes/Mb",
+        "fold_change": 0.76,
+        "p_value": 0.012,
+        "q_value": 0.04,
+        "n": 8,
+        "label": "14.2 vs 18.7 genes/Mb (Wilcoxon p=0.012)"
+      },
+      "bighead_result": {
+        "effect": "not_significant",
+        "observed": 17.1,
+        "expected": 18.2,
+        "unit": "genes/Mb",
+        "fold_change": 0.94,
+        "p_value": 0.42,
+        "q_value": 0.42,
+        "n": 8,
+        "label": "17.1 vs 18.2 genes/Mb (orthologous regions; p=0.42)"
+      },
+      "interpretation": "C. gariepinus inversions trend gene-poor; orthologous C. macrocephalus regions do not — consistent with inversions capturing distinct chromosomal domains in the African catfish lineage."
+    },
+    {
+      "id": "go_kegg_enrichment",
+      "category": "Functional cargo",
+      "statistic": "GO / KEGG enrichment among inversion-internal genes",
+      "test": "hypergeometric + Benjamini-Hochberg",
+      "null_comparison": "all annotated genes (background)",
+      "african_result": {
+        "effect": "enriched",
+        "observed": 12,
+        "expected": 4.2,
+        "unit": "significant terms (q<0.05)",
+        "fold_change": null,
+        "p_value": null,
+        "q_value": 0.008,
+        "n": 226,
+        "label": "12 KEGG terms enriched (q<0.05): immune response, hormone signalling, lipid metabolism"
+      },
+      "bighead_result": {
+        "effect": "not_tested",
+        "observed": null,
+        "expected": null,
+        "unit": null,
+        "fold_change": null,
+        "p_value": null,
+        "q_value": null,
+        "n": null,
+        "label": "orthologous gene set; no Mac-side cohort enrichment available"
+      },
+      "interpretation": "Inversion cargo enriched for immune, hormone, and metabolism functions — candidate breeding-relevant biology. Causal claims require functional validation."
+    },
+    {
+      "id": "breeding_candidate_genes",
+      "category": "Functional cargo",
+      "statistic": "Breeding-candidate genes inside inversions",
+      "test": "Fisher exact (curated gene list)",
+      "null_comparison": "matched random gene sets",
+      "african_result": {
+        "effect": "enriched",
+        "observed": 18,
+        "expected": 7.8,
+        "unit": "candidate genes",
+        "fold_change": 2.31,
+        "p_value": 0.0034,
+        "q_value": 0.012,
+        "n": 226,
+        "label": "18 candidates (immune/growth/stress/reproduction) inside inversions vs 7.8 expected (Fisher p=0.0034)"
+      },
+      "bighead_result": {
+        "effect": "not_tested",
+        "observed": null,
+        "expected": null,
+        "unit": null,
+        "fold_change": null,
+        "p_value": null,
+        "q_value": null,
+        "n": null,
+        "label": "African-only \u2014 requires Cmac broodstock cohort"
+      },
+      "interpretation": "Possible breeding-relevant cargo enriched in structural haplotypes. Candidate, not causal."
+    },
+    {
+      "id": "heterozygosity_inversions",
+      "category": "Population variation",
+      "statistic": "Heterozygosity inside inversions",
+      "test": "Wilcoxon rank-sum",
+      "null_comparison": "matched genomic intervals (same chromosome + size)",
+      "african_result": {
+        "effect": "higher_than_background",
+        "observed": 0.0184,
+        "expected": 0.0142,
+        "unit": "het / bp",
+        "fold_change": 1.30,
+        "p_value": 0.0021,
+        "q_value": 0.011,
+        "n": 226,
+        "label": "het 0.0184 inside vs 0.0142 outside (p=0.0021)"
+      },
+      "bighead_result": {
+        "effect": "not_tested",
+        "observed": null,
+        "expected": null,
+        "unit": null,
+        "fold_change": null,
+        "p_value": null,
+        "q_value": null,
+        "n": null,
+        "label": "African-only"
+      },
+      "interpretation": "Inversion regions preserve divergent haplotype backgrounds in the broodstock, consistent with structural-haplotype heterozygosity."
+    },
+    {
+      "id": "roh_overlap",
+      "category": "Population variation",
+      "statistic": "ROH / FROH overlap with inversion intervals",
+      "test": "permutation (chrom-matched intervals)",
+      "null_comparison": "matched intervals on same chromosomes",
+      "african_result": {
+        "effect": "lower_than_background",
+        "observed": 0.06,
+        "expected": 0.12,
+        "unit": "fraction of interval in ROH",
+        "fold_change": 0.50,
+        "p_value": 0.045,
+        "q_value": 0.09,
+        "n": 226,
+        "label": "ROH overlap 6% inside inversions vs 12% genome-wide (p=0.045)"
+      },
+      "bighead_result": {
+        "effect": "not_tested",
+        "observed": null, "expected": null, "unit": null,
+        "fold_change": null, "p_value": null, "q_value": null, "n": null,
+        "label": "African-only"
+      },
+      "interpretation": "Inversion haplotypes are NOT preferentially in ROH \u2014 consistent with their persistence as polymorphic structural haplotypes rather than collapse to homozygosity in inbreeding lines."
+    },
+    {
+      "id": "deleterious_burden",
+      "category": "Population variation",
+      "statistic": "Deleterious-variant burden in inversion haplotypes",
+      "test": "Wilcoxon rank-sum (carriers vs non-carriers)",
+      "null_comparison": "non-carriers",
+      "african_result": {
+        "effect": "higher_than_background",
+        "observed": 1.42,
+        "expected": 1.0,
+        "unit": "burden ratio (carrier / non-carrier)",
+        "fold_change": 1.42,
+        "p_value": 0.034,
+        "q_value": 0.07,
+        "n": 226,
+        "label": "carriers carry 1.42\u00D7 deleterious-variant burden (SIFT4G + VESM_650M, p=0.034)"
+      },
+      "bighead_result": {
+        "effect": "not_tested",
+        "observed": null, "expected": null, "unit": null,
+        "fold_change": null, "p_value": null, "q_value": null, "n": null,
+        "label": "African-only"
+      },
+      "interpretation": "Some structural haplotypes appear to carry slightly elevated deleterious-variant burden \u2014 a candidate breeding-risk signal worth tracking when selecting carrier vs non-carrier lines."
+    },
+    {
+      "id": "haplotype_differentiation",
+      "category": "Population variation",
+      "statistic": "FST / dXY between inversion structural states",
+      "test": "permutation (windowed FST over haplotype groups)",
+      "null_comparison": "randomized labels",
+      "african_result": {
+        "effect": "higher_than_background",
+        "observed": 0.308,
+        "expected": 0.041,
+        "unit": "Hudson FST",
+        "fold_change": 7.51,
+        "p_value": null,
+        "q_value": null,
+        "n": 226,
+        "label": "FST = 0.308 between inversion states vs 0.041 in flanks (LG28 sub-telomeric, K=3 hatchery groups)"
+      },
+      "bighead_result": {
+        "effect": "not_tested",
+        "observed": null, "expected": null, "unit": null,
+        "fold_change": null, "p_value": null, "q_value": null, "n": null,
+        "label": "African-only"
+      },
+      "interpretation": "Inversion structural states are strongly differentiated, supporting them as biological haplotypes rather than analytical noise."
+    }
+  ]
+}

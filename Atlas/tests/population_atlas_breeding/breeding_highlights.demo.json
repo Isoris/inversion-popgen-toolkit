@@ -1,0 +1,81 @@
+{
+  "metadata": {
+    "panel_name": "Sample highlights for breeding committee review (DEMO)",
+    "species": "C. gariepinus",
+    "cohort": "broodstock-226",
+    "date": "2026-04-30",
+    "notes": "DEMO breeding_highlights.json. Replace each entry with samples from your own cohort flagged by the breeding committee. Rows that match an auto-derived row on (sample, source) override the auto-derived row; rows without a match are appended as user-only entries. Status field is one of green/yellow/red. ref_url is optional; it makes the Source cell clickable."
+  },
+  "rows": [
+    {
+      "sample": "CGA001",
+      "highlight": "High inbreeding on Chr17",
+      "value": "top 1% F_ROH",
+      "source": "Diversity",
+      "status": "red",
+      "notes": "F_ROH = 0.387, chr17 ROH segment 12.4 Mb",
+      "ref_url": "Diversity_atlas.html#page5"
+    },
+    {
+      "sample": "CGA002",
+      "highlight": "Member of largest family cluster",
+      "value": "family size = 38",
+      "source": "Relatedness",
+      "status": "yellow",
+      "notes": "cluster F-A; recommend balancing against other broodlines",
+      "ref_url": "#page3"
+    },
+    {
+      "sample": "CGA007",
+      "highlight": "Member of largest family cluster",
+      "value": "family size = 38",
+      "source": "Relatedness",
+      "status": "yellow",
+      "ref_url": "#page3"
+    },
+    {
+      "sample": "CGA009",
+      "highlight": "High deleterious load on Chr02",
+      "value": "top 1% burden",
+      "source": "Burden",
+      "status": "red",
+      "notes": "SIFT4G n_deleterious = 142; VESM_650M score 0.83"
+    },
+    {
+      "sample": "CGA020",
+      "highlight": "Very high nucleotide diversity",
+      "value": "top 1% θπ",
+      "source": "Diversity",
+      "status": "green",
+      "notes": "preserve: high contribution to cohort diversity",
+      "ref_url": "Diversity_atlas.html#page2"
+    },
+    {
+      "sample": "CGA044",
+      "highlight": "Rare inversion haplotype carrier",
+      "value": "INV_LG05_002 (cohort freq = 1.8%)",
+      "source": "Inversions",
+      "status": "green",
+      "notes": "preserve: contributes haplotype diversity at LG05 inversion locus",
+      "ref_url": "Inversion_atlas.html#page18"
+    },
+    {
+      "sample": "CGA071",
+      "highlight": "Marker positive control",
+      "value": "M001 INV/INV",
+      "source": "Markers",
+      "status": "green",
+      "notes": "validated INV/INV genotype for marker M001",
+      "ref_url": "Inversion_atlas.html#page18"
+    },
+    {
+      "sample": "CGA088",
+      "highlight": "Marker negative control",
+      "value": "M001 STD/STD",
+      "source": "Markers",
+      "status": "green",
+      "notes": "validated STD/STD genotype for marker M001",
+      "ref_url": "Inversion_atlas.html#page18"
+    }
+  ]
+}

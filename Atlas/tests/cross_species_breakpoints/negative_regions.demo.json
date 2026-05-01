@@ -1,0 +1,120 @@
+{
+  "metadata": {
+    "panel_name": "Inversion-negative regions \u2014 LG28 sweep (demo)",
+    "date": "2026-04-30",
+    "framework": "multi-layer evidence battery (local PCA, GHSL, SV calls, heterozygosity, callable mask)",
+    "notes": "region_status indicates the strongest claim that can be made about each interval given the study's resolution, sample size, and callability limits.",
+    "study_resolution": {
+      "sample_size": 226,
+      "median_snp_density_per_kb": 1.2,
+      "callability_threshold": 0.50,
+      "smallest_detectable_inversion_kb": 50,
+      "rarest_detectable_freq": "approximately 1 percent (>=2 fish out of 226)"
+    }
+  },
+  "regions": [
+    {
+      "region_id": "LG28:0-1.5Mb",
+      "chr": "LG28",
+      "start_bp": 0,
+      "end_bp": 1500000,
+      "region_status": "no_detectable_inversion_high_confidence",
+      "evidence": {
+        "local_pca": "pass",
+        "ghsl":      "pass",
+        "sv_callers": "pass",
+        "heterozygosity": "pass",
+        "ld":        "pass",
+        "callable_mask": "pass"
+      },
+      "snp_density": 0.012,
+      "callable_fraction": 0.94,
+      "n_samples": 226,
+      "notes": "stable, high-coverage region; manuscript Fig. S3 control"
+    },
+    {
+      "region_id": "LG28:1.5-2.0Mb",
+      "chr": "LG28",
+      "start_bp": 1500000,
+      "end_bp": 2000000,
+      "region_status": "inversion_candidate",
+      "evidence": {
+        "local_pca": "pass",
+        "ghsl":      "pass",
+        "sv_callers": "pass",
+        "heterozygosity": "pass"
+      },
+      "snp_density": 0.015,
+      "callable_fraction": 0.96,
+      "n_samples": 226,
+      "notes": "sub-telomeric inversion candidate (focal LG28 finding, ~2.89 Mb in cohort 2)"
+    },
+    {
+      "region_id": "LG28:5.0-7.5Mb",
+      "chr": "LG28",
+      "start_bp": 5000000,
+      "end_bp": 7500000,
+      "region_status": "no_detectable_inversion_low_power",
+      "evidence": {
+        "local_pca": "pass",
+        "ghsl":      "limited",
+        "sv_callers": "pass",
+        "heterozygosity": "pass",
+        "callable_mask": "limited"
+      },
+      "snp_density": 0.0035,
+      "callable_fraction": 0.62,
+      "n_samples": 226,
+      "notes": "repetitive, low SNP density \u2014 absence call carries reduced confidence"
+    },
+    {
+      "region_id": "LG28:14-15Mb",
+      "chr": "LG28",
+      "start_bp": 14000000,
+      "end_bp": 15000000,
+      "region_status": "complex_candidate",
+      "evidence": {
+        "local_pca": "pass",
+        "ghsl":      "pass",
+        "sv_callers": "pass",
+        "heterozygosity": "pass"
+      },
+      "snp_density": 0.011,
+      "callable_fraction": 0.88,
+      "n_samples": 226,
+      "notes": "multi-arrangement region \u2014 evidence consistent with rearrangement but not a simple inversion (overlapping calls)"
+    },
+    {
+      "region_id": "LG28:18-19Mb",
+      "chr": "LG28",
+      "start_bp": 18000000,
+      "end_bp": 19000000,
+      "region_status": "not_testable",
+      "evidence": {
+        "callable_mask": "fail"
+      },
+      "snp_density": 0.0001,
+      "callable_fraction": 0.08,
+      "n_samples": 226,
+      "notes": "assembly gap / centromeric region \u2014 do not interpret"
+    },
+    {
+      "region_id": "LG28:22-25Mb",
+      "chr": "LG28",
+      "start_bp": 22000000,
+      "end_bp": 25000000,
+      "region_status": "no_detectable_inversion_high_confidence",
+      "evidence": {
+        "local_pca": "pass",
+        "ghsl":      "pass",
+        "sv_callers": "pass",
+        "heterozygosity": "pass",
+        "callable_mask": "pass"
+      },
+      "snp_density": 0.013,
+      "callable_fraction": 0.93,
+      "n_samples": 226,
+      "notes": "long stable interval; flanks the LG28 focal inversion call"
+    }
+  ]
+}
