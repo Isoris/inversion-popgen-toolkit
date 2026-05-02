@@ -26,8 +26,12 @@
 #     --te-dir /scratch/.../Cgar_TE_density \
 #     --mac-te-dir /scratch/.../Cmac_TE_density \
 #     --out /scratch/.../02_breakpoints/cs_breakpoints_v1.json \
-#     --min-mapq 40 --min-block-bp 50000 --cluster-radius-bp 50000 \
+#     --min-mapq 1 --min-block-bp 50000 --cluster-radius-bp 50000 \
 #     --flank-bp 100000
+#
+# Note on --min-mapq: default is 1 because wfmash mapq values are typically
+# 1-5 (different scoring scheme than minimap2 which produces 0-60). Use
+# --min-mapq 40 only if your PAF was produced by minimap2.
 #
 # Validation hooks (NOT run by this script — Quentin's hand QC):
 #   - 5 random breakpoints → IGV spot-check on Cgar BAM
@@ -562,8 +566,10 @@ def main():
                    help="Optional TSV of 226-sample inversion candidates "
                         "(cols: candidate_id, chrom, start_bp, end_bp). When given, each "
                         "breakpoint is annotated with which candidates it overlaps.")
-    p.add_argument("--min-mapq", type=int, default=40,
-                   help="drop PAF rows below this mapping quality (default 40)")
+    p.add_argument("--min-mapq", type=int, default=1,
+                   help="drop PAF rows below this mapping quality (default 1, "
+                        "appropriate for wfmash whose mapq is typically 1-5; "
+                        "use --min-mapq 40 for minimap2-style PAFs)")
     p.add_argument("--min-block-bp", type=int, default=50000,
                    help="drop PAF rows shorter than this in alignment_block_length (default 50000)")
     p.add_argument("--cluster-radius-bp", type=int, default=50000,
