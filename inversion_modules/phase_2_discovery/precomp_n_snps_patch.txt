@@ -1,0 +1,141 @@
+# =============================================================================
+# Patch instructions — add per-window SNP counts to precomp + JSON
+# =============================================================================
+# Goal: make the focal pane in pca_scrubber_v3 show "SNPs" + "density" rows
+# alongside the existing "windows" + "span" rows. Without this patch the
+# scrubber gracefully shows "—" for SNPs (it's already forward-compatible).
+# Apply once, regenerate precomp + JSON, the new rows appear.
+#
+# Affects:
+#   1. STEP_C01a_precompute.R       (compute n_snps in the dosage block)
+#   2. export_precomp_to_json_*.R   (pass n_snps through into windows[])
+#
+# Both changes are additive — no existing field is renamed or removed.
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# PATCH 1 — STEP_C01a_precompute.R, dosage block (~line 285-315)
+# -----------------------------------------------------------------------------
+# In the function that computes per-window dosage het rates, the line
+# `length(site_idx)` already gives us the SNP count per window. We were
+# discarding it. Two changes:
+#   (a) emit `n_snps = length(site_idx)` into the per-window rbind row
+#   (b) merge that column into `dt` after the function returns
+
+# REPLACE this block:
+
+      all_rows[[length(all_rows) + 1]] <- data.table(
+        chrom = chr, global_window_id = wid,
+        dosage_het_rate_median = round(het_median, 4),
+        dosage_het_rate_sd = round(het_sd, 4),
+        dosage_het_rate_cv = round(het_cv %||% NA_real_, 4)
+      )
+
+# WITH this block:
+
+      all_rows[[length(all_rows) + 1]] <- data.table(
+        chrom = chr, global_window_id = wid,
+        n_snps = as.integer(length(site_idx)),     # NEW: per-window SNP count
+        dosage_het_rate_median = round(het_median, 4),
+        dosage_het_rate_sd = round(het_sd, 4),
+        dosage_het_rate_cv = round(het_cv %||% NA_real_, 4)
+      )
+
+# IMPORTANT: this only counts windows where length(site_idx) >= 10 (the
+# existing skip threshold). Windows below that get NA in n_snps, which is the
+# honest behavior — we genuinely don't have SNP counts for them.
+#
+# If you also want to count below-threshold windows (e.g. windows with 3 or 5
+# SNPs, just for completeness), move the n_snps emission BEFORE the
+# `if (length(site_idx) < 10) next` line, in its own data.table:
+
+      # Emit n_snps for ALL windows (even sparse ones), separate from het stats
+      n_snps_rows[[length(n_snps_rows) + 1]] <- data.table(
+        chrom = chr, global_window_id = wid,
+        n_snps = as.integer(length(site_idx))
+      )
+      if (length(site_idx) < 10) next   # existing skip
+      # ... rest unchanged ...
+
+# Then merge n_snps_rows back into dt. The choice is yours; for the scrubber's
+# purpose (showing total SNPs in an L2), either approach is fine because L2s
+# typically span dozens of windows so a few sparse windows don't move the
+# total much.
+
+
+# -----------------------------------------------------------------------------
+# PATCH 2 — export_precomp_to_json_*.R, window object construction (~line 142)
+# -----------------------------------------------------------------------------
+# Pass n_snps from dt through into the per-window JSON object. The scrubber
+# already reads d.windows[i].n_snps if present.
+
+# REPLACE this block:
+
+windows <- vector("list", n_win)
+for (i in seq_len(n_win)) {
+  w <- list(
+    idx       = i - 1L,
+    start_bp  = as.integer(dt$start_bp[i]),
+    end_bp    = as.integer(dt$end_bp[i]),
+    center_mb = round(((dt$start_bp[i] + dt$end_bp[i]) / 2) / 1e6, 4),
+    z         = round4(dt[[z_col]][i]),
+    lam1      = round4(dt$lam_1[i] %||% NA_real_),
+    lam2      = round4(dt$lam_2[i] %||% NA_real_),
+    pc1       = round4(pc1_mat[i, ]),
+    pc2       = round4(pc2_mat[i, ])
+  )
+
+# WITH this block:
+
+windows <- vector("list", n_win)
+for (i in seq_len(n_win)) {
+  w <- list(
+    idx       = i - 1L,
+    start_bp  = as.integer(dt$start_bp[i]),
+    end_bp    = as.integer(dt$end_bp[i]),
+    center_mb = round(((dt$start_bp[i] + dt$end_bp[i]) / 2) / 1e6, 4),
+    z         = round4(dt[[z_col]][i]),
+    lam1      = round4(dt$lam_1[i] %||% NA_real_),
+    lam2      = round4(dt$lam_2[i] %||% NA_real_),
+    pc1       = round4(pc1_mat[i, ]),
+    pc2       = round4(pc2_mat[i, ])
+  )
+  # NEW: per-window SNP count for L2 totals + density in the scrubber focal pane
+  if ("n_snps" %in% names(dt) && !is.na(dt$n_snps[i])) {
+    w$n_snps <- as.integer(dt$n_snps[i])
+  }
+
+
+# -----------------------------------------------------------------------------
+# OPTIONAL — also expose total eigenvalue trace for true variance percentages
+# -----------------------------------------------------------------------------
+# The scrubber currently shows λ₁ = 0.034 / λ₂ = 0.012 in the focal pane axis
+# labels. To show "PC1 (18.7%)" like the published figure, we need either the
+# full eigenvalue spectrum per window OR the trace (sum of eigenvalues), so
+# the percent is computable as lam1 / trace.
+#
+# The local-PCA step (STEP_A02) computes 4 eigenvalues per window. If
+# pc$dt also has lam_3 and lam_4 columns (or a trace column), pass them too:
+
+  if ("lam_3" %in% names(dt)) w$lam3 <- round4(dt$lam_3[i])
+  if ("lam_4" %in% names(dt)) w$lam4 <- round4(dt$lam_4[i])
+  if ("eigen_trace" %in% names(dt)) w$lam_trace <- round4(dt$eigen_trace[i])
+
+# When `lam_trace` (or computable total) is present, a small scrubber-side
+# patch can switch the axis labels from `λ₁=0.034` to `PC1 (18.7%)`. That
+# scrubber patch is NOT shipped yet — wire up the data first, then we add
+# the percent rendering in a follow-up turn.
+
+
+# =============================================================================
+# After applying both patches:
+#
+#   1. Re-run STEP_C01a_precompute.R to regenerate the precomp .rds with
+#      the new n_snps column in dt.
+#
+#   2. Re-run export_precomp_to_json with the regenerated precomp.
+#
+#   3. Drop the new .json into the scrubber. The focal pane will show
+#      "SNPs" and "density" rows automatically — no scrubber rebuild needed.
+# =============================================================================
