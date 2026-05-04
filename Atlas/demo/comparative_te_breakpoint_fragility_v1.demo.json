@@ -1,0 +1,97 @@
+{
+  "tool": "comparative_te_breakpoint_fragility_v1",
+  "schema_version": 1,
+  "generated_at": "2026-05-03T13:00:00Z",
+  "params": {
+    "focal_radius_bp": 1100000,
+    "te_class": "all_TE",
+    "background": "chromosome_median",
+    "annotation_source": "EDTA2.2",
+    "lift_method": "miniprot+wfmash"
+  },
+  "per_breakpoint_per_species": [
+    {
+      "bp_id": "csbp_lg28_15_1Mb",
+      "species": "Cgar",
+      "gar_chr": "C_gar_LG28",
+      "gar_pos_bp": 15115000,
+      "homologous_chrom": "C_gar_LG28",
+      "focal_lo_bp": 14015000,
+      "focal_hi_bp": 16215000,
+      "focal_te_density": 0.587,
+      "bg_te_density_chrom": 0.341,
+      "fold_enrichment": 1.72,
+      "percentile": 91
+    },
+    {
+      "bp_id": "csbp_lg28_15_1Mb",
+      "species": "Cmac",
+      "gar_chr": "C_gar_LG28",
+      "gar_pos_bp": 15115000,
+      "homologous_chrom": "C_mac_LG01",
+      "focal_lo_bp": 9100000,
+      "focal_hi_bp": 11300000,
+      "focal_te_density": 0.612,
+      "bg_te_density_chrom": 0.318,
+      "fold_enrichment": 1.92,
+      "percentile": 96
+    },
+    {
+      "bp_id": "csbp_lg28_15_1Mb",
+      "species": "Cfus",
+      "gar_chr": "C_gar_LG28",
+      "gar_pos_bp": 15115000,
+      "homologous_chrom": "C_fus_LG07",
+      "focal_lo_bp": 10200000,
+      "focal_hi_bp": 12400000,
+      "focal_te_density": 0.681,
+      "bg_te_density_chrom": 0.295,
+      "fold_enrichment": 2.31,
+      "percentile": 98
+    },
+    {
+      "bp_id": "csbp_lg28_15_1Mb",
+      "species": "Capus",
+      "gar_chr": "C_gar_LG28",
+      "gar_pos_bp": 15115000,
+      "homologous_chrom": "Capus_LG12",
+      "focal_lo_bp": 6400000,
+      "focal_hi_bp": 8600000,
+      "focal_te_density": 0.422,
+      "bg_te_density_chrom": 0.380,
+      "fold_enrichment": 1.11,
+      "percentile": 62
+    },
+    {
+      "bp_id": "csbp_lg28_15_1Mb",
+      "species": "Phyp",
+      "gar_chr": "C_gar_LG28",
+      "gar_pos_bp": 15115000,
+      "homologous_chrom": "Phyp_chr18",
+      "focal_lo_bp": 3100000,
+      "focal_hi_bp": 5300000,
+      "focal_te_density": 0.755,
+      "bg_te_density_chrom": 0.241,
+      "fold_enrichment": 3.13,
+      "percentile": 99
+    },
+    {
+      "bp_id": "csbp_lg28_15_1Mb",
+      "species": "Hwyc",
+      "gar_chr": "C_gar_LG28",
+      "gar_pos_bp": 15115000,
+      "homologous_chrom": "Hwyc_chr05",
+      "focal_lo_bp": 8200000,
+      "focal_hi_bp": 10400000,
+      "focal_te_density": 0.288,
+      "bg_te_density_chrom": 0.305,
+      "fold_enrichment": 0.94,
+      "percentile": 38
+    }
+  ],
+  "vocabulary_discipline": {
+    "claim_allowed_focal_species": "polymorphic inversion in C. gariepinus + 226-sample carrier evidence",
+    "claim_allowed_comparative_species": "homologous breakpoint region is TE-rich; candidate recurrent rearrangement hotspot",
+    "claim_NOT_allowed": "structural polymorphism in non-resequenced species"
+  }
+}

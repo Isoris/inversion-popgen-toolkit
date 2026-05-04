@@ -1,0 +1,23 @@
+{
+  "tool": "phylo_tree_v1",
+  "schema_version": 1,
+  "species_set": ["Cgar", "Cmac", "Cfus", "Capus", "Phyp", "Hwyc", "Tfulv", "Ipun", "Smer", "Tros"],
+  "newick": "(Tros:100,((Smer:55,(Tfulv:40,Hwyc:40):15):10,(Ipun:50,(Phyp:55,((Capus:6,(Cfus:6,(Cgar:4,Cmac:4):2):3):8):6):5):3):20);",
+  "calibration": {
+    "unit": "Mya",
+    "calibrated": true,
+    "reference": "TimeTree5"
+  },
+  "support_values": {
+    "type": "bootstrap_proportion",
+    "encoded_in_newick": false
+  },
+  "provenance": {
+    "method": "IQ-TREE2",
+    "alignment": "single_copy_busco_concatenated",
+    "lineage_dataset": "actinopterygii_odb10",
+    "n_loci": 1482,
+    "model": "GTR+I",
+    "reference_paper": "F1 hybrid catfish manuscript Supplementary Data S4"
+  }
+}

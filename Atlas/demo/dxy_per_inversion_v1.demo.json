@@ -1,0 +1,42 @@
+{
+  "tool": "dxy_per_inversion_v1",
+  "schema_version": 1,
+  "generated_at": "2026-05-03T13:00:00Z",
+  "params": {
+    "min_carriers_per_class": 5,
+    "windowed": false,
+    "flank_size_bp": 1000000,
+    "method": "Reich_dXY_from_dosage_matrix",
+    "cohort": "226_pure_C_gariepinus"
+  },
+  "per_inversion": [
+    {
+      "candidate_id": "cand_lg28_15_18",
+      "chrom": "C_gar_LG28",
+      "start_bp": 15115000,
+      "end_bp": 18217000,
+      "n_hom_ref": 60,
+      "n_het": 106,
+      "n_hom_inv": 60,
+      "dxy_within_inversion_ref_vs_inv": 0.00420,
+      "dxy_flank_left_ref_vs_inv":      0.00195,
+      "dxy_flank_right_ref_vs_inv":     0.00210,
+      "fold_elevation_inside_vs_flank": 2.10,
+      "interpretation_default": "elevated_consistent_with_old_inversion"
+    },
+    {
+      "candidate_id": "cand_lg12_8_11",
+      "chrom": "C_gar_LG12",
+      "start_bp":  8400000,
+      "end_bp":   11200000,
+      "n_hom_ref": 92,
+      "n_het":    105,
+      "n_hom_inv": 29,
+      "dxy_within_inversion_ref_vs_inv": 0.00118,
+      "dxy_flank_left_ref_vs_inv":       0.00112,
+      "dxy_flank_right_ref_vs_inv":      0.00109,
+      "fold_elevation_inside_vs_flank":  1.07,
+      "interpretation_default": "low_consistent_with_recent_inversion"
+    }
+  ]
+}
