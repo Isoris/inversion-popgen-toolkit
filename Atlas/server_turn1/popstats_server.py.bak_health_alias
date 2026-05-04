@@ -1163,12 +1163,6 @@ async def health() -> Dict[str, Any]:
     }
 
 
-
-# Compatibility alias for atlas clients that probe /health instead of /api/health.
-@app.get("/health")
-async def health_alias() -> Dict[str, Any]:
-    return await health()
-
 @app.get("/api/cache/keys")
 async def cache_keys(prefix: str = "", limit: int = 200) -> Dict[str, Any]:
     _ensure_ready()

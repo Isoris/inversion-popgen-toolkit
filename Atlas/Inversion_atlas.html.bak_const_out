@@ -57431,7 +57431,7 @@ function savePopstatsView(hiddenChips) {
 // Collect tracks that are *available* in the loaded data. Splits POPSTATS_TRACKS
 // into [available, placeholder]. Plus auto-discovered entries from state.data.tracks.
 function collectPopstatsTracks() {
-  let out = [];
+  const out = [];
   for (const t of POPSTATS_TRACKS) {
     let hasData = !!t.alwaysOn;
     if (t.id === 'sim_collapse') hasData = !!(state.data && (state.data.sim_mat_collapse || state.data.sim_mat));

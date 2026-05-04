@@ -1,73 +1,107 @@
 # =============================================================================
-# popstats_server.config.example.yaml
+# popstats_server.local.yaml
 # =============================================================================
-# Site-local config for popstats_server. Mirrors the layout of
-# unified_ancestry/00_ancestry_config.sh — copy this file to
-# popstats_server.config.yaml and edit the paths for your site.
+# Local WSL config for popstats_server.
 #
-# Anything left blank or absent falls back to environment variables.
+# Purpose:
+# - Run live BEAGLE-based popstats locally from /mnt/e
+# - Use local compiled binaries from /mnt/c/Users/quent/Desktop/bio_tools_quentin/bin
+# - Skip BAM-heavy Hobs/HWE for now by pointing bam_dir to an empty folder
+#
+# Original scratch/LANTA paths are kept below as comments for reference.
 # =============================================================================
 
 # ---- Server bind ------------------------------------------------------------
-# Default: localhost only, port 8765 (matches atlas's atlasServer adapter).
-# DO NOT bind to 0.0.0.0 unless behind a firewall + auth — this server
-# launches subprocesses and reads cohort BAMs.
+# Use 8766 locally because 8765 may already be used by the atlas/static server.
 bind:
   host: "127.0.0.1"
-  port: 8765
+  # port: 8765
+  port: 8766
 
 # ---- Project anchors --------------------------------------------------------
-# These mirror BASE / REF / REF_FAI from 00_ancestry_config.sh.
-base: "/scratch/lt200308-agbsci/Quentin_project_KEEP_2026-02-04"
-ref: "${base}/00-samples/fClaHyb_Gar_LG.fa"
-ref_fai: "${base}/00-samples/fClaHyb_Gar_LG.fa.fai"
+# Original scratch base:
+# base: "/scratch/lt200308-agbsci/Quentin_project_KEEP_2026-02-04"
+# base: "/lustrefs/flash/scratch/lt200308-agbsci/Quentin_project_KEEP_2026-02-04"
+
+# Local data base on E:
+base: "/mnt/e/01-catfish_assembly_manuscript_CGA"
+
+# Original scratch reference paths:
+# ref: "${base}/00-samples/fClaHyb_Gar_LG.fa"
+# ref_fai: "${base}/00-samples/fClaHyb_Gar_LG.fa.fai"
+
+# Local reference paths:
+ref: "${base}/cross_species_breakpoints/00_fastas/fClaHyb_Gar_LG.fa"
+ref_fai: "${base}/cross_species_breakpoints/00_fastas/fClaHyb_Gar_LG.fa.fai"
 
 # ---- Engine binaries --------------------------------------------------------
-# Paths to compiled C binaries. Each binary's SHA-256 is mixed into cache
-# keys so a recompile automatically invalidates all dependent cache entries.
+# Local compiled binaries / symlinks.
+# Each binary hash is mixed into cache keys.
 engines:
-  region_popstats: "${base}/unified_ancestry/engines/fst_dxy/region_popstats"
-  hobs_windower:   "${base}/unified_ancestry/engines/hobs_hwe/scripts/hobs_windower"
-  angsd_patched:   "${base}/angsd_fixed_HWE/angsd"
-  instant_q:       "${base}/unified_ancestry/src/instant_q"  # not used in chat A but kept for symmetry
+  # Original scratch paths:
+  # region_popstats: "${base}/unified_ancestry/engines/fst_dxy/region_popstats"
+  # hobs_windower:   "${base}/unified_ancestry/engines/hobs_hwe/scripts/hobs_windower"
+  # angsd_patched:   "${base}/angsd_fixed_HWE/angsd"
+  # instant_q:       "${base}/unified_ancestry/src/instant_q"
+
+  # Local compiled engine paths:
+  region_popstats: "/mnt/c/Users/quent/Desktop/bio_tools_quentin/bin/region_popstats"
+  hobs_windower:   "/mnt/c/Users/quent/Desktop/bio_tools_quentin/bin/hobs_windower"
+  angsd_patched:   "/mnt/c/Users/quent/Desktop/bio_tools_quentin/bin/angsd_fixed_HWE"
+  instant_q:       "/mnt/c/Users/quent/Desktop/bio_tools_quentin/bin/instant_q"
 
 # ---- Data inputs ------------------------------------------------------------
-# BEAGLE_DIR — where main_qcpass.<CHR>.beagle.gz lives. Prefers dense BEAGLE
-# (inversion_localpca_v7) over the thin popstruct BEAGLE for popstats.
-beagle_dir: "${base}/inversion_localpca_v7/02_snps_beagle"
+# BEAGLE_DIR — where main_qcpass.<CHR>.beagle.gz lives.
+# Original scratch:
+# beagle_dir: "${base}/inversion_localpca_v7/02_snps_beagle"
 
-# Sample list (one ID per line, BAM-list-order — same order as BEAGLE columns)
-sample_list: "${base}/het_roh/01_inputs_check/samples.ind"
+# Local downloaded BEAGLE directory:
+beagle_dir: "${base}/02_snps_beagle"
 
-# Per-sample BAMs (used by Q07b ANGSD). Server resolves <sample>.<bam_suffix>
-# under bam_dir, falling back to .bam / .markdup.bam if the primary doesn't
-# exist. Matches Q07b's resolution.
-bam_dir: "${base}/00-samples/bams"
+# Sample list, one ID per line, same order as BEAGLE columns.
+# Original scratch:
+# sample_list: "${base}/het_roh/01_inputs_check/samples.ind"
+
+# Local downloaded sample list:
+sample_list: "${base}/samples.ind"
+
+# Per-sample BAMs used by Hobs/HWE endpoint.
+# We skip BAM-heavy Hobs/HWE locally for now, but keep this key defined
+# so server startup does not fail if it validates config structure.
+# Original scratch:
+# bam_dir: "${base}/00-samples/bams"
+# bam_suffix: "markdup.bam"
+
+# Local dummy BAM directory:
+bam_dir: "${base}/atlas_local_server/empty_bams"
 bam_suffix: "markdup.bam"
 
-# Engine B (instant_q) per-window per-sample Q-matrix cache for ancestry endpoint.
-# Server reads ${LOCAL_Q_DIR}/scale_<scale>/K<NN>/<CHR>.local_Q_samples.tsv.gz
-# Tolerates the legacy flat layout and the canonical-K symlinked layout.
-local_q_dir: "${base}/ancestry_cache"
+# Engine B ancestry cache.
+# Original scratch:
+# local_q_dir: "${base}/ancestry_cache"
+
+# Local dummy ancestry cache for now:
+local_q_dir: "${base}/atlas_local_server/empty_ancestry_cache"
 
 # ---- Cache directory --------------------------------------------------------
-# Server-managed content-addressable cache. SAFE to delete — will be rebuilt.
-# Keep on a fast local disk; ~1-50 GB depending on usage.
-cache_dir: "${base}/popstats_server_cache"
-cache_max_bytes: 53687091200    # 50 GB
-cache_health_ttl_sec: 60        # refresh engine-hash cache every N seconds
+# Original scratch:
+# cache_dir: "${base}/popstats_server_cache"
+
+# Local server-managed cache:
+cache_dir: "${base}/atlas_local_server/popstats_server_cache"
+cache_max_bytes: 53687091200
+cache_health_ttl_sec: 60
 
 # ---- Engine defaults --------------------------------------------------------
 popstats_defaults:
   win_bp: 50000
   step_bp: 10000
-  type: 2          # ANGSD-compatible fixed grid from chromosome position 0
+  type: 2
   downsample: 1
   ncores: 4
 
 hobs_defaults:
   scales:
-    # label : win_bp : step_bp
     - "5kb:5000:1000"
     - "10kb:10000:2000"
     - "50kb:50000:10000"
@@ -77,8 +111,8 @@ hobs_defaults:
     - "1Mb:1000000:200000"
 
 angsd_defaults:
-  threads: 2          # per group; 3 groups parallel = 6 cpus total
-  major_minor: 1      # -doMajorMinor 1 (from allele frequencies)
+  threads: 2
+  major_minor: 1
   min_maf: 0.05
   min_mapq: 20
   min_q: 20
@@ -86,15 +120,13 @@ angsd_defaults:
   max_het_freq: 1.0
 
 # ---- Validation -------------------------------------------------------------
-# Reject requests whose smallest group falls below this threshold.
-# Q07's R helper uses 10 by default; for live mode we keep the same floor.
 min_group_n: 10
 
 # ---- CORS -------------------------------------------------------------------
-# Atlas runs in browser at file:// or via local launcher (127.0.0.1:8765
-# already used as the launcher port — the popstats server should use a
-# DIFFERENT port if both are running). Allow file:// and localhost origins.
+# Include both atlas/static-server port 8765 and popstats-server port 8766.
 cors_origins:
   - "http://localhost:8765"
   - "http://127.0.0.1:8765"
-  - "null"           # file:// origin shows as "null" in CORS preflight
+  - "http://localhost:8766"
+  - "http://127.0.0.1:8766"
+  - "null"

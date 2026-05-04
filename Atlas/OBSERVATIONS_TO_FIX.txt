@@ -31,3 +31,8 @@ has too much margin in y axis in the bottom relative to other plots
 
 In the diversity atlas, in the ROH page, the heatmap S8b · Per-chromosome × per-sample F_ROH heatmap
 has its last samples and row collapsed and overlapping for some reasons.
+
+
+Im  not sure but when we fit the loess in the Boundaries page when there is no coverage it goes to 0 
+but idk if that affects the fit or not. in my understanding its not a problem?
+
