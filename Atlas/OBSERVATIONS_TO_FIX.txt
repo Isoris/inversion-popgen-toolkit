@@ -1,0 +1,33 @@
+When we go to the candidate focus and we click to drop the candidate, it doesnt drop it
+So we have to go to the karyotype / tier page and click the red cross and only then it will be dropped
+I feel that the two buttons must be working similarily.
+
+When we are in the boundaries page we can see the cross species fusion/fission breakpoint
+but its location is not the same as in the cross species page for instance it shows 
+around 14 mb something but in the cross-species page its 15.75 mb. 
+
+When we select a candidate or for some reasons when we do arrow up and down in the
+diagnosis page 1 local pca under the L3 contingency table. idk if its because we 
+already have the candidate for that interval but we cannot up and down to select and 
+promote and demote.
+
+next to schema v2 N layers button in top bar, we need the JS N scripts loaded 
+that shows what JS scripts as loaded, its the same style and design as schema v2 button
+but it is for javascripts.
+
+In top bar, buttons "session" "mode" and "data" unfold on hover but if we go down theres 
+a mini space so we cannot like reach the unfolded button the cursor goes to the little gap
+between the panel and the top bar buttons which refolds them, it doesnt stay open it closes
+and its a mini bug so we have to click instead so it toggles on.
+
+In L3 contingency tables tab of page 1, when we click "detailed" nothing happens.
+
+
+In the diversity atlas, the page 1 samples has plots that should be placed under their own pages no?
+I am not sure, however I believe that samples should be more about the general overview of the dataset.
+
+In the diversity atlas, the plot Per-sample θπ summary (ST2)  
+has too much margin in y axis in the bottom relative to other plots
+
+In the diversity atlas, in the ROH page, the heatmap S8b · Per-chromosome × per-sample F_ROH heatmap
+has its last samples and row collapsed and overlapping for some reasons.

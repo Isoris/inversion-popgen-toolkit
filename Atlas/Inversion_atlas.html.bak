@@ -56805,35 +56805,14 @@ catch (e) { console.warn('[nr] initial render failed:', e); }
 function _setActiveStage(stage) {
   const bar = document.getElementById('tabBar');
   if (!bar) return;
-
   bar.dataset.activeStage = stage;
-
-  const pills = Array.from(document.querySelectorAll('#tabBar .tab-stage-pill'));
-  const activePill = pills.find(pill => pill.dataset.stage === stage);
-
-  pills.forEach(pill => {
-    pill.dataset.expanded = pill.dataset.stage === stage ? '1' : '0';
+  document.querySelectorAll('#tabBar .tab-stage-pill').forEach(pill => {
+    if (pill.dataset.stage === stage) {
+      pill.dataset.expanded = '1';
+    } else {
+      pill.dataset.expanded = '0';
+    }
   });
-
-  // turn 129: keep expanded child tabs immediately beside their parent pill.
-  // Previously all page tabs were physically placed after every stage pill in
-  // the DOM, so clicking e.g. "refine" made boundaries/karyotype/windows
-  // appear far to the right after output/help. Moving this stage's visible
-  // tabs directly after the active pill makes the group behave like an
-  // inline folder: [discover] [refine] [boundaries] [karyotype] [windows]
-  // [popgen] [compare] [output] [help].
-  if (activePill) {
-    const stageTabs = Array.from(
-      document.querySelectorAll('#tabBar button[data-page][data-stage="' + stage + '"]')
-    );
-
-    let insertAfter = activePill;
-    stageTabs.forEach(tab => {
-      insertAfter.after(tab);
-      insertAfter = tab;
-    });
-  }
-
   // Persist to localStorage so the user's preferred stage survives reload.
   try {
     localStorage.setItem('inversion_atlas.active_stage', stage);
@@ -61813,19 +61792,19 @@ if (typeof _wireCandSubviewButtons === 'function') {
      turns 1..N-1. UMD modules register on window.* and are event-driven,
      so they're safe to load after the inline atlas script.
      ===================================================================== -->
-<script src="js/atlas_group_engine.js"></script>      <!-- turn 2 -->
-<script src="js/atlas_request_layer.js"></script>     <!-- turn 3 -->
-<script src="js/atlas_renderers_turn4.js"></script>   <!-- turn 4 -->
-<script src="js/atlas_floating_dock.js"></script>     <!-- turn 5a -->
-<script src="js/atlas_dock_tabs.js"></script>         <!-- turn 5b -->
-<script src="js/atlas_page6_wiring.js"></script>      <!-- turn 6 -->
-<script src="js/atlas_track_gallery.js"></script>     <!-- turn 6.5 -->
-<script src="js/atlas_turn7.js"></script>             <!-- turn 7 -->
-<script src="js/atlas_overview.js"></script>          <!-- turn 9 -->
-<script src="js/atlas_compare.js"></script>           <!-- turn 10 -->
-<script src="js/atlas_ld.js"></script>                <!-- turn 11c (fast_ld) -->
-<script src="js/atlas_dotplot.js"></script>           <!-- turn 115 (cross-species dot plot) -->
-<script src="js/atlas_focal_vs_bg.js"></script>      <!-- turn 117 (focal-vs-background widget) -->
+<script src="atlas_group_engine.js"></script>      <!-- turn 2 -->
+<script src="atlas_request_layer.js"></script>     <!-- turn 3 -->
+<script src="atlas_renderers_turn4.js"></script>   <!-- turn 4 -->
+<script src="atlas_floating_dock.js"></script>     <!-- turn 5a -->
+<script src="atlas_dock_tabs.js"></script>         <!-- turn 5b -->
+<script src="atlas_page6_wiring.js"></script>      <!-- turn 6 -->
+<script src="atlas_track_gallery.js"></script>     <!-- turn 6.5 -->
+<script src="atlas_turn7.js"></script>             <!-- turn 7 -->
+<script src="atlas_overview.js"></script>          <!-- turn 9 -->
+<script src="atlas_compare.js"></script>           <!-- turn 10 -->
+<script src="atlas_ld.js"></script>                <!-- turn 11c (fast_ld) -->
+<script src="atlas_dotplot.js"></script>           <!-- turn 115 (cross-species dot plot) -->
+<script src="atlas_focal_vs_bg.js"></script>      <!-- turn 117 (focal-vs-background widget) -->
 <script>
   // Turn 11c: mount the fast_ld split-heatmap panel onto page 3, beside Q09b.
   // The atlas's state shape differs from atlas_ld.js's default expectations
