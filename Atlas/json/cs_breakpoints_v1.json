@@ -1,0 +1,867 @@
+{
+  "tool": "cross_species_breakpoints_v1",
+  "schema_version": 2,
+  "generated_at": "2026-05-02T06:25:04Z",
+  "elapsed_seconds": 3.25,
+  "species_query": {
+    "name": "Clarias gariepinus",
+    "haplotype": "fClaHyb_Gar_LG"
+  },
+  "species_target": {
+    "name": "Clarias macrocephalus",
+    "haplotype": "fClaHyb_Mac_LG"
+  },
+  "input_paf": {
+    "path": "/mnt/e/01-catfish_assembly_manuscript_CGA/cross_species_breakpoints/01_wfmash/gar_vs_mac.paf",
+    "sha256": "b6bd13b39ff777f32e683292c2a128bdb816e1d19f6b355c8b415784be0834e9"
+  },
+  "params": {
+    "min_mapq": 1,
+    "min_block_bp": 50000,
+    "cluster_radius_bp": 50000,
+    "flank_bp": 100000,
+    "classes_annotated": [
+      "all_TE",
+      "young_TE_all",
+      "old_TE_all",
+      "Gypsy_LTR_retrotransposon",
+      "CACTA_TIR_transposon"
+    ]
+  },
+  "n_breakpoints": 3,
+  "n_by_event_type": {
+    "inversion": 2,
+    "fission_or_fusion": 1
+  },
+  "breakpoints": [
+    {
+      "id": "cs_bp_0001",
+      "event_type": "inversion",
+      "gar_chr": "C_gar_LG27",
+      "gar_pos_start": 12345136,
+      "gar_pos_end": 12700000,
+      "gar_pos_mb": 12.5226,
+      "n_member_breakpoints": 1,
+      "prev_block": {
+        "mac_chr": "C_mac_LG01",
+        "mac_start_bp": 13620154,
+        "mac_end_bp": 15752743,
+        "strand": "-",
+        "block_size_bp": 2143360,
+        "mapping_quality": 4
+      },
+      "next_block": {
+        "mac_chr": "C_mac_LG01",
+        "mac_start_bp": 9392147,
+        "mac_end_bp": 9686188,
+        "strand": "+",
+        "block_size_bp": 295808,
+        "mapping_quality": 3
+      },
+      "flanking_repeat_density_gar": {
+        "all_TE": {
+          "mean": 0.4323,
+          "max": 0.9088,
+          "n_windows": 40
+        },
+        "young_TE_all": {
+          "mean": 0.0193,
+          "max": 0.3666,
+          "n_windows": 40
+        },
+        "old_TE_all": {
+          "mean": 0.413,
+          "max": 0.7924,
+          "n_windows": 40
+        },
+        "Gypsy_LTR_retrotransposon": {
+          "mean": 0.0162,
+          "max": 0.1564,
+          "n_windows": 40
+        },
+        "CACTA_TIR_transposon": {
+          "mean": 0.1439,
+          "max": 0.6892,
+          "n_windows": 40
+        }
+      },
+      "flanking_repeat_density_mac": {
+        "prev": {
+          "mac_chr": "C_mac_LG01",
+          "anchor_bp": 15752743,
+          "by_class": {
+            "all_TE": {
+              "mean": 0.3823,
+              "max": 0.7854,
+              "n_windows": 40
+            },
+            "young_TE_all": {
+              "mean": 0.0235,
+              "max": 0.2212,
+              "n_windows": 40
+            },
+            "old_TE_all": {
+              "mean": 0.3588,
+              "max": 0.7854,
+              "n_windows": 40
+            },
+            "Gypsy_LTR_retrotransposon": {
+              "mean": 0.0082,
+              "max": 0.169,
+              "n_windows": 40
+            },
+            "CACTA_TIR_transposon": {
+              "mean": 0.1326,
+              "max": 0.507,
+              "n_windows": 40
+            }
+          }
+        },
+        "next": {
+          "mac_chr": "C_mac_LG01",
+          "anchor_bp": 9392147,
+          "by_class": {
+            "all_TE": {
+              "mean": 0.3817,
+              "max": 0.8112,
+              "n_windows": 40
+            },
+            "young_TE_all": {
+              "mean": 0.0137,
+              "max": 0.2316,
+              "n_windows": 40
+            },
+            "old_TE_all": {
+              "mean": 0.3681,
+              "max": 0.8112,
+              "n_windows": 40
+            },
+            "Gypsy_LTR_retrotransposon": {
+              "mean": 0.0112,
+              "max": 0.2098,
+              "n_windows": 40
+            },
+            "CACTA_TIR_transposon": {
+              "mean": 0.1382,
+              "max": 0.387,
+              "n_windows": 40
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "cs_bp_0002",
+      "event_type": "inversion",
+      "gar_chr": "C_gar_LG27",
+      "gar_pos_start": 16450000,
+      "gar_pos_end": 16552016,
+      "gar_pos_mb": 16.501,
+      "n_member_breakpoints": 1,
+      "prev_block": {
+        "mac_chr": "C_mac_LG01",
+        "mac_start_bp": 12550331,
+        "mac_end_bp": 13111487,
+        "strand": "+",
+        "block_size_bp": 561156,
+        "mapping_quality": 3
+      },
+      "next_block": {
+        "mac_chr": "C_mac_LG01",
+        "mac_start_bp": 8219825,
+        "mac_end_bp": 8925659,
+        "strand": "-",
+        "block_size_bp": 705834,
+        "mapping_quality": 3
+      },
+      "flanking_repeat_density_gar": {
+        "all_TE": {
+          "mean": 0.448,
+          "max": 1.0,
+          "n_windows": 40
+        },
+        "young_TE_all": {
+          "mean": 0.0646,
+          "max": 0.6936,
+          "n_windows": 40
+        },
+        "old_TE_all": {
+          "mean": 0.3878,
+          "max": 0.9488,
+          "n_windows": 40
+        },
+        "Gypsy_LTR_retrotransposon": {
+          "mean": 0.077,
+          "max": 0.8208,
+          "n_windows": 40
+        },
+        "CACTA_TIR_transposon": {
+          "mean": 0.1541,
+          "max": 0.8074,
+          "n_windows": 40
+        }
+      },
+      "flanking_repeat_density_mac": {
+        "prev": {
+          "mac_chr": "C_mac_LG01",
+          "anchor_bp": 13111487,
+          "by_class": {
+            "all_TE": {
+              "mean": 0.6012,
+              "max": 1.0,
+              "n_windows": 40
+            },
+            "young_TE_all": {
+              "mean": 0.3401,
+              "max": 1.0,
+              "n_windows": 40
+            },
+            "old_TE_all": {
+              "mean": 0.2611,
+              "max": 0.742,
+              "n_windows": 40
+            },
+            "Gypsy_LTR_retrotransposon": {
+              "mean": 0.0059,
+              "max": 0.141,
+              "n_windows": 40
+            },
+            "CACTA_TIR_transposon": {
+              "mean": 0.1174,
+              "max": 0.864,
+              "n_windows": 40
+            }
+          }
+        },
+        "next": {
+          "mac_chr": "C_mac_LG01",
+          "anchor_bp": 8219825,
+          "by_class": {
+            "all_TE": {
+              "mean": 0.3768,
+              "max": 1.0,
+              "n_windows": 40
+            },
+            "young_TE_all": {
+              "mean": 0.0157,
+              "max": 0.2332,
+              "n_windows": 40
+            },
+            "old_TE_all": {
+              "mean": 0.3624,
+              "max": 1.0,
+              "n_windows": 40
+            },
+            "Gypsy_LTR_retrotransposon": {
+              "mean": 0.0194,
+              "max": 0.2044,
+              "n_windows": 40
+            },
+            "CACTA_TIR_transposon": {
+              "mean": 0.1408,
+              "max": 0.7812,
+              "n_windows": 40
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "cs_bp_0003",
+      "event_type": "translocation_or_fission",
+      "gar_chr": "C_gar_LG28",
+      "gar_pos_start": 14250000,
+      "gar_pos_end": 16900000,
+      "gar_pos_mb": 15.575,
+      "n_member_breakpoints": 1,
+      "prev_block": {
+        "mac_chr": "C_mac_LG06",
+        "mac_start_bp": 12502561,
+        "mac_end_bp": 12917309,
+        "strand": "+",
+        "block_size_bp": 448976,
+        "mapping_quality": 3
+      },
+      "next_block": {
+        "mac_chr": "C_mac_LG01",
+        "mac_start_bp": 414234,
+        "mac_end_bp": 822704,
+        "strand": "+",
+        "block_size_bp": 408470,
+        "mapping_quality": 2
+      },
+      "event_type_refined": "fission_or_fusion",
+      "gar_chr_mac_cov": {
+        "C_mac_LG06": 6553907,
+        "C_mac_LG01": 759510
+      },
+      "flanking_repeat_density_gar": {
+        "all_TE": {
+          "mean": 0.9998,
+          "max": 1.0,
+          "n_windows": 40
+        },
+        "young_TE_all": {
+          "mean": 0.9998,
+          "max": 1.0,
+          "n_windows": 40
+        },
+        "old_TE_all": {
+          "mean": 0.0,
+          "max": 0.0,
+          "n_windows": 40
+        },
+        "Gypsy_LTR_retrotransposon": {
+          "mean": 0.0,
+          "max": 0.0,
+          "n_windows": 40
+        },
+        "CACTA_TIR_transposon": {
+          "mean": 0.0,
+          "max": 0.0,
+          "n_windows": 40
+        }
+      },
+      "flanking_repeat_density_mac": {
+        "prev": {
+          "mac_chr": "C_mac_LG06",
+          "anchor_bp": 12917309,
+          "by_class": {
+            "all_TE": {
+              "mean": 0.5129,
+              "max": 0.9018,
+              "n_windows": 40
+            },
+            "young_TE_all": {
+              "mean": 0.0101,
+              "max": 0.1018,
+              "n_windows": 40
+            },
+            "old_TE_all": {
+              "mean": 0.5028,
+              "max": 0.8162,
+              "n_windows": 40
+            },
+            "Gypsy_LTR_retrotransposon": {
+              "mean": 0.008,
+              "max": 0.2052,
+              "n_windows": 40
+            },
+            "CACTA_TIR_transposon": {
+              "mean": 0.1988,
+              "max": 0.6084,
+              "n_windows": 40
+            }
+          }
+        },
+        "next": {
+          "mac_chr": "C_mac_LG01",
+          "anchor_bp": 414234,
+          "by_class": {
+            "all_TE": {
+              "mean": 0.5741,
+              "max": 1.0,
+              "n_windows": 40
+            },
+            "young_TE_all": {
+              "mean": 0.0618,
+              "max": 0.5918,
+              "n_windows": 40
+            },
+            "old_TE_all": {
+              "mean": 0.5149,
+              "max": 1.0,
+              "n_windows": 40
+            },
+            "Gypsy_LTR_retrotransposon": {
+              "mean": 0.0348,
+              "max": 0.3322,
+              "n_windows": 40
+            },
+            "CACTA_TIR_transposon": {
+              "mean": 0.1792,
+              "max": 0.7634,
+              "n_windows": 40
+            }
+          }
+        }
+      },
+      "manuscript_note": "Spalax-style enrichment: gar_flank all_TE mean 1.00 vs chrom mean 0.51 (2.0x)"
+    }
+  ],
+  "n_synteny_blocks": 42,
+  "synteny_blocks": [
+    {
+      "gar_chr": "C_gar_LG15",
+      "gar_start": 2752272,
+      "gar_end": 3450000,
+      "mac_chr": "C_mac_LG06",
+      "mac_start": 33766692,
+      "mac_end": 34457983,
+      "strand": "-",
+      "block_size_bp": 697728,
+      "mapping_quality": 3
+    },
+    {
+      "gar_chr": "C_gar_LG15",
+      "gar_start": 3807056,
+      "gar_end": 4039376,
+      "mac_chr": "C_mac_LG06",
+      "mac_start": 33197999,
+      "mac_end": 33446336,
+      "strand": "-",
+      "block_size_bp": 248337,
+      "mapping_quality": 4
+    },
+    {
+      "gar_chr": "C_gar_LG23",
+      "gar_start": 1152848,
+      "gar_end": 1648848,
+      "mac_chr": "C_mac_LG01",
+      "mac_start": 48807311,
+      "mac_end": 49287146,
+      "strand": "-",
+      "block_size_bp": 496000,
+      "mapping_quality": 3
+    },
+    {
+      "gar_chr": "C_gar_LG23",
+      "gar_start": 1802576,
+      "gar_end": 2050000,
+      "mac_chr": "C_mac_LG01",
+      "mac_start": 48313637,
+      "mac_end": 48579365,
+      "strand": "-",
+      "block_size_bp": 265728,
+      "mapping_quality": 3
+    },
+    {
+      "gar_chr": "C_gar_LG23",
+      "gar_start": 3403136,
+      "gar_end": 6795008,
+      "mac_chr": "C_mac_LG01",
+      "mac_start": 43876442,
+      "mac_end": 47290208,
+      "strand": "-",
+      "block_size_bp": 3413766,
+      "mapping_quality": 3
+    },
+    {
+      "gar_chr": "C_gar_LG23",
+      "gar_start": 6900000,
+      "gar_end": 9249360,
+      "mac_chr": "C_mac_LG01",
+      "mac_start": 41387473,
+      "mac_end": 43773144,
+      "strand": "-",
+      "block_size_bp": 2385671,
+      "mapping_quality": 3
+    },
+    {
+      "gar_chr": "C_gar_LG23",
+      "gar_start": 9350000,
+      "gar_end": 9671200,
+      "mac_chr": "C_mac_LG01",
+      "mac_start": 40993695,
+      "mac_end": 41308086,
+      "strand": "-",
+      "block_size_bp": 321200,
+      "mapping_quality": 4
+    },
+    {
+      "gar_chr": "C_gar_LG23",
+      "gar_start": 10000000,
+      "gar_end": 11799744,
+      "mac_chr": "C_mac_LG01",
+      "mac_start": 38665188,
+      "mac_end": 40489162,
+      "strand": "-",
+      "block_size_bp": 1823974,
+      "mapping_quality": 3
+    },
+    {
+      "gar_chr": "C_gar_LG23",
+      "gar_start": 11950000,
+      "gar_end": 12900000,
+      "mac_chr": "C_mac_LG01",
+      "mac_start": 37595276,
+      "mac_end": 38517594,
+      "strand": "-",
+      "block_size_bp": 950000,
+      "mapping_quality": 3
+    },
+    {
+      "gar_chr": "C_gar_LG23",
+      "gar_start": 13100000,
+      "gar_end": 13396928,
+      "mac_chr": "C_mac_LG01",
+      "mac_start": 37111251,
+      "mac_end": 37403195,
+      "strand": "-",
+      "block_size_bp": 296928,
+      "mapping_quality": 4
+    },
+    {
+      "gar_chr": "C_gar_LG23",
+      "gar_start": 14251712,
+      "gar_end": 14998720,
+      "mac_chr": "C_mac_LG01",
+      "mac_start": 35741921,
+      "mac_end": 36462763,
+      "strand": "-",
+      "block_size_bp": 747008,
+      "mapping_quality": 3
+    },
+    {
+      "gar_chr": "C_gar_LG23",
+      "gar_start": 15450000,
+      "gar_end": 16396672,
+      "mac_chr": "C_mac_LG01",
+      "mac_start": 34321321,
+      "mac_end": 35295415,
+      "strand": "-",
+      "block_size_bp": 974094,
+      "mapping_quality": 4
+    },
+    {
+      "gar_chr": "C_gar_LG23",
+      "gar_start": 16554016,
+      "gar_end": 16899232,
+      "mac_chr": "C_mac_LG01",
+      "mac_start": 33831328,
+      "mac_end": 34186886,
+      "strand": "-",
+      "block_size_bp": 355558,
+      "mapping_quality": 3
+    },
+    {
+      "gar_chr": "C_gar_LG23",
+      "gar_start": 17052896,
+      "gar_end": 17900000,
+      "mac_chr": "C_mac_LG01",
+      "mac_start": 32828363,
+      "mac_end": 33678176,
+      "strand": "-",
+      "block_size_bp": 849813,
+      "mapping_quality": 3
+    },
+    {
+      "gar_chr": "C_gar_LG23",
+      "gar_start": 18405296,
+      "gar_end": 18746672,
+      "mac_chr": "C_mac_LG01",
+      "mac_start": 32115286,
+      "mac_end": 32461893,
+      "strand": "-",
+      "block_size_bp": 346607,
+      "mapping_quality": 3
+    },
+    {
+      "gar_chr": "C_gar_LG23",
+      "gar_start": 19000000,
+      "gar_end": 19699104,
+      "mac_chr": "C_mac_LG01",
+      "mac_start": 31163543,
+      "mac_end": 31866820,
+      "strand": "-",
+      "block_size_bp": 703277,
+      "mapping_quality": 3
+    },
+    {
+      "gar_chr": "C_gar_LG23",
+      "gar_start": 19800528,
+      "gar_end": 22443088,
+      "mac_chr": "C_mac_LG01",
+      "mac_start": 28416990,
+      "mac_end": 31098663,
+      "strand": "-",
+      "block_size_bp": 2681673,
+      "mapping_quality": 3
+    },
+    {
+      "gar_chr": "C_gar_LG23",
+      "gar_start": 23156832,
+      "gar_end": 23500000,
+      "mac_chr": "C_mac_LG01",
+      "mac_start": 27451409,
+      "mac_end": 27780439,
+      "strand": "-",
+      "block_size_bp": 343168,
+      "mapping_quality": 2
+    },
+    {
+      "gar_chr": "C_gar_LG27",
+      "gar_start": 717137,
+      "gar_end": 1650000,
+      "mac_chr": "C_mac_LG01",
+      "mac_start": 23712626,
+      "mac_end": 24680881,
+      "strand": "-",
+      "block_size_bp": 968255,
+      "mapping_quality": 3
+    },
+    {
+      "gar_chr": "C_gar_LG27",
+      "gar_start": 2051648,
+      "gar_end": 2998208,
+      "mac_chr": "C_mac_LG01",
+      "mac_start": 22295120,
+      "mac_end": 23278810,
+      "strand": "-",
+      "block_size_bp": 983690,
+      "mapping_quality": 3
+    },
+    {
+      "gar_chr": "C_gar_LG27",
+      "gar_start": 3850000,
+      "gar_end": 5300000,
+      "mac_chr": "C_mac_LG01",
+      "mac_start": 20429972,
+      "mac_end": 21953576,
+      "strand": "-",
+      "block_size_bp": 1523604,
+      "mapping_quality": 3
+    },
+    {
+      "gar_chr": "C_gar_LG27",
+      "gar_start": 5656480,
+      "gar_end": 8097568,
+      "mac_chr": "C_mac_LG01",
+      "mac_start": 17686910,
+      "mac_end": 20145494,
+      "strand": "-",
+      "block_size_bp": 2458584,
+      "mapping_quality": 3
+    },
+    {
+      "gar_chr": "C_gar_LG27",
+      "gar_start": 8200000,
+      "gar_end": 9500000,
+      "mac_chr": "C_mac_LG01",
+      "mac_start": 16255557,
+      "mac_end": 17581857,
+      "strand": "-",
+      "block_size_bp": 1326300,
+      "mapping_quality": 4
+    },
+    {
+      "gar_chr": "C_gar_LG27",
+      "gar_start": 10201776,
+      "gar_end": 12345136,
+      "mac_chr": "C_mac_LG01",
+      "mac_start": 13620154,
+      "mac_end": 15752743,
+      "strand": "-",
+      "block_size_bp": 2143360,
+      "mapping_quality": 4
+    },
+    {
+      "gar_chr": "C_gar_LG27",
+      "gar_start": 12700000,
+      "gar_end": 12995808,
+      "mac_chr": "C_mac_LG01",
+      "mac_start": 9392147,
+      "mac_end": 9686188,
+      "strand": "+",
+      "block_size_bp": 295808,
+      "mapping_quality": 3
+    },
+    {
+      "gar_chr": "C_gar_LG27",
+      "gar_start": 13104224,
+      "gar_end": 13598560,
+      "mac_chr": "C_mac_LG01",
+      "mac_start": 9773878,
+      "mac_end": 10294369,
+      "strand": "+",
+      "block_size_bp": 520491,
+      "mapping_quality": 3
+    },
+    {
+      "gar_chr": "C_gar_LG27",
+      "gar_start": 13700128,
+      "gar_end": 14950000,
+      "mac_chr": "C_mac_LG01",
+      "mac_start": 10391487,
+      "mac_end": 11663795,
+      "strand": "+",
+      "block_size_bp": 1272308,
+      "mapping_quality": 3
+    },
+    {
+      "gar_chr": "C_gar_LG27",
+      "gar_start": 15350128,
+      "gar_end": 15698928,
+      "mac_chr": "C_mac_LG01",
+      "mac_start": 12088201,
+      "mac_end": 12407750,
+      "strand": "+",
+      "block_size_bp": 348800,
+      "mapping_quality": 3
+    },
+    {
+      "gar_chr": "C_gar_LG27",
+      "gar_start": 15900384,
+      "gar_end": 16450000,
+      "mac_chr": "C_mac_LG01",
+      "mac_start": 12550331,
+      "mac_end": 13111487,
+      "strand": "+",
+      "block_size_bp": 561156,
+      "mapping_quality": 3
+    },
+    {
+      "gar_chr": "C_gar_LG27",
+      "gar_start": 16552016,
+      "gar_end": 17247184,
+      "mac_chr": "C_mac_LG01",
+      "mac_start": 8219825,
+      "mac_end": 8925659,
+      "strand": "-",
+      "block_size_bp": 705834,
+      "mapping_quality": 3
+    },
+    {
+      "gar_chr": "C_gar_LG27",
+      "gar_start": 17660432,
+      "gar_end": 18249744,
+      "mac_chr": "C_mac_LG01",
+      "mac_start": 7162127,
+      "mac_end": 7777348,
+      "strand": "-",
+      "block_size_bp": 615221,
+      "mapping_quality": 3
+    },
+    {
+      "gar_chr": "C_gar_LG27",
+      "gar_start": 18500000,
+      "gar_end": 18998976,
+      "mac_chr": "C_mac_LG01",
+      "mac_start": 6362591,
+      "mac_end": 6876639,
+      "strand": "-",
+      "block_size_bp": 514048,
+      "mapping_quality": 3
+    },
+    {
+      "gar_chr": "C_gar_LG27",
+      "gar_start": 19153120,
+      "gar_end": 19481568,
+      "mac_chr": "C_mac_LG01",
+      "mac_start": 5858894,
+      "mac_end": 6208853,
+      "strand": "-",
+      "block_size_bp": 349959,
+      "mapping_quality": 3
+    },
+    {
+      "gar_chr": "C_gar_LG27",
+      "gar_start": 19600000,
+      "gar_end": 19899360,
+      "mac_chr": "C_mac_LG01",
+      "mac_start": 5439843,
+      "mac_end": 5750619,
+      "strand": "-",
+      "block_size_bp": 310776,
+      "mapping_quality": 3
+    },
+    {
+      "gar_chr": "C_gar_LG28",
+      "gar_start": 4900000,
+      "gar_end": 5250000,
+      "mac_chr": "C_mac_LG06",
+      "mac_start": 4198501,
+      "mac_end": 4526719,
+      "strand": "+",
+      "block_size_bp": 350000,
+      "mapping_quality": 3
+    },
+    {
+      "gar_chr": "C_gar_LG28",
+      "gar_start": 7550000,
+      "gar_end": 8300000,
+      "mac_chr": "C_mac_LG06",
+      "mac_start": 6241573,
+      "mac_end": 7012760,
+      "strand": "+",
+      "block_size_bp": 771187,
+      "mapping_quality": 3
+    },
+    {
+      "gar_chr": "C_gar_LG28",
+      "gar_start": 8362416,
+      "gar_end": 12000000,
+      "mac_chr": "C_mac_LG06",
+      "mac_start": 7173462,
+      "mac_end": 10790946,
+      "strand": "+",
+      "block_size_bp": 3637584,
+      "mapping_quality": 3
+    },
+    {
+      "gar_chr": "C_gar_LG28",
+      "gar_start": 12103840,
+      "gar_end": 13100000,
+      "mac_chr": "C_mac_LG06",
+      "mac_start": 10866743,
+      "mac_end": 11835961,
+      "strand": "+",
+      "block_size_bp": 996160,
+      "mapping_quality": 3
+    },
+    {
+      "gar_chr": "C_gar_LG28",
+      "gar_start": 13250000,
+      "gar_end": 13600000,
+      "mac_chr": "C_mac_LG06",
+      "mac_start": 11976901,
+      "mac_end": 12322527,
+      "strand": "+",
+      "block_size_bp": 350000,
+      "mapping_quality": 4
+    },
+    {
+      "gar_chr": "C_gar_LG28",
+      "gar_start": 13801024,
+      "gar_end": 14250000,
+      "mac_chr": "C_mac_LG06",
+      "mac_start": 12502561,
+      "mac_end": 12917309,
+      "strand": "+",
+      "block_size_bp": 448976,
+      "mapping_quality": 3
+    },
+    {
+      "gar_chr": "C_gar_LG28",
+      "gar_start": 16900000,
+      "gar_end": 17287840,
+      "mac_chr": "C_mac_LG01",
+      "mac_start": 414234,
+      "mac_end": 822704,
+      "strand": "+",
+      "block_size_bp": 408470,
+      "mapping_quality": 2
+    },
+    {
+      "gar_chr": "C_gar_LG28",
+      "gar_start": 17355888,
+      "gar_end": 17700000,
+      "mac_chr": "C_mac_LG01",
+      "mac_start": 965353,
+      "mac_end": 1316393,
+      "strand": "+",
+      "block_size_bp": 351040,
+      "mapping_quality": 3
+    }
+  ],
+  "chrom_lengths_query": {
+    "C_gar_LG15": 35026786,
+    "C_gar_LG23": 26131173,
+    "C_gar_LG27": 24049244,
+    "C_gar_LG28": 20253780
+  },
+  "chrom_lengths_target": {
+    "C_mac_LG06": 37423284,
+    "C_mac_LG01": 50118297
+  }
+}
