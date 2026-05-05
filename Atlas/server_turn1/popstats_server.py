@@ -2,23 +2,47 @@
 # =============================================================================
 # popstats_server.py
 # =============================================================================
-# Live-engine HTTP wrapper for inversion popstats. Sits on the cluster (LANTA)
-# alongside BEAGLE / BAM / Engine B caches, exposes four endpoints to the atlas:
+# The unified atlas server. Local. One process. One port. All in one place.
+#
+# As of turn 145, this file owns BOTH halves of the previous split-server
+# setup: the popstats / LD / dosage / ancestry endpoints (its original job)
+# AND the lightweight /file + /compute endpoints that used to live in
+# atlas_server.py. The two subsystems boot independently:
+#
+#   /file + /compute      — always live, needs only --project-root (a folder)
+#   popstats / LD / dosage — live when --config <yaml> is passed and the
+#                            referenced binaries / data files exist
+#
+# Endpoints exposed:
+#
+#   GET  /health                        unified status across both subsystems
+#   GET  /api/health                    same payload, /api-prefixed alias
+#
+#   GET  /file/<path>                   read file contents (text/json/binary)
+#   POST /file/<path>                   write body to file under project root
+#   POST /compute/<name>                run a registered compute, return JSON
 #
 #   POST /api/popstats/groupwise        wraps region_popstats (Engine F)
 #   POST /api/popstats/hobs_groupwise   wraps angsd_fixed_HWE -doHWE + hobs_windower
 #   POST /api/ancestry/groupwise_q      reads instant_q local_Q_samples cache
-#   POST /api/shelf_ld_test             optional server-side; atlas does this in JS
-#   GET  /api/health                    engine versions + cache stats
+#   POST /api/shelf_ld_test             server-side shelf LD test
+#   POST /api/ld/split_heatmap          wraps fast_ld engine
+#   GET  /api/dosage/chunk              chromosome-wide dosage chunk (per-region)
+#   GET  /api/dosage/manifest           dosage store manifest
 #   GET  /api/cache/keys                debug: list cache hashes
 #   DEL  /api/cache/keys/<hash>         debug: drop a single cache entry
 #   GET  /api/jobs/<job_id>             progress polling for slow runs
 #
 # Architecture notes:
 #
-#   - The atlas is the source of truth for sample groupings. Every request
-#     carries explicit member lists; the server NEVER runs k-means or
-#     re-derives group assignments. This keeps the server stateless and
+#   - Local only. Bind defaults to 127.0.0.1. No auth, no HTTPS, no
+#     network exposure. All processed data (dosage TSV.GZ, SVs, FASTA,
+#     RDS precomps, popstats binaries) lives in the project folder the
+#     server reads from.
+#
+#   - The atlas is the source of truth for sample groupings. Every popstats
+#     request carries explicit member lists; the server NEVER runs k-means
+#     or re-derives group assignments. This keeps the server stateless and
 #     cleanly separates "what is a group" (atlas) from "compute stats given
 #     a group" (server).
 #
@@ -32,8 +56,12 @@
 #     /api/jobs/<id> until done.
 #
 #   - This file is dependency-light by design: FastAPI + uvicorn + pyyaml
-#     + numpy + pandas. It does NOT depend on any cluster R packages or the
-#     atlas codebase. Run it as a standalone process.
+#     + numpy + pandas. The /file + /compute subsystem has zero extra
+#     deps beyond stdlib + FastAPI.
+#
+# Migration note (turn 145):
+#   atlas_server.py is now a thin shim that re-exports this file's endpoint
+#   surface. The previous standalone http.server-based atlas_server is gone.
 # =============================================================================
 
 from __future__ import annotations
@@ -1095,6 +1123,13 @@ CACHE: Optional[DiskCache] = None
 SAMPLES: Optional[SampleListIndex] = None
 JOBS: JobManager = JobManager()
 
+# turn 145 — /file + /compute subsystem state. Independent of the popstats
+# subsystem above: usable on its own when the user just wants local file IO
+# without the engine binaries / BEAGLE / sample list. Set by _bootstrap_file
+# at startup.
+PROJECT_ROOT: Optional[Path] = None
+SERVER_VERSION: str = "v2-merged-turn145"
+
 
 from contextlib import asynccontextmanager
 
@@ -1111,10 +1146,18 @@ async def _lifespan(app: FastAPI):
                 _bootstrap(Path(cfg_path))
             except Exception as e:
                 log.error("startup _bootstrap failed: %s", e)
+    # turn 145 — same pattern for project-root subsystem.
+    if PROJECT_ROOT is None:
+        pr_path = os.environ.get("ATLAS_PROJECT_ROOT")
+        if pr_path:
+            try:
+                _bootstrap_file(Path(pr_path))
+            except Exception as e:
+                log.error("startup _bootstrap_file failed: %s", e)
     yield
 
 
-app = FastAPI(title="popstats_server", version="1.0", lifespan=_lifespan)
+app = FastAPI(title="atlas_server (merged)", version=SERVER_VERSION, lifespan=_lifespan)
 
 
 # CORS must be added before the app starts handling requests. We default to
@@ -1131,25 +1174,73 @@ app.add_middleware(
 
 
 def _ensure_ready() -> None:
-    """Defensive guard for handlers — raise 503 if startup didn't complete."""
+    """Defensive guard for popstats handlers — raise 503 if startup didn't complete."""
     if ENGINES is None or CACHE is None or SAMPLES is None:
         raise HTTPException(
             503,
-            "server not initialized — set POPSTATS_CONFIG env var or run via "
-            "`python popstats_server.py --config <path>`")
+            "popstats subsystem not configured. Pass --config <yaml> to enable, "
+            "or set POPSTATS_CONFIG env var.")
+
+
+def _ensure_project_root() -> Path:
+    """turn 145 — guard for /file and /compute handlers.
+
+    Returns the project root, raising 503 if unset. The default launch
+    path always sets it, but if the server is started with neither
+    --project-root nor ATLAS_PROJECT_ROOT, this subsystem is unavailable.
+    """
+    if PROJECT_ROOT is None:
+        raise HTTPException(
+            503,
+            "/file and /compute subsystem not configured. Pass --project-root <dir> "
+            "to enable, or set ATLAS_PROJECT_ROOT env var.")
+    return PROJECT_ROOT
+
+
+def _safe_project_path(rel: str) -> Path:
+    """Resolve a request path inside PROJECT_ROOT. Rejects traversal
+    attempts (`..`) by checking the resolved path is under the root.
+    Raises HTTPException with 403 on traversal, 503 if subsystem unset.
+    """
+    root = _ensure_project_root().resolve()
+    p = (root / rel).resolve()
+    try:
+        p.relative_to(root)
+    except ValueError:
+        raise HTTPException(403, f"path escapes project root: {rel}")
+    return p
+
+
+def _bootstrap_file(project_root: Path) -> None:
+    """turn 145 — bootstrap the /file + /compute subsystem.
+
+    Sets the global PROJECT_ROOT so /file and /compute handlers can
+    resolve paths against it. Independent of the popstats _bootstrap.
+    """
+    global PROJECT_ROOT
+    root = project_root.resolve()
+    if not root.exists():
+        raise RuntimeError(f"project root does not exist: {root}")
+    if not root.is_dir():
+        raise RuntimeError(f"project root is not a directory: {root}")
+    PROJECT_ROOT = root
+    log.info("/file + /compute subsystem ready: project_root=%s", root)
 
 
 # =============================================================================
-# Health
+# Health (turn 145 — subsystem-aware)
 # =============================================================================
 
-@app.get("/api/health")
-async def health() -> Dict[str, Any]:
-    _ensure_ready()
+def _popstats_subsystem_status() -> Dict[str, Any]:
+    """Build the popstats subsystem block of /health."""
+    if ENGINES is None or CACHE is None or SAMPLES is None:
+        return {
+            "ready": False,
+            "reason": "popstats subsystem not configured. Pass --config <yaml> "
+                      "(or POPSTATS_CONFIG env) to enable.",
+        }
     return {
-        "ok": True,
-        "service": "popstats_server",
-        "version": "1.0",
+        "ready": True,
         "engines": ENGINES.all_hashes(),
         "engine_paths": {k: str(v) for k, v in ENGINES._paths.items()},
         "cache": {
@@ -1171,11 +1262,163 @@ async def health() -> Dict[str, Any]:
     }
 
 
+def _file_subsystem_status() -> Dict[str, Any]:
+    """Build the /file + /compute subsystem block of /health."""
+    if PROJECT_ROOT is None:
+        return {
+            "ready": False,
+            "reason": "/file + /compute subsystem not configured. Pass "
+                      "--project-root <dir> (or ATLAS_PROJECT_ROOT env) to enable.",
+        }
+    return {
+        "ready": True,
+        "project_root": str(PROJECT_ROOT),
+        "computes": sorted(COMPUTE_REGISTRY.keys()),
+    }
+
+
+@app.get("/api/health")
+async def health() -> Dict[str, Any]:
+    """Unified health probe. Reports both subsystems independently.
+
+    Top-level `ok` is true if EITHER subsystem is ready (server is doing
+    something useful). Atlas frontend reads `subsystems.*.ready` to
+    decide which capabilities are available.
+    """
+    popstats = _popstats_subsystem_status()
+    file_io  = _file_subsystem_status()
+    return {
+        "ok":         popstats["ready"] or file_io["ready"],
+        "service":    "atlas_server (merged)",
+        "version":    SERVER_VERSION,
+        "now":        time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "subsystems": {
+            "popstats": popstats,
+            "file":     file_io,
+        },
+    }
+
 
 # Compatibility alias for atlas clients that probe /health instead of /api/health.
 @app.get("/health")
 async def health_alias() -> Dict[str, Any]:
     return await health()
+
+
+# =============================================================================
+# /file and /compute — turn 145 merge from atlas_server.py
+# =============================================================================
+# These mirror the original atlas_server.py surface exactly so any frontend
+# / script code that called them continues to work without modification.
+#
+#   GET  /file/<path>      — read; directories return JSON listing
+#   POST /file/<path>      — write body to file; mkdir -p as needed
+#   POST /compute/<name>   — call a registered compute, return JSON result
+#
+# All routes guard via _ensure_project_root() which raises 503 with a
+# clear remediation message when the subsystem isn't enabled. Path
+# safety: _safe_project_path() rejects any traversal that escapes
+# PROJECT_ROOT (returns 403).
+# =============================================================================
+
+@app.get("/file/{path:path}")
+async def file_get(path: str) -> Response:
+    target = _safe_project_path(path)
+    if not target.exists():
+        raise HTTPException(404, f"not found: {path}")
+    if target.is_dir():
+        # Directory listing as JSON
+        entries = []
+        for entry in sorted(target.iterdir()):
+            entries.append({
+                "name":   entry.name,
+                "is_dir": entry.is_dir(),
+                "size":   entry.stat().st_size if entry.is_file() else None,
+            })
+        return JSONResponse({"ok": True, "dir": path, "entries": entries})
+    # File: pick content-type by suffix
+    if target.suffix == ".json":
+        ct = "application/json"
+    elif target.suffix in (".txt", ".md", ".tsv", ".csv", ".yaml", ".yml"):
+        ct = "text/plain; charset=utf-8"
+    elif target.suffix in (".html", ".htm"):
+        ct = "text/html; charset=utf-8"
+    elif target.suffix in (".js",):
+        ct = "application/javascript; charset=utf-8"
+    elif target.suffix in (".css",):
+        ct = "text/css; charset=utf-8"
+    elif target.suffix in (".png",):
+        ct = "image/png"
+    elif target.suffix in (".jpg", ".jpeg"):
+        ct = "image/jpeg"
+    elif target.suffix in (".svg",):
+        ct = "image/svg+xml"
+    else:
+        ct = "application/octet-stream"
+    try:
+        body = target.read_bytes()
+    except Exception as e:
+        raise HTTPException(500, f"read failed: {type(e).__name__}: {e}")
+    return Response(content=body, media_type=ct)
+
+
+@app.post("/file/{path:path}")
+async def file_post(path: str, request: Request) -> Dict[str, Any]:
+    target = _safe_project_path(path)
+    body   = await request.body()
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(body)
+    except Exception as e:
+        raise HTTPException(500, f"write failed: {type(e).__name__}: {e}")
+    return {"ok": True, "path": path, "bytes": len(body)}
+
+
+@app.post("/compute/{name}")
+async def compute_post(name: str, request: Request) -> Dict[str, Any]:
+    root = _ensure_project_root()
+    handler = COMPUTE_REGISTRY.get(name)
+    if handler is None:
+        raise HTTPException(404, {
+            "error":      f"unknown compute: {name}",
+            "registered": sorted(COMPUTE_REGISTRY.keys()),
+        })
+    raw = await request.body()
+    try:
+        args = json.loads(raw) if raw else {}
+    except Exception as e:
+        raise HTTPException(400, f"invalid JSON: {e}")
+    try:
+        result = handler(args, project_root=root)
+    except Exception as e:
+        raise HTTPException(500, f"{type(e).__name__}: {e}")
+    return {"ok": True, "result": result}
+
+
+# Compute registry — same shape as the old atlas_server.py registry. Each
+# function takes (args: dict, project_root: Path) and returns a JSON-
+# serializable result. Add real computes as needed; the atlas-side adapter
+# calls them via POST /compute/<name>.
+def _compute_echo(args: Dict[str, Any], project_root: Path) -> Dict[str, Any]:
+    return {
+        "echo":           args,
+        "project_root":   str(project_root),
+        "server_version": SERVER_VERSION,
+    }
+
+
+def _compute_list_files(args: Dict[str, Any], project_root: Path) -> Dict[str, Any]:
+    pattern = args.get("pattern", "*")
+    matches = sorted(str(p.relative_to(project_root))
+                     for p in project_root.glob(pattern)
+                     if p.is_file())
+    return {"pattern": pattern, "files": matches}
+
+
+COMPUTE_REGISTRY: Dict[str, Any] = {
+    "echo":       _compute_echo,
+    "list_files": _compute_list_files,
+}
 
 @app.get("/api/cache/keys")
 async def cache_keys(prefix: str = "", limit: int = 200) -> Dict[str, Any]:
@@ -1785,23 +2028,77 @@ def _bootstrap(config_path: Path) -> None:
 # =============================================================================
 
 def main() -> None:
+    """turn 145 — unified entry point.
+
+    Both --config (popstats subsystem) and --project-root (/file +
+    /compute subsystem) are optional. The server starts as long as at
+    least one subsystem can be brought up. Default behavior with no
+    args: project root = current working directory, popstats disabled.
+    """
     import argparse
-    ap = argparse.ArgumentParser(description="popstats_server")
-    ap.add_argument("--config", required=True, type=Path,
-                    help="path to popstats_server.config.yaml")
+    ap = argparse.ArgumentParser(
+        description="atlas server (merged) — unified popstats + /file + /compute server")
+    ap.add_argument("--config", default=None, type=Path,
+                    help="path to popstats_server.config.yaml — enables "
+                         "popstats / LD / dosage / ancestry endpoints")
+    ap.add_argument("--project-root", default=None, type=Path,
+                    help="path to project folder — enables /file and /compute "
+                         "endpoints. Defaults to current working directory.")
     ap.add_argument("--host", default=None,
-                    help="override config bind.host")
+                    help="bind host (default 127.0.0.1, overrides config bind.host)")
     ap.add_argument("--port", default=None, type=int,
-                    help="override config bind.port")
+                    help="bind port (default 8765, overrides config bind.port)")
     ap.add_argument("--reload", action="store_true",
                     help="auto-reload on code change (dev only)")
     args = ap.parse_args()
 
-    _bootstrap(args.config)
-    bind = CFG.get("bind", {})
+    # /file + /compute subsystem: default to CWD when --project-root is omitted
+    if args.project_root is not None:
+        try:
+            _bootstrap_file(args.project_root)
+        except Exception as e:
+            log.error("--project-root bootstrap failed: %s", e)
+    else:
+        try:
+            _bootstrap_file(Path.cwd())
+        except Exception as e:
+            log.warning("default project_root bootstrap failed: %s "
+                        "(/file + /compute will be unavailable)", e)
+
+    # popstats subsystem: optional
+    if args.config is not None:
+        try:
+            _bootstrap(args.config)
+        except Exception as e:
+            log.error("--config bootstrap failed: %s "
+                      "(popstats endpoints will return 503)", e)
+    else:
+        log.info("no --config given; popstats endpoints will return 503")
+
+    # Resolve bind
+    bind = CFG.get("bind", {}) if CFG else {}
     host = args.host or bind.get("host", "127.0.0.1")
     port = int(args.port or bind.get("port", 8765))
+
+    # Sanity: refuse to start if neither subsystem is alive
+    if PROJECT_ROOT is None and ENGINES is None:
+        log.error("neither subsystem could be started — refusing to launch")
+        sys.exit(2)
+
     log.info("listening on http://%s:%d", host, port)
+    log.info("subsystems: file=%s, popstats=%s",
+             "ready" if PROJECT_ROOT is not None else "disabled",
+             "ready" if ENGINES is not None else "disabled")
+
+    # uvicorn.run("popstats_server:app", ...) re-imports the module in its
+    # own context, which discards the module-level state we just set in
+    # main(). Pass the same paths through env vars so the lifespan hook
+    # in the re-imported module re-runs the same bootstrap and lands in
+    # the same state. Both env vars are read by _lifespan() above.
+    if PROJECT_ROOT is not None:
+        os.environ["ATLAS_PROJECT_ROOT"] = str(PROJECT_ROOT)
+    if args.config is not None:
+        os.environ["POPSTATS_CONFIG"] = str(args.config.resolve())
 
     import uvicorn
     uvicorn.run("popstats_server:app", host=host, port=port,

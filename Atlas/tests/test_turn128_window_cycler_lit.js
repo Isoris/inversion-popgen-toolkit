@@ -44,14 +44,17 @@ ok('_mirrorStepModeFromState is now DEFINED (not just referenced)',
    /function\s+_mirrorStepModeFromState\s*\(/.test(html));
 
 ok('_refreshStepSizeBtn toggles is-active-step class',
-   /_refreshStepSizeBtn[\s\S]{0,500}classList\.toggle\(['"]is-active-step['"]/.test(html));
+   /_refreshStepSizeBtn[\s\S]{0,2500}classList\.toggle\(['"]is-active-step['"]/.test(html));
 
 ok('sidebar #stepModeBar click handler now also calls _refreshStepSizeBtn',
    /querySelectorAll\(['"]#stepModeBar button['"]\)\.forEach\(btn[\s\S]{0,1200}_refreshStepSizeBtn\(\)/.test(html),
    'sidebar click should sync the header cycler');
 
-ok('cycler text format unchanged (📊 Windows (N))',
-   /btn\.textContent = `📊 Windows \(\$\{n\}\)`/.test(html));
+// turn 147b updated _refreshStepSizeBtn to handle l2/winN modes
+// distinctly. The label is built via a `label` variable (not inline
+// template literal) — internal restructure, same output format.
+ok('cycler still emits "📊 Windows (N)" format for cycler-active modes',
+   /label\s*=\s*`📊 Windows \(\$\{n\}\)`/.test(html));
 
 // =============================================================================
 // Behavioural tests
@@ -215,24 +218,36 @@ console.log('\nTest: cycler lit for win10');
 }
 
 // --- Test: cycler dims for L2 mode (sidebar selected L2)
+// turn 147b — label switched from "📊 Windows (1)" to "📊 Windows (—)" so
+// the user can tell at a glance that the cycler is NOT the active step
+// setting (arrows jump L2 envelopes, not windows). Pre-147b the "(1)"
+// label was misleading — looked like step=1 was active when it wasn't.
 console.log('\nTest: cycler dim when stepMode=l2 (sidebar took over)');
 {
   const { sandbox, cyclerBtn } = makeSandbox('l2');
   vm.runInContext('_refreshStepSizeBtn();', sandbox);
-  ok('text falls back to "📊 Windows (1)" (default size)',
-     cyclerBtn.textContent === '📊 Windows (1)');
+  ok('text shows "📊 Windows (—)" (cycler not the live setting)',
+     cyclerBtn.textContent === '📊 Windows (—)');
   ok('class is-active-step is NOT set for l2',
      !cyclerBtn.classList.contains('is-active-step'),
      'l2 isnt in the cycler order so cycler should be dim');
 }
 
-// --- Test: cycler dims for winN mode (sidebar's custom N)
-console.log('\nTest: cycler dim when stepMode=winN');
+// --- Test: cycler engages for winN mode (sidebar's custom N)
+// turn 147b — Quentin's bug fix. Pre-147b the cycler stayed dim for
+// winN, hiding the fact that arrows ARE stepping in window units. Now
+// the cycler lights up AND shows the custom N value (e.g. "📊 Windows
+// (15)") so the user knows their custom step size is live.
+console.log('\nTest: cycler ENGAGES when stepMode=winN (turn 147b fix)');
 {
   const { sandbox, cyclerBtn } = makeSandbox('winN');
+  // Set a custom N value
+  sandbox.state.stepModeN = 15;
   vm.runInContext('_refreshStepSizeBtn();', sandbox);
-  ok('class is-active-step is NOT set for winN',
-     !cyclerBtn.classList.contains('is-active-step'));
+  ok('class is-active-step IS set for winN (turn 147b fix)',
+     cyclerBtn.classList.contains('is-active-step'));
+  ok('label reflects the custom N value',
+     cyclerBtn.textContent === '📊 Windows (15)');
 }
 
 // --- Test: _mirrorStepModeFromState toggles sidebar buttons correctly

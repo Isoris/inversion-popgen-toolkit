@@ -83,7 +83,7 @@ ok('#l2SweepInspectBtn trigger button present',
 ok('#l2SweepInspectBtn starts disabled',
    /id="l2SweepInspectBtn"[\s\S]{0,800}disabled\s*>/.test(html));
 ok('inspector button shows 🔍 inspect',
-   /id="l2SweepInspectBtn"[\s\S]{0,600}🔍\s*inspect/.test(html));
+   /id="l2SweepInspectBtn"[\s\S]{0,800}🔍\s*inspect/.test(html));
 ok('inspector button sibling to L2-sweep checkbox',
    /l2SweepToggleLabel[\s\S]{0,2500}l2SweepInspectBtn/.test(html));
 

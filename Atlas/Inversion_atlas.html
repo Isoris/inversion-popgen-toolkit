@@ -1247,6 +1247,24 @@
   #page3 .cat-toolbar .export-group button.export-fmt:hover {
     background: var(--accent); color: #0e1116;
   }
+  /* turn 146 (Turn D) — select inside export-group (tier dropdown for
+     bulk breeding-card export). Mirrors the export-fmt button styling
+     so the dropdown reads as part of the same control group. */
+  #page3 .cat-toolbar .export-group select.export-fmt {
+    background: var(--panel-2); color: var(--ink);
+    border: none; border-left: 1px solid var(--rule);
+    padding: 5px 8px; font-family: var(--mono); font-size: 11px;
+    font-weight: 500; cursor: pointer; border-radius: 0;
+    appearance: none; -webkit-appearance: none; -moz-appearance: none;
+    background-image: linear-gradient(45deg, transparent 50%, var(--ink-dim) 50%),
+                      linear-gradient(135deg, var(--ink-dim) 50%, transparent 50%);
+    background-position: calc(100% - 11px) 50%, calc(100% - 6px) 50%;
+    background-size: 5px 5px, 5px 5px; background-repeat: no-repeat;
+    padding-right: 22px;
+  }
+  #page3 .cat-toolbar .export-group select.export-fmt:hover {
+    background-color: var(--panel-3, #2a3245); color: var(--ink);
+  }
   #page3 .cat-toolbar .sel-info { font-family: var(--mono); font-size: 11px;
                         color: var(--ink-dim); margin-left: auto; }
   #page3 table.cat { width: 100%; border-collapse: collapse;
@@ -2731,6 +2749,33 @@
   #l3Panel .l3-layout button.active {
     background: var(--accent); color: #0e1116; border-color: var(--accent);
     font-weight: 600; }
+  /* turn 147 — L3 toolbar disclosure (Quentin: "L3 toolbar sprawls
+     across 3 rows on page 1, ~120px wasted vertical"). Workhorse
+     controls (layout / compare-unit / recluster + draft / promote /
+     collapse) stay always-visible; secondary controls (color mode,
+     K-mode, het toggle, L2-sweep, G-panel, b.continuity, scale-mode,
+     detailed, show tracked, clear spot, pin 2nd, live dosage) hide
+     behind a ⋯ disclosure that defaults collapsed. !important so
+     this beats any inline display style set by per-control logic
+     (e.g. #l3ScalePanes flipping on scale-mode toggle).
+     Persisted: localStorage 'pca_scrubber_v3.l3MoreExpanded'. */
+  #l3Panel.l3-more-collapsed .l3-more-item {
+    display: none !important;
+  }
+  #l3MoreToggleBtn {
+    background: var(--panel-2); color: var(--ink-dim);
+    border: 1px solid var(--rule); border-radius: 3px;
+    padding: 1px 8px; font-family: var(--mono); font-size: 10.5px;
+    cursor: pointer; margin-left: 6px;
+    white-space: nowrap; flex: 0 0 auto;
+  }
+  #l3MoreToggleBtn:hover { border-color: var(--ink-dim); color: var(--ink); }
+  /* When expanded, the toggle takes the accent color so the user knows
+     which state they're in — same convention as other .active buttons. */
+  #l3Panel:not(.l3-more-collapsed) #l3MoreToggleBtn {
+    background: var(--accent); color: #0e1116; border-color: var(--accent);
+    font-weight: 600;
+  }
   /* v4 turn 12a: scale-stability dropdowns + panel content */
   #l3Panel .l3-scale-sel {
     background: var(--panel-2); color: var(--ink);
@@ -4803,7 +4848,47 @@
            analysis (AS2+). The badge text reflects current state. -->
       <button id="activeSamplesBadge" class="atlas-tool-btn"
               title="Active samples — restrict K-means clustering and downstream contingency analyses to a subset of the cohort. Opens a modal with the full sample list. PC axes always reflect the full cohort.">active: —</button>
-      <!-- Server status badge appended dynamically by atlasServer init code. -->
+      <!-- Server status badge — turn 145 lifts this OUT of here.
+           See #atlasServerStandaloneBtn just below this folder. -->
+    </div>
+  </div>
+
+  <!-- turn 145 — Server status as its own top-bar button (lifted out of
+       the yellow `data` dropdown). One click opens a popup with the start
+       command + config snippet + recheck button. The popup HTML/wiring
+       lives in _atlasServerInitStandaloneBtn() further down the file. -->
+  <button id="atlasServerStandaloneBtn"
+          class="atlas-server-standalone"
+          type="button"
+          title="Atlas server status. Click for the start command and config path."
+          style="align-self: center; margin: 0 6px;
+                 background: #1c2231; color: #7a8398;
+                 border: 1px solid #2a3245; border-radius: 3px;
+                 padding: 4px 10px; font-family: var(--mono);
+                 font-size: 11px; cursor: pointer; line-height: 1; height: 26px;">
+    <span id="atlasServerStandaloneDot"
+          style="display: inline-block; width: 8px; height: 8px;
+                 border-radius: 50%; background: #6b7388; margin-right: 6px;
+                 vertical-align: middle;"></span><span id="atlasServerStandaloneLabel">server</span>
+  </button>
+  <!-- Popup overlay — hidden by default. Shown when the standalone button
+       is clicked. Built by _atlasServerInitStandaloneBtn at boot, but the
+       container lives here so it inherits the page's CSS variables. -->
+  <div id="atlasServerPopupOverlay"
+       style="display: none; position: fixed; top: 0; left: 0;
+              width: 100vw; height: 100vh; z-index: 9000;
+              background: rgba(0, 0, 0, 0.35); align-items: flex-start;
+              justify-content: center; padding-top: 60px;">
+    <div id="atlasServerPopup"
+         role="dialog"
+         aria-labelledby="atlasServerPopupTitle"
+         style="background: var(--panel, #1c2231); color: var(--ink, #d4dae6);
+                border: 1px solid var(--rule, #2a3245); border-radius: 6px;
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+                max-width: 560px; width: 92%; padding: 18px 22px;
+                font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+                font-size: 12px; line-height: 1.5;">
+      <!-- Body filled by _atlasServerRenderPopup -->
     </div>
   </div>
   <!-- v4 turn 73d: atlas selector — hover-expanding dropdown unifying all
@@ -6281,7 +6366,7 @@
          fixed/free modes. Drag adjusts --compact-l3h CSS variable. -->
     <div id="compactL3Resize" title="Drag to resize the L3 contingency tables panel · double-click to reset"></div>
 
-    <div class="panel" id="l3Panel">
+    <div class="panel l3-more-collapsed" id="l3Panel">
       <div id="l3Resize" title="Drag to resize · double-click to reset"></div>
       <div class="l3-head">
         <!-- v3.58: title doubles as a collapse-toggle. Clicking anywhere on
@@ -6300,13 +6385,13 @@
           <button data-layout="four">     ±2</button>
           <button data-layout="dual" disabled title="Pin a 2nd L2 first">Dual</button>
         </div>
-        <div class="l3-layout" id="l3ColorMode" style="margin-left: 12px;"
+        <div class="l3-layout l3-more-item" id="l3ColorMode" style="margin-left: 12px;"
              title="Pane coloring: shared (focal palette everywhere), unique (per-pane palettes), dual (fill=pane / ring=focal)">
           <button data-l3color="shared" class="active">shared colors</button>
           <button data-l3color="unique">unique/pane</button>
           <button data-l3color="dual">dual</button>
         </div>
-        <div class="l3-layout" id="l3KMode" style="margin-left: 12px;"
+        <div class="l3-layout l3-more-item" id="l3KMode" style="margin-left: 12px;"
              title="L3 K-means resolution. K=3 (default) gives a coarse INV/HET/REF-style geometric split. K=6 sub-resolves into nested haplotype-level clusters. ⚠ IMPORTANT — K-means bands are PROVISIONAL GEOMETRIC clusters, not biological regimes. Final regime calls (paper-level) require multi-evidence convergence: dosage (marker pattern), GHSL (haplotype divergence), heterozygosity, ROH/F_ROH (inbreeding/IBD confounder), and family/relatedness (kinship confounder). K=6 frequently represents nested substructure inside three major regimes — do NOT default to interpreting it as six biological regimes. See help → roadmap → 'Multi-evidence regime framework' for the planned mode switcher (v4.0).">
           <button data-l3k="k3" class="active"
                   title="K=3 — coarse geometric split, usually maps to {REF, HET, INV}-like bands. Provisional only; validate with dosage/GHSL/het/ROH/family before calling regimes.">K=3</button>
@@ -6324,7 +6409,7 @@
              dosage_chunks layer is missing (with a tooltip naming the layer).
              State: state.l3HetColoring (boolean, default false). Persisted
              to localStorage.pca_scrubber_v3.l3HetColoring. -->
-        <label id="l3HetToggleLabel" style="margin-left: 12px; display: flex;
+        <label id="l3HetToggleLabel" class="l3-more-item" style="margin-left: 12px; display: flex;
                                             align-items: center; gap: 4px;
                                             font-family: var(--mono); font-size: 10.5px;
                                             color: var(--ink-dim); cursor: pointer;
@@ -6346,7 +6431,7 @@
              Persisted to localStorage.pca_scrubber_v3.l2SweepEnabled.
              Per-chrom dismissed-set persisted under
              pca_scrubber_v3.l2SweepDismissed.<chrom>. -->
-        <label id="l2SweepToggleLabel" style="margin-left: 12px; display: flex;
+        <label id="l2SweepToggleLabel" class="l3-more-item" style="margin-left: 12px; display: flex;
                                               align-items: center; gap: 4px;
                                               font-family: var(--mono); font-size: 10.5px;
                                               color: var(--ink-dim); cursor: pointer;
@@ -6362,6 +6447,7 @@
              state.l2SweepResult — i.e. before the L2-sweep toggle is
              enabled, or before any chrom is loaded. -->
         <button id="l2SweepInspectBtn"
+                class="l3-more-item"
                 style="margin-left: 4px; background: transparent;
                        border: 1px solid var(--rule); color: var(--ink-dim);
                        padding: 1px 6px; cursor: pointer; font-family: var(--mono);
@@ -6379,18 +6465,17 @@
              will need a focused candidate; inheritance tab will need
              ≥2 confirmed candidates (Slices 2 + 3). -->
         <button id="gPanelOpenBtn"
+                class="l3-more-item"
                 style="margin-left: 12px; background: transparent;
                        border: 1px solid var(--rule); color: var(--ink-dim);
                        padding: 1px 6px; cursor: pointer; font-family: var(--mono);
                        font-size: 10.5px; border-radius: 3px;"
                 title="Open the unified groups popup — three tabs covering karyotype groups (per-candidate band membership), inheritance groups (cross-candidate Jaccard clusters), and manual groups (user-curated cohort splits). Hotkey: g. Slice 1 implements the manual tab; karyotype and inheritance ship in later slices.">G ▾</button>
-        <!-- v3.99 turn 6: hard line-break spacer. Forces the comparison-unit
-             group + b.continuity + per-button cluster onto a second row,
-             keeping the toolbar tight and never letting it grow beyond 2
-             lines on wide viewports. flex-basis:100% takes the full row,
-             height:0 means it's invisible vertically. -->
-        <div class="l3-head-break"
-             style="flex-basis: 100%; height: 0; margin: 0; padding: 0;"></div>
+        <!-- turn 147 — manual line-break removed. With the ⋯ more
+             disclosure collapsing the secondary controls by default,
+             the toolbar fits comfortably on one line; the previous
+             flex-basis:100% break was forcing a wasteful empty row.
+             flex-wrap: wrap on the parent still handles narrow viewports. -->
         <div class="l3-layout" id="l3CompareUnit" style="margin-left: 12px;"
              title="Comparison unit for L3 panes. L2 = whole envelopes (default). win1/5/10 = slabs of N windows centered on the scrubber. winN = user-defined slab size.">
           <button data-l3unit="L2"    class="active" title="Compare whole L2 envelopes (default)">L2</button>
@@ -6410,7 +6495,7 @@
              is 'carousel' (the 5-pane neighborhood); 'draft' uses the active
              candidate-mode draft (only enabled when one exists); 'chrom' is
              the whole-chromosome aggregate. -->
-        <div class="l3-layout" id="l3BcScope" style="margin-left: 12px;"
+        <div class="l3-layout l3-more-item" id="l3BcScope" style="margin-left: 12px;"
              title="Scope for the band-continuity metric in the focal L3 pane. carousel = 5-pane neighborhood (default). draft = the interval currently being assembled in candidate mode (only when building one). chrom = whole-chromosome aggregate.">
           <span class="dim" style="font-size: 9px; margin-right: 4px; align-self: center;">b.continuity:</span>
           <button data-l3bc="carousel" class="active" title="5-pane carousel neighborhood">carousel</button>
@@ -6425,12 +6510,12 @@
              the user pick each pane's unit independently (windows, SNP-bands,
              kb-bands, L1/L2/candidate envelopes). All math helpers shipped
              in turn 11; this row is the wiring + UI layer. -->
-        <div class="l3-layout" id="l3ScaleMode" style="margin-left: 12px;"
+        <div class="l3-layout l3-more-item" id="l3ScaleMode" style="margin-left: 12px;"
              title="Scale-stability test: same focal, three different zoom levels (fine / medium / coarse). Toggle ON to swap the L3 carousel from spatial neighbors to scale neighbors. Sankey + contingency between adjacent panes shows fuse/split structure. Verdict cascade: STABLE_3BAND / STABLE_6BAND / NESTED_3IN6 / OVERLAP_BREAKS_3 / UNSTABLE.">
           <button data-l3scale-toggle="off" class="active" title="Spatial-neighbor mode (default — existing L3 carousel)">⤢ off</button>
           <button data-l3scale-toggle="on" title="Scale-stability mode — three panes show fine / medium / coarse on the same focal window">⤢ scale</button>
         </div>
-        <div class="l3-layout" id="l3ScalePanes" style="margin-left: 12px; display: none;"
+        <div class="l3-layout l3-more-item" id="l3ScalePanes" style="margin-left: 12px; display: none;"
              title="Three scale dropdowns. Each pane picks its own unit independently. Defaults: 5w fine / L2 medium / candidate coarse (or L1 if no candidate active).">
           <span class="dim" style="font-size: 9px; margin-right: 4px; align-self: center;">Σ:</span>
           <select id="l3ScaleSel0" data-l3scale-pane="0" class="l3-scale-sel"></select>
@@ -6559,6 +6644,7 @@
              tracked samples can take many vertical lines when there are 20+
              on the watchlist. Persisted via localStorage. -->
         <button id="l3DetailedBtn"
+                class="l3-more-item"
                 title="Show detailed view: reveals the per-tracked-sample → group readout in the focal pane"
                 style="background: var(--panel-2); color: var(--ink-dim);
                        border: 1px solid var(--rule); border-radius: 3px;
@@ -6574,6 +6660,7 @@
              _applySpotlightHighlights re-applies (or removes) the cell
              classes. -->
         <button id="l3SpotlightTrackedBtn"
+                class="l3-more-item"
                 title="Show tracked: label every tracked sample in each L3 mini-PCA + light up their cells in the contingency tables. Click again to turn off."
                 style="background: var(--panel-2); color: var(--ink-dim);
                        border: 1px solid var(--rule); border-radius: 3px;
@@ -6581,13 +6668,14 @@
                        font-size: 10.5px; cursor: pointer;
                        margin-left: 8px; white-space: nowrap; flex: 0 0 auto;">⊕ show tracked</button>
         <button id="l3SpotlightClearBtn"
+                class="l3-more-item"
                 title="Clear the cross-pane sample spotlight (single-sample + tracked-all)."
                 style="background: var(--panel-2); color: var(--ink-dim);
                        border: 1px solid var(--rule); border-radius: 3px;
                        padding: 3px 10px; font-family: var(--mono);
                        font-size: 10.5px; cursor: pointer;
                        margin-left: 4px; white-space: nowrap; flex: 0 0 auto;">⊘ clear spot</button>
-        <button id="pinL2Btn" style="background: var(--panel-2); color: var(--ink-dim);
+        <button id="pinL2Btn" class="l3-more-item" style="background: var(--panel-2); color: var(--ink-dim);
                                        border: 1px solid var(--rule); border-radius: 3px;
                                        padding: 3px 10px; font-family: var(--mono);
                                        font-size: 10.5px; cursor: pointer;
@@ -6597,12 +6685,22 @@
              below the L3 contingency. Strip is hidden by default — only
              useful when dosage_chunks index is loaded. -->
         <button id="dhCursorToggleBtn"
+                class="l3-more-item"
                 title="Toggle live dosage heatmap (±5 windows around cursor). Requires dosage_chunks layer."
                 style="background: var(--panel-2); color: var(--ink-dim);
                        border: 1px solid var(--rule); border-radius: 3px;
                        padding: 3px 10px; font-family: var(--mono);
                        font-size: 10.5px; cursor: pointer;
                        margin-left: 6px; white-space: nowrap; flex: 0 0 auto;">▦ live dosage</button>
+        <!-- turn 147 — ⋯ more disclosure. Toggles the secondary
+             cluster of L3 controls (color / K-mode / het / L2-sweep /
+             G-panel / b.continuity / scale / detailed / spotlights /
+             pin / live dosage). Defaults collapsed; persists state to
+             localStorage 'pca_scrubber_v3.l3MoreExpanded'. The hidden
+             items keep their event listeners + state — only their
+             visibility changes. -->
+        <button id="l3MoreToggleBtn"
+                title="Show / hide secondary L3 controls (color, K-mode, het, L2-sweep, G-panel, band-continuity, scale-stability, detailed, spotlights, pin, live dosage). Hidden by default to keep the toolbar compact. Click to reveal — your choice persists.">⋯ more</button>
         <!-- v3.58: collapse button is position:sticky so it stays visible at
              the right edge even when the toolbar overflows horizontally. Without
              this, on narrow viewports the user could collapse the panel via the
@@ -7150,6 +7248,24 @@
         <button id="catExportGallerySVG" class="export export-fmt" title="Export gallery as SVG (vector format, infinitely scalable, journal-preferred). The SVG file is the source of truth for the PNG and PDF exports too.">SVG</button>
         <button id="catExportGalleryPNG" class="export export-fmt" title="Export gallery as PNG raster image at ~300 DPI equivalent (rasterized from the SVG via HTML5 Canvas at 4× scale). Use when a journal demands raster.">PNG</button>
         <button id="catExportGalleryPDF" class="export export-fmt" title="Export gallery as PDF via the browser's print-to-PDF flow. Opens a new window with the SVG sized to A4 landscape; press Ctrl/Cmd+P then choose 'Save as PDF'. Browsers handle font rendering natively, producing high-quality vector PDF.">PDF</button>
+      </span>
+      <!-- turn 146 (Turn D) — bulk breeding-card export. Two formats:
+           HTML (single combined doc, paginated A4, browse-or-print),
+           JSON (per-card data envelope for downstream pipelines). The
+           tier dropdown gates which candidates land in the bundle;
+           default Tier 1+2 = "breeding-ready set". -->
+      <span class="export-group" title="Bulk breeding-readiness card export. One card per candidate, gated by the tier dropdown. HTML = combined doc (one card per A4 page, browse or Ctrl+P → Save as PDF). JSON = bundle of card data envelopes (per-candidate _buildBreedingCard output, for downstream tooling).">
+        <span class="export-group-label">🧬 breeding cards</span>
+        <select id="catBreedingTierSel" class="export export-fmt"
+                title="Which tiers to include in the export. Tier 1+2 (default) is the breeding-ready set — Tier 3/4 are exploratory and not for direct breeding decisions."
+                style="min-width: 78px;">
+          <option value="tier_1_2" selected>Tier 1+2</option>
+          <option value="tier_1">Tier 1 only</option>
+          <option value="tier_1_2_3">Tier 1+2+3</option>
+          <option value="all">all tiers</option>
+        </select>
+        <button id="catExportBreedingHTML" class="export export-fmt" title="Combined HTML document (one card per A4 page, with a table-of-contents page first). Open in a browser to scroll, or Ctrl/Cmd+P → Save as PDF for distribution.">HTML</button>
+        <button id="catExportBreedingJSON" class="export export-fmt" title="JSON bundle — { schema, generated_at, chrom, n_cards, filter, cards: [...] }. Each card entry is the exact _buildBreedingCard output. Round-trippable for downstream pipelines.">JSON</button>
       </span>
       <span class="sel-info" id="catSelInfo" title="Live counts of selected rows / visible rows / total rows in the catalogue.">0 selected of 0</span>
     </div>
@@ -7980,6 +8096,191 @@
         <tr><td><b>16 help</b></td><td>This page.</td></tr>
         <tr><td><b>17 focal-vs-bg widget</b></td><td>Spalax-style focal-vs-background distribution comparison. Renders on page 11 (boundaries — focal = candidate scan range, radius shared with the parent toolbar) and page 16 (cross-species — focal = breakpoint &plusmn;2 Mb, independent radius). Wilcoxon rank-sum P value (live, in-browser, normal approximation w/ continuity correction). Metric pool auto-discovers from loaded layers: |Z| (always available, from the cohort precomp), F_ST/Hobs/&theta;&pi; (when popstats live server is hooked up), tRNA_all / rRNA_all / rRNA_5S / ncRNA_all (when the ncRNA density layer is loaded), all_TE (when the repeat-density layer is loaded). Z-transform toggle on by default. Bg scope: per-chrom (default) or genome-wide-excl-focal. View mode: full or zoomed-to-scan-range. <b>Note:</b> on page 16, the metric values come from the 226-fish cohort (single haplotype), <i>not</i> from cross-species data &mdash; so &lsquo;|Z|&rsquo; here means &ldquo;cohort divergence at this position&rdquo;, not &ldquo;cross-species divergence&rdquo;. The widget hides with a hint when the active breakpoint&rsquo;s <code>gar_chr</code> doesn&rsquo;t match the cohort chrom currently loaded on page 1.</td></tr>
       </table>
+
+      <h4 id="tutorials-section">Tutorials</h4>
+      <!-- turn 144 — placeholder section for guided walkthroughs.
+           Same UX pattern as the "30 seconds to figure 3" tutorial in
+           the diversity atlas: each card is clickable, opens a step-by-
+           step walkthrough overlay. None of these are wired yet — the
+           cards render as `coming soon` stubs. When a tutorial is
+           authored, swap its data-status from `pending` to `available`
+           and wire its data-tutorial-id to the launcher (separate slice).
+           Quentin: tell me which CLI / atlas tutorials to author and in
+           what order; this section is the catalogue stub. -->
+      <details open>
+        <summary style="cursor: pointer; padding: 4px 0; color: var(--ink); font-size: 11px; font-weight: 600;">
+          Guided walkthroughs (click a card to launch — currently placeholders)
+        </summary>
+        <div style="margin: 10px 0 6px 4px; color: var(--ink-dim); font-size: 11px; line-height: 1.6;">
+          <p style="margin: 0 0 10px 0;">
+            Short clickable walkthroughs that take you from a clean atlas
+            load to a specific deliverable in a few steps. Each tutorial
+            is self-contained — it tells you which JSON to load, which
+            buttons to press, and what to look for at each step. Same UX
+            as the <i>30 seconds to figure 3</i> tutorial in the diversity
+            atlas.
+          </p>
+
+          <div id="tutorialsGrid"
+               style="display: grid;
+                      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+                      gap: 10px; margin: 4px 0 12px;">
+
+            <!-- Atlas walkthroughs -->
+            <div class="tutorial-card" data-tutorial-id="discover_first_inversion"
+                 data-status="pending"
+                 title="Coming soon — guided walkthrough"
+                 style="border: 1px solid var(--rule); border-radius: 4px;
+                        padding: 10px 12px; background: var(--panel-2);
+                        cursor: not-allowed; opacity: 0.85;">
+              <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px;">
+                <b style="font-size: 11.5px; color: var(--ink);">Discover your first inversion</b>
+                <span style="font-size: 9.5px; padding: 1px 6px; border-radius: 2px;
+                             background: var(--panel-3); color: var(--ink-dimmer);
+                             font-family: var(--mono);">coming soon</span>
+              </div>
+              <div style="font-size: 10.5px; margin-top: 4px;">
+                Load a chrom JSON → scrub to the cleanest 3-band PCA → lock K=3 colors → promote.
+                The minimum-viable end-to-end loop.
+              </div>
+            </div>
+
+            <div class="tutorial-card" data-tutorial-id="boundary_refinement"
+                 data-status="pending"
+                 title="Coming soon — guided walkthrough"
+                 style="border: 1px solid var(--rule); border-radius: 4px;
+                        padding: 10px 12px; background: var(--panel-2);
+                        cursor: not-allowed; opacity: 0.85;">
+              <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px;">
+                <b style="font-size: 11.5px; color: var(--ink);">Refine boundaries (page 4)</b>
+                <span style="font-size: 9.5px; padding: 1px 6px; border-radius: 2px;
+                             background: var(--panel-3); color: var(--ink-dimmer);
+                             font-family: var(--mono);">coming soon</span>
+              </div>
+              <div style="font-size: 10.5px; margin-top: 4px;">
+                Promoted candidate → boundary refinement page → SV anchors + flanking PC1 → commit edits.
+              </div>
+            </div>
+
+            <div class="tutorial-card" data-tutorial-id="breeding_card"
+                 data-status="pending"
+                 title="Coming soon — guided walkthrough"
+                 style="border: 1px solid var(--rule); border-radius: 4px;
+                        padding: 10px 12px; background: var(--panel-2);
+                        cursor: not-allowed; opacity: 0.85;">
+              <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px;">
+                <b style="font-size: 11.5px; color: var(--ink);">Print a breeding-readiness card</b>
+                <span style="font-size: 9.5px; padding: 1px 6px; border-radius: 2px;
+                             background: var(--panel-3); color: var(--ink-dimmer);
+                             font-family: var(--mono);">coming soon</span>
+              </div>
+              <div style="font-size: 10.5px; margin-top: 4px;">
+                Promoted candidate → page 7 karyotype → 🧬 print breeding card → save as PDF.
+                Per-arrangement F<sub>ROH</sub>, K=8 ancestry, pairing advice.
+              </div>
+            </div>
+
+            <div class="tutorial-card" data-tutorial-id="manuscript_bundle"
+                 data-status="pending"
+                 title="Coming soon — guided walkthrough"
+                 style="border: 1px solid var(--rule); border-radius: 4px;
+                        padding: 10px 12px; background: var(--panel-2);
+                        cursor: not-allowed; opacity: 0.85;">
+              <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px;">
+                <b style="font-size: 11.5px; color: var(--ink);">Export a manuscript bundle</b>
+                <span style="font-size: 9.5px; padding: 1px 6px; border-radius: 2px;
+                             background: var(--panel-3); color: var(--ink-dimmer);
+                             font-family: var(--mono);">coming soon</span>
+              </div>
+              <div style="font-size: 10.5px; margin-top: 4px;">
+                Page 5 catalogue → 📝 manuscript bundle → ready-to-paste Methods + Results Markdown + TSV.
+              </div>
+            </div>
+
+            <!-- Command-line / pipeline walkthroughs -->
+            <div class="tutorial-card" data-tutorial-id="cli_inversion_toolkit"
+                 data-status="pending"
+                 title="Coming soon — command-line walkthrough"
+                 style="border: 1px solid var(--rule); border-radius: 4px;
+                        padding: 10px 12px; background: var(--panel-2);
+                        cursor: not-allowed; opacity: 0.85;">
+              <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px;">
+                <b style="font-size: 11.5px; color: var(--ink);">CLI · inversion-popgen-toolkit</b>
+                <span style="font-size: 9.5px; padding: 1px 6px; border-radius: 2px;
+                             background: var(--panel-3); color: var(--ink-dimmer);
+                             font-family: var(--mono);">coming soon</span>
+              </div>
+              <div style="font-size: 10.5px; margin-top: 4px;">
+                LANTA: end-to-end run on one chromosome — local PCA → MDS of θπ → contingency catalogue.
+              </div>
+            </div>
+
+            <div class="tutorial-card" data-tutorial-id="cli_te_density"
+                 data-status="pending"
+                 title="Coming soon — command-line walkthrough"
+                 style="border: 1px solid var(--rule); border-radius: 4px;
+                        padding: 10px 12px; background: var(--panel-2);
+                        cursor: not-allowed; opacity: 0.85;">
+              <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px;">
+                <b style="font-size: 11.5px; color: var(--ink);">CLI · TE density (RD)</b>
+                <span style="font-size: 9.5px; padding: 1px 6px; border-radius: 2px;
+                             background: var(--panel-3); color: var(--ink-dimmer);
+                             font-family: var(--mono);">coming soon</span>
+              </div>
+              <div style="font-size: 10.5px; margin-top: 4px;">
+                <code>RUN_RD_TE_FULL_BOTH_SPECIES.sh</code> — both haplotypes,
+                R aggregation, atlas-ready JSON.
+              </div>
+            </div>
+
+            <div class="tutorial-card" data-tutorial-id="cli_step_d17_boundary"
+                 data-status="pending"
+                 title="Coming soon — command-line walkthrough"
+                 style="border: 1px solid var(--rule); border-radius: 4px;
+                        padding: 10px 12px; background: var(--panel-2);
+                        cursor: not-allowed; opacity: 0.85;">
+              <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px;">
+                <b style="font-size: 11.5px; color: var(--ink);">CLI · STEP_D17 boundary scan</b>
+                <span style="font-size: 9.5px; padding: 1px 6px; border-radius: 2px;
+                             background: var(--panel-3); color: var(--ink-dimmer);
+                             font-family: var(--mono);">coming soon</span>
+              </div>
+              <div style="font-size: 10.5px; margin-top: 4px;">
+                L1/L2 boundary-scan pipeline. L3 contingency-table validation queued
+                as the next step.
+              </div>
+            </div>
+
+            <div class="tutorial-card" data-tutorial-id="cli_module_2b_popstruct"
+                 data-status="pending"
+                 title="Coming soon — command-line walkthrough"
+                 style="border: 1px solid var(--rule); border-radius: 4px;
+                        padding: 10px 12px; background: var(--panel-2);
+                        cursor: not-allowed; opacity: 0.85;">
+              <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px;">
+                <b style="font-size: 11.5px; color: var(--ink);">CLI · MODULE_2B population structure</b>
+                <span style="font-size: 9.5px; padding: 1px 6px; border-radius: 2px;
+                             background: var(--panel-3); color: var(--ink-dimmer);
+                             font-family: var(--mono);">coming soon</span>
+              </div>
+              <div style="font-size: 10.5px; margin-top: 4px;">
+                NGSadmix K=2–20 → PCAngsd → evalAdmix → ngsRelate → NAToRA pruning to 81 unrelated.
+              </div>
+            </div>
+
+          </div>
+
+          <p style="margin: 8px 0 0 0; color: var(--ink-dimmer); font-size: 10.5px;">
+            <i>Authoring note:</i> tutorials follow the <i>30 seconds to
+            figure 3</i> pattern from the diversity atlas — clickable card
+            opens a step-by-step overlay with screenshots, button-press
+            highlights, and "what to look for" callouts at each step. To
+            add a new tutorial, add a card here, set <code>data-status="available"</code>
+            and wire <code>data-tutorial-id</code> to the launcher
+            (planned, separate slice).
+          </p>
+        </div>
+      </details>
 
       <h4 id="hotkeys-section">Hotkeys / tutorial</h4>
       <details open>
@@ -10538,11 +10839,72 @@ function _getOrComputeUVRotation(l2idx) {
     return fail;
   }
 
+  // turn 150: window aggregation extracted to _aggregateWindowRangeForUV so
+  // both L2 and slab paths share it. The (k3 → axis → rotation) phase is
+  // further extracted to _computeUVRotationCore so all five U/V clusterers
+  // can run on either L2 or slab rotations without code duplication.
+  const agg = _aggregateWindowRangeForUV(env._s0, env._e0);
+  const result = _computeUVRotationCore(agg.xs, agg.ys, d.n_samples);
+  state.l2UVRotationCache.set(l2idx, result);
+  return result;
+}
+
+// =============================================================================
+// turn 150 — Slab UV rotation cache and shared rotation core
+// -----------------------------------------------------------------------------
+// Mirrors _getOrComputeUVRotation but keyed on slab range [s, e] instead of
+// L2 envelope index. Each L2 envelope has ONE rotation cache entry; each slab
+// range gets its own. Cache invalidates on the same data-identity boundary
+// as the L2 cache.
+//
+// Used by getSlabClusterByMode → clusterSlab_UV* to enable the recluster
+// dropdown's U/V modes for slab compare units (1w / 5w / 10w / Nw). Before
+// this, slab compare fell back to kmeans-K3 with a visible "fallback" notice
+// (turn 149); after this, the U/V dropdown options work against slab ranges.
+function _getOrComputeUVRotationSlab(s, e) {
+  if (!state.slabUVRotationCache) state.slabUVRotationCache = new Map();
+  const dataKey = state.data ? state.data.chrom + '|' + state.data.n_windows : '';
+  if (state._slabUVRotationCacheDataKey !== dataKey) {
+    state.slabUVRotationCache = new Map();
+    state._slabUVRotationCacheDataKey = dataKey;
+  }
+  const d = state.data;
+  if (!d) return { ok: false, reason: 'NO_DATA' };
+  if (s == null || e == null || s < 0 || e >= d.n_windows || s > e) {
+    return { ok: false, reason: 'BAD_RANGE' };
+  }
+  const cacheKey = `${s}_${e}`;
+  if (state.slabUVRotationCache.has(cacheKey)) {
+    return state.slabUVRotationCache.get(cacheKey);
+  }
+  const agg = _aggregateWindowRangeForUV(s, e);
+  if (!agg) {
+    const fail = { ok: false, reason: 'NO_WINDOWS' };
+    state.slabUVRotationCache.set(cacheKey, fail);
+    return fail;
+  }
+  const result = _computeUVRotationCore(agg.xs, agg.ys, d.n_samples);
+  state.slabUVRotationCache.set(cacheKey, result);
+  return result;
+}
+
+// Phase 1 of UV rotation: aggregate per-sample mean (PC1*sign, PC2) across
+// windows [s, e] inclusive. Always uses MEAN regardless of state.aggMethod —
+// the L2 rotation pipeline historically uses mean unconditionally (the rotation
+// math doesn't need the median variant; means are stable enough for the
+// principal-axis fit). Slabs keep that convention.
+//
+// Returns { xs, ys } typed arrays of length n_samples, or null if range is empty.
+function _aggregateWindowRangeForUV(s, e) {
+  const d = state.data;
+  if (!d) return null;
+  const nW = e - s + 1;
+  if (nW < 1) return null;
   const nS = d.n_samples;
   const xs = new Float64Array(nS);
   const ys = new Float64Array(nS);
   for (let w = 0; w < nW; w++) {
-    const { pc1, pc2, sign } = getPC(env._s0 + w);
+    const { pc1, pc2, sign } = getPC(s + w);
     for (let si = 0; si < nS; si++) {
       xs[si] += pc1[si] * sign;
       ys[si] += pc2[si];
@@ -10552,14 +10914,18 @@ function _getOrComputeUVRotation(l2idx) {
     xs[si] /= nW;
     ys[si] /= nW;
   }
+  return { xs, ys };
+}
 
+// Phase 2 of UV rotation: K-means3 on aggregated (xs, ys) → axis from
+// centroid[0] to centroid[2] → rotate to (u, v). Returns the same shape the
+// L2 rotation cache used to return directly. Both L2 and slab paths share
+// this exactly.
+function _computeUVRotationCore(xs, ys, nS) {
   const k3 = kmeans2D(xs, ys, 3);
   if (!k3 || !k3.cx || !k3.cy || k3.cx.length !== 3) {
-    const fail = { ok: false, reason: 'KMEANS_FAILED' };
-    state.l2UVRotationCache.set(l2idx, fail);
-    return fail;
+    return { ok: false, reason: 'KMEANS_FAILED' };
   }
-
   const dx = k3.cx[2] - k3.cx[0];
   const dy = k3.cy[2] - k3.cy[0];
   const axisLen2 = dx * dx + dy * dy;
@@ -10575,7 +10941,7 @@ function _getOrComputeUVRotation(l2idx) {
     vs[si] = -px * sin_a + py * cos_a;
   }
 
-  // Rotate centroids too (cheap, lets distance-to-Het modes skip recomputing)
+  // Rotate centroids too (cheap; lets distance-to-Het modes skip recomputing)
   const hom1_u =  k3.cx[0] * cos_a + k3.cy[0] * sin_a;
   const hom1_v = -k3.cx[0] * sin_a + k3.cy[0] * cos_a;
   const het_u  =  k3.cx[1] * cos_a + k3.cy[1] * sin_a;
@@ -10583,7 +10949,7 @@ function _getOrComputeUVRotation(l2idx) {
   const hom2_u =  k3.cx[2] * cos_a + k3.cy[2] * sin_a;
   const hom2_v = -k3.cx[2] * sin_a + k3.cy[2] * cos_a;
 
-  const cache = {
+  return {
     ok: true,
     xs, ys, us, vs,
     angle: angle * 180 / Math.PI,
@@ -10591,12 +10957,10 @@ function _getOrComputeUVRotation(l2idx) {
     het_x:  k3.cx[1], het_y:  k3.cy[1],
     hom2_x: k3.cx[2], hom2_y: k3.cy[2],
     hom1_u, hom1_v, het_u, het_v, hom2_u, hom2_v,
-    baseLabels: k3.labels,    // raw-space K=3 labels
+    baseLabels: k3.labels,
     baseN: k3.n_per_group.slice(),
     degenerate: axisLen2 <= 0,
   };
-  state.l2UVRotationCache.set(l2idx, cache);
-  return cache;
 }
 
 // =============================================================================
@@ -10730,6 +11094,19 @@ function _kDistAutoEps(pointsObj, k) {
 // are dragging the centroids.
 function clusterL2_UVDenoise(l2idx) {
   const rot = _getOrComputeUVRotation(l2idx);
+  return _clusterFromRotation_UVDenoise(rot);
+}
+
+// turn 150: slab variant — same algorithm, slab-keyed rotation cache.
+function clusterSlab_UVDenoise(s, e) {
+  const rot = _getOrComputeUVRotationSlab(s, e);
+  return _clusterFromRotation_UVDenoise(rot);
+}
+
+// Phase 3 (post-rotation) for uv-denoise mode. Takes a rotation result; runs
+// DBSCAN as a noise pre-filter, then K-means3 on survivors, then assigns noise
+// samples to the nearest centroid for K=3 contingency.
+function _clusterFromRotation_UVDenoise(rot) {
   if (!rot.ok) return { ok: false, reason: rot.reason };
   const nS = rot.us.length;
 
@@ -10743,7 +11120,7 @@ function clusterL2_UVDenoise(l2idx) {
   if (!isFinite(eps) || eps <= 0) {
     // Fall back to plain rotated K-means3
     const result = kmeans2D(rot.us, rot.vs, 3);
-    return _wrapKmeansResultAsCluster(result, l2idx, 3, 'UVDenoise-fallback-no-eps');
+    return _wrapKmeansResultAsCluster(result, null, 3, 'UVDenoise-fallback-no-eps');
   }
   const minPts = Math.max(3, Math.floor(nS * 0.08));
   const dbLabels = _dbscan(ptsObj, eps, minPts);
@@ -10754,7 +11131,7 @@ function clusterL2_UVDenoise(l2idx) {
   if (nonNoiseIdx.length < 9) {   // 3 per group minimum
     // Too few survivors — fall back to plain rotated K-means3
     const result = kmeans2D(rot.us, rot.vs, 3);
-    return _wrapKmeansResultAsCluster(result, l2idx, 3, 'UVDenoise-fallback-too-few-survivors');
+    return _wrapKmeansResultAsCluster(result, null, 3, 'UVDenoise-fallback-too-few-survivors');
   }
   const sub_us = new Float64Array(nonNoiseIdx.length);
   const sub_vs = new Float64Array(nonNoiseIdx.length);
@@ -10788,7 +11165,7 @@ function clusterL2_UVDenoise(l2idx) {
     }
   }
 
-  return _wrapKmeansResultAsCluster({ labels, n_per_group: npg }, l2idx, 3, null);
+  return _wrapKmeansResultAsCluster({ labels, n_per_group: npg }, null, 3, null);
 }
 
 // =============================================================================
@@ -10815,6 +11192,17 @@ function clusterL2_UVDenoise(l2idx) {
 // off-diagonal mass that wasn't there in plain rotated K-means3.
 function clusterL2_UVDBSCAN(l2idx) {
   const rot = _getOrComputeUVRotation(l2idx);
+  return _clusterFromRotation_UVDBSCAN(rot);
+}
+
+// turn 150: slab variant — same algorithm, slab-keyed rotation cache.
+function clusterSlab_UVDBSCAN(s, e) {
+  const rot = _getOrComputeUVRotationSlab(s, e);
+  return _clusterFromRotation_UVDBSCAN(rot);
+}
+
+// Phase 3 (post-rotation) for uv-dbscan mode.
+function _clusterFromRotation_UVDBSCAN(rot) {
   if (!rot.ok) return { ok: false, reason: rot.reason };
   const nS = rot.us.length;
 
@@ -10881,7 +11269,7 @@ function clusterL2_UVDBSCAN(l2idx) {
     }
   }
 
-  return _wrapKmeansResultAsCluster({ labels, n_per_group: npg }, l2idx, 3, null);
+  return _wrapKmeansResultAsCluster({ labels, n_per_group: npg }, null, 3, null);
 }
 
 // =============================================================================
@@ -10911,6 +11299,17 @@ function clusterL2_UVDBSCAN(l2idx) {
 // the Het cell of the contingency, signaling intermediate behavior.
 function clusterL2_UVDistRank(l2idx) {
   const rot = _getOrComputeUVRotation(l2idx);
+  return _clusterFromRotation_UVDistRank(rot);
+}
+
+// turn 150: slab variant — same algorithm, slab-keyed rotation cache.
+function clusterSlab_UVDistRank(s, e) {
+  const rot = _getOrComputeUVRotationSlab(s, e);
+  return _clusterFromRotation_UVDistRank(rot);
+}
+
+// Phase 3 (post-rotation) for uv-dist-rank mode.
+function _clusterFromRotation_UVDistRank(rot) {
   if (!rot.ok) return { ok: false, reason: rot.reason };
   const nS = rot.us.length;
 
@@ -10946,7 +11345,7 @@ function clusterL2_UVDistRank(l2idx) {
     for (let i = tercile; i < idx.length; i++) { labels[idx[i]] = g; npg[g]++; }
   }
 
-  return _wrapKmeansResultAsCluster({ labels, n_per_group: npg }, l2idx, 3, null);
+  return _wrapKmeansResultAsCluster({ labels, n_per_group: npg }, null, 3, null);
 }
 
 // =============================================================================
@@ -10972,6 +11371,17 @@ function clusterL2_UVDistRank(l2idx) {
 // contingency table".
 function clusterL2_UVDistFuzzy(l2idx) {
   const rot = _getOrComputeUVRotation(l2idx);
+  return _clusterFromRotation_UVDistFuzzy(rot);
+}
+
+// turn 150: slab variant — same algorithm, slab-keyed rotation cache.
+function clusterSlab_UVDistFuzzy(s, e) {
+  const rot = _getOrComputeUVRotationSlab(s, e);
+  return _clusterFromRotation_UVDistFuzzy(rot);
+}
+
+// Phase 3 (post-rotation) for uv-dist-fuzzy mode.
+function _clusterFromRotation_UVDistFuzzy(rot) {
   if (!rot.ok) return { ok: false, reason: rot.reason };
   const nS = rot.us.length;
   const eps_inv = 1e-9;
@@ -11008,7 +11418,7 @@ function clusterL2_UVDistFuzzy(l2idx) {
     npg[best]++;
   }
 
-  return _wrapKmeansResultAsCluster({ labels, n_per_group: npg }, l2idx, 3, null);
+  return _wrapKmeansResultAsCluster({ labels, n_per_group: npg }, null, 3, null);
 }
 
 // =============================================================================
@@ -11027,16 +11437,29 @@ function clusterL2_UVDistFuzzy(l2idx) {
 
 function clusterL2_UVRotated(l2idx) {
   const rot = _getOrComputeUVRotation(l2idx);
+  return _clusterFromRotation_UVRotated(rot);
+}
+
+// turn 150: slab variant — same algorithm, slab-keyed rotation cache.
+function clusterSlab_UVRotated(s, e) {
+  const rot = _getOrComputeUVRotationSlab(s, e);
+  return _clusterFromRotation_UVRotated(rot);
+}
+
+// Phase 3 (post-rotation) for uv-rotated mode. Takes a rotation result from
+// either _getOrComputeUVRotation or _getOrComputeUVRotationSlab; returns the
+// final cluster shape.
+function _clusterFromRotation_UVRotated(rot) {
   if (!rot.ok) return { ok: false, reason: rot.reason };
   if (rot.degenerate) {
     // All centroids coincide — fall back to raw-space K-means3.
     return _wrapKmeansResultAsCluster(
       { labels: rot.baseLabels, n_per_group: rot.baseN },
-      l2idx, 3, 'UVRotated-degenerate-fallback'
+      null, 3, 'UVRotated-degenerate-fallback'
     );
   }
   const result = kmeans2D(rot.us, rot.vs, 3);
-  return _wrapKmeansResultAsCluster(result, l2idx, 3, null);
+  return _wrapKmeansResultAsCluster(result, null, 3, null);
 }
 
 // Helper: wrap a kmeans1D/2D result in the cluster shape that
@@ -11411,6 +11834,66 @@ function getSlabClusterAt(s, e, K) {
   const r = clusterSlabAtK(s, e, K);
   state.slabGroupCache.set(k, r);
   return r;
+}
+
+// =============================================================================
+// turn 150 — getSlabClusterByMode: dispatcher mirroring getL2ClusterByMode
+// -----------------------------------------------------------------------------
+// Routes a (slab range, mode) request to the appropriate slab clusterer.
+// Used by compareSlabPair_byMode to enable the recluster dropdown's full
+// menu in slab compare mode (1w / 5w / 10w / Nw). Cache strategy: per-mode
+// caching via state.slabGroupCacheByMode, invalidates on data identity
+// boundary same as state.slabGroupCache.
+function getSlabClusterByMode(s, e, mode) {
+  // 'kmeans-K3' = current default behavior. Just route to existing
+  // getSlabClusterAt at state.k.
+  if (!mode || mode === 'kmeans-K3') {
+    return getSlabClusterAt(s, e, state.k);
+  }
+  // 'kmeans-K6' — route to existing per-K cache at K=6.
+  if (mode === 'kmeans-K6') {
+    return getSlabClusterAt(s, e, 6);
+  }
+
+  // Modes with their own cache. All five U/V modes plug in here.
+  if (!state.slabGroupCacheByMode) state.slabGroupCacheByMode = new Map();
+  const dataKey = state.data ? state.data.chrom + '|' + state.data.n_windows : '';
+  if (state._slabGroupCacheByModeDataKey !== dataKey) {
+    state.slabGroupCacheByMode = new Map();
+    state._slabGroupCacheByModeDataKey = dataKey;
+  }
+  const cacheKey = `${s}_${e}_${mode}`;
+  if (state.slabGroupCacheByMode.has(cacheKey)) {
+    return state.slabGroupCacheByMode.get(cacheKey);
+  }
+
+  let result;
+  switch (mode) {
+    case 'distance-uv':           // backwards-compat alias for uv-rotated
+    case 'uv-rotated':
+      result = clusterSlab_UVRotated(s, e);
+      break;
+    case 'uv-denoise':
+      result = clusterSlab_UVDenoise(s, e);
+      break;
+    case 'uv-dbscan':
+      result = clusterSlab_UVDBSCAN(s, e);
+      break;
+    case 'uv-dist-rank':
+      result = clusterSlab_UVDistRank(s, e);
+      break;
+    case 'uv-dist-fuzzy':
+      result = clusterSlab_UVDistFuzzy(s, e);
+      break;
+    default:
+      // Unknown / disabled mode (gmm-3/4/5/6, dosage, etc.) — fall back to
+      // kmeans-K3 default. Defensive: the UI disables these modes via
+      // <option disabled>, but state can carry stale values from
+      // localStorage when modes are removed.
+      result = getSlabClusterAt(s, e, state.k);
+  }
+  state.slabGroupCacheByMode.set(cacheKey, result);
+  return result;
 }
 
 // Helper: resolve state.compareUnit → halfW (windows on each side of center).
@@ -14310,6 +14793,110 @@ function compareSlabPair(leftRange, rightRange, K) {
     cl_npg: cl.n_per_group, cr_npg: cr.n_per_group,
     cl_usedK: K, cr_usedK: K,
     isSlabPair: true,
+  };
+}
+
+// =============================================================================
+// turn 149 — compareSlabPair_byMode: recluster-aware compare for slab mode
+// -----------------------------------------------------------------------------
+// Closes the gap turn 148 introduced by exposing the per-pane recluster
+// dropdown in slab mode without honoring it (slab compare silently used
+// kmeans-K3 regardless of state.l3ReclusterMode).
+//
+// Coverage today:
+//   - kmeans-K3 → compareSlabPair(left, right, state.k)   [usually 3]
+//   - kmeans-K6 → compareSlabPair(left, right, 6)
+//   - U/V modes (uv-rotated, uv-denoise, uv-dbscan, uv-dist-rank,
+//     uv-dist-fuzzy, distance-uv) → fall back to kmeans-K3 with a
+//     `fellBack: true` flag and `reclusterMode: 'kmeans-K3'`. The renderer
+//     reads the discrepancy between requested and actual mode to surface a
+//     notice. Honest degradation rather than silent ignore.
+//
+// Why U/V modes don't yet work for slabs: the L2 implementations build
+// per-sample (u, v) coordinates by aggregating ALL windows of an L2
+// envelope (via _getOrComputeUVRotation reading env._s0..env._e0) and
+// running K-means3-for-centroids → principal-axis rotation → U/V
+// projection. Porting this to slabs would require a slab-aware rotation
+// cache + slab-keyed variants of all five clusterers, ~250 LOC. This is
+// queued but not in scope for the parity follow-up.
+function compareSlabPair_byMode(leftRange, rightRange, mode) {
+  if (!leftRange || !rightRange) return null;
+  const m = mode || 'kmeans-K3';
+  // turn 150: U/V modes are no longer faked with a kmeans-K3 fallback. The
+  // shared rotation core (_computeUVRotationCore) + slab rotation cache
+  // (_getOrComputeUVRotationSlab) + per-mode slab clusterers now run the
+  // actual U/V algorithm on slab ranges. For backward compat with renderers
+  // that read cmp.fellBack, we keep emitting the field — it's now always
+  // false unless we hit an unknown future mode that genuinely degrades.
+  //
+  // K depends on mode (mirrors compareL2Pair_byMode):
+  //   - kmeans-K6 → K=6
+  //   - all others (kmeans-K3, U/V modes, defaults) → K=state.k
+  const K = (m === 'kmeans-K6') ? 6 : state.k;
+  const requestedMode = m;
+  let fellBack = false;
+
+  // Direct kmeans paths route to compareSlabPair as before — same path, no
+  // by-mode dispatch needed (kmeans-K3 / kmeans-K6 are getSlabClusterAt-
+  // backed and the alignment math is identical).
+  if (m === 'kmeans-K3' || !m || m === 'kmeans-K6') {
+    const cmp = compareSlabPair(leftRange, rightRange, K);
+    if (!cmp) return null;
+    cmp.reclusterMode = m || 'kmeans-K3';
+    cmp.requestedMode = requestedMode;
+    cmp.fellBack = false;
+    return cmp;
+  }
+
+  // U/V modes — fetch via getSlabClusterByMode (slab rotation cache + slab
+  // clusterer), then align labels and build the contingency the same way
+  // compareSlabPair does.
+  const cl = getSlabClusterByMode(leftRange[0],  leftRange[1],  m);
+  const cr = getSlabClusterByMode(rightRange[0], rightRange[1], m);
+  if (!cl || !cr || !cl.labels || !cr.labels) {
+    // Genuine failure (e.g. KMEANS_FAILED in rotation, BAD_RANGE) — fall back
+    // to kmeans-K3 with fellBack:true so the renderer can surface a notice.
+    const cmpFb = compareSlabPair(leftRange, rightRange, state.k);
+    if (!cmpFb) return null;
+    cmpFb.reclusterMode = 'kmeans-K3';
+    cmpFb.requestedMode = requestedMode;
+    cmpFb.fellBack = true;
+    return cmpFb;
+  }
+  const llab = cl.fixedKLabels || cl.labels;
+  const rlab = cr.fixedKLabels || cr.labels;
+  const align = alignLabels(llab, rlab, K);
+  let p_value, test_kind;
+  if (K === 2) {
+    p_value = fisher2x2(align.table);
+    test_kind = 'fisher_2x2';
+  } else {
+    const cs = chiSquare(align.table, K);
+    p_value = cs.p_approx;
+    test_kind = 'chi2_' + K + 'x' + K;
+  }
+  let verdict;
+  if (!cl.ok || !cr.ok) verdict = 'LOW_POWER';
+  else if (align.concord >= state.mergeThr) verdict = 'MERGE';
+  else verdict = 'SEPARATE';
+  return {
+    leftIdx: null, rightIdx: null,
+    leftRange, rightRange,
+    K,
+    table: align.table,
+    perm: align.perm,
+    concord: align.concord,
+    p_value,
+    test_kind,
+    verdict,
+    cl_ok: cl.ok, cr_ok: cr.ok,
+    cl_reason: cl.reason, cr_reason: cr.reason,
+    cl_npg: cl.n_per_group, cr_npg: cr.n_per_group,
+    cl_usedK: cl.usedK || K, cr_usedK: cr.usedK || K,
+    isSlabPair: true,
+    reclusterMode: m,
+    requestedMode,
+    fellBack,
   };
 }
 
@@ -21321,6 +21908,1316 @@ function _buildBreedingCard(candidate, opts) {
 if (typeof window !== 'undefined') {
   window._buildBreedingCard = _buildBreedingCard;
 }
+
+// =============================================================================
+// turn 144 — Breeding-readiness card, Turn C (render layer)
+// =============================================================================
+// Consumes _buildBreedingCard(cand) output (turn 143) and produces:
+//   - _renderBreedingCardHTML(card, opts)         — pure body-HTML string
+//   - _renderBreedingCardFROHBarsSVG(burden, opts)— pure SVG bar chart
+//   - _breedingCardPrintHTML(card, opts)          — full <!doctype> page
+//                                                   with @page A4 + auto-print
+//   - openBreedingCardPrintWindow(cand)           — DOM dispatcher (window.open)
+//   - _wireCandKaryoPrintCardBtn()                — wires the toolbar button
+//
+// Render contract (SPEC §1):
+//   • Header strip:    chrom · coords · span · tier · confidence
+//   • Karyotype counts (REF / HET / INV / MID / HOM_AMBIG), color-coded
+//   • F_ROH per-arrangement bar chart (means with min–max whisker) +
+//     Wilcoxon p value (REF vs INV; falls back to REF vs all_carriers
+//     when no clean HOM_INV)
+//   • F_ROH per-arrangement summary table (n / mean / median / sd / IQR)
+//   • Carrier × K=8 ancestry contingency table
+//   • MAF block
+//   • Pairing-advice block — one styled card per rule, severity color-coded
+//   • Footer: provenance + atlas reviewer URL + generation timestamp
+//
+// PURE: every renderer takes data → returns a string. Only
+// openBreedingCardPrintWindow / _wireCandKaryoPrintCardBtn touch the DOM.
+// -----------------------------------------------------------------------------
+
+// Tiny HTML-safe escape. Used everywhere user-derived strings (sample IDs,
+// k8 cluster names, candidate IDs, advice text) reach the rendered HTML.
+// Mirrors _svgEsc at line ~67943 but for HTML — we can't reuse the SVG
+// helper because it's defined later in the file.
+function _brHtmlEsc(s) {
+  if (s == null) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// Karyotype palette. Picks small high-contrast colors that read on
+// both screen and grayscale-printed paper. REF → cool blue, HET →
+// neutral teal-green, INV → warm orange, MID → muted violet,
+// HOM_AMBIGUOUS → grey.
+const _BR_KARYO_COLORS = {
+  HOM_REF: '#3b6fb6',
+  HET:     '#3cc08a',
+  HOM_INV: '#d97a2c',
+  HOM_MID: '#8c6db5',
+  HOM:     '#8a8a8a',     // ambiguous-role single-HOM case
+};
+
+// Severity → color mapping for the advice cards
+const _BR_SEVERITY_COLORS = {
+  strong: { border: '#d97a2c', bg: '#fef3e6', tag: '#a85a18' },
+  warn:   { border: '#c8a032', bg: '#fdf6e0', tag: '#8a6f1a' },
+  info:   { border: '#7a9bcc', bg: '#eef3fa', tag: '#3b6fb6' },
+};
+
+// Format a probability or fraction with a sensible number of digits.
+// 1.234e-7 stays scientific; 0.012 stays decimal.
+function _brFmtP(p) {
+  if (p == null || !Number.isFinite(p)) return 'NA';
+  if (p === 0) return '0';
+  if (p < 1e-3) return p.toExponential(2);
+  return p.toFixed(3);
+}
+
+// Format a percentage with one decimal, '—' for non-finite.
+function _brFmtPct(x) {
+  if (x == null || !Number.isFinite(x)) return '—';
+  return (x * 100).toFixed(1) + '%';
+}
+
+// Format a small floating-point number (F_ROH means etc.) with 4 digits.
+function _brFmtFloat(x, digits) {
+  if (x == null || !Number.isFinite(x)) return '—';
+  return x.toFixed(digits == null ? 4 : digits);
+}
+
+// Format an integer count, '—' for non-finite.
+function _brFmtInt(x) {
+  if (x == null || !Number.isFinite(x)) return '—';
+  return String(Math.round(x));
+}
+
+// Format a base-pair coordinate as Mb to 2 decimals.
+function _brFmtMb(bp) {
+  if (bp == null || !Number.isFinite(bp)) return '—';
+  return (bp / 1e6).toFixed(2);
+}
+
+// -----------------------------------------------------------------------------
+// _renderBreedingCardFROHBarsSVG(burden, opts)
+// -----------------------------------------------------------------------------
+// Produces a small inline SVG bar chart showing per-arrangement mean F_ROH
+// with min–max whiskers. Returns '' when burden.available is false.
+//
+// Layout: 4 bars (REF, HET, INV, MID) — each with the bar height = mean,
+// whisker spanning [min, max], center tick = median.
+//
+// Sized for the print-page width (~520px usable): SVG is 520×170 by default.
+// PURE.
+function _renderBreedingCardFROHBarsSVG(burden, opts) {
+  const _opts = opts || {};
+  const W = _opts.width  || 520;
+  const H = _opts.height || 170;
+  if (!burden || !burden.available) {
+    // Render an empty placeholder rect so the print layout stays stable.
+    const reason = burden && burden.reason ? burden.reason : 'unavailable';
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + W + ' ' + H +
+           '" width="' + W + '" height="' + H + '" role="img" aria-label="F_ROH bars unavailable">' +
+           '<rect x="0" y="0" width="' + W + '" height="' + H +
+           '" fill="#f7f7f7" stroke="#dcdcdc"/>' +
+           '<text x="' + (W/2) + '" y="' + (H/2) +
+           '" text-anchor="middle" dominant-baseline="middle" ' +
+           'font-family="system-ui,sans-serif" font-size="12" fill="#888">' +
+           'F_ROH chart unavailable (' + _brHtmlEsc(reason) + ')</text></svg>';
+  }
+
+  const groups = burden.groups || {};
+  // Decide which bars to draw — always REF/HET/INV; add MID iff present
+  const wanted = [
+    { key: 'HOM_REF', label: 'REF',  color: _BR_KARYO_COLORS.HOM_REF },
+    { key: 'HET',     label: 'HET',  color: _BR_KARYO_COLORS.HET },
+    { key: 'HOM_INV', label: 'INV',  color: _BR_KARYO_COLORS.HOM_INV },
+  ];
+  if (groups.HOM_MID && Number.isFinite(groups.HOM_MID.n) && groups.HOM_MID.n > 0) {
+    wanted.push({ key: 'HOM_MID', label: 'MID', color: _BR_KARYO_COLORS.HOM_MID });
+  }
+
+  // Find global y-max across all groups (for whisker tops). Ignore non-finite.
+  let yMax = 0;
+  for (const w of wanted) {
+    const g = groups[w.key];
+    if (!g || g.n === 0) continue;
+    if (Number.isFinite(g.max) && g.max > yMax) yMax = g.max;
+    if (Number.isFinite(g.mean) && g.mean > yMax) yMax = g.mean;
+  }
+  if (yMax <= 0) yMax = 0.1;     // floor: keep axis visible
+  // Pad y-axis 10% above max
+  const yAxisMax = yMax * 1.1;
+
+  // Layout
+  const padL = 50, padR = 20, padT = 14, padB = 32;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+  const nBars = wanted.length;
+  const slotW = plotW / nBars;
+  const barW  = Math.max(20, slotW * 0.45);
+
+  // y-coord helper: data → svg
+  const yPx = (v) => padT + plotH - (Number.isFinite(v) ? (v / yAxisMax) * plotH : 0);
+
+  let s = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + W + ' ' + H +
+          '" width="' + W + '" height="' + H + '" role="img" ' +
+          'aria-label="F_ROH per arrangement">';
+
+  // Background
+  s += '<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="#ffffff"/>';
+
+  // Y-axis with 4 ticks + label
+  for (let i = 0; i <= 4; i++) {
+    const v = (yAxisMax * i / 4);
+    const y = yPx(v);
+    s += '<line x1="' + padL + '" y1="' + y.toFixed(1) +
+         '" x2="' + (padL + plotW) + '" y2="' + y.toFixed(1) +
+         '" stroke="#eaeaea" stroke-width="1"/>';
+    s += '<text x="' + (padL - 6) + '" y="' + (y + 3).toFixed(1) +
+         '" text-anchor="end" font-family="system-ui,sans-serif" font-size="9" ' +
+         'fill="#666">' + v.toFixed(3) + '</text>';
+  }
+  // Y-axis title
+  s += '<text x="14" y="' + (padT + plotH/2).toFixed(1) +
+       '" text-anchor="middle" font-family="system-ui,sans-serif" font-size="10" ' +
+       'fill="#444" transform="rotate(-90 14 ' + (padT + plotH/2).toFixed(1) + ')">F_ROH</text>';
+
+  // Bars + whiskers
+  wanted.forEach((w, i) => {
+    const g = groups[w.key];
+    const cx = padL + (i + 0.5) * slotW;
+    if (!g || !Number.isFinite(g.n) || g.n === 0) {
+      // Empty slot
+      s += '<text x="' + cx.toFixed(1) + '" y="' + (padT + plotH - 4).toFixed(1) +
+           '" text-anchor="middle" font-family="system-ui,sans-serif" font-size="10" ' +
+           'fill="#bbb">n=0</text>';
+      // x-tick label
+      s += '<text x="' + cx.toFixed(1) + '" y="' + (padT + plotH + 14).toFixed(1) +
+           '" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" ' +
+           'fill="#444" font-weight="600">' + _brHtmlEsc(w.label) + '</text>';
+      return;
+    }
+    const meanY = yPx(g.mean);
+    const baseY = yPx(0);
+    // Bar
+    s += '<rect x="' + (cx - barW/2).toFixed(1) + '" y="' + meanY.toFixed(1) +
+         '" width="' + barW.toFixed(1) + '" height="' + (baseY - meanY).toFixed(1) +
+         '" fill="' + w.color + '" fill-opacity="0.7" stroke="' + w.color +
+         '" stroke-width="1"/>';
+    // Whisker (min — max)
+    if (Number.isFinite(g.min) && Number.isFinite(g.max) && g.max > g.min) {
+      const yMin = yPx(g.min);
+      const yMaxV = yPx(g.max);
+      s += '<line x1="' + cx.toFixed(1) + '" y1="' + yMaxV.toFixed(1) +
+           '" x2="' + cx.toFixed(1) + '" y2="' + yMin.toFixed(1) +
+           '" stroke="#222" stroke-width="1"/>';
+      // Top + bottom caps
+      const cap = Math.min(8, barW/3);
+      s += '<line x1="' + (cx - cap).toFixed(1) + '" y1="' + yMaxV.toFixed(1) +
+           '" x2="' + (cx + cap).toFixed(1) + '" y2="' + yMaxV.toFixed(1) +
+           '" stroke="#222" stroke-width="1"/>';
+      s += '<line x1="' + (cx - cap).toFixed(1) + '" y1="' + yMin.toFixed(1) +
+           '" x2="' + (cx + cap).toFixed(1) + '" y2="' + yMin.toFixed(1) +
+           '" stroke="#222" stroke-width="1"/>';
+    }
+    // Median tick (white line across the bar)
+    if (Number.isFinite(g.median)) {
+      const yMed = yPx(g.median);
+      s += '<line x1="' + (cx - barW/2).toFixed(1) + '" y1="' + yMed.toFixed(1) +
+           '" x2="' + (cx + barW/2).toFixed(1) + '" y2="' + yMed.toFixed(1) +
+           '" stroke="#fff" stroke-width="1.5"/>';
+    }
+    // n label inside/over the bar
+    s += '<text x="' + cx.toFixed(1) + '" y="' + Math.max(meanY - 4, padT + 10).toFixed(1) +
+         '" text-anchor="middle" font-family="system-ui,sans-serif" font-size="9" ' +
+         'fill="#222">n=' + g.n + '</text>';
+    // X-tick label
+    s += '<text x="' + cx.toFixed(1) + '" y="' + (padT + plotH + 14).toFixed(1) +
+         '" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" ' +
+         'fill="#444" font-weight="600">' + _brHtmlEsc(w.label) + '</text>';
+  });
+
+  // Wilcoxon p value annotation in the corner
+  if (burden.wilcoxon_ref_vs_inv && Number.isFinite(burden.wilcoxon_ref_vs_inv.p_two_sided)) {
+    const p = burden.wilcoxon_ref_vs_inv.p_two_sided;
+    s += '<text x="' + (W - padR - 4).toFixed(1) + '" y="' + (padT + 12).toFixed(1) +
+         '" text-anchor="end" font-family="system-ui,sans-serif" font-size="10" ' +
+         'fill="#444">REF vs INV: p = ' + _brHtmlEsc(_brFmtP(p)) + '</text>';
+  } else if (burden.wilcoxon_ref_vs_carriers && Number.isFinite(burden.wilcoxon_ref_vs_carriers.p_two_sided)) {
+    const p = burden.wilcoxon_ref_vs_carriers.p_two_sided;
+    s += '<text x="' + (W - padR - 4).toFixed(1) + '" y="' + (padT + 12).toFixed(1) +
+         '" text-anchor="end" font-family="system-ui,sans-serif" font-size="10" ' +
+         'fill="#444">REF vs carriers: p = ' + _brHtmlEsc(_brFmtP(p)) + '</text>';
+  }
+
+  s += '</svg>';
+  return s;
+}
+
+if (typeof window !== 'undefined') {
+  window._renderBreedingCardFROHBarsSVG = _renderBreedingCardFROHBarsSVG;
+}
+
+// -----------------------------------------------------------------------------
+// _renderBreedingCardHTML(card, opts) — pure body HTML
+// -----------------------------------------------------------------------------
+//
+// Returns the complete body-HTML string for a card. Designed to be wrapped
+// by _breedingCardPrintHTML for print, OR injected into an existing div for
+// in-page preview (Turn D could use this).
+//
+// Idempotent / pure. No DOM. Defensive against missing fields — null cards
+// render an empty-state block with a clear "no candidate" message.
+//
+// Output structure (all under `.brc-card`):
+//   .brc-header
+//     .brc-title
+//     .brc-meta            (chrom · coords · span · tier · confidence)
+//   .brc-section.brc-karyo
+//     karyotype counts row (color chips)
+//   .brc-section.brc-froh
+//     bar SVG + summary table
+//   .brc-section.brc-ancestry
+//     K8 × karyotype contingency table
+//   .brc-section.brc-maf
+//   .brc-section.brc-advice
+//     one .brc-advice-item per rule
+//   .brc-footer
+function _renderBreedingCardHTML(card, opts) {
+  const _opts = opts || {};
+  if (!card) {
+    return '<div class="brc-card brc-empty">' +
+           '<div class="brc-header"><div class="brc-title">No candidate</div></div>' +
+           '<div class="brc-empty-msg">Pass a candidate to _buildBreedingCard ' +
+           'to render the breeding-readiness card.</div></div>';
+  }
+
+  const c    = card.candidate || {};
+  const ka   = card.karyotype || {};
+  const bu   = card.burden    || {};
+  const an   = card.ancestry  || {};
+  const maf  = card.maf       || null;
+  const cov  = card.coverage  || null;
+  const adv  = Array.isArray(card.advice) ? card.advice : [];
+
+  let h = '<div class="brc-card">';
+
+  // ---------- Header ----------
+  const titleId = c.id ? _brHtmlEsc(c.id) : 'unnamed';
+  h += '<div class="brc-header">';
+  h += '<div class="brc-title">Breeding-readiness card — ' + titleId + '</div>';
+  const metaBits = [];
+  if (c.chrom) metaBits.push('<b>' + _brHtmlEsc(c.chrom) + '</b>');
+  if (Number.isFinite(c.start_bp) && Number.isFinite(c.end_bp)) {
+    metaBits.push(_brFmtMb(c.start_bp) + '–' + _brFmtMb(c.end_bp) + ' Mb');
+  }
+  if (Number.isFinite(c.span_mb)) {
+    metaBits.push('span ' + c.span_mb.toFixed(2) + ' Mb');
+  }
+  if (c.K) metaBits.push('K=' + _brHtmlEsc(String(c.K)));
+  if (c.tier) metaBits.push('<span class="brc-tag">' + _brHtmlEsc(String(c.tier)) + '</span>');
+  if (c.confidence) metaBits.push('confidence: ' + _brHtmlEsc(String(c.confidence)));
+  h += '<div class="brc-meta">' + metaBits.join(' · ') + '</div>';
+  h += '</div>';   // /header
+
+  // ---------- Karyotype counts row ----------
+  h += '<div class="brc-section brc-karyo">';
+  h += '<h3 class="brc-h">Karyotype counts</h3>';
+  if (ka && ka.summary) {
+    const sm = ka.summary;
+    const chips = [];
+    const chip = (label, n, color) => {
+      return '<div class="brc-chip" style="border-color:' + color +
+             '; background:' + color + '14;">' +
+             '<div class="brc-chip-n" style="color:' + color + ';">' +
+             _brFmtInt(n) + '</div>' +
+             '<div class="brc-chip-l">' + _brHtmlEsc(label) + '</div></div>';
+    };
+    chips.push(chip('HOM_REF', sm.HOM_REF, _BR_KARYO_COLORS.HOM_REF));
+    chips.push(chip('HET',     sm.HET,     _BR_KARYO_COLORS.HET));
+    chips.push(chip('HOM_INV', sm.HOM_INV, _BR_KARYO_COLORS.HOM_INV));
+    if (sm.HOM_MID > 0) {
+      chips.push(chip('HOM_MID', sm.HOM_MID, _BR_KARYO_COLORS.HOM_MID));
+    }
+    if (sm.HOM_AMBIGUOUS_ROLE > 0) {
+      chips.push(chip('HOM (ambig.)', sm.HOM_AMBIGUOUS_ROLE, _BR_KARYO_COLORS.HOM));
+    }
+    h += '<div class="brc-chip-row">' + chips.join('') + '</div>';
+    // Extra summary line
+    const extra = [];
+    if (ka.classification_summary) extra.push(_brHtmlEsc(ka.classification_summary));
+    if (ka.consistency) extra.push('regime: ' + _brHtmlEsc(ka.consistency));
+    if (ka.multi_haplotype) extra.push('<span class="brc-tag-warn">multi-haplotype</span>');
+    if (ka.ambiguous_role)  extra.push('<span class="brc-tag-warn">ambiguous role</span>');
+    if (sm.AMBIGUOUS > 0)   extra.push(sm.AMBIGUOUS + ' ambig.');
+    if (sm.NO_DOSAGE > 0)   extra.push(sm.NO_DOSAGE + ' no-dosage');
+    if (extra.length) {
+      h += '<div class="brc-extra">' + extra.join(' · ') + '</div>';
+    }
+  } else {
+    h += '<div class="brc-empty-msg">Karyotype not available — ' +
+         _brHtmlEsc(ka.reason || 'unknown reason') + '.</div>';
+  }
+  h += '</div>';   // /karyo
+
+  // ---------- F_ROH per arrangement ----------
+  h += '<div class="brc-section brc-froh">';
+  h += '<h3 class="brc-h">F<sub>ROH</sub> per arrangement</h3>';
+  if (bu.available) {
+    // Bar chart
+    h += '<div class="brc-svg-wrap">' + _renderBreedingCardFROHBarsSVG(bu) + '</div>';
+    // Summary table
+    h += '<table class="brc-table"><thead><tr>';
+    h += '<th>Arrangement</th><th>n</th><th>mean</th><th>median</th>' +
+         '<th>sd</th><th>Q1–Q3</th><th>min–max</th></tr></thead><tbody>';
+    const rowFor = (key, label) => {
+      const g = bu.groups && bu.groups[key];
+      if (!g || g.n === 0) {
+        return '<tr><td>' + _brHtmlEsc(label) +
+               '</td><td>0</td><td>—</td><td>—</td><td>—</td>' +
+               '<td>—</td><td>—</td></tr>';
+      }
+      return '<tr><td>' + _brHtmlEsc(label) + '</td>' +
+             '<td>' + g.n + '</td>' +
+             '<td>' + _brFmtFloat(g.mean) + '</td>' +
+             '<td>' + _brFmtFloat(g.median) + '</td>' +
+             '<td>' + _brFmtFloat(g.sd) + '</td>' +
+             '<td>' + _brFmtFloat(g.q1) + '–' + _brFmtFloat(g.q3) + '</td>' +
+             '<td>' + _brFmtFloat(g.min) + '–' + _brFmtFloat(g.max) + '</td></tr>';
+    };
+    h += rowFor('HOM_REF', 'HOM_REF');
+    h += rowFor('HET',     'HET');
+    h += rowFor('HOM_INV', 'HOM_INV');
+    if (bu.groups && bu.groups.HOM_MID && bu.groups.HOM_MID.n > 0) {
+      h += rowFor('HOM_MID', 'HOM_MID');
+    }
+    if (bu.all_carriers && bu.all_carriers.n > 0) {
+      const g = bu.all_carriers;
+      h += '<tr><td><i>all carriers</i></td>' +
+           '<td>' + g.n + '</td>' +
+           '<td>' + _brFmtFloat(g.mean) + '</td>' +
+           '<td>' + _brFmtFloat(g.median) + '</td>' +
+           '<td>' + _brFmtFloat(g.sd) + '</td>' +
+           '<td>' + _brFmtFloat(g.q1) + '–' + _brFmtFloat(g.q3) + '</td>' +
+           '<td>' + _brFmtFloat(g.min) + '–' + _brFmtFloat(g.max) + '</td></tr>';
+    }
+    h += '</tbody></table>';
+    // Wilcoxon line
+    if (bu.wilcoxon_ref_vs_inv) {
+      const w = bu.wilcoxon_ref_vs_inv;
+      const dStr = Number.isFinite(bu.delta_mean_inv_minus_ref)
+                   ? (bu.delta_mean_inv_minus_ref >= 0 ? '+' : '') +
+                     bu.delta_mean_inv_minus_ref.toFixed(4)
+                   : '—';
+      h += '<div class="brc-wilcoxon">' +
+           'REF vs INV (Mann–Whitney U, two-sided, tie + continuity-corrected): ' +
+           '<b>p = ' + _brHtmlEsc(_brFmtP(w.p_two_sided)) + '</b> · ' +
+           'Δ(mean INV − REF) = ' + dStr +
+           ' · n = (' + (w.n_a || 0) + ' / ' + (w.n_b || 0) + ')';
+      if (w.n_tie_groups > 0) h += ' · ' + w.n_tie_groups + ' tie groups';
+      h += '</div>';
+    }
+    if (bu.wilcoxon_ref_vs_carriers && (!bu.wilcoxon_ref_vs_inv ||
+         !Number.isFinite(bu.wilcoxon_ref_vs_inv.p_two_sided))) {
+      const w = bu.wilcoxon_ref_vs_carriers;
+      h += '<div class="brc-wilcoxon">' +
+           'REF vs all carriers: <b>p = ' + _brHtmlEsc(_brFmtP(w.p_two_sided)) +
+           '</b> · n = (' + (w.n_a || 0) + ' / ' + (w.n_b || 0) + ')</div>';
+    }
+    if (bu.n_unresolved > 0) {
+      h += '<div class="brc-extra brc-warn">Note: ' + bu.n_unresolved +
+           ' samples could not be matched to cohort_diversity_v1 (missing F_ROH).</div>';
+    }
+  } else {
+    h += '<div class="brc-empty-msg">F<sub>ROH</sub> per-arrangement statistics ' +
+         'not available — <code>' + _brHtmlEsc(bu.reason || 'unknown') +
+         '</code>.</div>';
+  }
+  h += '</div>';   // /froh
+
+  // ---------- Carrier × K=8 ancestry ----------
+  h += '<div class="brc-section brc-ancestry">';
+  h += '<h3 class="brc-h">Carrier × K=8 broodline ancestry</h3>';
+  if (an.available && Array.isArray(an.rows) && an.rows.length > 0) {
+    h += '<table class="brc-table"><thead><tr>';
+    h += '<th>K=8 cluster</th>';
+    for (const col of an.karyotypes) {
+      const color = _BR_KARYO_COLORS[col] || '#444';
+      h += '<th style="color:' + color + ';">' + _brHtmlEsc(col) + '</th>';
+    }
+    h += '<th>total</th></tr></thead><tbody>';
+    for (const row of an.rows) {
+      h += '<tr><td><b>' + _brHtmlEsc(row.k8) + '</b></td>';
+      for (const col of an.karyotypes) {
+        const n   = row.counts[col] || 0;
+        const fr  = row.frac && row.frac[col];
+        const txt = (n === 0) ? '0' :
+                    (n + ' <span class="brc-frac">(' +
+                     (Number.isFinite(fr) ? (fr * 100).toFixed(0) + '%' : '—') +
+                     ')</span>');
+        h += '<td>' + txt + '</td>';
+      }
+      h += '<td>' + row.total_classified + '</td></tr>';
+    }
+    // Totals row
+    h += '<tr class="brc-totals"><td><b>total</b></td>';
+    for (const col of an.karyotypes) {
+      h += '<td><b>' + (an.totals[col] || 0) + '</b></td>';
+    }
+    h += '<td><b>' + (an.totals.total_classified || 0) + '</b></td></tr>';
+    h += '</tbody></table>';
+    if (an.n_unresolved > 0) {
+      h += '<div class="brc-extra brc-warn">Note: ' + an.n_unresolved +
+           ' samples could not be assigned to a K=8 cluster.</div>';
+    }
+  } else {
+    h += '<div class="brc-empty-msg">Ancestry table not available — <code>' +
+         _brHtmlEsc(an.reason || 'unknown') + '</code>.</div>';
+  }
+  h += '</div>';   // /ancestry
+
+  // ---------- MAF ----------
+  h += '<div class="brc-section brc-maf">';
+  h += '<h3 class="brc-h">Arrangement frequency</h3>';
+  if (maf) {
+    h += '<div class="brc-maf-row">';
+    h += '<span class="brc-maf-pair"><span class="brc-maf-label" ' +
+         'style="color:' + _BR_KARYO_COLORS.HOM_REF + ';">p(REF)</span> = ' +
+         _brFmtFloat(maf.p_ref, 3) + '</span>';
+    h += '<span class="brc-maf-pair"><span class="brc-maf-label" ' +
+         'style="color:' + _BR_KARYO_COLORS.HOM_INV + ';">p(INV)</span> = ' +
+         _brFmtFloat(maf.p_inv, 3) + '</span>';
+    h += '<span class="brc-maf-pair"><b>MAF</b> = ' +
+         _brFmtFloat(maf.maf, 3) + ' (' + _brFmtPct(maf.maf) + ')</span>';
+    h += '<span class="brc-maf-pair">minor allele: <b>' +
+         _brHtmlEsc(maf.minor_allele || '—') + '</b></span>';
+    h += '<span class="brc-maf-pair">n alleles = ' +
+         (maf.n_alleles || 0) + '</span>';
+    h += '</div>';
+  } else {
+    h += '<div class="brc-empty-msg">MAF cannot be computed — insufficient ' +
+         'classified samples (or HOM-only ambiguous regime).</div>';
+  }
+  h += '</div>';   // /maf
+
+  // ---------- Pairing advice ----------
+  h += '<div class="brc-section brc-advice">';
+  h += '<h3 class="brc-h">Pairing-design implications</h3>';
+  if (adv.length === 0) {
+    h += '<div class="brc-empty-msg">No advice items emitted.</div>';
+  } else {
+    for (const item of adv) {
+      const sev   = item.severity || 'info';
+      const pal   = _BR_SEVERITY_COLORS[sev] || _BR_SEVERITY_COLORS.info;
+      const kind  = item.kind || 'unknown';
+      h += '<div class="brc-advice-item" style="border-left-color:' + pal.border +
+           '; background:' + pal.bg + ';">';
+      h += '<div class="brc-advice-tag" style="color:' + pal.tag + ';">' +
+           _brHtmlEsc(sev.toUpperCase()) + ' · ' + _brHtmlEsc(kind) + '</div>';
+      h += '<div class="brc-advice-text">' + _brHtmlEsc(item.text || '') + '</div>';
+      // Evidence (if any)
+      if (item.evidence && typeof item.evidence === 'object') {
+        const evBits = [];
+        for (const k of Object.keys(item.evidence)) {
+          const v = item.evidence[k];
+          let vs;
+          if (Number.isFinite(v)) {
+            // p-values and small numbers get _brFmtP; others get short fixed
+            if (k.indexOf('p_value') >= 0 || k === 'maf') vs = _brFmtP(v);
+            else if (Math.abs(v) < 1) vs = v.toFixed(4);
+            else vs = String(v);
+          } else if (v == null) {
+            vs = '—';
+          } else {
+            vs = String(v);
+          }
+          evBits.push('<span class="brc-evk">' + _brHtmlEsc(k) + '</span>=' + _brHtmlEsc(vs));
+        }
+        if (evBits.length) {
+          h += '<div class="brc-advice-ev">' + evBits.join(' · ') + '</div>';
+        }
+      }
+      h += '</div>';
+    }
+  }
+  // Disclaimer (SPEC §2: "auto-generated; final breeding decisions require human review")
+  h += '<div class="brc-disclaimer">Auto-generated from cohort genomic statistics. ' +
+       'Final breeding decisions require human review. ' +
+       'Suggestions, not prescriptions.</div>';
+  h += '</div>';   // /advice
+
+  // ---------- Footer ----------
+  h += '<div class="brc-footer">';
+  const provBits = [];
+  provBits.push('schema: ' + _brHtmlEsc(card.schema || ''));
+  provBits.push('generated: ' + _brHtmlEsc(card.generated_at || ''));
+  if (cov && Number.isFinite(cov.n_total)) {
+    provBits.push('cohort: ' + cov.n_total + ' samples');
+    if (cov.n_resolved !== cov.n_total) {
+      provBits.push(cov.n_resolved + ' resolved / ' +
+                    (cov.n_total - cov.n_resolved) + ' unresolved');
+    }
+  }
+  if (card.atlas_url) {
+    provBits.push('<a href="' + _brHtmlEsc(card.atlas_url) + '">atlas reviewer link</a>');
+  }
+  h += provBits.join(' · ');
+  h += '</div>';
+
+  h += '</div>';   // /brc-card
+  return h;
+}
+
+if (typeof window !== 'undefined') {
+  window._renderBreedingCardHTML = _renderBreedingCardHTML;
+}
+
+// -----------------------------------------------------------------------------
+// _breedingCardPrintCSS() — returns the @page A4 + print stylesheet
+// -----------------------------------------------------------------------------
+// Kept as a separate fn so tests can assert specific selectors / units
+// without depending on a particular HTML wrapper.
+function _breedingCardPrintCSS() {
+  return [
+    '@page { size: A4; margin: 14mm; }',
+    'html, body { margin: 0; padding: 0; background: #ffffff; ' +
+      'color: #1a1a1a; font-family: system-ui, -apple-system, Segoe UI, sans-serif; ' +
+      'font-size: 11pt; line-height: 1.4; }',
+    'body { padding: 0; }',
+    '.brc-card { max-width: 180mm; margin: 0 auto; padding: 0; }',
+    '.brc-header { border-bottom: 2px solid #1a1a1a; padding: 0 0 6mm; ' +
+      'margin: 0 0 6mm; }',
+    '.brc-title { font-size: 16pt; font-weight: 700; margin: 0 0 2mm; }',
+    '.brc-meta { font-size: 10.5pt; color: #444; }',
+    '.brc-meta b { color: #1a1a1a; }',
+    '.brc-tag { display: inline-block; padding: 1px 6px; ' +
+      'border-radius: 3px; background: #f0e4d0; color: #6e4f10; ' +
+      'font-size: 9.5pt; font-weight: 600; }',
+    '.brc-tag-warn { display: inline-block; padding: 1px 6px; ' +
+      'border-radius: 3px; background: #fdeac0; color: #8a6f1a; ' +
+      'font-size: 9.5pt; font-weight: 600; }',
+    '.brc-section { margin: 0 0 6mm; padding: 0; ' +
+      'page-break-inside: avoid; break-inside: avoid; }',
+    '.brc-h { font-size: 12pt; font-weight: 700; margin: 0 0 3mm; ' +
+      'padding: 0 0 1mm; border-bottom: 1px solid #ccc; }',
+    '.brc-chip-row { display: flex; gap: 6mm; flex-wrap: wrap; ' +
+      'margin: 0 0 2mm; }',
+    '.brc-chip { border: 1px solid; border-radius: 3px; padding: 2mm 4mm; ' +
+      'min-width: 18mm; text-align: center; }',
+    '.brc-chip-n { font-size: 16pt; font-weight: 700; line-height: 1.1; }',
+    '.brc-chip-l { font-size: 9pt; color: #444; margin-top: 1mm; ' +
+      'font-family: ui-monospace, "Menlo", "Consolas", monospace; }',
+    '.brc-extra { font-size: 9.5pt; color: #555; margin-top: 1mm; }',
+    '.brc-warn { color: #8a6f1a; }',
+    '.brc-svg-wrap { margin: 0 0 2mm; }',
+    '.brc-svg-wrap svg { max-width: 100%; height: auto; display: block; }',
+    '.brc-table { width: 100%; border-collapse: collapse; ' +
+      'font-size: 9.5pt; margin: 0 0 2mm; }',
+    '.brc-table th, .brc-table td { padding: 1mm 2mm; ' +
+      'border-bottom: 1px solid #e0e0e0; text-align: left; }',
+    '.brc-table thead th { background: #f4f4f4; font-weight: 600; ' +
+      'border-bottom: 1px solid #888; }',
+    '.brc-table .brc-totals td { background: #f8f8f8; ' +
+      'border-top: 1px solid #888; }',
+    '.brc-frac { color: #777; font-size: 8.5pt; }',
+    '.brc-wilcoxon { font-size: 10pt; padding: 2mm 3mm; ' +
+      'background: #f7f7f9; border-left: 3px solid #3b6fb6; ' +
+      'margin: 1mm 0 0; }',
+    '.brc-maf-row { display: flex; gap: 8mm; flex-wrap: wrap; ' +
+      'font-size: 10.5pt; padding: 2mm 3mm; background: #f7f7f9; ' +
+      'border-radius: 3px; }',
+    '.brc-maf-label { font-family: ui-monospace, monospace; ' +
+      'font-weight: 600; }',
+    '.brc-advice-item { border-left: 4px solid; padding: 2mm 4mm; ' +
+      'margin: 0 0 2mm; border-radius: 0 2px 2px 0; ' +
+      'page-break-inside: avoid; break-inside: avoid; }',
+    '.brc-advice-tag { font-size: 8.5pt; font-weight: 700; ' +
+      'font-family: ui-monospace, monospace; letter-spacing: 0.5px; ' +
+      'margin: 0 0 1mm; }',
+    '.brc-advice-text { font-size: 10.5pt; line-height: 1.45; }',
+    '.brc-advice-ev { font-size: 8.5pt; color: #555; margin-top: 1mm; ' +
+      'font-family: ui-monospace, monospace; }',
+    '.brc-evk { color: #777; }',
+    '.brc-disclaimer { font-size: 9pt; color: #666; font-style: italic; ' +
+      'margin-top: 3mm; padding-top: 2mm; border-top: 1px dashed #ccc; }',
+    '.brc-footer { font-size: 8.5pt; color: #888; ' +
+      'border-top: 1px solid #ccc; padding-top: 2mm; margin-top: 6mm; }',
+    '.brc-footer a { color: #3b6fb6; }',
+    '.brc-empty-msg { font-size: 10pt; color: #888; ' +
+      'padding: 2mm 0; font-style: italic; }',
+    '.brc-empty-msg code { background: #eee; padding: 0 3px; ' +
+      'border-radius: 2px; font-size: 9pt; color: #444; }',
+    '@media print { .brc-no-print { display: none !important; } ' +
+      'a { color: #1a1a1a; text-decoration: none; } }',
+    '.brc-print-hint { background: #fff7d6; border: 1px solid #d0b070; ' +
+      'border-radius: 4px; padding: 2mm 3mm; margin: 0 auto 4mm; ' +
+      'max-width: 180mm; font-size: 10pt; color: #3a2c00; }',
+    '.brc-print-hint code { background: #ede1b8; padding: 0 4px; ' +
+      'border-radius: 2px; }',
+  ].join('\n');
+}
+
+if (typeof window !== 'undefined') {
+  window._breedingCardPrintCSS = _breedingCardPrintCSS;
+}
+
+// -----------------------------------------------------------------------------
+// _breedingCardPrintHTML(card, opts) — full <!doctype> page
+// -----------------------------------------------------------------------------
+// Wraps _renderBreedingCardHTML in a complete HTML document with the print
+// stylesheet and an optional auto-print script. Used by
+// openBreedingCardPrintWindow.
+//
+// PURE.
+function _breedingCardPrintHTML(card, opts) {
+  const _opts = opts || {};
+  const autoPrint = _opts.auto_print !== false;
+  const showHint  = _opts.show_hint !== false;
+  const titleBits = [];
+  if (card && card.candidate) {
+    if (card.candidate.id)    titleBits.push(card.candidate.id);
+    if (card.candidate.chrom) titleBits.push(card.candidate.chrom);
+  }
+  const docTitle = (titleBits.length ? titleBits.join(' · ') + ' — ' : '') +
+                   'breeding-readiness card';
+
+  const body = _renderBreedingCardHTML(card, _opts);
+  const css  = _breedingCardPrintCSS();
+
+  const hintHtml = showHint ?
+    ('<div class="brc-print-hint brc-no-print">' +
+     '<b>Save as PDF:</b> press <code>Ctrl/Cmd+P</code>' +
+     (autoPrint ? ' (or wait for the print dialog to open automatically)' : '') +
+     ', then choose <b>Save as PDF</b> as the destination. ' +
+     'This message will not appear in the saved PDF.</div>') : '';
+
+  const autoScript = autoPrint ?
+    ('<script>\n' +
+     'window.addEventListener("load", function () {\n' +
+     '  setTimeout(function () { try { window.print(); } catch (_) {} }, 250);\n' +
+     '});\n' +
+     '</' + 'script>') : '';
+
+  return '<!doctype html>\n' +
+         '<html lang="en"><head>\n' +
+         '<meta charset="utf-8"/>\n' +
+         '<title>' + _brHtmlEsc(docTitle) + '</title>\n' +
+         '<style>\n' + css + '\n</style>\n' +
+         '</head><body>\n' +
+         hintHtml +
+         body + '\n' +
+         autoScript + '\n' +
+         '</body></html>';
+}
+
+if (typeof window !== 'undefined') {
+  window._breedingCardPrintHTML = _breedingCardPrintHTML;
+}
+
+// -----------------------------------------------------------------------------
+// openBreedingCardPrintWindow(cand, opts) — DOM dispatcher
+// -----------------------------------------------------------------------------
+// Builds the card from the candidate, opens a popup, writes the HTML, and
+// the embedded auto-print script triggers the browser print dialog.
+//
+// Returns the opened window reference (or false if popup blocked).
+function openBreedingCardPrintWindow(candidate, opts) {
+  const _opts = opts || {};
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    return false;
+  }
+  if (typeof _buildBreedingCard !== 'function') {
+    if (typeof alert === 'function') {
+      alert('Breeding-card builder unavailable.');
+    }
+    return false;
+  }
+  if (!candidate) {
+    if (typeof alert === 'function') {
+      alert('No active candidate. Open a candidate on page 3 first.');
+    }
+    return false;
+  }
+  let card = null;
+  try {
+    card = _buildBreedingCard(candidate, { include_values: false });
+  } catch (e) {
+    if (typeof alert === 'function') {
+      alert('Failed to build breeding card: ' + e.message);
+    }
+    return false;
+  }
+  if (!card) {
+    if (typeof alert === 'function') {
+      alert('Could not build breeding card for this candidate.');
+    }
+    return false;
+  }
+
+  let html;
+  try {
+    html = _breedingCardPrintHTML(card, _opts);
+  } catch (e) {
+    if (typeof alert === 'function') {
+      alert('Failed to render breeding card: ' + e.message);
+    }
+    return false;
+  }
+
+  let win = null;
+  try {
+    win = window.open('', '_blank',
+      'width=900,height=900,scrollbars=yes,resizable=yes');
+  } catch (_) {}
+  if (!win) {
+    if (typeof alert === 'function') {
+      alert('Print window requires a popup. Please allow popups for this page and try again.');
+    }
+    return false;
+  }
+  try {
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+  } catch (e) {
+    if (typeof alert === 'function') {
+      alert('Failed to write breeding card to popup: ' + e.message);
+    }
+    return false;
+  }
+  return win;
+}
+
+if (typeof window !== 'undefined') {
+  window.openBreedingCardPrintWindow = openBreedingCardPrintWindow;
+}
+
+// -----------------------------------------------------------------------------
+// _wireCandKaryoPrintCardBtn() — adds the "Print breeding card" button to the
+// karyotype-tab toolbar (#candKaryoPane .ck-toolbar) for the active candidate.
+//
+// Idempotent. Called from inside renderCandidateKaryotype after the toolbar
+// is rebuilt. The button sits next to the existing "⬇ export TSV" button.
+// -----------------------------------------------------------------------------
+function _wireCandKaryoPrintCardBtn(candidate) {
+  if (typeof document === 'undefined') return;
+  const toolbar = document.querySelector('#candKaryoPane .ck-toolbar');
+  if (!toolbar) return;
+  // Don't add twice
+  if (toolbar.querySelector('#ckPrintBreedingCard')) return;
+  const btn = document.createElement('button');
+  btn.id = 'ckPrintBreedingCard';
+  btn.className = 'export';
+  btn.title = 'Open this candidate\'s breeding-readiness card in a new ' +
+              'window (auto-opens print dialog — choose Save as PDF).';
+  btn.textContent = '🧬 print breeding card';
+  // Insert before the .info span so the layout stays predictable
+  const info = toolbar.querySelector('#ckInfo');
+  if (info) {
+    toolbar.insertBefore(btn, info);
+  } else {
+    toolbar.appendChild(btn);
+  }
+  btn.addEventListener('click', () => {
+    try {
+      openBreedingCardPrintWindow(candidate);
+    } catch (e) {
+      if (typeof alert === 'function') {
+        alert('Failed to open breeding card: ' + e.message);
+      }
+    }
+  });
+}
+
+if (typeof window !== 'undefined') {
+  window._wireCandKaryoPrintCardBtn = _wireCandKaryoPrintCardBtn;
+}
+
+// =============================================================================
+// turn 146 — Breeding-readiness card, Turn D (bulk catalogue export)
+// =============================================================================
+// SPEC: specs_new_turn131/SPEC_per_candidate_breeding_readiness_card.md §4
+// Slice 3 (bulk PDF export from the catalogue page).
+//
+// Builds on Turn C's renderer. Adds:
+//   - _filterCandsForBreedingExport(cands, tierMode)  — pure tier filter
+//   - _buildBreedingCardsCombinedHTML(cards, opts)    — pure: combined doc
+//   - _buildBreedingCardsJSONBundle(cards, opts)      — pure: JSON envelope
+//   - _exportBreedingCardsHTML(opts)                  — DOM dispatcher
+//   - _exportBreedingCardsJSON(opts)                  — DOM dispatcher
+//   - _wireCatalogueBreedingExportBtns()              — wires the toolbar
+//
+// User flow:
+//   Page 5 catalogue → 🧬 breeding cards · HTML  → single combined doc
+//                                          · JSON  → per-card data bundle
+//   Tier dropdown gates which candidates are exported.
+//
+// Two-format choice (no zip):
+//   - HTML is the "actually use it" format — single file, paginated for
+//     printing, hatchery managers can scroll or Ctrl+P.
+//   - JSON is the "downstream pipeline" format — exact _buildBreedingCard
+//     output, one envelope, easy to re-render or feed into reports.
+//   - We deliberately don't ship a ZIP path. JSZip is ~90KB, and the
+//     combined HTML doc handles the "I want all of them at once" case.
+//     Per-card individual HTMLs can be exported one-at-a-time via the
+//     existing page-7 print button (Turn C).
+// -----------------------------------------------------------------------------
+
+// Tier filter modes. Defaults match Quentin's ask: Tier 1 + Tier 2 are the
+// breeding-ready set; Tier 3 / 4 are exploratory and shouldn't be in the
+// default bundle. The 'all' mode is provided for completeness.
+const _BREEDING_EXPORT_TIER_MODES = {
+  'tier_1_2':     ['Tier 1', 'Tier 2'],
+  'tier_1':       ['Tier 1'],
+  'tier_1_2_3':   ['Tier 1', 'Tier 2', 'Tier 3'],
+  'all':          null,    // null = no filter, include every candidate
+};
+
+// _filterCandsForBreedingExport(cands, tierMode) — pure tier filter
+//
+// Inputs:
+//   cands    — array of candidate objects (e.g., state.candidateList)
+//   tierMode — string key of _BREEDING_EXPORT_TIER_MODES, or array of
+//              accepted tier labels, or null/undefined → 'tier_1_2'
+//
+// Output:
+//   { kept: <array>, dropped_no_tier: <number>, dropped_off_tier: <number>,
+//     mode: <string>, accepted_tiers: <array|null> }
+//
+// "no_tier" = candidate has no .tier field (untiered yet); these are
+// always dropped except when mode is 'all'. "off_tier" = candidate has a
+// .tier but it's not in the accepted set.
+function _filterCandsForBreedingExport(cands, tierMode) {
+  const out = { kept: [], dropped_no_tier: 0, dropped_off_tier: 0,
+                mode: null, accepted_tiers: null };
+  if (!Array.isArray(cands)) return out;
+  let accepted;
+  if (Array.isArray(tierMode)) {
+    accepted = tierMode.slice();
+    out.mode = 'custom';
+  } else {
+    const key = (typeof tierMode === 'string' && tierMode in _BREEDING_EXPORT_TIER_MODES)
+                ? tierMode : 'tier_1_2';
+    accepted = _BREEDING_EXPORT_TIER_MODES[key];   // may be null = include all
+    out.mode = key;
+  }
+  out.accepted_tiers = accepted ? accepted.slice() : null;
+  for (const c of cands) {
+    if (!c) continue;
+    const t = c.tier;
+    if (accepted == null) {
+      // 'all' mode — include every candidate, even untiered
+      out.kept.push(c);
+      continue;
+    }
+    if (t == null || typeof t !== 'string' || t === '') {
+      out.dropped_no_tier++;
+      continue;
+    }
+    if (accepted.indexOf(t) < 0) {
+      out.dropped_off_tier++;
+      continue;
+    }
+    out.kept.push(c);
+  }
+  return out;
+}
+
+if (typeof window !== 'undefined') {
+  window._filterCandsForBreedingExport = _filterCandsForBreedingExport;
+  window._BREEDING_EXPORT_TIER_MODES   = _BREEDING_EXPORT_TIER_MODES;
+}
+
+// _buildBreedingCardsCombinedHTML(cards, opts) — pure combined-doc builder
+//
+// Concatenates many _renderBreedingCardHTML bodies into one self-contained
+// HTML document. Each card is a `<section class="brc-print-page">` with a
+// CSS `page-break-after: always` rule, so a single Ctrl+P paginates with
+// one card per A4 page.
+//
+// The TOC at the top is a small index — chrom · coords · tier · confidence
+// — so the user can scan before printing.
+//
+// Inputs:
+//   cards — array of objects returned by _buildBreedingCard (one per cand)
+//   opts:
+//     auto_print  — default false (combined doc is for browsing, not auto-print)
+//     show_hint   — default true (the dismissable Save-as-PDF hint banner)
+//     filter_meta — { mode, accepted_tiers, dropped_no_tier, dropped_off_tier,
+//                     n_total }  optional; if present, rendered as a "what's
+//                                 in this bundle" summary at the top
+//     chrom       — chromosome label for the title (default: extracted from
+//                                                    first card)
+//
+// PURE.
+function _buildBreedingCardsCombinedHTML(cards, opts) {
+  const _opts = opts || {};
+  const autoPrint = _opts.auto_print === true;     // default OFF — no surprise
+  const showHint  = _opts.show_hint  !== false;
+  const arr       = Array.isArray(cards) ? cards : [];
+
+  // Title
+  const chrom = _opts.chrom ||
+                (arr.length > 0 && arr[0] && arr[0].candidate && arr[0].candidate.chrom)
+                || '';
+  const docTitle = (chrom ? chrom + ' — ' : '') +
+                   'breeding-readiness cards (n=' + arr.length + ')';
+
+  // CSS — reuse the per-card stylesheet, plus a small print-page wrapper.
+  const baseCss = (typeof _breedingCardPrintCSS === 'function')
+                    ? _breedingCardPrintCSS() : '';
+  const combinedCss = baseCss + '\n' +
+    /* Combined-doc additions */
+    '@page { size: A4; margin: 14mm; }\n' +
+    '.brc-print-page { page-break-after: always; break-after: page; ' +
+      'padding: 0 0 8mm; }\n' +
+    '.brc-print-page:last-child { page-break-after: auto; break-after: auto; }\n' +
+    '.brc-bundle-toc { max-width: 180mm; margin: 0 auto 8mm; ' +
+      'padding: 8mm 6mm; border: 1px solid #ccc; border-radius: 3px; ' +
+      'background: #fafbfc; page-break-after: always; break-after: page; }\n' +
+    '.brc-bundle-toc h2 { margin: 0 0 4mm; font-size: 14pt; }\n' +
+    '.brc-bundle-toc-meta { font-size: 9.5pt; color: #555; ' +
+      'margin: 0 0 4mm; line-height: 1.5; }\n' +
+    '.brc-bundle-toc table { width: 100%; border-collapse: collapse; ' +
+      'font-size: 10pt; }\n' +
+    '.brc-bundle-toc table th { background: #f4f4f4; font-weight: 600; ' +
+      'text-align: left; padding: 1.5mm 2mm; ' +
+      'border-bottom: 1px solid #888; }\n' +
+    '.brc-bundle-toc table td { padding: 1.2mm 2mm; ' +
+      'border-bottom: 1px solid #e2e2e2; }\n' +
+    '.brc-bundle-toc table tr:hover { background: #eef3fa; }\n' +
+    '.brc-bundle-toc table a { color: #1a1a1a; text-decoration: none; }\n' +
+    '.brc-bundle-toc table a:hover { text-decoration: underline; }\n' +
+    '@media print { .brc-bundle-toc table tr:hover { background: transparent; } }\n';
+
+  // Header: TOC + filter meta
+  let headerHtml = '<div class="brc-bundle-toc">' +
+                   '<h2>Breeding-readiness card bundle</h2>';
+  if (chrom) {
+    headerHtml += '<div class="brc-bundle-toc-meta"><b>Chromosome:</b> ' +
+                  _brHtmlEsc(String(chrom)) + '</div>';
+  }
+  // Filter meta block
+  if (_opts.filter_meta) {
+    const fm = _opts.filter_meta;
+    const bits = [];
+    if (fm.mode) bits.push('<b>Filter:</b> ' + _brHtmlEsc(String(fm.mode)));
+    if (fm.accepted_tiers) {
+      bits.push('<b>Tiers included:</b> ' +
+                fm.accepted_tiers.map(t => _brHtmlEsc(String(t))).join(', '));
+    } else if (fm.mode === 'all') {
+      bits.push('<b>Tiers:</b> all (no tier filter)');
+    }
+    if (Number.isFinite(fm.n_total)) bits.push('<b>Total candidates:</b> ' + fm.n_total);
+    bits.push('<b>In bundle:</b> ' + arr.length);
+    if (Number.isFinite(fm.dropped_no_tier) && fm.dropped_no_tier > 0) {
+      bits.push('<b>Dropped (untiered):</b> ' + fm.dropped_no_tier);
+    }
+    if (Number.isFinite(fm.dropped_off_tier) && fm.dropped_off_tier > 0) {
+      bits.push('<b>Dropped (off-tier):</b> ' + fm.dropped_off_tier);
+    }
+    headerHtml += '<div class="brc-bundle-toc-meta">' + bits.join(' · ') + '</div>';
+  }
+  headerHtml += '<div class="brc-bundle-toc-meta">' +
+                '<b>Generated:</b> ' + _brHtmlEsc(new Date().toISOString()) +
+                '</div>';
+
+  // TOC rows
+  if (arr.length > 0) {
+    headerHtml += '<table>';
+    headerHtml += '<thead><tr>' +
+                  '<th>#</th><th>candidate</th><th>coords (Mb)</th>' +
+                  '<th>span</th><th>tier</th><th>confidence</th></tr></thead><tbody>';
+    arr.forEach((card, idx) => {
+      const c = (card && card.candidate) || {};
+      const anchor = 'brc-card-' + (idx + 1);
+      const idStr = c.id || ('candidate_' + (idx + 1));
+      const startMb = (Number.isFinite(c.start_bp)) ? (c.start_bp / 1e6).toFixed(2) : '—';
+      const endMb   = (Number.isFinite(c.end_bp))   ? (c.end_bp   / 1e6).toFixed(2) : '—';
+      const spanMb  = (Number.isFinite(c.span_mb))  ? c.span_mb.toFixed(2) + ' Mb' : '—';
+      const tier    = c.tier || '—';
+      const conf    = c.confidence || '—';
+      headerHtml += '<tr>' +
+                    '<td>' + (idx + 1) + '</td>' +
+                    '<td><a href="#' + _brHtmlEsc(anchor) + '">' +
+                       _brHtmlEsc(String(idStr)) + '</a></td>' +
+                    '<td>' + _brHtmlEsc(startMb) + '–' + _brHtmlEsc(endMb) + '</td>' +
+                    '<td>' + _brHtmlEsc(spanMb) + '</td>' +
+                    '<td>' + _brHtmlEsc(String(tier)) + '</td>' +
+                    '<td>' + _brHtmlEsc(String(conf)) + '</td>' +
+                    '</tr>';
+    });
+    headerHtml += '</tbody></table>';
+  } else {
+    headerHtml += '<div class="brc-bundle-toc-meta" style="color:#a32b2b;">' +
+                  '<b>No candidates matched the active filter.</b> ' +
+                  'Adjust the tier dropdown and try again.</div>';
+  }
+  headerHtml += '</div>';
+
+  // Hint banner (dismissable for print)
+  const hintHtml = showHint ?
+    ('<div class="brc-print-hint brc-no-print">' +
+     '<b>Save as PDF:</b> press <code>Ctrl/Cmd+P</code>' +
+     (autoPrint ? ' (or wait for the print dialog to open automatically)' : '') +
+     ', then choose <b>Save as PDF</b> as the destination. ' +
+     'This message will not appear in the saved PDF. ' +
+     'One card per page; first page is the table of contents.</div>') : '';
+
+  // Body — one section per card
+  let body = '';
+  arr.forEach((card, idx) => {
+    const anchor = 'brc-card-' + (idx + 1);
+    body += '<section class="brc-print-page" id="' + _brHtmlEsc(anchor) + '">';
+    if (typeof _renderBreedingCardHTML === 'function') {
+      body += _renderBreedingCardHTML(card);
+    } else {
+      // Defensive: render a placeholder if Turn C renderer isn't present
+      body += '<div class="brc-card brc-empty"><div class="brc-header">' +
+              '<div class="brc-title">Renderer unavailable</div></div></section>';
+    }
+    body += '</section>';
+  });
+
+  const autoScript = autoPrint ?
+    ('<script>\n' +
+     'window.addEventListener("load", function () {\n' +
+     '  setTimeout(function () { try { window.print(); } catch (_) {} }, 250);\n' +
+     '});\n' +
+     '</' + 'script>') : '';
+
+  return '<!doctype html>\n' +
+         '<html lang="en"><head>\n' +
+         '<meta charset="utf-8"/>\n' +
+         '<title>' + _brHtmlEsc(docTitle) + '</title>\n' +
+         '<style>\n' + combinedCss + '\n</style>\n' +
+         '</head><body>\n' +
+         hintHtml +
+         headerHtml +
+         body + '\n' +
+         autoScript + '\n' +
+         '</body></html>';
+}
+
+if (typeof window !== 'undefined') {
+  window._buildBreedingCardsCombinedHTML = _buildBreedingCardsCombinedHTML;
+}
+
+// _buildBreedingCardsJSONBundle(cards, opts) — pure JSON envelope builder
+//
+// Returns a JSON-serializable object wrapping all cards plus filter
+// metadata. Each entry under `cards` is the EXACT _buildBreedingCard
+// output (no remapping), so downstream tooling can consume the same
+// schema as the per-card render.
+//
+// Inputs:
+//   cards — array of card objects from _buildBreedingCard
+//   opts:
+//     filter_meta — same shape as _buildBreedingCardsCombinedHTML's
+//     chrom       — optional override
+//
+// PURE.
+function _buildBreedingCardsJSONBundle(cards, opts) {
+  const _opts = opts || {};
+  const arr = Array.isArray(cards) ? cards : [];
+  const chrom = _opts.chrom ||
+                (arr.length > 0 && arr[0] && arr[0].candidate && arr[0].candidate.chrom)
+                || null;
+  return {
+    schema:        'breeding_readiness_card_bundle_v1',
+    generated_at:  new Date().toISOString(),
+    chrom:         chrom,
+    n_cards:       arr.length,
+    filter:        _opts.filter_meta || null,
+    cards:         arr,
+  };
+}
+
+if (typeof window !== 'undefined') {
+  window._buildBreedingCardsJSONBundle = _buildBreedingCardsJSONBundle;
+}
+
+// _breedingExportTrigger(blob, filename) — DOM helper, downloads a Blob.
+// Mirrors the exportManuscriptBundle pattern (line ~60887): create <a>,
+// click, defer-cleanup. The 100ms delay before revoke gives the browser
+// time to actually start the download.
+function _breedingExportTrigger(blob, filename) {
+  if (typeof document === 'undefined') return false;
+  try {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    setTimeout(() => {
+      try { document.body.removeChild(a); } catch (_) {}
+      try { URL.revokeObjectURL(url); } catch (_) {}
+    }, 200);
+    return true;
+  } catch (e) {
+    if (typeof alert === 'function') {
+      alert('Export failed: ' + e.message);
+    }
+    return false;
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window._breedingExportTrigger = _breedingExportTrigger;
+}
+
+// _gatherBreedingCardsFromState(opts) — DOM-touching: pulls candidate list
+// from state, applies tier filter, calls _buildBreedingCard for each.
+// Returns { cards, filter_meta, chrom, n_input }.
+//
+// Returns null and shows an alert if no candidates would be exported
+// (i.e., user-visible safety net before trying to download an empty bundle).
+function _gatherBreedingCardsFromState(opts) {
+  const _opts = opts || {};
+  const _state = (typeof window !== 'undefined' && window.state) ? window.state : state;
+  const allCands = (_state && Array.isArray(_state.candidateList))
+                     ? _state.candidateList.slice() : [];
+  const tierMode = _opts.tierMode || 'tier_1_2';
+
+  const fr = _filterCandsForBreedingExport(allCands, tierMode);
+  if (fr.kept.length === 0) {
+    const reason = (allCands.length === 0)
+      ? 'No saved candidates on this chromosome. Promote at least one candidate first.'
+      : 'No candidates matched the active tier filter (' + fr.mode + '). ' +
+        'Saved: ' + allCands.length + '. ' +
+        'Try changing the tier dropdown to "all" or "tier_1_2_3".';
+    if (typeof alert === 'function') alert(reason);
+    return null;
+  }
+
+  // Build cards. _buildBreedingCard tolerates missing prereqs (returns
+  // a card with subsystem .available=false fields), so this won't throw
+  // even when cohort_diversity_v1 / h_classification aren't loaded.
+  const cards = [];
+  for (const c of fr.kept) {
+    let card = null;
+    try { card = _buildBreedingCard(c, { include_values: false }); } catch (_) {}
+    if (card) cards.push(card);
+  }
+
+  const chrom = (_state && _state.data && _state.data.chrom) || null;
+
+  return {
+    cards,
+    chrom,
+    n_input: allCands.length,
+    filter_meta: {
+      mode:              fr.mode,
+      accepted_tiers:    fr.accepted_tiers,
+      dropped_no_tier:   fr.dropped_no_tier,
+      dropped_off_tier:  fr.dropped_off_tier,
+      n_total:           allCands.length,
+    },
+  };
+}
+
+if (typeof window !== 'undefined') {
+  window._gatherBreedingCardsFromState = _gatherBreedingCardsFromState;
+}
+
+// _exportBreedingCardsHTML(opts) — top-level HTML export dispatcher.
+// Pulls candidates, filters, builds the combined HTML, downloads.
+function _exportBreedingCardsHTML(opts) {
+  const gathered = _gatherBreedingCardsFromState(opts);
+  if (!gathered) return false;
+
+  const html = _buildBreedingCardsCombinedHTML(gathered.cards, {
+    chrom:       gathered.chrom,
+    filter_meta: gathered.filter_meta,
+    auto_print:  false,
+    show_hint:   true,
+  });
+
+  const fname = (gathered.chrom || 'cohort') +
+                '_breeding_cards_' +
+                (gathered.filter_meta.mode || 'all') + '.html';
+  const blob = new Blob([html], { type: 'text/html' });
+  return _breedingExportTrigger(blob, fname);
+}
+
+// _exportBreedingCardsJSON(opts) — top-level JSON export dispatcher.
+function _exportBreedingCardsJSON(opts) {
+  const gathered = _gatherBreedingCardsFromState(opts);
+  if (!gathered) return false;
+
+  const bundle = _buildBreedingCardsJSONBundle(gathered.cards, {
+    chrom:       gathered.chrom,
+    filter_meta: gathered.filter_meta,
+  });
+
+  const fname = (gathered.chrom || 'cohort') +
+                '_breeding_cards_' +
+                (gathered.filter_meta.mode || 'all') + '.json';
+  const blob = new Blob([JSON.stringify(bundle, null, 2)],
+                        { type: 'application/json' });
+  return _breedingExportTrigger(blob, fname);
+}
+
+if (typeof window !== 'undefined') {
+  window._exportBreedingCardsHTML = _exportBreedingCardsHTML;
+  window._exportBreedingCardsJSON = _exportBreedingCardsJSON;
+}
+
+// _wireCatalogueBreedingExportBtns() — idempotent: wires the catalogue-
+// page buttons + tier dropdown to the dispatchers above. Called once at
+// boot via DOMContentLoaded; safe to re-call (guards on dataset._wired).
+function _wireCatalogueBreedingExportBtns() {
+  if (typeof document === 'undefined') return;
+  const tierSel = document.getElementById('catBreedingTierSel');
+  const htmlBtn = document.getElementById('catExportBreedingHTML');
+  const jsonBtn = document.getElementById('catExportBreedingJSON');
+
+  // Restore tier choice from localStorage if present
+  if (tierSel && !tierSel.dataset._wired) {
+    tierSel.dataset._wired = '1';
+    try {
+      const saved = localStorage.getItem('pca_scrubber_v3.breeding_export_tier');
+      if (saved && (saved in _BREEDING_EXPORT_TIER_MODES)) tierSel.value = saved;
+    } catch (_) {}
+    tierSel.addEventListener('change', () => {
+      try {
+        localStorage.setItem('pca_scrubber_v3.breeding_export_tier',
+                             tierSel.value || 'tier_1_2');
+      } catch (_) {}
+    });
+  }
+
+  const _currentTier = () => (tierSel && tierSel.value) || 'tier_1_2';
+
+  if (htmlBtn && !htmlBtn.dataset._wired) {
+    htmlBtn.dataset._wired = '1';
+    htmlBtn.addEventListener('click', () => {
+      _exportBreedingCardsHTML({ tierMode: _currentTier() });
+    });
+  }
+  if (jsonBtn && !jsonBtn.dataset._wired) {
+    jsonBtn.dataset._wired = '1';
+    jsonBtn.addEventListener('click', () => {
+      _exportBreedingCardsJSON({ tierMode: _currentTier() });
+    });
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window._wireCatalogueBreedingExportBtns = _wireCatalogueBreedingExportBtns;
+  if (typeof document !== 'undefined') {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', _wireCatalogueBreedingExportBtns);
+    } else {
+      setTimeout(_wireCatalogueBreedingExportBtns, 0);
+    }
+  }
+}
+
 
 // -----------------------------------------------------------------------------
 // Filter / sort helpers
@@ -42540,8 +44437,20 @@ function _applySpotlightHighlights(curFocalL2) {
   cols.forEach(col => {
     const meta = col.__l3_meta;
     if (!meta) return;
-    const cl_left  = getL2Cluster(meta.leftIdx);
-    const cl_right = getL2Cluster(meta.rightIdx);
+    // turn 148: slab columns route cluster lookups via getSlabClusterAt
+    // (range-keyed) instead of getL2Cluster (idx-keyed). Detect via
+    // meta.isSlab; meta has leftRange/rightRange [s, e] for slabs and
+    // leftIdx/rightIdx for L2.
+    let cl_left, cl_right;
+    if (meta.isSlab) {
+      if (!meta.leftRange || !meta.rightRange ||
+          typeof getSlabClusterAt !== 'function') return;
+      cl_left  = getSlabClusterAt(meta.leftRange[0],  meta.leftRange[1],  meta.K);
+      cl_right = getSlabClusterAt(meta.rightRange[0], meta.rightRange[1], meta.K);
+    } else {
+      cl_left  = getL2Cluster(meta.leftIdx);
+      cl_right = getL2Cluster(meta.rightIdx);
+    }
     if (!cl_left || !cl_right || !cl_left.labels || !cl_right.labels) return;
     const leftL  = cl_left.fixedKLabels || cl_left.labels;
     const rightL = cl_right.fixedKLabels || cl_right.labels;
@@ -43284,12 +45193,18 @@ function renderL3PanelSlab() {
                         ' display: flex; gap: 8px; align-items: center;' +
                         ' border-bottom: 1px solid var(--rule);';
     let offsetSlab = null;
+    // turn 148: per-pane toolbar mirrors of the global L3 controls (parity
+    // with L2 mode line 44592). Sits to the right of the title text via
+    // margin-left:auto inside the existing .l3-pane-tools span. Renders even
+    // on out-of-range panes so layout stays stable across panes.
+    const paneToolsHtml = (typeof _l3PaneHeaderToolsHtml === 'function')
+      ? _l3PaneHeaderToolsHtml() : '';
     if (isFocal) {
       // Inline K=N suffix when single-K (v3.53 convention)
       const kSuffix = (ksToRender.length === 1) ? ` · K=${ksToRender[0]}` : '';
-      head.innerHTML = `<span style="font-weight: 600;">◆ slab focal</span>` +
-                       ` <span class="dim">w${range[0]+1}–w${range[1]+1} (${W}w)${kSuffix}</span>` +
-                       ` <span class="dim" style="margin-left:auto;">SIM —</span>`;
+      head.innerHTML = `<span class="l3-pane-title" style="font-weight: 600;">◆ slab focal` +
+                       ` <span class="dim" style="font-weight:400;">w${range[0]+1}–w${range[1]+1} (${W}w)${kSuffix}</span></span>` +
+                       paneToolsHtml;
     } else {
       const arrow = offset < 0 ? '←' : '→';
       offsetSlab = slabRangeOffset(cur, halfW, offset);
@@ -43297,7 +45212,9 @@ function renderL3PanelSlab() {
       const lblText = offsetSlab
         ? `slab ${offset > 0 ? '+' : ''}${offset} · w${offsetSlab[0]+1}–w${offsetSlab[1]+1}${kSuffix}`
         : `slab ${offset} · out of range`;
-      head.innerHTML = `<span class="dim">${arrow}</span> <span style="font-weight: 500;">${lblText}</span>`;
+      head.innerHTML = `<span class="l3-pane-title"><span class="dim">${arrow}</span> ` +
+                       `<span style="font-weight: 500;">${lblText}</span></span>` +
+                       paneToolsHtml;
     }
     col.appendChild(head);
 
@@ -43336,6 +45253,25 @@ function renderL3PanelSlab() {
         col.appendChild(kBadge);
       }
 
+      // turn 148: karyotype chips ABOVE the mini-PCA on the focal pane
+      // (parity with L2 mode line 44687-44699). _kSpecificMetaInlineHtml works
+      // off cl.n_per_group + cl.centers — both available on slab clusters.
+      // Pass l2idx=null to skip the sub-band annotation chip (which only
+      // applies to L2 envelopes in active draft context).
+      if (isFocal) {
+        const clFocal = getSlabClusterAt(range[0], range[1], K);
+        if (typeof _kSpecificMetaInlineHtml === 'function') {
+          const chipsHtml = _kSpecificMetaInlineHtml(clFocal, null);
+          if (chipsHtml) {
+            const focalChipsAbove = document.createElement('div');
+            focalChipsAbove.style.cssText = 'font-size: 9.5px; line-height: 1.2; ' +
+              'padding: 2px 10px; margin: 0;';
+            focalChipsAbove.innerHTML = chipsHtml;
+            col.appendChild(focalChipsAbove);
+          }
+        }
+      }
+
       // Mini-PCA canvas
       const miniWrap = document.createElement('div');
       miniWrap.style.cssText = 'padding: 6px;';
@@ -43343,6 +45279,41 @@ function renderL3PanelSlab() {
       mini.style.cssText = 'display: block; width: 100%; height: 110px; cursor: crosshair; background: var(--panel-2);';
       miniWrap.appendChild(mini);
       col.appendChild(miniWrap);
+      // turn 148: spotlight click — fires after drawSlabMiniPCA has populated
+      // canvas.__l3_render. Same handler as L2 mode (parity with line 44707).
+      if (typeof _setupL3MiniClick === 'function') _setupL3MiniClick(mini);
+
+      // turn 148: band-selector strip on focal pane in candidate mode (parity
+      // with L2 mode line 44713-44744). _l3BandSelectorHtml is K-and-counts
+      // only — no L2 dependency — so it works for slabs too.
+      if (isFocal && typeof _l3BandSelectorHtml === 'function') {
+        try {
+          let bandCounts = null;
+          try {
+            const cl = getSlabClusterAt(range[0], range[1], K);
+            if (cl) {
+              const labels = cl.fixedKLabels || cl.labels;
+              if (labels && labels.length) {
+                bandCounts = new Array(K).fill(0);
+                for (let s = 0; s < labels.length; s++) {
+                  const lbl = labels[s] | 0;
+                  if (lbl >= 0 && lbl < K) bandCounts[lbl]++;
+                }
+              }
+            }
+          } catch (_) {}
+          const selHtml = _l3BandSelectorHtml(K, bandCounts);
+          if (selHtml) {
+            const sel = document.createElement('div');
+            sel.innerHTML = selHtml;
+            const inner = sel.firstChild;
+            if (inner) col.appendChild(inner);
+          }
+          if (typeof _wireBandSelectorClicks === 'function') {
+            _wireBandSelectorClicks();
+          }
+        } catch (_) { /* fail-soft — never break focal pane */ }
+      }
 
       // Content block: focal shows cluster info; neighbors show contingency
       const content = document.createElement('div');
@@ -43356,18 +45327,70 @@ function renderL3PanelSlab() {
         requestAnimationFrame(() => drawSlabMiniPCA(mini, range, cl ? cl.labels : null));
       } else {
         // ctHtml expects focal-on-rows for offset>=0, focal-on-cols for offset<0.
-        const cmp = (offset < 0)
-          ? compareSlabPair(offsetSlab, range, K)
-          : compareSlabPair(range, offsetSlab, K);
+        // turn 149: when state.l3ReclusterMode is set to a non-default mode,
+        // route through compareSlabPair_byMode (parity with L2 line 44832).
+        // The byMode variant handles kmeans-K6 directly and falls back to
+        // kmeans-K3 with a `fellBack: true` flag for U/V modes (which don't
+        // yet have slab implementations). Default kmeans-K3 keeps the simple
+        // path so unaffected users see no behavioral change.
+        const reMode = state.l3ReclusterMode || 'kmeans-K3';
+        let cmp;
+        if (reMode !== 'kmeans-K3') {
+          cmp = (offset < 0)
+            ? compareSlabPair_byMode(offsetSlab, range, reMode)
+            : compareSlabPair_byMode(range, offsetSlab, reMode);
+        } else {
+          cmp = (offset < 0)
+            ? compareSlabPair(offsetSlab, range, K)
+            : compareSlabPair(range, offsetSlab, K);
+        }
         // v3.65: compute alignedLabels first so we can pass to ctHtml for
-        // tracked-samples readout (slab variant).
+        // tracked-samples readout (slab variant). When reMode forces a
+        // different K (e.g. kmeans-K6 against l3KMode='k3' sections), the
+        // aligned labels are still at the section K — visual K mismatch
+        // between the mini-PCA palette (K=3) and the contingency (K=6) is
+        // the same trade-off L2 mode accepts.
         const alignedLabels = alignedSlabLabelsTo(range, offsetSlab, K);
         const neighborCl = getSlabClusterAt(offsetSlab[0], offsetSlab[1], K);
         if (!cmp) {
           content.innerHTML = '<div class="dim">low power · slab K-means failed</div>';
         } else {
-          content.innerHTML = ctHtml(cmp, offset, alignedLabels);
+          // turn 149: surface fallback notice when a U/V mode was requested
+          // but slab compare fell back to kmeans-K3 (no slab-aware U/V
+          // implementation yet). Prepended to the contingency content so
+          // the user knows the visible table doesn't reflect the dropdown
+          // setting.
+          let prefix = '';
+          if (cmp.fellBack && cmp.requestedMode) {
+            prefix = `<div class="dim" style="font-size:9.5px; line-height:1.3; ` +
+                     `padding:2px 4px; margin-bottom:4px; ` +
+                     `border-left: 2px solid var(--accent); padding-left:6px;" ` +
+                     `title="The U/V recluster modes (uv-rotated, uv-denoise, uv-dbscan, uv-dist-rank, uv-dist-fuzzy) require a slab-aware rotation pipeline that isn't shipped yet. ` +
+                     `Slab compare falls back to kmeans-K3 for these modes. Use kmeans-K3 or kmeans-K6 for accurate slab-mode reclustering, or switch the compare unit back to L2 for U/V modes.">` +
+                     `↩ slab fallback: <b>${cmp.requestedMode}</b> not available for slabs · using kmeans-K3` +
+                     `</div>`;
+          }
+          content.innerHTML = prefix + ctHtml(cmp, offset, alignedLabels);
         }
+        // turn 148: stash spotlight-resolution metadata on the column (parity
+        // with L2 mode line 44798-44807). Slab variant uses leftRange /
+        // rightRange instead of L2 indices and sets isSlab:true so the
+        // post-pass can route to getSlabClusterAt.
+        // turn 149: meta.K must reflect the K that was actually used in the
+        // contingency, which may differ from the section K when reMode forced
+        // a different K (e.g. kmeans-K6). Read from cmp.K.
+        const ctK = (cmp && cmp.K) ? cmp.K : K;
+        const _invPerm = new Array(ctK);
+        if (cmp && cmp.perm) {
+          for (let r = 0; r < ctK; r++) _invPerm[cmp.perm[r]] = r;
+        }
+        col.__l3_meta = {
+          K: ctK, offset,
+          isSlab: true,
+          leftRange:  (offset < 0) ? offsetSlab : range,
+          rightRange: (offset < 0) ? range      : offsetSlab,
+          invPerm: _invPerm,
+        };
         requestAnimationFrame(() => drawSlabMiniPCA(mini, offsetSlab,
           alignedLabels || (neighborCl ? neighborCl.labels : null)));
       }
@@ -43375,6 +45398,13 @@ function renderL3PanelSlab() {
 
     body.appendChild(col);
   });
+
+  // turn 148: apply cross-pane sample-spotlight highlights to the just-rendered
+  // contingency tables (parity with L2 mode line 44822). _applySpotlightHighlights
+  // detects slab columns via meta.isSlab and routes to getSlabClusterAt.
+  if (typeof _applySpotlightHighlights === 'function') {
+    try { _applySpotlightHighlights(null); } catch (_) {}
+  }
 }
 
 // Compact focal-content HTML for a slab (vs. focalContentHtml for an L2).
@@ -43481,6 +45511,25 @@ function drawSlabMiniPCA(canvas, range, labels) {
   xMin -= xPad; xMax += xPad; yMin -= yPad; yMax += yPad;
   const toX = v => pad.l + ((v - xMin) / (xMax - xMin)) * plotW;
   const toY = v => pad.t + (1 - (v - yMin) / (yMax - yMin)) * plotH;
+  // turn 148: cache render context for the click-spotlight hit-tester (parity
+  // with drawMiniPCA line 46550). Stored on the canvas itself so panel re-
+  // renders never produce a stale hit-test. _setupL3MiniClick reads
+  // __l3_render.{wMid, sign, pad, plotW, plotH, xMin..yMax, cssW, cssH} and
+  // calls getPC(wMid) to reconstruct the per-window PCs for the hit-test
+  // — for slabs we use the slab center as wMid (the slab's "representative"
+  // window). The slab K-means runs on slab-MEAN PC1, but the hit-test only
+  // needs an approximate sample → coordinate mapping; using the center
+  // window matches L2 mode's choice of using the L2's wMid.
+  const slabMid = (range[0] + range[1]) >> 1;
+  const { sign: slabSign } = getPC(slabMid);
+  canvas.__l3_render = {
+    l2idx: null,                     // slab variant — no L2 index
+    isSlab: true, slabRange: range.slice(),
+    wMid: slabMid, sign: slabSign,
+    pad, plotW, plotH,
+    xMin, xMax, yMin, yMax,
+    cssW: w, cssH: h,
+  };
   // Frame
   ctx.strokeStyle = themeColor('rule');
   ctx.strokeRect(pad.l + 0.5, pad.t + 0.5, plotW, plotH);
@@ -44817,14 +46866,46 @@ function _setupL3MiniClick(canvas) {
       }
       return;
     }
-    // Nearest-sample lookup using the cached PC1/PC2 + sign at this pane's wMid
-    const { pc1, pc2, sign } = getPC(ctx.wMid);
+    // turn 148: Nearest-sample lookup. For L2 panes use a single representative
+    // window's PCs (cached at ctx.wMid + sign). For slab panes use the slab-mean
+    // PCs (re-aggregated here — aggregateSlab is cheap enough and may be cached
+    // upstream); this matches what drawSlabMiniPCA actually plots, otherwise
+    // the click would land on the wrong sample at W>1.
+    let pc1Plot, pc2Plot, signMul;
+    if (ctx.isSlab && ctx.slabRange) {
+      const agg = (typeof aggregateSlab === 'function')
+        ? aggregateSlab(ctx.slabRange[0], ctx.slabRange[1]) : null;
+      if (!agg) return;
+      // agg.xs is already sign-flipped (sum of pc1[si]*sign / nW). agg.ys is
+      // present only when state.aggMethod === 'mean_pc12'; recompute pc2-mean
+      // here as a fallback to match what drawSlabMiniPCA does (it always
+      // computes ys2 directly, so we mirror that).
+      const nS = state.data.n_samples;
+      let pc2Mean = agg.ys;
+      if (!pc2Mean) {
+        pc2Mean = new Float64Array(nS);
+        const nW = ctx.slabRange[1] - ctx.slabRange[0] + 1;
+        for (let w0 = ctx.slabRange[0]; w0 <= ctx.slabRange[1]; w0++) {
+          const { pc2 } = getPC(w0);
+          for (let si = 0; si < nS; si++) pc2Mean[si] += pc2[si];
+        }
+        for (let si = 0; si < nS; si++) pc2Mean[si] /= nW;
+      }
+      pc1Plot = agg.xs;
+      pc2Plot = pc2Mean;
+      signMul = 1;                         // sign already applied in agg.xs
+    } else {
+      const pcRes = getPC(ctx.wMid);
+      pc1Plot = pcRes.pc1;
+      pc2Plot = pcRes.pc2;
+      signMul = pcRes.sign;
+    }
     const toX = v => ctx.pad.l + ((v - ctx.xMin) / (ctx.xMax - ctx.xMin)) * ctx.plotW;
     const toY = v => ctx.pad.t + (1 - (v - ctx.yMin) / (ctx.yMax - ctx.yMin)) * ctx.plotH;
     let bestI = -1, bestD = Infinity;
     const nS = state.data.n_samples;
     for (let si = 0; si < nS; si++) {
-      const x = toX(pc1[si] * sign), y = toY(pc2[si]);
+      const x = toX(pc1Plot[si] * signMul), y = toY(pc2Plot[si]);
       const dd = (x - px) * (x - px) + (y - py) * (y - py);
       if (dd < bestD) { bestD = dd; bestI = si; }
     }
@@ -55259,6 +57340,11 @@ const atlasServer = {
   status: 'unknown',
   lastChecked: 0,
   cacheLifetimeMs: 30_000,
+  // turn 145 — last /health response body (parsed JSON), or null if the
+  // last probe failed or returned non-JSON. The standalone-button popup
+  // reads `lastHealthBody.subsystems.popstats.ready` to surface partial
+  // states (server up, popstats subsystem disabled).
+  lastHealthBody: null,
 
   // Allow override via localStorage (so users can point at a different port)
   _initUrl() {
@@ -55272,6 +57358,7 @@ const atlasServer = {
     this.url = u || _ATLAS_SERVER_DEFAULT_URL;
     this.status = 'unknown';
     this.lastChecked = 0;
+    this.lastHealthBody = null;
     try { localStorage.setItem(_ATLAS_SERVER_LS_KEY, this.url); } catch (_) {}
   },
 
@@ -55303,8 +57390,21 @@ const atlasServer = {
       });
       if (timer) clearTimeout(timer);
       ok = resp && (resp.ok || resp.status === 0);
+      // turn 145 — capture the body so the popup can report which
+      // subsystems are live. Tolerate non-JSON responses (older shim,
+      // opaque CORS) by leaving lastHealthBody = null.
+      if (ok) {
+        try {
+          this.lastHealthBody = await resp.json();
+        } catch (_) {
+          this.lastHealthBody = null;
+        }
+      } else {
+        this.lastHealthBody = null;
+      }
     } catch (_) {
       ok = false;
+      this.lastHealthBody = null;
     }
     this.status = ok ? 'available' : 'unavailable';
     this.lastChecked = now;
@@ -55384,62 +57484,312 @@ atlasServer._initUrl();
 
 window.atlasServer = atlasServer;
 
-// --- mode badge in the toolbar -----------------------------------------------
+// --- standalone server button + popup (turn 145) -----------------------------
 //
-// Adds a small visual indicator to the existing atlas-tools group. Click
-// the badge to refresh the health check.
-function _atlasServerInitBadge() {
-  const group = document.getElementById('atlasToolsGroup');
-  if (!group || document.getElementById('atlasServerBadge')) return;
-  const badge = document.createElement('button');
-  badge.id = 'atlasServerBadge';
-  badge.className = 'atlas-tool-btn';
-  badge.title = 'Server status (click to refresh). View mode = single-file in-browser. '
-              + 'Server mode = local Python server reachable at ' + atlasServer.url
-              + '. Run `python3 atlas_server.py <project_folder>` to enable.';
-  badge.style.cssText = 'background:#1c2231;color:#7a8398;border:1px solid #2a3245;'
-                      + 'border-radius:3px;padding:0 8px;font-family:var(--mono);'
-                      + 'font-size:11px;line-height:1;cursor:pointer;align-self:center;height:22px;';
-  badge.textContent = '◌ checking...';
-  group.appendChild(badge);
+// Lifted out of the yellow `data ▾` dropdown into its own top-bar button.
+// One click opens a popup with two snippets the user can copy-paste in a
+// terminal at the Atlas/ root:
+//
+//   1. START — `./run_atlas.sh` (or `python3 run_atlas.py` cross-platform)
+//   2. CONFIG — `cp <example>.yaml <real>.yaml` to enable popstats
+//
+// Plus a Recheck button and a Close button. State is read from
+// `atlasServer.status` and refreshed via `atlasServer.isAvailable(true)`.
+//
+// The popup is intentionally minimal — Quentin: "not much more
+// complicated. and one snippet for the config of the server like where
+// are files. so we know this is the command for the server this is for
+// the config."
+//
+// The legacy `_atlasServerInitBadge` is gone in turn 145; if anything
+// still calls it, it's a no-op alias that delegates to the new init.
+function _atlasServerInitStandaloneBtn() {
+  const btn = document.getElementById('atlasServerStandaloneBtn');
+  if (!btn || btn.dataset._wired === '1') return;
+  btn.dataset._wired = '1';
 
-  function _refreshBadge() {
+  const dot   = document.getElementById('atlasServerStandaloneDot');
+  const label = document.getElementById('atlasServerStandaloneLabel');
+  const overlay = document.getElementById('atlasServerPopupOverlay');
+  const popup   = document.getElementById('atlasServerPopup');
+  if (!dot || !label || !overlay || !popup) return;
+
+  // Three colors: green (ready), amber (partial — server reachable but a
+  // subsystem unavailable), grey (unreachable). Amber is reserved for the
+  // case where /health came back but reports `subsystems.popstats.ready ===
+  // false` — at that point the user CAN read JSONs / save candidates but
+  // can't run live popstats.
+  const COLORS = {
+    ready:    { dot: '#3cc08a', border: '#3cc08a55', text: '#3cc08a' },
+    partial:  { dot: '#e0b042', border: '#e0b04255', text: '#e0b042' },
+    down:     { dot: '#6b7388', border: '#2a3245',   text: '#7a8398' },
+    checking: { dot: '#7a8398', border: '#2a3245',   text: '#a8b1c4' },
+  };
+  function _setLook(state) {
+    const c = COLORS[state] || COLORS.down;
+    dot.style.background  = c.dot;
+    btn.style.borderColor = c.border;
+    label.style.color     = c.text;
+  }
+
+  // Decide which state we're in given atlasServer.status + last health body.
+  function _currentState() {
     if (atlasServer.status === 'available') {
-      badge.textContent = '● server';
-      badge.style.color = '#3cc08a';
-      badge.style.borderColor = '#3cc08a44';
-    } else if (atlasServer.status === 'unavailable') {
-      badge.textContent = '○ view';
-      badge.style.color = '#7a8398';
-      badge.style.borderColor = '#2a3245';
+      const hb = atlasServer.lastHealthBody || null;
+      // New merged-server health shape: subsystems.popstats.ready
+      if (hb && hb.subsystems && hb.subsystems.popstats &&
+          hb.subsystems.popstats.ready === false &&
+          hb.subsystems.file && hb.subsystems.file.ready === true) {
+        return 'partial';
+      }
+      return 'ready';
+    }
+    if (atlasServer.status === 'unavailable') return 'down';
+    return 'checking';
+  }
+
+  function _refreshLook() {
+    _setLook(_currentState());
+  }
+
+  // ---- popup body ----------------------------------------------------------
+  // Two snippets are non-negotiable. Everything else is one paragraph or
+  // less. The popup is a leaf — no tabs, no settings, no dropdowns.
+  function _popupHtml() {
+    const state = _currentState();
+    const url = atlasServer.url || 'http://127.0.0.1:8765';
+
+    let statusBlock;
+    if (state === 'ready') {
+      statusBlock =
+        '<div style="padding: 8px 12px; background: #2a3a32; border-left: 3px solid #3cc08a; ' +
+        '            border-radius: 0 3px 3px 0; margin: 0 0 16px;">' +
+        '  <b style="color: #3cc08a;">● Server reachable</b>' +
+        '  <div style="color: #a8b1c4; margin-top: 2px; font-size: 11px;">' +
+        _atlasServerEsc(url) + ' — both subsystems ready.' +
+        '  </div>' +
+        '</div>';
+    } else if (state === 'partial') {
+      statusBlock =
+        '<div style="padding: 8px 12px; background: #3a3526; border-left: 3px solid #e0b042; ' +
+        '            border-radius: 0 3px 3px 0; margin: 0 0 16px;">' +
+        '  <b style="color: #e0b042;">● Server reachable, popstats subsystem disabled</b>' +
+        '  <div style="color: #a8b1c4; margin-top: 2px; font-size: 11px;">' +
+        '    File IO + computes work; live popstats / LD / dosage will return 503.' +
+        '    See the CONFIG snippet below to enable.' +
+        '  </div>' +
+        '</div>';
+    } else if (state === 'down') {
+      statusBlock =
+        '<div style="padding: 8px 12px; background: #3a2a2a; border-left: 3px solid #d97a2c; ' +
+        '            border-radius: 0 3px 3px 0; margin: 0 0 16px;">' +
+        '  <b style="color: #d97a2c;">● Server not running</b>' +
+        '  <div style="color: #a8b1c4; margin-top: 2px; font-size: 11px;">' +
+        '    The atlas works fine in view-only mode without a server.' +
+        '    Start one with the command below to enable saving / live computes.' +
+        '  </div>' +
+        '</div>';
     } else {
-      badge.textContent = '◌ checking...';
-      badge.style.color = '#a8b1c4';
+      statusBlock =
+        '<div style="padding: 8px 12px; background: #232838; border-left: 3px solid #7a8398; ' +
+        '            border-radius: 0 3px 3px 0; margin: 0 0 16px;">' +
+        '  <b style="color: #a8b1c4;">◌ Probing…</b>' +
+        '</div>';
+    }
+
+    // Snippet 1: start command. Identical phrasing to the launcher comment.
+    const startCmd = './run_atlas.sh';
+    const startCmdAlt = 'python3 run_atlas.py';
+
+    // Snippet 2: config — the example -> real copy. The user copies the
+    // example yaml to the canonical name, edits paths, re-runs the launcher.
+    const cfgCmd =
+      'cp server_turn1/popstats_server.config.example.yaml \\\n' +
+      '   server_turn1/popstats_server.config.yaml';
+
+    return [
+      '<div style="display: flex; align-items: baseline; justify-content: space-between; margin: 0 0 12px;">',
+      '  <div id="atlasServerPopupTitle"',
+      '       style="font-size: 14px; font-weight: 600; color: var(--ink, #d4dae6);">',
+      '    Atlas server',
+      '  </div>',
+      '  <button id="atlasServerPopupClose"',
+      '          style="background: transparent; border: none; color: #7a8398;',
+      '                 font-size: 16px; cursor: pointer; line-height: 1; padding: 0 4px;"',
+      '          title="Close (Esc)">✕</button>',
+      '</div>',
+
+      statusBlock,
+
+      // ---- Snippet 1: start ----
+      '<div style="font-family: var(--mono); font-size: 9.5px; color: #7a8398; ',
+      '            text-transform: uppercase; letter-spacing: 0.6px; margin: 0 0 4px;">',
+      '  start &mdash; paste in a terminal at the Atlas/ root',
+      '</div>',
+      '<div style="position: relative; margin: 0 0 6px;">',
+      '  <pre id="atlasServerStartSnippet"',
+      '       style="margin: 0; padding: 10px 44px 10px 12px; background: #11161f; color: #d4dae6;',
+      '              border: 1px solid var(--rule, #2a3245); border-radius: 3px;',
+      '              font-family: var(--mono); font-size: 12px; white-space: pre;',
+      '              overflow-x: auto;">' + _atlasServerEsc(startCmd) + '</pre>',
+      '  <button data-copy-target="atlasServerStartSnippet"',
+      '          class="atlas-server-copy-btn"',
+      '          title="Copy to clipboard"',
+      '          style="position: absolute; top: 4px; right: 4px; background: #232a3a;',
+      '                 color: #a8b1c4; border: 1px solid var(--rule, #2a3245);',
+      '                 border-radius: 3px; padding: 2px 8px; font-family: var(--mono);',
+      '                 font-size: 10px; cursor: pointer;">📋 copy</button>',
+      '</div>',
+      '<div style="color: #6b7388; font-size: 10.5px; margin: 0 0 16px;">',
+      '  on Windows / no bash: <code style="font-family: var(--mono); color: #a8b1c4;">' +
+        _atlasServerEsc(startCmdAlt) + '</code>',
+      '</div>',
+
+      // ---- Snippet 2: config ----
+      '<div style="font-family: var(--mono); font-size: 9.5px; color: #7a8398; ',
+      '            text-transform: uppercase; letter-spacing: 0.6px; margin: 0 0 4px;">',
+      '  config &mdash; one-time, only if you want live popstats',
+      '</div>',
+      '<div style="position: relative; margin: 0 0 6px;">',
+      '  <pre id="atlasServerCfgSnippet"',
+      '       style="margin: 0; padding: 10px 44px 10px 12px; background: #11161f; color: #d4dae6;',
+      '              border: 1px solid var(--rule, #2a3245); border-radius: 3px;',
+      '              font-family: var(--mono); font-size: 12px; white-space: pre;',
+      '              overflow-x: auto;">' + _atlasServerEsc(cfgCmd) + '</pre>',
+      '  <button data-copy-target="atlasServerCfgSnippet"',
+      '          class="atlas-server-copy-btn"',
+      '          title="Copy to clipboard"',
+      '          style="position: absolute; top: 4px; right: 4px; background: #232a3a;',
+      '                 color: #a8b1c4; border: 1px solid var(--rule, #2a3245);',
+      '                 border-radius: 3px; padding: 2px 8px; font-family: var(--mono);',
+      '                 font-size: 10px; cursor: pointer;">📋 copy</button>',
+      '</div>',
+      '<div style="color: #6b7388; font-size: 10.5px; margin: 0 0 16px;">',
+      '  Copy the example, edit paths inside (engines, sample list, etc.),',
+      '  re-run the launcher.',
+      '</div>',
+
+      // ---- Footer: recheck + url ----
+      '<div style="display: flex; align-items: center; gap: 12px; padding-top: 10px;',
+      '            border-top: 1px solid var(--rule, #2a3245);">',
+      '  <button id="atlasServerPopupRecheck"',
+      '          style="background: var(--accent, #f5a524); color: #11161f;',
+      '                 border: none; border-radius: 3px; padding: 5px 14px;',
+      '                 font-family: var(--mono); font-size: 11px; font-weight: 600;',
+      '                 cursor: pointer;">⟳ Recheck</button>',
+      '  <div style="color: #6b7388; font-size: 10.5px; flex: 1; text-align: right;">',
+      '    expected at <code style="color: #a8b1c4;">' + _atlasServerEsc(url) + '</code>',
+      '  </div>',
+      '</div>',
+    ].join('');
+  }
+
+  function _renderPopup() {
+    popup.innerHTML = _popupHtml();
+    // Wire close
+    const closeBtn = document.getElementById('atlasServerPopupClose');
+    if (closeBtn) closeBtn.addEventListener('click', _closePopup);
+    // Wire recheck
+    const recheckBtn = document.getElementById('atlasServerPopupRecheck');
+    if (recheckBtn) recheckBtn.addEventListener('click', async () => {
+      recheckBtn.textContent = '◌ checking…';
+      recheckBtn.disabled = true;
+      try {
+        await atlasServer.isAvailable(true);
+      } catch (_) {}
+      _refreshLook();
+      _renderPopup();   // re-render with new state
+    });
+    // Wire copy buttons
+    popup.querySelectorAll('.atlas-server-copy-btn').forEach(b => {
+      b.addEventListener('click', () => _copyTarget(b));
+    });
+  }
+
+  function _copyTarget(triggerBtn) {
+    const id = triggerBtn.dataset.copyTarget;
+    const el = id ? document.getElementById(id) : null;
+    if (!el) return;
+    const text = el.textContent;
+    const restore = triggerBtn.textContent;
+    const showOk = () => {
+      triggerBtn.textContent = '✓ copied';
+      setTimeout(() => { triggerBtn.textContent = restore; }, 1400);
+    };
+    const showFail = () => {
+      triggerBtn.textContent = '✕ failed';
+      setTimeout(() => { triggerBtn.textContent = restore; }, 1400);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(showOk, showFail);
+    } else {
+      // Fallback for older browsers / file:// origins
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        ok ? showOk() : showFail();
+      } catch (_) {
+        showFail();
+      }
     }
   }
 
-  badge.addEventListener('click', async () => {
-    badge.textContent = '◌ checking...';
-    badge.style.color = '#a8b1c4';
-    await atlasServer.isAvailable(true);
-    _refreshBadge();
+  function _openPopup() {
+    _renderPopup();
+    overlay.style.display = 'flex';
+  }
+  function _closePopup() {
+    overlay.style.display = 'none';
+  }
+
+  // Click outside the inner popup → close
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) _closePopup();
+  });
+  // Esc → close
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && overlay.style.display !== 'none') _closePopup();
   });
 
-  // Initial check (silent — failures expected when no server is running)
-  atlasServer.isAvailable().then(() => _refreshBadge()).catch(() => _refreshBadge());
+  // Click button → open popup
+  btn.addEventListener('click', _openPopup);
+
+  // Initial state: probe silently and reflect on the dot
+  _setLook('checking');
+  atlasServer.isAvailable().then(() => _refreshLook()).catch(() => _refreshLook());
 }
 
-// Initialize badge after DOM is ready (atlas-tools group is built early in body)
+// Tiny HTML escape used by _popupHtml. Local to this section.
+function _atlasServerEsc(s) {
+  if (s == null) return '';
+  return String(s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// turn 145 — pre-145 init function name kept as a no-op alias so any
+// stale caller (older bundle scripts, dev console, etc.) doesn't throw.
+function _atlasServerInitBadge() {
+  return _atlasServerInitStandaloneBtn();
+}
+
+// Initialize after DOM is ready.
 if (typeof document !== 'undefined') {
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', _atlasServerInitBadge);
+    document.addEventListener('DOMContentLoaded', _atlasServerInitStandaloneBtn);
   } else {
-    // Defer one tick so the atlas-tools group is in the DOM
-    setTimeout(_atlasServerInitBadge, 0);
+    setTimeout(_atlasServerInitStandaloneBtn, 0);
   }
 }
 
-window._atlasServerInitBadge = _atlasServerInitBadge;
+window._atlasServerInitStandaloneBtn = _atlasServerInitStandaloneBtn;
+window._atlasServerInitBadge         = _atlasServerInitBadge;
 
 // =============================================================================
 // Auto-classifier for haplotype labels (turn 120)
@@ -56776,6 +59126,13 @@ function _renderCandidateKaryotypeBody() {
   });
   const expBtn = document.getElementById('ckExportTSV');
   if (expBtn) expBtn.addEventListener('click', () => exportKaryotypeTSV(c, sorted));
+
+  // turn 144 (Breeding-readiness card, Turn C): inject the "Print breeding
+  // card" button next to the export-TSV button. Idempotent — repeated calls
+  // on re-render are no-ops because the wirer guards on existing #id.
+  if (typeof _wireCandKaryoPrintCardBtn === 'function') {
+    try { _wireCandKaryoPrintCardBtn(c); } catch (_) {}
+  }
 }
 
 // =============================================================================
@@ -59846,6 +62203,11 @@ if (_stepModeNInput) {
       }
       // Sync the L3 toolbar
       _syncStepModeToCompareUnit();
+      // turn 147 — refresh the header cycler so the "(N)" label reflects
+      // the new custom value immediately.
+      if (typeof _refreshStepSizeBtn === 'function') {
+        try { _refreshStepSizeBtn(); } catch (_) {}
+      }
     }
   });
 }
@@ -61193,6 +63555,41 @@ function setL3Collapsed(b) {
   if (titleEl) {
     titleEl.addEventListener('click', () => setL3Collapsed(!state.l3Collapsed));
   }
+  // turn 147 — ⋯ more disclosure for the L3 toolbar (Quentin's "L3
+  // toolbar sprawls across 3 rows on page 1, ~120px wasted vertical").
+  // Defaults to collapsed (the panel root #l3Panel ships with class
+  // 'l3-more-collapsed' in the static HTML). Restoring an expanded
+  // choice is a localStorage read.
+  const _moreBtn = document.getElementById('l3MoreToggleBtn');
+  const _l3PanelEl = document.getElementById('l3Panel');
+  function _applyL3MoreState(expanded) {
+    if (!_l3PanelEl) return;
+    _l3PanelEl.classList.toggle('l3-more-collapsed', !expanded);
+    if (_moreBtn) {
+      _moreBtn.textContent = expanded ? '⋯ less' : '⋯ more';
+      _moreBtn.title = expanded
+        ? 'Hide secondary L3 controls (color, K-mode, het, L2-sweep, G-panel, ' +
+          'band-continuity, scale-stability, detailed, spotlights, pin, live dosage). ' +
+          'Your choice persists.'
+        : 'Show secondary L3 controls (color, K-mode, het, L2-sweep, G-panel, ' +
+          'band-continuity, scale-stability, detailed, spotlights, pin, live dosage). ' +
+          'Hidden by default to keep the toolbar compact. Click to reveal — your choice persists.';
+    }
+  }
+  // Restore from localStorage
+  let _l3MoreExpanded = false;
+  try {
+    _l3MoreExpanded = localStorage.getItem('pca_scrubber_v3.l3MoreExpanded') === '1';
+  } catch (_) {}
+  _applyL3MoreState(_l3MoreExpanded);
+  if (_moreBtn) {
+    _moreBtn.addEventListener('click', () => {
+      _l3MoreExpanded = !_l3MoreExpanded;
+      try { localStorage.setItem('pca_scrubber_v3.l3MoreExpanded',
+                                 _l3MoreExpanded ? '1' : '0'); } catch (_) {}
+      _applyL3MoreState(_l3MoreExpanded);
+    });
+  }
 })();
 
 // =============================================================================
@@ -61259,13 +63656,41 @@ function _stepSizeForMode(m) {
 function _refreshStepSizeBtn() {
   const btn = document.getElementById('jumpToWindowsBtn');
   if (!btn) return;
-  const n = _stepSizeForMode(state.stepMode);
-  btn.textContent = `📊 Windows (${n})`;
-  // turn 128: light up the cycler whenever its current value (win1/win5/win10)
-  // is the active step mode. When the user has switched to 'l2' or 'winN'
-  // from the sidebar, the cycler dims (it's no longer the live setting).
-  const isCyclerLive = (_STEP_CYCLE_ORDER.indexOf(state.stepMode) >= 0);
-  btn.classList.toggle('is-active-step', isCyclerLive);
+  // turn 147 — fully reflect state.stepMode in the cycler button:
+  //   - 'l2'                  → label "📊 Windows (—)"; dim (cycler not live)
+  //   - 'win1' / 'win5' / 'win10' → label shows the cycler step; lit
+  //   - 'winN'                → label shows the custom N from sidebar;
+  //                             still lit (the cycler is NOT the live
+  //                             setting, but the user's stepping IS in
+  //                             windows mode — without this the user
+  //                             can't tell that arrow keys are stepping
+  //                             N windows instead of L2 envelopes).
+  // Tooltip also updated so hover explains the current state.
+  const m = state.stepMode;
+  let label, lit, title;
+  if (m === 'l2' || m == null) {
+    label = '📊 Windows (—)';
+    lit   = false;
+    title = 'Arrow-step cycler. Currently inactive — arrow keys jump '
+          + 'between L2 envelopes. Click to switch to 1-window steps; '
+          + 'click again to cycle 1 → 5 → 10 → 1.';
+  } else if (m === 'winN') {
+    const n = Math.max(1, (state.stepModeN | 0) || 1);
+    label = `📊 Windows (${n})`;
+    lit   = true;
+    title = `Arrow-step cycler. Currently set to ${n} windows per step `
+          + `(custom value from sidebar). Click to switch to the 1 → 5 → 10 cycle.`;
+  } else {
+    const n = _stepSizeForMode(m);
+    label = `📊 Windows (${n})`;
+    lit   = true;
+    title = `Arrow-step cycler. Currently set to ${n} window`
+          + `${n === 1 ? '' : 's'} per step. Click to advance the cycle `
+          + `(1 → 5 → 10 → 1).`;
+  }
+  btn.textContent = label;
+  btn.classList.toggle('is-active-step', lit);
+  btn.title = title;
 }
 
 // turn 128: keep the sidebar #stepModeBar buttons + #stepModeInfo + the

@@ -1,9 +1,10 @@
 # engine_fast_ld
 
 Standalone fast LD engine. C binary + Python wrapper + windows-JSON
-preprocessor. Used by `server_turn11c_ld_fast/` to power the page-3 LD
-panel. Not specific to the atlas — could be reused by anyone with a
-BEAGLE-imputed dosage TSV + an atlas-style windows JSON.
+preprocessor. Imported by `server_turn1/ld_endpoint.py` (the LD endpoint
+module of the merged atlas server) to power the page-3 LD panel. Not
+specific to the atlas — could be reused by anyone with a BEAGLE-imputed
+dosage TSV + an atlas-style windows JSON.
 
 ## Files
 
