@@ -607,9 +607,16 @@
     miniHolder.style.cssText = 'display:flex;justify-content:center;cursor:pointer;';
     wrap.appendChild(miniHolder);
 
+    // Track the inner SVG element so the hover wiring can scope itself to
+    // the actual dotplot square (not the unfilled left/right margins of
+    // the flex-centered holder). renderMini() refreshes this reference.
+    let miniSvgEl = null;
+
     const renderMini = () => {
       const v = computeLayoutFor(resolution);
       miniHolder.innerHTML = _renderDotplotSVG(data, v.alignments, v.layout, miniSize, opts);
+      miniSvgEl = miniHolder.querySelector('svg');
+      _wireMiniHover();
     };
     renderMini();
     resSelect.addEventListener('change', () => {
@@ -768,25 +775,31 @@
       popupState.open = true;
     };
 
-    // Hover wiring on the mini panel
+    // Hover wiring — bound to the inner SVG (the actual dotplot square),
+    // NOT to the flex-centered holder, so the unfilled left/right margins
+    // of the panel don't trigger the popup. Re-bound after each renderMini()
+    // because the SVG element is replaced via innerHTML on resolution change.
     let hoverTimer = null;
-    miniHolder.addEventListener('mouseenter', () => {
-      // Open immediately on hover (no pin step — pure hover model).
-      if (!popupState.open) renderEnlarged();
-    });
-    miniHolder.addEventListener('mouseleave', () => {
-      // Small grace period so the user can move into the popup itself
-      // without the popup closing under them.
-      if (hoverTimer) clearTimeout(hoverTimer);
-      hoverTimer = setTimeout(() => closePopup(), 80);
-    });
+    function _wireMiniHover() {
+      if (!miniSvgEl) return;
+      miniSvgEl.addEventListener('mouseenter', () => {
+        if (!popupState.open) renderEnlarged();
+      });
+      miniSvgEl.addEventListener('mouseleave', () => {
+        // Small grace period so the user can move into the popup itself
+        // without the popup closing under them.
+        if (hoverTimer) clearTimeout(hoverTimer);
+        hoverTimer = setTimeout(() => closePopup(), 80);
+      });
+    }
+
     // If the user moves into the popup, cancel the close timer; if they
-    // move out of both mini and popup, schedule close.
+    // move out of both the mini-svg and the popup, schedule close.
     document.addEventListener('mouseover', (ev) => {
       if (!popupState.open) return;
       if (popupState.el && popupState.el.contains(ev.target)) {
         if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = null; }
-      } else if (!miniHolder.contains(ev.target)) {
+      } else if (!miniSvgEl || !miniSvgEl.contains(ev.target)) {
         if (hoverTimer) clearTimeout(hoverTimer);
         hoverTimer = setTimeout(() => closePopup(), 80);
       }

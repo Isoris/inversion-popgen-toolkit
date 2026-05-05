@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>SV evidence — step 4.5 smoke test (region-select mode)</title>
+<style>
+  :root {
+    --bg: #0e1116; --panel: #151a22; --panel-2: #1c2330; --panel-3: #2a3242;
+    --ink: #e7edf3; --ink-dim: #8a94a3; --ink-dimmer: #5a6472;
+    --accent: #f5a524; --accent-2: #4fa3ff; --good: #3cc08a; --bad: #e0555c;
+    --rule: #2a3242;
+    --ui: system-ui, -apple-system, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  body.light-theme {
+    --bg: #fafbfc; --panel: #fff; --panel-2: #f1f3f6; --panel-3: #e3e7ec;
+    --ink: #1a1f26; --ink-dim: #5a6472; --ink-dimmer: #8a94a3;
+    --rule: #d3d8de;
+  }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--ui); }
+  #harness { display: flex; flex-direction: column; height: 100vh; }
+  #harness-bar {
+    flex: 0 0 auto; padding: 6px 12px; border-bottom: 1px solid var(--rule);
+    background: var(--panel-2); display: flex; gap: 12px; align-items: center;
+    font-size: 12px; flex-wrap: wrap;
+  }
+  #harness-bar button {
+    background: var(--panel); color: var(--ink); border: 1px solid var(--rule);
+    padding: 3px 10px; border-radius: 3px; cursor: pointer; font-size: 11px;
+  }
+  #page_sv_evidence { flex: 1 1 auto; min-height: 0; }
+  .page.active { display: block; }
+  #harness-status { color: var(--ink-dim); font-size: 11px; }
+</style>
+</head>
+<body>
+<div id="harness">
+  <div id="harness-bar">
+    <strong>SV evidence step-4.5 smoke test</strong>
+    <button id="btn-load-fixture">load fixture</button>
+    <button id="btn-load-1000">load 1000 SVs</button>
+    <button id="btn-clear">clear</button>
+    <button id="btn-theme">toggle theme</button>
+    <span id="harness-status">click "◧ select" in toolbar → drag on locus to filter region · Esc clears · "↺" reset clears region too</span>
+  </div>
+  <div id="page_sv_evidence" class="page active">
+    <div id="sv_evidence_root"></div>
+  </div>
+</div>
+
+<script src="../../js/atlas_sv_evidence.js"></script>
+<script>
+  function makeLocks() {
+    const labels = [];
+    for (let i = 0; i < 61;  i++) labels.push({ sample_id: 's_h1h1_' + i, label: 'HOMO_1' });
+    for (let i = 0; i < 103; i++) labels.push({ sample_id: 's_het_'  + i, label: 'HET'    });
+    for (let i = 0; i < 62;  i++) labels.push({ sample_id: 's_h2h2_' + i, label: 'HOMO_2' });
+    return labels;
+  }
+  window.state = {
+    activeCandidateId: 'cand_LG28_15Mb',
+    candidateState: { cand_LG28_15Mb: { locked_labels: makeLocks() } },
+    candidateList: [{ id: 'cand_LG28_15Mb', candidate_id: 'cand_LG28_15Mb', chrom: 'C_gar_LG28' }],
+  };
+  AtlasSVEvidence.init({ root: document.getElementById('sv_evidence_root') });
+  AtlasSVEvidence.attachHotkeys();
+
+  function makeSyntheticLargeLayer() {
+    const types = ['BND','INV','DEL','DUP','Other'];
+    const zones = ['left_flank','left_boundary','inversion_body','right_boundary','right_flank'];
+    const patterns = ['canonical_breakpoint_marker','dominant_presence_marker',
+                      'het_specific_marker','sub_haplotype_marker',
+                      'internal_linked_marker','uninformative'];
+    const calls = [];
+    for (let i = 0; i < 1000; i++) {
+      const fdr = Math.random() < 0.4 ? Math.pow(10, -Math.random() * 12) : Math.random();
+      calls.push({
+        sv_id: 'SV' + String(i + 1).padStart(4, '0'),
+        sv_type: types[Math.floor(Math.random() * types.length)],
+        chrom: 'C_gar_LG28',
+        position_bp: Math.round(14140000 + Math.random() * 4980000),
+        end_bp: null,
+        zone: zones[Math.floor(Math.random() * zones.length)],
+        distance_to_edge_bp: Math.round((Math.random() - 0.5) * 1000000),
+        n_samples_with_call: Math.round(150 + Math.random() * 76),
+        quality: 'PASS',
+        callers: ['delly2'],
+        genotype_counts: {
+          'H1/H1': { AA: 10, AB: 5, BB: 1, miss: 0 },
+          'H1/H2': { AA: 5,  AB: 80, BB: 8, miss: 0 },
+          'H2/H2': { AA: 0,  AB: 5, BB: 50, miss: 0 },
+        },
+        fisher: { comparison: 'H1/H1_vs_H2/H2',
+                  odds_ratio: Math.random() * 80,
+                  p_value: fdr * 0.5, fdr_bh: fdr },
+        pattern_label: fdr < 0.05 ? patterns[Math.floor(Math.random() * 5)] : 'uninformative',
+        notes: '',
+      });
+    }
+    return {
+      format_version: 'sv_genotype_counts_v1',
+      candidate_id: 'cand_LG28_15Mb',
+      chrom: 'C_gar_LG28',
+      boundary_left_bp: 15142000,
+      boundary_right_bp: 18124000,
+      zone_definitions_bp: {
+        left_flank:     [14140000, 14640000],
+        left_boundary:  [14640000, 15640000],
+        inversion_body: [15640000, 17620000],
+        right_boundary: [17620000, 18620000],
+        right_flank:    [18620000, 19120000],
+      },
+      groups_used: { 'H1/H1':{n:61,members:[]}, 'H1/H2':{n:103,members:[]}, 'H2/H2':{n:62,members:[]} },
+      sv_calls: calls,
+      boundary_summary: { left:{}, right:{} },
+      upset_top_combinations: [],
+    };
+  }
+
+  document.getElementById('btn-load-fixture').addEventListener('click', () => {
+    fetch('fixture_sv_genotype_counts_v1.json').then(r => r.json()).then(j => {
+      AtlasSVEvidence._state.layer = j;
+      AtlasSVEvidence._state.activeCandidateId = j.candidate_id;
+      AtlasSVEvidence._state.layerError = null;
+      AtlasSVEvidence._state.layerLoading = false;
+      AtlasSVEvidence._state.pageIndex = 0;
+      AtlasSVEvidence.refresh();
+    });
+  });
+  document.getElementById('btn-load-1000').addEventListener('click', () => {
+    const layer = makeSyntheticLargeLayer();
+    AtlasSVEvidence._state.layer = layer;
+    AtlasSVEvidence._state.activeCandidateId = layer.candidate_id;
+    AtlasSVEvidence._state.layerError = null;
+    AtlasSVEvidence._state.layerLoading = false;
+    AtlasSVEvidence._state.pageIndex = 0;
+    AtlasSVEvidence.refresh();
+  });
+  document.getElementById('btn-clear').addEventListener('click', () => {
+    AtlasSVEvidence._state.layer = null;
+    AtlasSVEvidence.refresh();
+  });
+  document.getElementById('btn-theme').addEventListener('click', () => {
+    document.body.classList.toggle('light-theme');
+  });
+
+  setTimeout(() => document.getElementById('btn-load-fixture').click(), 50);
+</script>
+</body>
+</html>

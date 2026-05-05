@@ -1,0 +1,199 @@
+{
+  "format_version": "sv_genotype_counts_v1",
+  "candidate_id": "cand_LG28_15Mb",
+  "chrom": "C_gar_LG28",
+  "boundary_left_bp": 15142000,
+  "boundary_right_bp": 18124000,
+  "zone_definitions_bp": {
+    "left_flank":     [14140000, 14640000],
+    "left_boundary":  [14640000, 15640000],
+    "inversion_body": [15640000, 17620000],
+    "right_boundary": [17620000, 18620000],
+    "right_flank":    [18620000, 19120000]
+  },
+  "groups_used": {
+    "H1/H1": { "label": "H1/H1", "n": 61,  "members": [] },
+    "H1/H2": { "label": "H1/H2", "n": 103, "members": [] },
+    "H2/H2": { "label": "H2/H2", "n": 62,  "members": [] }
+  },
+  "sv_calls": [
+    {
+      "sv_id": "SV001", "sv_type": "BND", "chrom": "C_gar_LG28",
+      "position_bp": 15142380, "end_bp": 18118200,
+      "zone": "left_boundary", "distance_to_edge_bp": 380,
+      "n_samples_with_call": 226, "quality": "PASS",
+      "callers": ["delly2", "manta"],
+      "genotype_counts": {
+        "H1/H1": { "AA": 55, "AB": 5,  "BB": 1,  "miss": 0 },
+        "H1/H2": { "AA": 10, "AB": 81, "BB": 8,  "miss": 4 },
+        "H2/H2": { "AA": 0,  "AB": 6,  "BB": 55, "miss": 1 }
+      },
+      "fisher": {
+        "comparison": "H1/H1_vs_H2/H2",
+        "odds_ratio": 42.1, "p_value": 1.2e-12, "fdr_bh": 2.1e-9
+      },
+      "pattern_label": "canonical_breakpoint_marker",
+      "notes": "BND pair → 18.12 Mb"
+    },
+    {
+      "sv_id": "SV002", "sv_type": "INV", "chrom": "C_gar_LG28",
+      "position_bp": 15138900, "end_bp": 18121400,
+      "zone": "left_boundary", "distance_to_edge_bp": -3100,
+      "n_samples_with_call": 226, "quality": "PASS",
+      "callers": ["manta"],
+      "genotype_counts": {
+        "H1/H1": { "AA": 58, "AB": 2,  "BB": 0,  "miss": 1 },
+        "H1/H2": { "AA": 12, "AB": 73, "BB": 12, "miss": 6 },
+        "H2/H2": { "AA": 1,  "AB": 5,  "BB": 54, "miss": 2 }
+      },
+      "fisher": {
+        "comparison": "H1/H1_vs_H2/H2",
+        "odds_ratio": 28.7, "p_value": 5.6e-10, "fdr_bh": 8.4e-7
+      },
+      "pattern_label": "canonical_breakpoint_marker",
+      "notes": "Manta INV"
+    },
+    {
+      "sv_id": "SV003", "sv_type": "DEL", "chrom": "C_gar_LG28",
+      "position_bp": 15205600, "end_bp": 15217600,
+      "zone": "left_boundary", "distance_to_edge_bp": 63600,
+      "n_samples_with_call": 224, "quality": "PASS",
+      "callers": ["delly2"],
+      "genotype_counts": {
+        "H1/H1": { "AA": 44, "AB": 12, "BB": 4,  "miss": 1 },
+        "H1/H2": { "AA": 18, "AB": 62, "BB": 17, "miss": 6 },
+        "H2/H2": { "AA": 3,  "AB": 17, "BB": 39, "miss": 3 }
+      },
+      "fisher": {
+        "comparison": "H1/H1_vs_H2/H2",
+        "odds_ratio": 6.3, "p_value": 2.1e-4, "fdr_bh": 0.0041
+      },
+      "pattern_label": "dominant_presence_marker",
+      "notes": "~12 kb DEL"
+    },
+    {
+      "sv_id": "SV004", "sv_type": "BND", "chrom": "C_gar_LG28",
+      "position_bp": 18121950, "end_bp": 15136950,
+      "zone": "right_boundary", "distance_to_edge_bp": -50,
+      "n_samples_with_call": 223, "quality": "PASS",
+      "callers": ["delly2", "manta"],
+      "genotype_counts": {
+        "H1/H1": { "AA": 0,  "AB": 3,  "BB": 58, "miss": 0 },
+        "H1/H2": { "AA": 4,  "AB": 74, "BB": 22, "miss": 3 },
+        "H2/H2": { "AA": 3,  "AB": 52, "BB": 8,  "miss": 1 }
+      },
+      "fisher": {
+        "comparison": "H1/H1_vs_H2/H2",
+        "odds_ratio": 56.9, "p_value": 3.4e-14, "fdr_bh": 6.7e-11
+      },
+      "pattern_label": "canonical_breakpoint_marker",
+      "notes": "BND pair → 15.14 Mb"
+    },
+    {
+      "sv_id": "SV005", "sv_type": "INV", "chrom": "C_gar_LG28",
+      "position_bp": 18128300, "end_bp": 15140000,
+      "zone": "right_boundary", "distance_to_edge_bp": 4300,
+      "n_samples_with_call": 225, "quality": "PASS",
+      "callers": ["manta"],
+      "genotype_counts": {
+        "H1/H1": { "AA": 1,  "AB": 6,  "BB": 54, "miss": 0 },
+        "H1/H2": { "AA": 5,  "AB": 67, "BB": 26, "miss": 5 },
+        "H2/H2": { "AA": 6,  "AB": 48, "BB": 10, "miss": 2 }
+      },
+      "fisher": {
+        "comparison": "H1/H1_vs_H2/H2",
+        "odds_ratio": 33.2, "p_value": 8.2e-12, "fdr_bh": 1.1e-8
+      },
+      "pattern_label": "canonical_breakpoint_marker",
+      "notes": "Manta INV"
+    },
+    {
+      "sv_id": "SV006", "sv_type": "DUP", "chrom": "C_gar_LG28",
+      "position_bp": 17950100, "end_bp": 17995100,
+      "zone": "inversion_body", "distance_to_edge_bp": null,
+      "n_samples_with_call": 221, "quality": "PASS",
+      "callers": ["delly2"],
+      "genotype_counts": {
+        "H1/H1": { "AA": 10, "AB": 28, "BB": 20, "miss": 3 },
+        "H1/H2": { "AA": 20, "AB": 48, "BB": 25, "miss": 10 },
+        "H2/H2": { "AA": 10, "AB": 26, "BB": 22, "miss": 4 }
+      },
+      "fisher": {
+        "comparison": "H1/H1_vs_H2/H2",
+        "odds_ratio": 2.1, "p_value": 0.086, "fdr_bh": 0.18
+      },
+      "pattern_label": "internal_linked_marker",
+      "notes": "~45 kb DUP"
+    },
+    {
+      "sv_id": "SV007", "sv_type": "DEL", "chrom": "C_gar_LG28",
+      "position_bp": 16882400, "end_bp": 16893400,
+      "zone": "inversion_body", "distance_to_edge_bp": null,
+      "n_samples_with_call": 219, "quality": "PASS",
+      "callers": ["delly2"],
+      "genotype_counts": {
+        "H1/H1": { "AA": 13, "AB": 24, "BB": 19, "miss": 5 },
+        "H1/H2": { "AA": 23, "AB": 49, "BB": 17, "miss": 14 },
+        "H2/H2": { "AA": 10, "AB": 24, "BB": 16, "miss": 12 }
+      },
+      "fisher": {
+        "comparison": "H1/H1_vs_H2/H2",
+        "odds_ratio": 1.6, "p_value": 0.32, "fdr_bh": 0.49
+      },
+      "pattern_label": "uninformative",
+      "notes": "—"
+    },
+    {
+      "sv_id": "SV008", "sv_type": "BND", "chrom": "C_gar_LG28",
+      "position_bp": 14920700, "end_bp": null,
+      "zone": "left_flank", "distance_to_edge_bp": -221300,
+      "n_samples_with_call": 223, "quality": "PASS",
+      "callers": ["manta"],
+      "genotype_counts": {
+        "H1/H1": { "AA": 29, "AB": 20, "BB": 10, "miss": 2 },
+        "H1/H2": { "AA": 31, "AB": 40, "BB": 28, "miss": 4 },
+        "H2/H2": { "AA": 18, "AB": 25, "BB": 18, "miss": 1 }
+      },
+      "fisher": {
+        "comparison": "H1/H1_vs_H2/H2",
+        "odds_ratio": 0.9, "p_value": 0.78, "fdr_bh": 0.83
+      },
+      "pattern_label": "uninformative",
+      "notes": "—"
+    }
+  ],
+  "boundary_summary": {
+    "left": {
+      "interval_bp": [14640000, 15640000],
+      "by_sv_type": {
+        "BND":   { "n_total": 24, "n_associated_fdr_lt_0_05": 9 },
+        "INV":   { "n_total": 11, "n_associated_fdr_lt_0_05": 5 },
+        "DEL":   { "n_total": 38, "n_associated_fdr_lt_0_05": 7 },
+        "DUP":   { "n_total": 22, "n_associated_fdr_lt_0_05": 4 },
+        "Other": { "n_total": 7,  "n_associated_fdr_lt_0_05": 0 }
+      }
+    },
+    "right": {
+      "interval_bp": [17620000, 18620000],
+      "by_sv_type": {
+        "BND":   { "n_total": 27, "n_associated_fdr_lt_0_05": 11 },
+        "INV":   { "n_total": 12, "n_associated_fdr_lt_0_05": 6 },
+        "DEL":   { "n_total": 41, "n_associated_fdr_lt_0_05": 8 },
+        "DUP":   { "n_total": 24, "n_associated_fdr_lt_0_05": 5 },
+        "Other": { "n_total": 5,  "n_associated_fdr_lt_0_05": 0 }
+      }
+    }
+  },
+  "upset_top_combinations": [
+    { "members": ["SV001"],                  "intersection_size": 42 },
+    { "members": ["SV001","SV004"],          "intersection_size": 31 },
+    { "members": ["SV001","SV002"],          "intersection_size": 17 },
+    { "members": ["SV004","SV005"],          "intersection_size": 11 },
+    { "members": ["SV001","SV004","SV005"],  "intersection_size": 9  },
+    { "members": ["SV001","SV002","SV004"],  "intersection_size": 9  },
+    { "members": ["SV002"],                  "intersection_size": 8  },
+    { "members": ["SV005"],                  "intersection_size": 5  },
+    { "members": ["SV001","SV003"],          "intersection_size": 3  },
+    { "members": ["SV004"],                  "intersection_size": 2  }
+  ]
+}

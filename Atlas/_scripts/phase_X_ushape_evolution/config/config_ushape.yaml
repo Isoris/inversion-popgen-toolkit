@@ -1,0 +1,41 @@
+# =============================================================================
+# config_ushape.yaml — defaults for the U-shape evolution module
+# =============================================================================
+# All thresholds and windowing parameters in one place. Read by:
+#   - LAUNCH_U00_run_all.sh  (offline batch)
+#   - the popstats server endpoint (server can override per-request via the
+#     `params` block of the POST body)
+# =============================================================================
+
+# windowing
+n_windows_inside: 100        # candidate is split into this many equal windows
+edge_fraction:    0.20       # first/last 20% of inversion = edge zones
+center_fraction:  0.60       # middle 60% = center zone
+max_flank_bp:     2000000    # cap flank length at 2 Mb each side
+min_flank_bp:     100000     # minimum flank length
+min_window_bp:    1000       # lower bound on window size for short candidates
+
+# group sample sizes
+min_group_n:      3          # HOMO_1 and HOMO_2 each need at least this many samples
+
+# thresholds for the rule classifier
+u_score_high:               1.5    # neutral_like_U_shape gate
+inside_flank_high:          1.5    # flat_high_deep gate
+internal_peak_high:         1.5    # locally_adapted_internal_peak_like gate
+asymmetry_log2_high:        1.0    # asymmetric_edge gate (abs(log2(left/right)))
+fst_enrichment_high:        1.5    # FST inside/flank when used in composites
+oldness_min:                1.2    # AGE GATE — below this -> young_weak_divergence
+dxy_min_inside:             1.0e-4 # second AGE GATE — absolute dXY floor inside
+flatness_max_for_flat:      0.35   # flat_deep requires sd/mean below this
+min_inside_windows_for_shape: 8    # below this -> insufficient_data
+
+# matched-background (U03)
+n_random_background: 1000
+matched_seed:        42
+
+# clustering (U04)
+k_min: 2
+k_max: 8
+
+# validation (U05)
+n_perm: 999

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>SV evidence — step 6 smoke test (heatmap + 3 layers + dim wiring)</title>
+<style>
+  :root {
+    --bg: #0e1116; --panel: #151a22; --panel-2: #1c2330; --panel-3: #2a3242;
+    --ink: #e7edf3; --ink-dim: #8a94a3; --ink-dimmer: #5a6472;
+    --accent: #f5a524; --accent-2: #4fa3ff; --good: #3cc08a; --bad: #e0555c;
+    --rule: #2a3242;
+    --ui: system-ui, -apple-system, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  body.light-theme {
+    --bg: #fafbfc; --panel: #fff; --panel-2: #f1f3f6; --panel-3: #e3e7ec;
+    --ink: #1a1f26; --ink-dim: #5a6472; --ink-dimmer: #8a94a3;
+    --rule: #d3d8de;
+  }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--ui); }
+  #harness { display: flex; flex-direction: column; height: 100vh; }
+  #harness-bar {
+    flex: 0 0 auto; padding: 6px 12px; border-bottom: 1px solid var(--rule);
+    background: var(--panel-2); display: flex; gap: 12px; align-items: center;
+    font-size: 12px; flex-wrap: wrap;
+  }
+  #harness-bar button {
+    background: var(--panel); color: var(--ink); border: 1px solid var(--rule);
+    padding: 3px 10px; border-radius: 3px; cursor: pointer; font-size: 11px;
+  }
+  #page_sv_evidence { flex: 1 1 auto; min-height: 0; }
+  .page.active { display: block; }
+  #harness-status { color: var(--ink-dim); font-size: 11px; }
+  #harness-status code {
+    background: var(--panel); padding: 1px 4px; border-radius: 2px;
+    font-family: var(--mono);
+  }
+</style>
+</head>
+<body>
+<div id="harness">
+  <div id="harness-bar">
+    <strong>SV evidence step-6 smoke test</strong>
+    <button id="btn-load-all">load all 3 layers</button>
+    <button id="btn-load-gt">just gt</button>
+    <button id="btn-load-comb">+ combinations</button>
+    <button id="btn-load-supp">+ support (heatmap)</button>
+    <button id="btn-clear">clear all</button>
+    <button id="btn-expand">expand heatmap (large)</button>
+    <button id="btn-collapse">collapse heatmap</button>
+    <button id="btn-theme">toggle theme</button>
+    <span id="harness-status">
+      Drop a folder · or click <code>load all 3 layers</code> · the heatmap
+      appears below the UpSet panel · click an UpSet bar to dim non-carriers
+      in the locus glyphs · click the heatmap's <code>↗ expand</code> for the
+      large overlay · <code>Esc</code> closes everything.
+    </span>
+  </div>
+  <div id="page_sv_evidence" class="page active">
+    <div id="sv_evidence_root"></div>
+  </div>
+</div>
+
+<script src="../../js/atlas_sv_evidence.js"></script>
+<script>
+  // Worked-example karyotype lock: 61 H1/H1, 103 H1/H2, 62 H2/H2 = 226 fish.
+  // This is the same cohort shape the fixture JSONs assume.
+  function makeLocks() {
+    const labels = [];
+    for (let i = 0; i < 61;  i++) labels.push({ sample_id: 's_h1h1_' + i, label: 'HOMO_1' });
+    for (let i = 0; i < 103; i++) labels.push({ sample_id: 's_het_'  + i, label: 'HET'    });
+    for (let i = 0; i < 62;  i++) labels.push({ sample_id: 's_h2h2_' + i, label: 'HOMO_2' });
+    return labels;
+  }
+  window.state = {
+    activeCandidateId: 'cand_LG28_15Mb',
+    candidateState: { cand_LG28_15Mb: { locked_labels: makeLocks() } },
+    candidateList: [{ id: 'cand_LG28_15Mb', candidate_id: 'cand_LG28_15Mb', chrom: 'C_gar_LG28' }],
+  };
+  AtlasSVEvidence.init({ root: document.getElementById('sv_evidence_root') });
+  AtlasSVEvidence.attachHotkeys();
+
+  function loadGt() {
+    return fetch('fixture_sv_genotype_counts_v1.json').then(r => r.json()).then(j => {
+      AtlasSVEvidence._state.layer = j;
+      AtlasSVEvidence._state.activeCandidateId = j.candidate_id;
+      AtlasSVEvidence._state.layerError = null;
+      AtlasSVEvidence._state.layerLoading = false;
+      AtlasSVEvidence._state.pageIndex = 0;
+    });
+  }
+  function loadCombinations() {
+    return fetch('fixture_sv_evidence_combinations_v1.json').then(r => r.json())
+      .then(j => AtlasSVEvidence.setCombinationsLayer(j));
+  }
+  function loadSupport() {
+    return fetch('fixture_sv_support_by_sample_v1.json').then(r => r.json())
+      .then(j => AtlasSVEvidence.setSupportLayer(j));
+  }
+
+  document.getElementById('btn-load-all').addEventListener('click', () => {
+    Promise.all([loadGt(), loadCombinations(), loadSupport()])
+      .then(() => AtlasSVEvidence.refresh());
+  });
+  document.getElementById('btn-load-gt').addEventListener('click', () => {
+    loadGt().then(() => AtlasSVEvidence.refresh());
+  });
+  document.getElementById('btn-load-comb').addEventListener('click', () => {
+    loadCombinations().then(() => AtlasSVEvidence.refresh());
+  });
+  document.getElementById('btn-load-supp').addEventListener('click', () => {
+    loadSupport().then(() => AtlasSVEvidence.refresh());
+  });
+  document.getElementById('btn-clear').addEventListener('click', () => {
+    AtlasSVEvidence._state.layer            = null;
+    AtlasSVEvidence._state.combinationsLayer = null;
+    AtlasSVEvidence._state.supportLayer     = null;
+    AtlasSVEvidence._state.selectedSamples  = null;
+    AtlasSVEvidence._state.activeCombinationIndex = null;
+    AtlasSVEvidence._state.heatmapView      = 'compact';
+    // Also tear down any large overlay
+    const ov = document.querySelector('[data-sv-hm-overlay]');
+    if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+    AtlasSVEvidence.refresh();
+  });
+  document.getElementById('btn-expand').addEventListener('click', () => {
+    AtlasSVEvidence.setHeatmapView('large');
+  });
+  document.getElementById('btn-collapse').addEventListener('click', () => {
+    AtlasSVEvidence.setHeatmapView('compact');
+  });
+  document.getElementById('btn-theme').addEventListener('click', () => {
+    document.body.classList.toggle('light-theme');
+  });
+
+  // Auto-load on first paint
+  setTimeout(() => document.getElementById('btn-load-all').click(), 50);
+</script>
+</body>
+</html>

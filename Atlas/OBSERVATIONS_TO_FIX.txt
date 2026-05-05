@@ -1,6 +1,9 @@
-When we go to the candidate focus and we click to drop the candidate, it doesnt drop it
+[FIXED turn 128] When we go to the candidate focus and we click to drop the candidate, it doesnt drop it
 So we have to go to the karyotype / tier page and click the red cross and only then it will be dropped
 I feel that the two buttons must be working similarily.
+  → page 2 #candidateClearBtn now routes through the canonical removeCandidateFully(),
+    same as page 4's red ✕. Both surfaces drop the candidate from the saved list,
+    null state.candidate, clear the persisted active id, and refresh every dependent UI.
 
 When we are in the boundaries page we can see the cross species fusion/fission breakpoint
 but its location is not the same as in the cross species page for instance it shows 
@@ -10,10 +13,18 @@ When we select a candidate or for some reasons when we do arrow up and down in t
 diagnosis page 1 local pca under the L3 contingency table. idk if its because we 
 already have the candidate for that interval but we cannot up and down to select and 
 promote and demote.
+  → also: when arrow up/down navigates the L3 promote/demote, the sub-panel
+    isn't highlighting and merging candidates is broken.
 
-next to schema v2 N layers button in top bar, we need the JS N scripts loaded 
+[FIXED turn 128] next to schema v2 N layers button in top bar, we need the JS N scripts loaded 
 that shows what JS scripts as loaded, its the same style and design as schema v2 button
 but it is for javascripts.
+  → #jsScriptsBadge added in the header, sibling of #schemaBadge. Same styling
+    (.v2 green when all 15 expected scripts registered their globals, .partial
+    orange when one or more didn't — currently atlas_dosage_bridge.js isn't
+    auto-loaded so it shows 14/15 by default). Click opens a modal listing
+    every script with ✅/⚪/🚫 status, expected window.<Global>, description,
+    and turn marker. Same close pattern as the schema modal.
 
 In top bar, buttons "session" "mode" and "data" unfold on hover but if we go down theres 
 a mini space so we cannot like reach the unfolded button the cursor goes to the little gap
@@ -35,4 +46,112 @@ has its last samples and row collapsed and overlapping for some reasons.
 
 Im  not sure but when we fit the loess in the Boundaries page when there is no coverage it goes to 0 
 but idk if that affects the fit or not. in my understanding its not a problem?
+
+[ADDED turn 128, NOT YET FIXED] In the PCA on page 1, the karyotype groups legend
+sits on top of the plot — the leftmost stripe's data points are hidden underneath.
+The legend should be moved OUTSIDE the canvas (smaller, on the left side), so the
+PCA scatter starts to the legend's right and uses the full canvas area for data.
+  → blocked: I (Claude) couldn't locate the rendering call site that's painting
+    a karyotype legend on the page 1 main #pcaCanvas. drawPCA() does not paint
+    one — only drawMiniPCA() (L3 contingency mini-PCAs at line ~39624) draws
+    a top-RIGHT canvas legend. A screenshot from Quentin would unblock this.
+
+[FIXED turn 128] Window-mode cycler 📊 Windows (N) didn't light up when active.
+  → New CSS rule #viewModeBar #jumpToWindowsBtn.is-active-step (accent border +
+    accent text on panel-2 bg, distinct from the genome/L1/L2 zoom-active style
+    so it doesn't read as another zoom level). _refreshStepSizeBtn() now toggles
+    that class whenever state.stepMode is one of win1/win5/win10. As a bonus
+    fix: _mirrorStepModeFromState was previously REFERENCED but never DEFINED —
+    every cycler click silently failed to sync the sidebar #stepModeBar buttons.
+    Now defined; sidebar tracks every cycler click. Sidebar clicks also refresh
+    the cycler so both surfaces stay reflective.
+
+[FIXED turn 128, partial] PCA tracked-sample trails too opaque on non-PC1 axes.
+  → Trail line alpha now drops 0.85 → 0.32 when neither X nor Y axis is PC1
+    (i.e., user is viewing PC2×PC3, PC2×PC4, etc.). Default pc1×pc2 view keeps
+    the original 0.85. The dot-fade alpha (0.15 → 0.65 along the trail) is
+    preserved — it implies temporal direction regardless of axis choice.
+
+[FIXED turn 128c] When we select window 5 or 10 in the multi button (header
+cycler 📊 Windows (N)), it should also switch the L3 contingency panel's
+compare-unit to win5 or win10 — but it didn't.
+  → cycleStepSize was calling a never-defined `_mirrorStepModeIntoCompare`
+    helper (silent no-op, mirrors the previous _mirrorStepModeFromState
+    bug). Now calls the real `_syncStepModeToCompareUnit`. Also persists
+    state.stepMode to localStorage's `pca_scrubber_v3.stepmode` (not just
+    the cycler-only key) so reloads restore the same value across both
+    surfaces.
+
+[FIXED turn 128c] Spacebar global play/pause unbind (Quentin's request:
+"You can unbind play button space bar since it's not useful really").
+  → Spacebar now does NOTHING outside candidate mode (no preventDefault,
+    so the browser's native spacebar handling stands — typically page
+    scroll). Inside candidate mode it still acts as a shortcut for C
+    (toggle L3 cut at cursor). The Play button (#playBtn) keeps its
+    mouse-click handler — only the global key shortcut is gone.
+
+[FIXED turn 128c] CTRL+- (browser unzoom) leaves L3 mini-PCAs distorted
+because the resize handler didn't refit canvases robustly.
+  → Two-layer fix: (1) the resize handler now schedules redraw via
+    requestAnimationFrame so layout has time to settle before fitCanvas
+    reads bounding rects, with a debounce flag to coalesce same-tick
+    bursts. (2) Added a matchMedia `(resolution: <DPR>dppx)` listener that
+    fires on DPR changes regardless of whether `resize` does (Chrome/Edge
+    sometimes don't fire `resize` on browser zoom because CSS dimensions
+    don't change — only DPR does). The DPR listener re-installs itself
+    with the new resolution on each fire so subsequent zooms still
+    catch.
+
+[FIXED turn 128d] "Help > Help" redundancy — the help stage pill expanded
+to show only one tab (#16 help). Generic single-child stage detection now
+collapses any stage whose child count is exactly 1: the pill itself acts
+as the page tab (data-as-page="1" mirrors the active state). CSS hides
+the redundant child tab + the expand arrow + count chip on single-child
+stages.
+
+[FIXED turn 128d] Compact-mode tracked-samples panel hadn't received the
+fixed-mode settings update — still had old 4-button band picker, no
+lasso, no scree, no K-cycle button.
+  → Ported the fixed-mode aside layout to the compact panel one-for-one:
+    Row A trails | sign-align PC1 | lasso | scree, lasso confirm/clear bar,
+    K-cycle button + 6 K-colored numeric band buttons. New compact-suffix
+    IDs delegate to fixed-mode handlers via _wireCompactCheckboxMirror
+    (bidirectional sync, no infinite recursion). _updatePcaLassoUI mirrors
+    onto the compact lasso UI. _syncTrackedCompactUI updates the new
+    kCycleBtnCompact label.
+
+[FIXED turn 128d] L3 contingency table defaulted to "Focal only" single-
+pane view; should default to "+L/R" two-neighbor view.
+  → state.l3Layout default changed from 'focal' to 'leftright'. Markup
+    .active class moved from data-layout="focal" to data-layout="leftright".
+
+[ADDED turn 128d, SPEC ONLY] Het (dosage) coloring on L3 contingency mini-
+PCAs with a "het" toolbar toggle, color-bar legend, and tracked-samples
+always-on subtoggle.
+  → Spec at specs_todo/SPEC_l3_het_dosage_coloring.md. State slot
+    state.l3HetColoring already added. L3 toolbar checkbox added (next to
+    K-mode group). Renderer body + cache + drawMiniPCA hook + color-bar
+    legend NOT YET IMPLEMENTED — Slice 1 finishes next turn.
+
+[ADDED turn 128d, SPEC ONLY] Unified G-panel popup with three tabs
+(karyotype / inheritance / manual).
+  → Spec at specs_todo/SPEC_g_panel_unified_groups.md. Answers Quentin's
+    question about whether karyotype + inheritance + manual groups belong
+    in one popup. Yes for those three; family stays separate (different
+    ontology — kinship not phenotype).
+
+[ADDED turn 128d, NOT YET FIXED] Inheritance/grouping panel doesn't
+auto-compute or find groups when clicked for the candidate. Diagnosed:
+the inheritance pipeline reads `state.candidates` (a dict only populated
+by Save-Session import); user actions (promote, lock-and-promote, draft
+confirm) populate `state.candidateList` (an array). The two slots are
+never bridged, so `_gatherActiveCandidatesForInheritance` silently sees
+zero candidates even with 5 saved.
+  → It IS the same grouping as the page-2 candidate bands (both derive
+    from `locked_labels`); the codebase just lost the bridge. Fix queued
+    as Pre-Slice in SPEC_g_panel_unified_groups.md (option c —
+    `_rebuildCandidateRegistries()` auto-sync helper, ~0.3 turn). Must
+    land BEFORE the G-panel Slice 1 ships, otherwise the karyotype +
+    inheritance tabs will be empty even with saved candidates.
+
 

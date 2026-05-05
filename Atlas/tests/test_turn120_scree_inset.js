@@ -17,9 +17,11 @@
 // =============================================================================
 
 const fs = require('fs');
+const path = require('path');
 const vm = require('vm');
 
-const html = fs.readFileSync('/home/claude/work/build/Inversion_atlas.html', 'utf8');
+const ATLAS_PATH = path.resolve(__dirname, '..', 'Inversion_atlas.html');
+const html = fs.readFileSync(ATLAS_PATH, 'utf8');
 
 let pass = 0, fail = 0;
 function ok(name, cond, detail) {
@@ -261,6 +263,6 @@ if (!fn) {
 
 // =============================================================================
 console.log('\n=========================================');
-console.log('passed: ' + pass + ' / failed: ' + fail);
+console.log('  PASS: ' + pass + '   FAIL: ' + fail);
 console.log('=========================================');
 process.exit(fail > 0 ? 1 : 0);

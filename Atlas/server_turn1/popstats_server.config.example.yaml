@@ -50,6 +50,22 @@ bam_suffix: "markdup.bam"
 # Tolerates the legacy flat layout and the canonical-K symlinked layout.
 local_q_dir: "${base}/ancestry_cache"
 
+# ---- Dosage heatmap bridge (S6.P4.1) ----------------------------------------
+# Per-chromosome gzipped TSV store that GET /api/dosage/chunk reads from.
+# Layout (per spec specs_todo/from_turn129/S6_dosage_heatmap_streaming_viewer.md):
+#     <dosage_dir>/<chrom>.sites.tsv.gz       # pos, ref, alt, miss, diag, site_id
+#     <dosage_dir>/<chrom>.dosage.tsv.gz      # n_sites x n_samples cells; -1 / NA / .
+# Sample-IDs come from `dosage_samples` or fall back to `sample_list`.
+# Defaults to `${base}/04_dosage_by_chr/`.
+dosage_dir: "${base}/04_dosage_by_chr"
+# Optional: override the samples file used for dosage column ordering. Leave
+# unset to reuse `sample_list` above (the popstats sample list is in
+# BAM-list order, which matches the dosage column order from the standard
+# pipeline).
+# dosage_samples: "${base}/samples.tsv"
+# Hard cap on requested region size (bp). > this returns 400 region_too_large.
+dosage_max_region_bp: 50000000
+
 # ---- Cache directory --------------------------------------------------------
 # Server-managed content-addressable cache. SAFE to delete — will be rebuilt.
 # Keep on a fast local disk; ~1-50 GB depending on usage.

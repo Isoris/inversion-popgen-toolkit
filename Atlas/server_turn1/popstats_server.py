@@ -70,6 +70,14 @@ from pydantic import BaseModel, Field, field_validator
 # Turn 11a: LD split-heatmap endpoint (separate module to keep this file readable)
 from ld_endpoint import LDSplitReq, handle_split_heatmap
 
+# Turn S6.P4.1: dosage chunk bridge endpoint (separate module; unblocks the
+# atlas-side renderDosageHeatmap by giving it a live data source instead of
+# pre-baked chunk JSONs). See specs_todo/from_turn129/S6_dosage_heatmap_streaming_viewer.md.
+from dosage_bridge import (
+    DosageChunkReq, handle_dosage_chunk,
+    DEFAULT_MAX_REGION_BP as DOSAGE_DEFAULT_MAX_REGION_BP,
+)
+
 # =============================================================================
 # Logging
 # =============================================================================
@@ -1611,6 +1619,132 @@ async def ld_split_heatmap(req: LDSplitReq) -> Response:
         cache_root=CACHE.root,
     )
     return JSONResponse(payload)
+
+
+# =============================================================================
+# Dosage heatmap bridge — atlas-side P4.1 slice
+# =============================================================================
+# GET /api/dosage/chunk?chrom=...&start=...&end=...&cap=...&mode=...
+#
+# Hands the atlas's existing renderDosageHeatmap a chunk in the renderer-
+# compatible shape so the candidate-panel heatmap can read live data instead
+# of needing pre-built chunk JSONs. Atlas-side: detect server availability,
+# inject a synthetic chunk index per chromosome with templated URL.
+#
+# This endpoint is read-only and stateless; cache lives on the atlas side
+# (`_fetchAndCacheChunk`). No need for the popstats DiskCache here.
+
+@app.get("/api/dosage/chunk")
+async def dosage_chunk(chrom: str, start: int, end: int,
+                       cap: int = 1000, mode: str = "raw") -> Response:
+    _ensure_ready()
+    # Validate via the shared pydantic model so the same checks apply
+    # whether the call comes through FastAPI's query-param coercion or
+    # the unit tests' direct construction.
+    try:
+        req = DosageChunkReq(chrom=chrom, start=start, end=end, cap=cap, mode=mode)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail={"error": "bad_request",
+                                                     "message": str(e)})
+    # Resolve the dosage source. Convention: <base>/04_dosage_by_chr/
+    base = Path(CFG.get("base", ""))
+    dosage_dir = Path(CFG.get("dosage_dir") or (base / "04_dosage_by_chr"))
+    samples_path = Path(CFG.get("dosage_samples") or
+                        CFG.get("sample_list") or
+                        (base / "samples.tsv"))
+    if not dosage_dir.is_dir():
+        raise HTTPException(status_code=500, detail={
+            "error": "dosage_dir_missing",
+            "expected_dir": str(dosage_dir),
+            "hint": "Set 'dosage_dir' in popstats_server.config.yaml.",
+        })
+    payload = handle_dosage_chunk(
+        req,
+        dosage_dir=dosage_dir,
+        samples_path=samples_path,
+        max_region_bp=int(CFG.get("dosage_max_region_bp",
+                                  DOSAGE_DEFAULT_MAX_REGION_BP)),
+    )
+    return JSONResponse(payload)
+
+
+@app.get("/api/dosage/manifest")
+async def dosage_manifest() -> Dict[str, Any]:
+    """Lightweight manifest for the bridge installer on the atlas side.
+
+    Returns the list of chromosomes for which {chrom}.sites.tsv.gz +
+    {chrom}.dosage.tsv.gz both exist under dosage_dir, plus each chrom's
+    last-site bp (used to set the synthetic chunk's `end_bp` so that
+    _findCoveringChunk resolves any region to it).
+
+    The atlas-side bridge installer fetches this once at health-check
+    time and builds a synthetic dosage_chunks index from it.
+    """
+    _ensure_ready()
+    base = Path(CFG.get("base", ""))
+    dosage_dir = Path(CFG.get("dosage_dir") or (base / "04_dosage_by_chr"))
+    samples_path = Path(CFG.get("dosage_samples") or
+                        CFG.get("sample_list") or
+                        (base / "samples.tsv"))
+    chroms: List[Dict[str, Any]] = []
+    if dosage_dir.is_dir():
+        # Discover by .sites.tsv.gz; require matching .dosage.tsv.gz.
+        for sf in sorted(dosage_dir.glob("*.sites.tsv.gz")):
+            chrom = sf.name[:-len(".sites.tsv.gz")]
+            df = dosage_dir / f"{chrom}.dosage.tsv.gz"
+            if not df.exists():
+                continue
+            # Estimate length-bp by reading the last position from the
+            # sites file. Cheap because gzip can stream forward; we only
+            # need the last numeric line. (The standalone viewer's
+            # 01_prepare_dosage_store.py records this in manifest.json
+            # instead of re-deriving it on every request.)
+            length_bp = _last_pos_in_sites(sf)
+            chroms.append({
+                "name": chrom,
+                "length_bp": length_bp,
+                "sites_path": str(sf.relative_to(dosage_dir)),
+                "dosage_path": str(df.relative_to(dosage_dir)),
+            })
+    return {
+        "ok": True,
+        "service": "popstats_server.dosage_bridge",
+        "schema_version": "dosage_manifest_v1",
+        "n_samples": (len([1 for _ in open(samples_path)])
+                      if samples_path.exists() else 0),
+        "chroms": chroms,
+        "limits": {
+            "default_max_sites": 1000,
+            "hard_cap": 20000,
+            "max_region_bp": int(CFG.get("dosage_max_region_bp",
+                                         DOSAGE_DEFAULT_MAX_REGION_BP)),
+        },
+    }
+
+
+def _last_pos_in_sites(sites_gz: Path) -> int:
+    """Read the last numeric `pos` from a sites.tsv.gz, streaming forward.
+
+    Cheap (linear in file size) but only called at /api/dosage/manifest
+    time, not per-region. Returns 0 if the file is empty / unreadable.
+    """
+    try:
+        last = 0
+        with gzip.open(sites_gz, "rt") as f:
+            for line in f:
+                if not line or line.startswith("#"):
+                    continue
+                cell0 = line.split("\t", 1)[0].strip()
+                if not cell0:
+                    continue
+                try:
+                    last = int(cell0)
+                except ValueError:
+                    # Header row; skip
+                    continue
+        return last
+    except Exception:
+        return 0
 
 
 # =============================================================================
