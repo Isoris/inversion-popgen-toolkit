@@ -1,0 +1,70 @@
+{
+  "tool": "synteny_multispecies_v1",
+  "schema_version": 1,
+  "generated_at": "2026-05-03T12:00:00Z",
+  "species": [
+    { "id": "Cgar",  "label": "Clarias gariepinus",        "tier": "core",            "focal": true  },
+    { "id": "Cmac",  "label": "Clarias macrocephalus",     "tier": "core",            "focal": true  },
+    { "id": "Cfus",  "label": "Clarias fuscus",            "tier": "clarias_context", "focal": false },
+    { "id": "Capus", "label": "Channallabes apus",         "tier": "clarias_context", "focal": false },
+    { "id": "Phyp",  "label": "Pangasianodon hypophthalmus","tier": "mid_outgroup",   "focal": false },
+    { "id": "Hwyc",  "label": "Hemibagrus wyckioides",     "tier": "far_outgroup",    "focal": false },
+    { "id": "Tfulv", "label": "Tachysurus fulvidraco",     "tier": "far_outgroup",    "focal": false },
+    { "id": "Ipun",  "label": "Ictalurus punctatus",       "tier": "far_outgroup",    "focal": false },
+    { "id": "Smer",  "label": "Silurus meridionalis",      "tier": "far_outgroup",    "focal": false },
+    { "id": "Tros",  "label": "Trichomycterus rosablanca", "tier": "deep_outgroup",   "focal": false }
+  ],
+  "synteny_blocks": [
+    {
+      "block_id": "blk_LG28_subtelo_cgar_cmac",
+      "members": [
+        { "species": "Cgar",  "chrom": "C_gar_LG28", "start_bp": 14800000, "end_bp": 18200000, "strand": "+", "chrom_length_bp": 28500000 },
+        { "species": "Cmac",  "chrom": "C_mac_LG01", "start_bp":  8100000, "end_bp": 11300000, "strand": "-", "chrom_length_bp": 32100000 }
+      ],
+      "support": { "wfmash": true, "miniprot": true, "n_anchors": 142 }
+    },
+    {
+      "block_id": "blk_LG28_subtelo_cgar_cfus",
+      "members": [
+        { "species": "Cgar", "chrom": "C_gar_LG28", "start_bp": 14800000, "end_bp": 18200000, "strand": "+", "chrom_length_bp": 28500000 },
+        { "species": "Cfus", "chrom": "C_fus_LG07", "start_bp":  9200000, "end_bp": 12400000, "strand": "+", "chrom_length_bp": 26800000 }
+      ],
+      "support": { "wfmash": true, "miniprot": true, "n_anchors": 128 }
+    },
+    {
+      "block_id": "blk_LG28_subtelo_cgar_capus",
+      "members": [
+        { "species": "Cgar",  "chrom": "C_gar_LG28",  "start_bp": 14800000, "end_bp": 18200000, "strand": "+", "chrom_length_bp": 28500000 },
+        { "species": "Capus", "chrom": "Capus_LG12",  "start_bp":  6400000, "end_bp":  9700000, "strand": "+", "chrom_length_bp": 24100000 }
+      ],
+      "support": { "wfmash": true, "miniprot": true, "n_anchors": 87 }
+    },
+    {
+      "block_id": "blk_LG28_subtelo_cgar_phyp",
+      "members": [
+        { "species": "Cgar", "chrom": "C_gar_LG28", "start_bp": 14800000, "end_bp": 18200000, "strand": "+", "chrom_length_bp": 28500000 },
+        { "species": "Phyp", "chrom": "Phyp_chr18", "start_bp":  3100000, "end_bp":  6200000, "strand": "-", "chrom_length_bp": 21500000 }
+      ],
+      "support": { "wfmash": false, "miniprot": true, "n_anchors": 42 }
+    }
+  ],
+  "breakpoints_multilineage": [
+    {
+      "bp_id": "csbp_lg28_15_1Mb",
+      "position": { "species": "Cgar", "chrom": "C_gar_LG28", "pos_bp": 15115000 },
+      "lineage_distribution": {
+        "Cgar":  "boundary_present",
+        "Cmac":  "boundary_present",
+        "Cfus":  "boundary_present",
+        "Capus": "boundary_absent_internal_to_block",
+        "Phyp":  "fission_in_target",
+        "Hwyc":  "boundary_absent_internal_to_block",
+        "Tfulv": "unknown",
+        "Ipun":  "fission_in_target",
+        "Smer":  "unknown",
+        "Tros":  "unknown"
+      },
+      "interpretation_default": "boundary_reuse_across_lineages_class_E_candidate"
+    }
+  ]
+}

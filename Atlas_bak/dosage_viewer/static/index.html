@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dosage viewer — MS_Inversions catfish cohort</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body data-theme="light">
+
+<header class="topbar">
+  <div class="brand">
+    <strong>Dosage viewer</strong>
+    <span class="brand-sub">C. gariepinus 226-sample cohort</span>
+  </div>
+
+  <!-- Region selectors ------------------------------------------------- -->
+  <div class="control-row" id="regionRow">
+    <label>chrom
+      <select id="chromSelect" class="ctl"></select>
+    </label>
+    <label>start
+      <input id="startInput" class="ctl ctl-num" type="number" min="1" step="1000">
+    </label>
+    <label>end
+      <input id="endInput" class="ctl ctl-num" type="number" min="1" step="1000">
+    </label>
+  </div>
+
+  <!-- Sampling controls ----------------------------------------------- -->
+  <div class="control-row" id="modeRow">
+    <label>mode
+      <select id="modeSelect" class="ctl">
+        <option value="raw">raw</option>
+        <option value="even">even</option>
+        <option value="random">random</option>
+        <option value="variance">variance</option>
+        <option value="hybrid" selected>hybrid (70/30)</option>
+        <option value="aggregate">aggregate (binned)</option>
+      </select>
+    </label>
+    <label>max_sites
+      <input id="maxSitesInput" class="ctl ctl-num" type="number"
+             value="1000" min="2" max="20000" step="100">
+    </label>
+    <label id="seedLabel">seed
+      <input id="seedInput" class="ctl ctl-num" type="number" value="1" min="0" step="1">
+    </label>
+    <button id="renderBtn" class="ctl ctl-btn primary">Render</button>
+  </div>
+
+  <!-- Candidate / breakpoint shortcut row ----------------------------- -->
+  <div class="control-row" id="candidateRow">
+    <label>candidate
+      <select id="candidateSelect" class="ctl">
+        <option value="">(none)</option>
+      </select>
+    </label>
+    <button id="loadCandBtn" class="ctl ctl-btn">Load candidate</button>
+    <button id="loadLeftBtn" class="ctl ctl-btn">± left bp</button>
+    <button id="loadRightBtn" class="ctl ctl-btn">± right bp</button>
+    <label>± window kbp
+      <input id="bpWindowInput" class="ctl ctl-num" type="number" value="500" min="1" step="100">
+    </label>
+    <button id="tileBtn" class="ctl ctl-btn">Whole chrom (tile)</button>
+  </div>
+
+  <div class="utility-row">
+    <span id="storeBadge" class="badge">…</span>
+    <span id="lastFetch" class="badge"></span>
+    <span class="grow"></span>
+    <button id="themeToggle" class="ctl ctl-btn small">light/dark</button>
+  </div>
+</header>
+
+<!-- Main canvas + info area ------------------------------------------- -->
+<main class="viewer">
+  <section id="metaStrip" class="meta-strip">
+    <span class="meta-pill" id="mp_chrom">—</span>
+    <span class="meta-pill" id="mp_range">—</span>
+    <span class="meta-pill" id="mp_sites">—</span>
+    <span class="meta-pill" id="mp_mode">—</span>
+    <span class="meta-pill" id="mp_n_samples">—</span>
+    <span class="meta-pill" id="mp_warning"></span>
+  </section>
+
+  <div class="canvas-wrap">
+    <canvas id="heatmapCanvas" width="1024" height="200"></canvas>
+    <div id="hoverInfo" class="hover-info" hidden></div>
+  </div>
+
+  <section class="legend">
+    <span class="legend-swatch" style="background: #2166AC"></span> dosage 0 (REF/REF)
+    <span class="legend-swatch" style="background: #F7F7F7"></span> dosage 1 (HET)
+    <span class="legend-swatch" style="background: #B2182B"></span> dosage 2 (ALT/ALT)
+    <span class="legend-swatch legend-na"></span> NA
+    <span class="legend-note" id="legendNote"></span>
+  </section>
+
+  <section class="recent-history" id="recentHistory">
+    <h3 class="section-title">Recent regions</h3>
+    <ul id="recentList"></ul>
+  </section>
+</main>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

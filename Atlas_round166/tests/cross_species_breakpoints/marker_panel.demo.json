@@ -1,0 +1,83 @@
+{
+  "metadata": {
+    "panel_name": "Inversion marker pilot panel v1",
+    "species": "C. gariepinus",
+    "cross_species_check": "C. macrocephalus orthologous regions",
+    "date": "2026-04-30",
+    "notes": "DEMO marker_panel.json. Replace each entry with primer designs and pilot test results from your own work. The atlas auto-tier from variant_afs.json is the starting point; this overlay records primers, expected amplicon sizes, validation status, and cross-species controls. Markers without atlas candidate matches can be added (see INV_HISTORICAL_001)."
+  },
+  "markers": [
+    {
+      "inversion_id": "CAND_LG28_subtelo",
+      "tier": 1,
+      "marker_type": "private indel (gel-visible)",
+      "expected_use": "direct genotyping (carrier vs non-carrier)",
+      "validation_status": "pilot_tested",
+      "primer_F": "CTGAACGGAATGCAACTGGT",
+      "primer_R": "TGGCAACTGAATGCGAACGT",
+      "amplicon_bp_state_A": 240,
+      "amplicon_bp_state_B": 180,
+      "n_carriers_tested": 24,
+      "controls": {
+        "positive_controls_INV": ["CGA021", "CGA044", "CGA088"],
+        "heterozygote_controls": ["CGA005", "CGA017"],
+        "negative_controls_STD": ["CGA009", "CGA010", "CGA033"],
+        "bighead_negative_status": "tested_no_amplification",
+        "bighead_orthologous_sequence_status": "absent",
+        "bighead_expected_pattern": "no amplification (orthologous indel absent in Cmac)",
+        "f1_hybrid_expected_pattern": "African paternal 240/180 bp dual-band on hybrid background",
+        "no_template_control_required": true
+      },
+      "notes": "LG28 sub-telomeric inversion (~2.89 Mb). 240 bp band = inverted state (60 bp insertion present), 180 bp = reference. Validated on 12 INV/INV + 12 STD/STD; bighead negative; F1 shows expected dual-band on paternal copy."
+    },
+    {
+      "inversion_id": "CAND_LG07_mid",
+      "tier": 2,
+      "marker_type": "tagging SNP (KASP)",
+      "expected_use": "population screening (validate per batch)",
+      "validation_status": "designed_only",
+      "primer_F": "GACGTTGGAATCAGCAGCTAA[C/T]",
+      "primer_R": "AAGTCCAATGCAGCAGCAGTC",
+      "n_carriers_tested": 0,
+      "controls": {
+        "positive_controls_INV": ["CGA055", "CGA067"],
+        "heterozygote_controls": ["CGA012"],
+        "negative_controls_STD": ["CGA002", "CGA006"],
+        "bighead_negative_status": "not_yet_tested",
+        "bighead_orthologous_sequence_status": "unknown",
+        "no_template_control_required": true
+      },
+      "notes": "KASP assay designed against tagging SNP at 25.1 Mb. r\u00b2 with structural state = 0.84 in resequencing data. Pilot panel ready but not yet wet-lab validated; bighead specificity check pending."
+    },
+    {
+      "inversion_id": "CAND_LG15_distal",
+      "tier": 4,
+      "marker_type": "exploratory",
+      "expected_use": "research follow-up only",
+      "validation_status": "untested",
+      "controls": {
+        "positive_controls_INV": [],
+        "heterozygote_controls": [],
+        "negative_controls_STD": [],
+        "bighead_negative_status": "not_yet_tested",
+        "bighead_orthologous_sequence_status": "unknown"
+      },
+      "notes": "Atlas signal weak; AF in karyotype groups does not separate cleanly. Needs more confirmed-state samples before any marker design."
+    },
+    {
+      "inversion_id": "INV_HISTORICAL_001",
+      "chrom": "LG14",
+      "tier": 2,
+      "marker_type": "tagging SNP",
+      "expected_use": "screening",
+      "validation_status": "validated",
+      "n_carriers_tested": 88,
+      "controls": {
+        "positive_controls_INV": ["legacy_validated_set_INV"],
+        "negative_controls_STD": ["legacy_validated_set_STD"],
+        "bighead_negative_status": "tested_no_amplification"
+      },
+      "notes": "Inherited from prior breeding programme records (not in current atlas candidate list). Listed for traceability and to demonstrate the user-only marker path \u2014 atlas auto-tiering does not see this marker but the panel still tracks it."
+    }
+  ]
+}

@@ -1,0 +1,108 @@
+{
+  "tool": "karyotype_lineage_v1",
+  "schema_version": 2,
+  "generated_at": "2026-05-03T16:00:00Z",
+  "params": {
+    "method": "mashmap_one_to_one",
+    "segment_bp": 1000000,
+    "block_bp": 1000000,
+    "chain_gap_bp": 1000000,
+    "identity_pct": 85,
+    "filter": "one-to-one",
+    "source_pipeline": "/project/lt200308-agbsci/01-catfish_assembly/05_ancestral_karyotype/mashmap_fusion_scan_lines",
+    "wfmash_refinement": {
+      "method": "wfmash",
+      "segment_bp": 50000,
+      "block_bp": 250000,
+      "identity_pct": 90,
+      "filter": "one-to-one",
+      "applied_to_classes": ["1-2", "1-3"]
+    }
+  },
+  "focal_species": "Cgar",
+  "sister_species": ["Cmac"],
+  "outgroup_species": ["Tros"],
+  "per_focal_chr": [
+    {
+      "focal_chr": "C_gar_LG28",
+      "classes_by_species": {
+        "Cgar":  { "class": "1-1", "targets": ["C_gar_LG28"], "refined_by_wfmash": "confirmed", "wfmash_n_blocks": 28, "wfmash_pct_identity": 100.0 },
+        "Cmac":  { "class": "1-2", "targets": ["C_mac_LG01", "C_mac_LG18"],
+                   "refined_by_wfmash": "confirmed",
+                   "wfmash_class": "1-2",
+                   "wfmash_targets": [
+                     { "chrom": "C_mac_LG01", "start_bp": 8100000, "end_bp": 11300000, "strand": "-" },
+                     { "chrom": "C_mac_LG18", "start_bp": 14200000, "end_bp": 18500000, "strand": "+" }
+                   ],
+                   "wfmash_n_blocks": 22, "wfmash_pct_identity": 92.4 },
+        "Cfus":  { "class": "1-1", "targets": ["C_fus_LG07"], "refined_by_wfmash": "confirmed", "wfmash_n_blocks": 17, "wfmash_pct_identity": 91.8 },
+        "Capus": { "class": "1-1", "targets": ["Capus_LG12"], "refined_by_wfmash": "confirmed", "wfmash_n_blocks": 14, "wfmash_pct_identity": 89.5 },
+        "Phyp":  { "class": "1-1", "targets": ["Phyp_chr18"], "refined_by_wfmash": "failed" },
+        "Hwyc":  { "class": "1-1", "targets": ["Hwyc_chr05"], "refined_by_wfmash": "confirmed", "wfmash_n_blocks": 5, "wfmash_pct_identity": 86.1 },
+        "Ipun":  { "class": "1-1", "targets": ["Ipun_chr12"] },
+        "Smer":  { "class": "1-1", "targets": ["Smer_chr10"] },
+        "Tros":  { "class": "1-1", "targets": ["Tros_chr08"], "refined_by_wfmash": "failed" }
+      },
+      "_note": "Cmac sister 1-2 confirmed by wfmash with refined coords -> sister_lineage_fission, boost to high confidence."
+    },
+    {
+      "focal_chr": "C_gar_LG07",
+      "classes_by_species": {
+        "Cgar":  { "class": "1-1", "targets": ["C_gar_LG07"], "refined_by_wfmash": "confirmed" },
+        "Cmac":  { "class": "1-2", "targets": ["C_mac_LG02", "C_mac_LG18"],
+                   "refined_by_wfmash": "confirmed",
+                   "wfmash_targets": [
+                     { "chrom": "C_mac_LG02", "start_bp": 12000000, "end_bp": 15000000, "strand": "+" },
+                     { "chrom": "C_mac_LG18", "start_bp": 8500000,  "end_bp": 11400000, "strand": "-" }
+                   ],
+                   "wfmash_n_blocks": 18 },
+        "Cfus":  { "class": "1-2", "targets": ["C_fus_LG03", "C_fus_LG07"],
+                   "refined_by_wfmash": "refuted", "wfmash_class": "1-1",
+                   "wfmash_targets": [{ "chrom": "C_fus_LG07", "start_bp": 0, "end_bp": 25000000 }],
+                   "wfmash_n_blocks": 24,
+                   "_note_atlas": "mashmap split into 2 chrs but wfmash at 50kb shows continuous mapping to one. mashmap artifact." },
+        "Capus": { "class": "1-2", "targets": ["Capus_LG05", "Capus_LG09"],
+                   "refined_by_wfmash": "confirmed",
+                   "wfmash_n_blocks": 12 },
+        "Phyp":  { "class": "1-1", "targets": ["Phyp_chr07"], "refined_by_wfmash": "confirmed" },
+        "Hwyc":  { "class": "1-1", "targets": ["Hwyc_chr11"] },
+        "Tros":  { "class": "1-1", "targets": ["Tros_chr11"], "refined_by_wfmash": "failed" }
+      },
+      "_note": "Cmac and Capus 1-2 confirmed (different targets each); Cfus initially 1-2 but wfmash refuted -> ancestral_split signal weakened or hotspot."
+    },
+    {
+      "focal_chr": "C_gar_LG10",
+      "classes_by_species": {
+        "Cgar":  { "class": "1-2", "targets": ["C_gar_LG10", "C_gar_LG14"],
+                   "refined_by_wfmash": "confirmed",
+                   "wfmash_targets": [
+                     { "chrom": "C_gar_LG10", "start_bp": 0, "end_bp": 28500000 },
+                     { "chrom": "C_gar_LG14", "start_bp": 0, "end_bp": 32100000 }
+                   ],
+                   "wfmash_n_blocks": 31 },
+        "Cmac":  { "class": "1-1", "targets": ["C_mac_LG09"], "refined_by_wfmash": "confirmed" },
+        "Cfus":  { "class": "1-1", "targets": ["C_fus_LG09"], "refined_by_wfmash": "confirmed" },
+        "Phyp":  { "class": "1-1", "targets": ["Phyp_chr12"], "refined_by_wfmash": "confirmed" },
+        "Hwyc":  { "class": "1-1", "targets": ["Hwyc_chr14"], "refined_by_wfmash": "confirmed" },
+        "Tros":  { "class": "1-1", "targets": ["Tros_chr14"], "refined_by_wfmash": "confirmed" }
+      },
+      "_note": "All cells wfmash confirmed -> focal_lineage_fission boosted to high confidence."
+    },
+    {
+      "focal_chr": "C_gar_LG01",
+      "classes_by_species": {
+        "Cgar":  { "class": "1-1", "targets": ["C_gar_LG01"] },
+        "Cmac":  { "class": "1-1", "targets": ["C_mac_LG01"] },
+        "Cfus":  { "class": "1-1", "targets": ["C_fus_LG01"] },
+        "Capus": { "class": "1-1", "targets": ["Capus_LG01"] },
+        "Phyp":  { "class": "1-1", "targets": ["Phyp_chr01"] },
+        "Tros":  { "class": "1-1", "targets": ["Tros_chr01"] }
+      },
+      "_note": "All 1-1; no wfmash refinement attempted (per params.applied_to_classes filter)."
+    }
+  ],
+  "vocabulary_discipline": {
+    "claim_allowed": "chromosome-scale karyotype context (1-1, 1-2 mapping classes); polarization to specific lineages using outgroup species; wfmash refinement of mashmap calls",
+    "claim_NOT_allowed": "breakpoint-resolution claims; events within a chromosome at <1 Mb scale (use breakpoint-scale wfmash synteny layer for that)"
+  }
+}

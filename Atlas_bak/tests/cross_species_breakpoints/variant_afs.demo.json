@@ -1,0 +1,86 @@
+{
+  "metadata": {
+    "panel_name": "Per-variant allele frequencies in karyotype groups",
+    "species": "C. gariepinus",
+    "cohort": "broodstock-226",
+    "date": "2026-04-30",
+    "notes": "DEMO variant_afs.json. The atlas reads this and computes private_score = AF_INV - AF_STD; dosage_score = 1 - |AF_HET - 0.5|*2; final_score = private_score + dosage_score. Variants are assigned tiers automatically: AF_STD<=0.02 + AF_HET in [0.25,0.75] + AF_INV>=0.80 = Tier 1; AF_STD<=0.05 + AF_INV>=0.70 = Tier 2; otherwise Tier 4. Indels with size in [20,300] bp are flagged gel-visible. Replace with real variants from your VCF subset to inversion intervals."
+  },
+  "variants_by_inversion": {
+    "CAND_LG28_subtelo": [
+      {
+        "chr": "LG28",
+        "pos": 9234567,
+        "ref": "A",
+        "alt": "ATTGGCCAATTCCGG",
+        "type": "indel",
+        "indel_size_bp": 60,
+        "af_std": 0.01,
+        "af_het": 0.48,
+        "af_inv": 0.96,
+        "comment": "clean Tier 1: STD=0.01 / HET=0.48 / INV=0.96; gel-visible 60bp indel"
+      },
+      {
+        "chr": "LG28",
+        "pos": 9239876,
+        "ref": "G",
+        "alt": "T",
+        "type": "snp",
+        "af_std": 0.02,
+        "af_het": 0.46,
+        "af_inv": 0.91,
+        "comment": "clean Tier 1 SNP (KASP-suitable)"
+      },
+      {
+        "chr": "LG28",
+        "pos": 9512300,
+        "ref": "C",
+        "alt": "CAACT",
+        "type": "indel",
+        "indel_size_bp": 4,
+        "af_std": 0.00,
+        "af_het": 0.50,
+        "af_inv": 0.94,
+        "comment": "Tier 1 dosage but indel too small for cheap gel (4bp)"
+      },
+      {
+        "chr": "LG28",
+        "pos": 9678234,
+        "ref": "A",
+        "alt": "C",
+        "type": "snp",
+        "af_std": 0.04,
+        "af_het": 0.62,
+        "af_inv": 0.78,
+        "comment": "Tier 2 strong tag with imperfect dosage"
+      }
+    ],
+    "CAND_LG07_mid": [
+      {
+        "chr": "LG07",
+        "pos": 25123456,
+        "ref": "G",
+        "alt": "GAACTAACGT",
+        "type": "indel",
+        "indel_size_bp": 9,
+        "af_std": 0.03,
+        "af_het": 0.55,
+        "af_inv": 0.82,
+        "comment": "Tier 2: AF_STD just above Tier 1 threshold; KASP-style assay"
+      }
+    ],
+    "CAND_LG15_distal": [
+      {
+        "chr": "LG15",
+        "pos": 11234567,
+        "ref": "T",
+        "alt": "G",
+        "type": "snp",
+        "af_std": 0.18,
+        "af_het": 0.55,
+        "af_inv": 0.65,
+        "comment": "Tier 4 noise: AF_STD too high, AF_INV too low"
+      }
+    ]
+  }
+}

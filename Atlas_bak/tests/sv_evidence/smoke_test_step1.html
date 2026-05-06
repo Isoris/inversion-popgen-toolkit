@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>SV evidence — step 1 smoke test</title>
+<style>
+  /* Inline copies of the atlas's CSS variables — minimal subset for
+     the SV evidence module's styles to render correctly. The full atlas
+     theme system is bigger; this just covers what atlas_sv_evidence.js
+     actually reads. */
+  :root {
+    --bg: #0e1116; --panel: #151a22; --panel-2: #1c2330; --panel-3: #2a3242;
+    --ink: #e7edf3; --ink-dim: #8a94a3; --ink-dimmer: #5a6472;
+    --accent: #f5a524; --accent-2: #4fa3ff; --good: #3cc08a; --bad: #e0555c;
+    --rule: #2a3242;
+    --ui: system-ui, -apple-system, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  body.light-theme {
+    --bg: #fafbfc; --panel: #fff; --panel-2: #f1f3f6; --panel-3: #e3e7ec;
+    --ink: #1a1f26; --ink-dim: #5a6472; --ink-dimmer: #8a94a3;
+    --rule: #d3d8de;
+  }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--ui); }
+  #harness {
+    display: flex; flex-direction: column; height: 100vh;
+  }
+  #harness-bar {
+    flex: 0 0 auto;
+    padding: 6px 12px; border-bottom: 1px solid var(--rule);
+    background: var(--panel-2);
+    display: flex; gap: 12px; align-items: center;
+    font-size: 12px;
+  }
+  #harness-bar button {
+    background: var(--panel); color: var(--ink); border: 1px solid var(--rule);
+    padding: 3px 10px; border-radius: 3px; cursor: pointer; font-size: 11px;
+  }
+  #harness-bar button:hover { background: var(--panel-3); }
+  #page_sv_evidence { flex: 1 1 auto; min-height: 0; }
+  #harness-status { color: var(--ink-dim); font-size: 11px; }
+</style>
+</head>
+<body>
+<div id="harness">
+  <div id="harness-bar">
+    <strong>SV evidence step-1 smoke test</strong>
+    <button id="btn-no-cand">no candidate</button>
+    <button id="btn-cand-no-locks">candidate, no locks</button>
+    <button id="btn-cand-no-layer">candidate + locks, no layer</button>
+    <button id="btn-full">candidate + locks + layer</button>
+    <button id="btn-theme">toggle theme</button>
+    <span id="harness-status"></span>
+  </div>
+  <div id="page_sv_evidence">
+    <div id="sv_evidence_root"></div>
+  </div>
+</div>
+
+<script src="../../js/atlas_sv_evidence.js"></script>
+<script>
+  // Minimal global atlas state stub. The real atlas exposes a much bigger
+  // window.state — the SV evidence module only reads .activeCandidateId,
+  // .candidate, .candidateState[cid].locked_labels, and (optionally)
+  // .candidateList for chrom-resolution. Anything else is unused.
+  window.state = {
+    activeCandidateId: null,
+    candidateState: {},
+    candidateList: [
+      { id: 'cand_LG28_15Mb', candidate_id: 'cand_LG28_15Mb', chrom: 'C_gar_LG28' }
+    ],
+  };
+
+  const root = document.getElementById('sv_evidence_root');
+  const status = document.getElementById('harness-status');
+  AtlasSVEvidence.init({ root: root });
+
+  function setStatus(s) { status.textContent = s; }
+
+  // Stub a 226-sample karyotype lock matching the spec fixture's group counts
+  // (61 H1/H1, 103 H1/H2, 62 H2/H2).
+  function fakeLockedLabels() {
+    const labels = [];
+    for (let i = 0; i < 61; i++)  labels.push({ sample_id: 's_h1h1_' + i, label: 'HOMO_1' });
+    for (let i = 0; i < 103; i++) labels.push({ sample_id: 's_het_'  + i, label: 'HET'    });
+    for (let i = 0; i < 62; i++)  labels.push({ sample_id: 's_h2h2_' + i, label: 'HOMO_2' });
+    return labels;
+  }
+
+  document.getElementById('btn-no-cand').addEventListener('click', () => {
+    window.state.activeCandidateId = null;
+    AtlasSVEvidence.loadCandidate(null);
+    setStatus('state: no candidate');
+  });
+
+  document.getElementById('btn-cand-no-locks').addEventListener('click', () => {
+    window.state.activeCandidateId = 'cand_LG28_15Mb';
+    window.state.candidateState['cand_LG28_15Mb'] = { locked_labels: [] };
+    AtlasSVEvidence.loadCandidate('cand_LG28_15Mb');
+    setStatus('state: candidate active, no karyotype locks');
+  });
+
+  document.getElementById('btn-cand-no-layer').addEventListener('click', () => {
+    window.state.activeCandidateId = 'cand_NONEXISTENT';
+    window.state.candidateState['cand_NONEXISTENT'] = { locked_labels: fakeLockedLabels() };
+    AtlasSVEvidence.loadCandidate('cand_NONEXISTENT')
+      .then(() => setStatus('state: locks set, layer fetch failed (expected)'));
+  });
+
+  document.getElementById('btn-full').addEventListener('click', () => {
+    // Use an explicit fixture URL that the module's loader will resolve to
+    // json/sv_genotype_counts/cand_LG28_15Mb.json. For local file:// usage
+    // (no atlas_server), fetch may fail — in which case we override the
+    // module's loader to read from the test fixture directly. Both paths
+    // exercise the same downstream renders.
+    window.state.activeCandidateId = 'cand_LG28_15Mb';
+    window.state.candidateState['cand_LG28_15Mb'] = { locked_labels: fakeLockedLabels() };
+    AtlasSVEvidence.loadCandidate('cand_LG28_15Mb').then(json => {
+      if (!json) {
+        // Fallback: load the fixture directly via fetch (relative path),
+        // poke it into _state, re-render. Useful when running off
+        // file:// without a server.
+        fetch('fixture_sv_genotype_counts_v1.json').then(r => r.json()).then(j => {
+          AtlasSVEvidence._state.layer = j;
+          AtlasSVEvidence._state.layerError = null;
+          AtlasSVEvidence._state.layerLoading = false;
+          AtlasSVEvidence.refresh();
+          setStatus('state: full (fixture loaded via fallback)');
+        }).catch(e => setStatus('fixture load failed: ' + e.message));
+      } else {
+        setStatus('state: full (layer loaded)');
+      }
+    });
+  });
+
+  document.getElementById('btn-theme').addEventListener('click', () => {
+    document.body.classList.toggle('light-theme');
+  });
+
+  // Default: no candidate.
+  setStatus('state: no candidate (initial)');
+</script>
+</body>
+</html>

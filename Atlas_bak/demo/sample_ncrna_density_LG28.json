@@ -1,0 +1,257 @@
+{
+  "tool": "ncrna_density_v1",
+  "schema_version": 1,
+  "species": "C. gariepinus",
+  "n_chromosomes": 1,
+  "n_classes": 16,
+  "classes": [
+    "tRNA_all",
+    "tRNA_HC",
+    "tRNA_pseudo",
+    "tRNA_intronic",
+    "tRNA_Sec",
+    "rRNA_all",
+    "rRNA_5S",
+    "rRNA_5_8S",
+    "rRNA_18S",
+    "rRNA_28S",
+    "rRNA_partial",
+    "ncRNA_all",
+    "ncRNA_snRNA",
+    "ncRNA_snoRNA",
+    "ncRNA_miRNA",
+    "ncRNA_other"
+  ],
+  "default_class": "tRNA_all",
+  "generated_at": "2026-05-03T03:00:00Z",
+  "chromosomes": [
+    {
+      "chrom": "LG28",
+      "n_windows": 8,
+      "window_centers_mb": [
+        2.5,
+        7.5,
+        12.5,
+        16,
+        20,
+        24,
+        28,
+        34
+      ],
+      "window_start_bp": [
+        0,
+        5000000,
+        10000000,
+        14000000,
+        18000000,
+        22000000,
+        26000000,
+        30000000
+      ],
+      "window_end_bp": [
+        5000000,
+        10000000,
+        15000000,
+        18000000,
+        22000000,
+        26000000,
+        30000000,
+        38000000
+      ],
+      "by_class": {
+        "tRNA_all": {
+          "densities": [
+            4.2,
+            3.1,
+            5,
+            2.8,
+            4.6,
+            3.4,
+            4,
+            3.2
+          ]
+        },
+        "tRNA_HC": {
+          "densities": [
+            2,
+            1.5,
+            2.4,
+            1.4,
+            2.2,
+            1.6,
+            1.9,
+            1.5
+          ]
+        },
+        "tRNA_pseudo": {
+          "densities": [
+            1.8,
+            1.4,
+            2.2,
+            1.2,
+            2,
+            1.6,
+            1.8,
+            1.4
+          ]
+        },
+        "tRNA_intronic": {
+          "densities": [
+            0.4,
+            0.2,
+            0.4,
+            0.2,
+            0.4,
+            0.2,
+            0.3,
+            0.3
+          ]
+        },
+        "tRNA_Sec": {
+          "densities": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "rRNA_all": {
+          "densities": [
+            0,
+            0,
+            0.4,
+            8.2,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "rRNA_5S": {
+          "densities": [
+            0,
+            0,
+            0,
+            8,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "rRNA_5_8S": {
+          "densities": [
+            0,
+            0,
+            0.2,
+            0.1,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "rRNA_18S": {
+          "densities": [
+            0,
+            0,
+            0.1,
+            0.05,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "rRNA_28S": {
+          "densities": [
+            0,
+            0,
+            0.1,
+            0.05,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "rRNA_partial": {
+          "densities": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "ncRNA_all": {
+          "densities": [
+            0.4,
+            0.5,
+            0.6,
+            0.4,
+            0.5,
+            0.5,
+            0.4,
+            0.4
+          ]
+        },
+        "ncRNA_snRNA": {
+          "densities": [
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1
+          ]
+        },
+        "ncRNA_snoRNA": {
+          "densities": [
+            0.1,
+            0.1,
+            0.2,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1
+          ]
+        },
+        "ncRNA_miRNA": {
+          "densities": [
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1
+          ]
+        },
+        "ncRNA_other": {
+          "densities": [
+            0.1,
+            0.2,
+            0.2,
+            0.1,
+            0.2,
+            0.2,
+            0.1,
+            0.1
+          ]
+        }
+      }
+    }
+  ]
+}
