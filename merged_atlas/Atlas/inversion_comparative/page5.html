@@ -1,0 +1,1158 @@
+  <div id="page5" class="page">
+    <div class="help-content">
+      <h3>Quick reference</h3>
+      <h4>Tabs</h4>
+      <table class="help-table">
+        <tr><td><b>1 local PCA |z|</b></td><td>Main scrubber — sim_mat, robust |Z|, pop-stat tracks, K-means PCA, L3 contingency. Where you do exploratory inversion calling on the dosage signal — tune K, lock colors, draft + commit candidates.</td></tr>
+        <tr><td><b>2 local PCA θπ</b></td><td>Same scrubber, but on per-sample θπ (nucleotide diversity) instead of dosage. Orthogonal validation of inversion candidates + discovery of regions only the diversity signal sees (sweeps, balancing selection). Empty until R-side ships the θπ layers (STEP_R39/R40/R41). SCHEMA §22.</td></tr>
+        <tr><td><b>3 candidate focus</b></td><td>Deep-dive on a single promoted candidate. Multi-panel grid (sim_mini, karyogram, dosage heatmap, ancestry strip), prev/next navigation. Toggle ⭐ <i>mark confirmed</i> here to populate the confirmed-walkthrough tab. Two-track candidates show per-track regime chips here (turn 48).</td></tr>
+        <tr><td><b>4 boundaries</b></td><td>Refine each promoted candidate's [start_bp, end_bp] into approximate left/right boundary zones using SV anchors + flanking PC1. Auto-propose + manual override (E/F at cursor). SCHEMA §12. Edits persist across reloads (turn 51).</td></tr>
+        <tr><td><b>5 catalogue</b></td><td>Sortable, filterable catalogue of all L2 envelopes (or L1-merged regions). Hover any column header for the definition. Export selected rows as TSV or Markdown. <i>📋 export registry</i> ships per-track-aware TSV+JSON for downstream cluster pipeline (turn 45). <i>📝 manuscript bundle</i> ships an LLM-ready Markdown + companion TSV (turn 50).</td></tr>
+        <tr><td><b>6 negative regions</b></td><td>Inversion-negative inventory — the complement of the catalogue. Each row is a genomic interval evaluated against the multi-layer evidence battery (local PCA, GHSL, SV calls, heterozygosity, callable mask, etc.) and assigned a <code>region_status</code> (<code>inversion_candidate</code> / <code>complex_candidate</code> / <code>no_detectable_inversion_high_confidence</code> / <code>no_detectable_inversion_low_power</code> / <code>not_testable</code>). Caution banner + Methods note make the manuscript-grade framing explicit: "no detectable inversion under defined resolution", never "no inversions exist". Empty until a <code>negative_regions.json</code> is loaded.</td></tr>
+        <tr><td><b>7 karyotype / tier</b></td><td>Two views in one page. <i>Karyotype</i> — per-promoted-candidate sample-level regime breakdown. <i>Tier</i> — 14-axis classification view (existence A-D, boundaries, groups, internal structure, mechanism, age, burden, tier). Tier renders empty until the cluster-side <code>final_classification.json</code> layer is loaded via <i>📦 load registry</i>. Two-track candidates show a 7-column karyotype with per-track membership (turn 43).</td></tr>
+        <tr><td><b>8 popstats</b></td><td>Stack of population-genetic tracks (Z, SNP density, BEAGLE uncertainty, coverage, θπ, FST, Hobs/Hexp, ancestry Δ12) aligned to the chromosome. Click chips to toggle visibility.</td></tr>
+        <tr><td><b>9 ancestry</b></td><td>Per-window ancestry view: K-cluster assignment + delta12 confidence heatmap, sample × window. Driven by the ancestry layer in precomp.</td></tr>
+        <tr><td><b>10 windows</b></td><td>Per-window summary table — robust |Z|, λ₁/λ₂, eigenvalue ratio, SNP counts, L1/L2 envelope membership. Click any row to jump to that window. Coloring follows whichever sortable column you click (one click sets sort + color).</td></tr>
+        <tr><td><b>11 confirmed</b></td><td>Carousel walk-through of all candidates marked confirmed on page 3. ←/→ to step through — useful for assembling manuscript figures from the final inversion set.</td></tr>
+        <tr><td><b>12 markers</b></td><td>Diagnostic PCR marker panels per candidate (3–10 markers tagging each K=3 regime). Hidden until phase-13 marker JSONs are loaded. SCHEMA §10.</td></tr>
+        <tr><td><b>13 cross-species</b></td><td>Cross-species breakpoint catalogue (Cgar↔Cmac wfmash 1-to-1 alignment). Each chromosome-scale rearrangement (inversion / translocation / fission/fusion) is shown with both species' coordinates and the flanking repeat-element density on both sides. <b>●</b> flag in catalogue = Spalax-style <code>all_TE</code> enrichment at the breakpoint flank (≥1.5× chrom mean). <b>✪</b> flag = the cross-species breakpoint coincides with a polymorphic inversion candidate from the 226-sample cohort (the same locus is recurrently rearrangement-prone across timescales). Empty until a <code>cs_breakpoints_v1.json</code> file is loaded — output of <code>STEP_CS01_extract_breakpoints.py</code> in the <code>cross_species_breakpoints/</code> LANTA pipeline. Hotkeys: <b>↑/↓</b> step, <b>I/T/F</b> event-type filters, <b>Esc</b> clear filters. Manuscript hook for repeat-mediated chromosome-evolution mechanism (Kuang et al. 2024-style).</td></tr>
+        <tr><td><b>14 stats profile</b></td><td>Statistical profile of inversion-associated genomic features. One comparative inversion-phenotype synthesis table covering breakpoint architecture (distance to synteny edges, fusion/fission proximity), genomic composition (repeat density, telomere/centromere/gap proximity, gene density), functional cargo (GO/KEGG, breeding-candidate genes), population variation (heterozygosity, ROH overlap, deleterious burden, FST between haplotypes), and breeding utility (markerability), with side-by-side African vs Bighead columns. Auto-derives rows from <code>state.crossSpecies</code> (page 13) + <code>state.candidateList</code> (pages 1-3); rows that need annotation tracks (gene density, GO/KEGG, ROH BED, deleterious-variant calls, FST) accept a <code>stats_profile.json</code> or .tsv overlay via the <i>load JSON / TSV</i> button. View modes: detailed (6 columns) / compact (4 columns). Filters: by category, scope (all / African-only / cross-species), significant-only. Export: CSV (current view) + SVG (manuscript figure). Manuscript synthesis: <i>"What is statistically special about inversion regions, and are the patterns shared between parental species?"</i></td></tr>
+        <tr><td><b>15 marker panel</b></td><td>Marker readiness panel — per-inversion confidence tier table built around <b>private indels with clean dosage signatures</b>, not breakpoint PCR. Four tiers: <b>Tier 1</b> private indel/SNP tag (AF_STD ≤0.02, AF_HET ∈ [0.25, 0.75], AF_INV ≥0.80) with positive/negative controls in all three karyotype groups AND bighead specificity confirmed; <b>Tier 2</b> multi-marker panel (≥3 linked private markers) or strong tag (AF_STD ≤0.05, AF_INV ≥0.70) with controls but imperfect het; <b>Tier 3</b> breakpoint PCR candidate (DEMOTED — breakpoint precision is uncertain even on the cs_breakpoint catalogue); <b>Tier 4</b> exploratory only. AF scoring runs live in the browser from a <code>variant_afs.json</code> upload (per-variant AF in STD/HET/INV groups). Atlas auto-suggests positive (INV/INV, HET) and negative (STD/STD) control samples from candidate karyotype state on page 1. Includes the 5-step pilot validation checklist with cross-species controls (bighead negative, F₁ hybrid expected pattern, no-template) and the protective methods sentence: <i>"Because the target breeding system involves interspecific F₁ hybrids, candidate markers were additionally screened against the bighead catfish orthologous genome to distinguish African inversion tags from maternal-species sequence differences."</i> Accepts <code>marker_panel.json</code> overlay with primer sequences, amplicon sizes, and validation status.</td></tr>
+        <tr><td><b>16 help</b></td><td>This page.</td></tr>
+        <tr><td><b>17 focal-vs-bg widget</b></td><td>Spalax-style focal-vs-background distribution comparison. Renders on page 11 (boundaries — focal = candidate scan range, radius shared with the parent toolbar) and page 16 (cross-species — focal = breakpoint &plusmn;2 Mb, independent radius). Wilcoxon rank-sum P value (live, in-browser, normal approximation w/ continuity correction). Metric pool auto-discovers from loaded layers: |Z| (always available, from the cohort precomp), F_ST/Hobs/&theta;&pi; (when popstats live server is hooked up), tRNA_all / rRNA_all / rRNA_5S / ncRNA_all (when the ncRNA density layer is loaded), all_TE (when the repeat-density layer is loaded). Z-transform toggle on by default. Bg scope: per-chrom (default) or genome-wide-excl-focal. View mode: full or zoomed-to-scan-range. <b>Note:</b> on page 16, the metric values come from the 226-fish cohort (single haplotype), <i>not</i> from cross-species data &mdash; so &lsquo;|Z|&rsquo; here means &ldquo;cohort divergence at this position&rdquo;, not &ldquo;cross-species divergence&rdquo;. The widget hides with a hint when the active breakpoint&rsquo;s <code>gar_chr</code> doesn&rsquo;t match the cohort chrom currently loaded on page 1.</td></tr>
+      </table>
+
+      <h4 id="tutorials-section">Tutorials</h4>
+      <!-- turn 144 — placeholder section for guided walkthroughs.
+           Same UX pattern as the "30 seconds to figure 3" tutorial in
+           the diversity atlas: each card is clickable, opens a step-by-
+           step walkthrough overlay. None of these are wired yet — the
+           cards render as `coming soon` stubs. When a tutorial is
+           authored, swap its data-status from `pending` to `available`
+           and wire its data-tutorial-id to the launcher (separate slice).
+           Quentin: tell me which CLI / atlas tutorials to author and in
+           what order; this section is the catalogue stub. -->
+      <details open>
+        <summary style="cursor: pointer; padding: 4px 0; color: var(--ink); font-size: 11px; font-weight: 600;">
+          Guided walkthroughs (click a card to launch — currently placeholders)
+        </summary>
+        <div style="margin: 10px 0 6px 4px; color: var(--ink-dim); font-size: 11px; line-height: 1.6;">
+          <p style="margin: 0 0 10px 0;">
+            Short clickable walkthroughs that take you from a clean atlas
+            load to a specific deliverable in a few steps. Each tutorial
+            is self-contained — it tells you which JSON to load, which
+            buttons to press, and what to look for at each step. Same UX
+            as the <i>30 seconds to figure 3</i> tutorial in the diversity
+            atlas.
+          </p>
+
+          <div id="tutorialsGrid"
+               style="display: grid;
+                      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+                      gap: 10px; margin: 4px 0 12px;">
+
+            <!-- Atlas walkthroughs -->
+            <div class="tutorial-card" data-tutorial-id="discover_first_inversion"
+                 data-status="pending"
+                 title="Coming soon — guided walkthrough"
+                 style="border: 1px solid var(--rule); border-radius: 4px;
+                        padding: 10px 12px; background: var(--panel-2);
+                        cursor: not-allowed; opacity: 0.85;">
+              <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px;">
+                <b style="font-size: 11.5px; color: var(--ink);">Discover your first inversion</b>
+                <span style="font-size: 9.5px; padding: 1px 6px; border-radius: 2px;
+                             background: var(--panel-3); color: var(--ink-dimmer);
+                             font-family: var(--mono);">coming soon</span>
+              </div>
+              <div style="font-size: 10.5px; margin-top: 4px;">
+                Load a chrom JSON → scrub to the cleanest 3-band PCA → lock K=3 colors → promote.
+                The minimum-viable end-to-end loop.
+              </div>
+            </div>
+
+            <div class="tutorial-card" data-tutorial-id="boundary_refinement"
+                 data-status="pending"
+                 title="Coming soon — guided walkthrough"
+                 style="border: 1px solid var(--rule); border-radius: 4px;
+                        padding: 10px 12px; background: var(--panel-2);
+                        cursor: not-allowed; opacity: 0.85;">
+              <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px;">
+                <b style="font-size: 11.5px; color: var(--ink);">Refine boundaries (page 4)</b>
+                <span style="font-size: 9.5px; padding: 1px 6px; border-radius: 2px;
+                             background: var(--panel-3); color: var(--ink-dimmer);
+                             font-family: var(--mono);">coming soon</span>
+              </div>
+              <div style="font-size: 10.5px; margin-top: 4px;">
+                Promoted candidate → boundary refinement page → SV anchors + flanking PC1 → commit edits.
+              </div>
+            </div>
+
+            <div class="tutorial-card" data-tutorial-id="breeding_card"
+                 data-status="pending"
+                 title="Coming soon — guided walkthrough"
+                 style="border: 1px solid var(--rule); border-radius: 4px;
+                        padding: 10px 12px; background: var(--panel-2);
+                        cursor: not-allowed; opacity: 0.85;">
+              <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px;">
+                <b style="font-size: 11.5px; color: var(--ink);">Print a breeding-readiness card</b>
+                <span style="font-size: 9.5px; padding: 1px 6px; border-radius: 2px;
+                             background: var(--panel-3); color: var(--ink-dimmer);
+                             font-family: var(--mono);">coming soon</span>
+              </div>
+              <div style="font-size: 10.5px; margin-top: 4px;">
+                Promoted candidate → page 7 karyotype → 🧬 print breeding card → save as PDF.
+                Per-arrangement F<sub>ROH</sub>, K=8 ancestry, pairing advice.
+              </div>
+            </div>
+
+            <div class="tutorial-card" data-tutorial-id="manuscript_bundle"
+                 data-status="pending"
+                 title="Coming soon — guided walkthrough"
+                 style="border: 1px solid var(--rule); border-radius: 4px;
+                        padding: 10px 12px; background: var(--panel-2);
+                        cursor: not-allowed; opacity: 0.85;">
+              <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px;">
+                <b style="font-size: 11.5px; color: var(--ink);">Export a manuscript bundle</b>
+                <span style="font-size: 9.5px; padding: 1px 6px; border-radius: 2px;
+                             background: var(--panel-3); color: var(--ink-dimmer);
+                             font-family: var(--mono);">coming soon</span>
+              </div>
+              <div style="font-size: 10.5px; margin-top: 4px;">
+                Page 5 catalogue → 📝 manuscript bundle → ready-to-paste Methods + Results Markdown + TSV.
+              </div>
+            </div>
+
+            <!-- Command-line / pipeline walkthroughs -->
+            <div class="tutorial-card" data-tutorial-id="cli_inversion_toolkit"
+                 data-status="pending"
+                 title="Coming soon — command-line walkthrough"
+                 style="border: 1px solid var(--rule); border-radius: 4px;
+                        padding: 10px 12px; background: var(--panel-2);
+                        cursor: not-allowed; opacity: 0.85;">
+              <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px;">
+                <b style="font-size: 11.5px; color: var(--ink);">CLI · inversion-popgen-toolkit</b>
+                <span style="font-size: 9.5px; padding: 1px 6px; border-radius: 2px;
+                             background: var(--panel-3); color: var(--ink-dimmer);
+                             font-family: var(--mono);">coming soon</span>
+              </div>
+              <div style="font-size: 10.5px; margin-top: 4px;">
+                LANTA: end-to-end run on one chromosome — local PCA → MDS of θπ → contingency catalogue.
+              </div>
+            </div>
+
+            <div class="tutorial-card" data-tutorial-id="cli_te_density"
+                 data-status="pending"
+                 title="Coming soon — command-line walkthrough"
+                 style="border: 1px solid var(--rule); border-radius: 4px;
+                        padding: 10px 12px; background: var(--panel-2);
+                        cursor: not-allowed; opacity: 0.85;">
+              <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px;">
+                <b style="font-size: 11.5px; color: var(--ink);">CLI · TE density (RD)</b>
+                <span style="font-size: 9.5px; padding: 1px 6px; border-radius: 2px;
+                             background: var(--panel-3); color: var(--ink-dimmer);
+                             font-family: var(--mono);">coming soon</span>
+              </div>
+              <div style="font-size: 10.5px; margin-top: 4px;">
+                <code>RUN_RD_TE_FULL_BOTH_SPECIES.sh</code> — both haplotypes,
+                R aggregation, atlas-ready JSON.
+              </div>
+            </div>
+
+            <div class="tutorial-card" data-tutorial-id="cli_step_d17_boundary"
+                 data-status="pending"
+                 title="Coming soon — command-line walkthrough"
+                 style="border: 1px solid var(--rule); border-radius: 4px;
+                        padding: 10px 12px; background: var(--panel-2);
+                        cursor: not-allowed; opacity: 0.85;">
+              <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px;">
+                <b style="font-size: 11.5px; color: var(--ink);">CLI · STEP_D17 boundary scan</b>
+                <span style="font-size: 9.5px; padding: 1px 6px; border-radius: 2px;
+                             background: var(--panel-3); color: var(--ink-dimmer);
+                             font-family: var(--mono);">coming soon</span>
+              </div>
+              <div style="font-size: 10.5px; margin-top: 4px;">
+                L1/L2 boundary-scan pipeline. L3 contingency-table validation queued
+                as the next step.
+              </div>
+            </div>
+
+            <div class="tutorial-card" data-tutorial-id="cli_module_2b_popstruct"
+                 data-status="pending"
+                 title="Coming soon — command-line walkthrough"
+                 style="border: 1px solid var(--rule); border-radius: 4px;
+                        padding: 10px 12px; background: var(--panel-2);
+                        cursor: not-allowed; opacity: 0.85;">
+              <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px;">
+                <b style="font-size: 11.5px; color: var(--ink);">CLI · MODULE_2B population structure</b>
+                <span style="font-size: 9.5px; padding: 1px 6px; border-radius: 2px;
+                             background: var(--panel-3); color: var(--ink-dimmer);
+                             font-family: var(--mono);">coming soon</span>
+              </div>
+              <div style="font-size: 10.5px; margin-top: 4px;">
+                NGSadmix K=2–20 → PCAngsd → evalAdmix → ngsRelate → NAToRA pruning to 81 unrelated.
+              </div>
+            </div>
+
+          </div>
+
+          <p style="margin: 8px 0 0 0; color: var(--ink-dimmer); font-size: 10.5px;">
+            <i>Authoring note:</i> tutorials follow the <i>30 seconds to
+            figure 3</i> pattern from the diversity atlas — clickable card
+            opens a step-by-step overlay with screenshots, button-press
+            highlights, and "what to look for" callouts at each step. To
+            add a new tutorial, add a card here, set <code>data-status="available"</code>
+            and wire <code>data-tutorial-id</code> to the launcher
+            (planned, separate slice).
+          </p>
+        </div>
+      </details>
+
+      <h4 id="hotkeys-section">Hotkeys / tutorial</h4>
+      <details open>
+        <summary style="cursor: pointer; padding: 4px 0; color: var(--ink); font-size: 11px; font-weight: 600;">
+          Inversion Atlas — keyboard workflow (click to toggle)
+        </summary>
+        <div style="margin: 10px 0 6px 4px; line-height: 1.7; color: var(--ink-dim); font-size: 11px;">
+          <p style="margin: 0 0 8px 0;">In the Inversion Atlas:</p>
+          <ul style="margin: 0 0 8px 18px; padding: 0;">
+            <li>Use <b>← / →</b> to navigate the genome (step between L2 windows).</li>
+            <li>Click <b>Zoom L2</b> or <b>Window</b> to change the scale.</li>
+            <li>Use <b>↑</b> (arrow up) to validate a merge.</li>
+            <li>Use <b>↓</b> (arrow down) to demote.</li>
+            <li>Click <b>promote</b> to add the consolidated interval to the candidate list.</li>
+            <li>Then go to the <b>catalogue</b> page for results.</li>
+          </ul>
+          <p style="margin: 8px 0 0 0; color: var(--ink-dimmer); font-size: 10.5px;">
+            That's the core L1 → L2 review loop. Other hotkeys are documented per-tab in the row descriptions above.
+          </p>
+        </div>
+      </details>
+
+      <h4 id="bp-classification-section">Breakpoint classification framework</h4>
+      <details open>
+        <summary style="cursor: pointer; padding: 4px 0; color: var(--ink); font-size: 11px; font-weight: 600;">
+          Two-layer classification for cross-species breakpoints (click to toggle)
+        </summary>
+        <div style="margin: 10px 0 6px 4px; line-height: 1.6; color: var(--ink-dim); font-size: 11px;">
+          <p style="margin: 0 0 10px 0;">
+            Cross-species breakpoints (page 13) and inversion candidates (pages 1, 5)
+            are classified along two independent axes. The architecture class
+            (Layer 1) describes <i>what kind</i> of breakpoint it is. The age model
+            (Layer 2) describes <i>when</i> the rearrangement most likely happened.
+            Both axes use the evidence already in the atlas (TE flanking density,
+            local PCA bands, synteny block edges, dXY) plus future layers
+            (10-species synteny, miniprot anchors) when they ship.
+          </p>
+
+          <p style="margin: 12px 0 4px 0; color: var(--ink); font-weight: 600;">
+            Layer 1 — Architecture
+          </p>
+          <table class="help-table" style="margin-bottom: 8px;">
+            <tr>
+              <td><b>A</b> Simple inversion</td>
+              <td>Two clean inversion edges. Local PCA / MDS bands support inversion. No strong synteny boundary with related species. <i>Ordinary polymorphic inversion.</i></td>
+            </tr>
+            <tr>
+              <td><b>B</b> Synteny-boundary inversion</td>
+              <td>Inversion edge overlaps the edge of a conserved syntenic block. Same block boundary exists in related species, but chromosome identity is mostly conserved. <i>The inversion may reuse a pre-existing genomic boundary.</i></td>
+            </tr>
+            <tr>
+              <td><b>C</b> Fusion/fission-associated</td>
+              <td>One inversion breakpoint overlaps a cross-species chromosome split/join point. One species has the region on one chromosome; another species has homologous material split across two chromosomes. <i>The inversion may be anchored at an older karyotype breakpoint.</i></td>
+            </tr>
+            <tr>
+              <td><b>D</b> Terminal translocation / reversed attachment</td>
+              <td>Region is near a chromosome end. Homologous segment appears on a different chromosome in another species, possibly in reversed orientation. Synteny suggests terminal segment movement. <i>A chromosome-end segment may have moved or reattached in another genomic context.</i></td>
+            </tr>
+            <tr>
+              <td><b>E</b> Recurrent rearrangement hotspot</td>
+              <td>The same region carries inversion AND translocation/fusion/fission AND orientation-switch signals — plus repeat-rich / low-mappability / telomeric / centromeric features. Multiple species may show different rearrangements around the same point. <i>This region may repeatedly break and repair in different ways.</i> Scientific label: <code>recurrent breakage-and-repair hotspot</code>.</td>
+            </tr>
+            <tr>
+              <td><b>F</b> Ambiguous / assembly-risk</td>
+              <td>Gap near breakpoint, low mappability, collapsed repeat, scaffold join, weak SV support, only one breakpoint visible. <i>Do not over-interpret yet.</i></td>
+            </tr>
+          </table>
+
+          <p style="margin: 12px 0 4px 0; color: var(--ink); font-weight: 600;">
+            Layer 2 — Age model
+          </p>
+          <table class="help-table" style="margin-bottom: 8px;">
+            <tr>
+              <td><b>YOUNG-POP</b></td>
+              <td>Inversion only seen inside the focal population. Low dXY between standard / inverted haplotypes. Long shared haplotype around breakpoint. No evidence in related species. <i>The inversion is likely recent.</i></td>
+            </tr>
+            <tr>
+              <td><b>OLD-POLY</b></td>
+              <td>Strong dXY elevation inside the inversion. Deep standard-vs-inverted haplotype split. Arrangement-specific phylogeny. Possibly shared across populations / species. <i>The inversion itself may be old.</i></td>
+            </tr>
+            <tr>
+              <td><b>OLD-BP / YOUNG-INV</b></td>
+              <td>Inversion is polymorphic only now / recently, but its breakpoint overlaps an ancient synteny / karyotype / repeat boundary. dXY inside the inversion is not extremely old. <i>The fragile region is old, but the inversion using it may be younger.</i></td>
+            </tr>
+            <tr>
+              <td><b>LINEAGE-KARYO</b></td>
+              <td>Breakpoint explains a difference between species' chromosomes. Outgroup suggests the event happened on one lineage. Fusion / fission / translocation is fixed between species. <i>Mostly a species-evolution breakpoint, not a population inversion.</i></td>
+            </tr>
+            <tr>
+              <td><b>MULTI-AGE-HOTSPOT</b></td>
+              <td>Breakpoint substrate appears ancient. Karyotype change happened at one time. Present-day inversion / translocation polymorphism may be younger. Same region shows several rearrangement types. <i>Different rearrangement events of different ages reused the same fragile region.</i></td>
+            </tr>
+          </table>
+
+          <p style="margin: 12px 0 4px 0; color: var(--ink); font-weight: 600;">
+            Combined label format
+          </p>
+          <p style="margin: 0 0 8px 0;">
+            <code>candidate_id | architecture | age_model | confidence</code>
+          </p>
+          <p style="margin: 0 0 8px 0; color: var(--ink-dimmer); font-size: 10.5px;">
+            Example: <code>LG28_candidate_X | Class D/E (terminal translocation + recurrent hotspot) | OLD-BP/YOUNG-INV | medium</code>
+          </p>
+
+          <p style="margin: 12px 0 4px 0; color: var(--ink); font-weight: 600;">
+            Manuscript framing
+          </p>
+          <p style="margin: 0 0 8px 0; padding: 8px 12px; background: var(--panel-2); border-left: 3px solid var(--accent); border-radius: 2px; font-style: italic; line-height: 1.7;">
+            Some present-day inversion boundaries were classified as recurrent
+            rearrangement hotspots when they colocalized with cross-species
+            karyotype breakpoints, terminal translocation signals, and
+            orientation-discordant synteny. These cases were interpreted as old
+            breakpoint regions potentially reused by younger inversion events.
+          </p>
+
+          <p style="margin: 12px 0 4px 0; color: var(--ink-dimmer); font-size: 10.5px;">
+            <b>Status</b>: this is a reference framework. Per-breakpoint
+            classification UI (assign a class + age tag to each breakpoint, persist
+            across sessions, auto-suggest from evidence layers) is scoped for a
+            future session — see TURN&nbsp;115+ in the handoff. The reference here
+            documents the schema so manuscript text and reviewer responses use
+            consistent vocabulary.
+          </p>
+        </div>
+      </details>
+
+      <h4>Changelog</h4>
+      <details>
+        <summary style="cursor: pointer; padding: 4px 0; color: var(--ink); font-size: 11px; font-weight: 600;">
+          Recent additions (click to toggle)
+        </summary>
+        <table class="help-table" style="margin-top: 8px;">
+          <tr><td style="white-space: nowrap;"><b>v4 turn 82</b></td><td><b>Negative regions page</b> shipped (page 6, between Catalogue and Karyotype/tier). Inversion-negative inventory — the complement of the catalogue. Each row is a genomic interval evaluated against the multi-layer evidence battery (local PCA, GHSL, SV calls, heterozygosity, callable mask, etc.) with one of five <code>region_status</code> values: <code>inversion_candidate</code> / <code>complex_candidate</code> / <code>no_detectable_inversion_high_confidence</code> / <code>no_detectable_inversion_low_power</code> / <code>not_testable</code>. Caution banner + Methods note both make the manuscript-grade framing explicit: <i>"no detectable inversion under defined resolution"</i>, never <i>"no inversions exist"</i>. Loads <code>negative_regions.json</code>. Downstream tabs renumbered: karyotype 7, popstats 8, ancestry 9, windows 10, confirmed 11, markers 12, cross-species 13, stats profile 14, marker panel 15, help 16.</td></tr>
+          <tr><td style="white-space: nowrap;"><b>v4 turn 80</b></td><td><b>Workflow stage bands</b> on the tab bar (very subtle 2px top border per tab, color-coded by stage: discovery / refinement / classification / synthesis / help). <b>First-use attention pulse</b> on five key affordances: load JSON, 🔬 Zoom L2, 📊 Window step cycler, ▤ move-to-minimap, ⬆ promote to candidate. Pulse dismissal persists in localStorage so returning users see a clean UI.</td></tr>
+          <tr><td style="white-space: nowrap;"><b>v4 turn 79</b></td><td><b>Cross-atlas hash routing.</b> <code>Inversion_atlas.html#page18</code> now lands on the marker panel directly (was: opened on whatever tab was last visited). <code>hashchange</code> events also fire for in-page navigation. The marker panel methods note now includes a back-link to <code>Population_atlas.html#page8</code> (breeding highlights).</td></tr>
+          <tr><td style="white-space: nowrap;"><b>v4 turn 78</b></td><td><b>Marker panel rebuilt around private indels.</b> Tier 1 = clean dosage signature (AF_STD ≤0.02, AF_HET ∈ [0.25, 0.75], AF_INV ≥0.80) + controls + bighead specificity; Tier 3 demoted (breakpoint precision uncertain). Live AF scoring from <code>variant_afs.json</code>. Auto-suggested controls from karyotype. (Page 14.)</td></tr>
+          <tr><td style="white-space: nowrap;"><b>v4 turn 77</b></td><td><b>Stats profile page</b> added (page 13). Comparative inversion-phenotype synthesis table covering breakpoint architecture, genomic composition, functional cargo, population variation, and breeding utility. Auto-derives from atlas state; accepts <code>stats_profile.json</code> overlay.</td></tr>
+          <tr><td style="white-space: nowrap;"><b>v4 turn 76</b></td><td><b>Cross-species page</b> gained macro-synteny layer (3-tier Sankey, length-matched permutation test, per-chrom relationship table). Schema bumped from v1 to v2 with <code>synteny_blocks</code>, <code>chrom_lengths_query/target</code>. (Page 12.)</td></tr>
+          <tr><td style="white-space: nowrap;"><b>v4 turn 75</b></td><td><b>Cross-species breakpoints page</b> shipped (page 12). Driven by <code>STEP_CS01_extract_breakpoints.py</code> + wfmash 1-to-1 alignment. Per-breakpoint event_type (inversion / translocation / fission/fusion), repeat-element flank density, recurrence flag against 226-sample candidates.</td></tr>
+        </table>
+      </details>
+
+      <h4>New JSON schemas</h4>
+      <details>
+        <summary style="cursor: pointer; padding: 4px 0; color: var(--ink); font-size: 11px; font-weight: 600;">
+          File formats accepted by recent pages (click to toggle)
+        </summary>
+        <table class="help-table" style="margin-top: 8px;">
+          <tr><td style="white-space: nowrap;"><code>cs_breakpoints_v1.json</code></td><td>Page 12 input. Output of <code>STEP_CS01_extract_breakpoints.py</code>. Contains <code>breakpoints[]</code> (per-breakpoint event_type, gar/mac coordinates, repeat-element flank density), <code>synteny_blocks[]</code> (1-to-1 anchor blocks for the macro-synteny layer), <code>chrom_lengths_query/target</code>, and metadata. Schema v2.</td></tr>
+          <tr><td style="white-space: nowrap;"><code>dotplot_mashmap_v1.json</code></td><td>Optional page-16 input for the dot plot panel. Multi-resolution mashmap output (segment-length × percent-identity grid, all <code>--one-to-one</code>). Generated once on the cluster by <code>STEP_DP01_run_mashmap_grid.sh</code> + <code>STEP_DP02_aggregate_mashmap_to_json.py</code>. Schema: <code>resolutions[]</code> with <code>label</code>, <code>segment_length_bp</code>, <code>pi_min</code>, <code>n_alignments</code>, <code>alignments[]</code>. The dot plot also renders from <code>cs_breakpoints_v1</code> v2 <code>synteny_blocks[]</code> alone — the mashmap layer is additive, providing the resolution dropdown for finer / coarser views.</td></tr>
+          <tr><td style="white-space: nowrap;"><code>&lt;chrom&gt;_ncrna_density.json</code></td><td>Page 11 input. Optional sibling track to the repeat-density layer. Per-chrom density (loci/Mb) for tRNA (tRNAscan-SE), rRNA (barrnap), and ncRNA-other (Rfam/Infernal). Sub-classes preserved: <code>tRNA_HC</code>/<code>tRNA_pseudo</code>/<code>tRNA_intronic</code>/<code>tRNA_Sec</code>; <code>rRNA_5S</code>/<code>5_8S</code>/<code>18S</code>/<code>28S</code>/<code>partial</code>; <code>ncRNA_snRNA</code>/<code>snoRNA</code>/<code>miRNA</code>/<code>other</code>. Generated once per haplotype by <code>aggregate_ncrna_density.R</code> from the canonical <code>fClaHyb_*.tRNA.gff3</code> + <code>.rRNA.gff3</code> + <code>.ncRNA.gff3</code>. Schema: <code>tool: 'ncrna_density_v1'</code>, <code>chromosomes[]</code> with <code>by_class</code> mirroring the TEfull shape exactly so downstream consumers (focal-vs-bg widget) auto-discover the metrics.</td></tr>
+          <tr><td style="white-space: nowrap;"><code>stats_profile.json</code></td><td>Page 13 overlay. Optional. Adds rows the atlas can't compute itself — gene density, GO/KEGG enrichment, ROH overlap, deleterious burden, FST between haplotypes. Each row: <code>{ category, label, scope, african_result, bighead_result, interpretation }</code>. TSV variant accepted.</td></tr>
+          <tr><td style="white-space: nowrap;"><code>variant_afs.json</code></td><td>Page 14 input for the AF-based tier promotion. Shape: <code>{ metadata, variants_by_inversion: { &lt;inv_id&gt;: [&lt;variant&gt;] } }</code>. Each variant: <code>{ chr, pos, ref, alt, type, indel_size_bp, af_std, af_het, af_inv }</code>. Atlas computes <code>private_score</code>, <code>dosage_score</code>, <code>final_score</code>, gel-visibility, and assigns Tier 1–4.</td></tr>
+          <tr><td style="white-space: nowrap;"><code>marker_panel.json</code></td><td>Page 14 overlay. User-curated overrides with primer sequences, expected amplicon sizes, validation status, and per-marker controls block (positive_controls_INV / heterozygote_controls / negative_controls_STD / cross-species fields).</td></tr>
+        </table>
+      </details>
+
+      <h4>Vocabulary</h4>
+      <table class="help-table">
+        <tr><td><b>L1 / L2 / L3</b></td><td>Coarse → fine PCA window scales. L2 envelopes are what the scrubber clusters and what the catalogue rows correspond to. L3 cuts let you split a single L2 into sub-intervals at commit time without re-running the upstream local PCA.</td></tr>
+        <tr><td><b>Window resolution</b></td><td>A candidate is committed at either <code>L2</code> resolution (the default — boundaries snap to L2-envelope edges) or <code>W</code> resolution (per-window precision; boundaries can fall mid-L2). Set on commit; round-trips in JSON. SCHEMA §24.</td></tr>
+        <tr><td><b>L3 cut</b></td><td>A per-window cut inside a candidate's draft, applied at commit time to split the candidate into N sub-intervals (a SPLIT). Each sub-interval is a sibling of the others, linked via <code>parent_split_id</code>. SCHEMA §24.</td></tr>
+        <tr><td><b>Interval</b></td><td>A contiguous span of L2s that you might want to treat as one unit. Drafted in <i>candidate mode</i> on tab 1 (arrow-up extends, arrow-down shrinks; F flip, B set boundary, C cut) or assembled by L1-merging in the catalogue.</td></tr>
+        <tr><td><b>Candidate</b></td><td>An interval that has been <i>promoted</i> via <i>⬆ promote to candidate</i> (tab 1) or <i>👁 view as candidate</i> (tab 5). Lives on the candidate list in the right sidebar. Starts <b>provisional</b>; flip ⭐ <i>mark confirmed</i> on tab 3 once reviewed. Lane-stacking on the cand-strip resolves overlapping candidates visually. SCHEMA §25.</td></tr>
+        <tr><td><b>Regime</b></td><td>What each fish (sample) is <i>assigned to</i> within a candidate. For K=3: <code>g0 / g1 / g2</code> = homo1 / het / homo2 (PC1-rank order). Fish-regime calls export to <code>fish_regime_calls.tsv</code> (per-track since turn 46).</td></tr>
+        <tr><td><b>Regime registry</b></td><td>User-curated annotation of "this group of L2s belongs to inversion-system X." Each regime carries a label, axis_topology (SCHEMA §26), L2 members, candidate members (track-scoped since turn 48), and notes. Open via the <i>⚙ registry</i> button on tab 3's regime row.</td></tr>
+        <tr><td><b>Axis topology</b></td><td>Regime-registry vocabulary controlling how a regime aligns to the genome's principal axes: <code>biallelic_inversion</code>, <code>nested_inversion</code>, <code>polymorphism_complex</code>, <code>family_LD</code>, <code>diversity_only</code>, <code>unspecified</code>. User-chosen, never auto-assigned. SCHEMA §26.</td></tr>
+        <tr><td><b>Track</b></td><td>A subset of a candidate's K-bands grouped as a single inversion call. Single-track is the default (one track owns all bands). Two-track candidates split bands into two parallel inversion calls sharing the genomic region — common when K≥4 and the σ-profile says <code>TWO_INVERSIONS</code>. Each track has its own active_bands, regime_id, and per-track sample membership. Mutually exclusive: each band belongs to at most one track. (Turns 36-48.)</td></tr>
+        <tr><td><b>Atlas trio</b></td><td>Three sibling lenses on the same loaded JSON. <b>Inversion Atlas</b> (tabs 1–11) is the curation tool — drafts candidates, manages tracks, refines boundaries. <b>Diversity Atlas</b> (tab 13, SCHEMA §17 + §23) reinterprets the same data through a population-genetic-diversity lens. <b>Genome Atlas</b> (tab 14, SCHEMA §28) grounds both in the reference assembly + annotations. Inversion Atlas <i>computes</i> (you curate); the other two are <i>render-only</i> — they consume layers produced by the cluster-side R/genome pipelines.</td></tr>
+        <tr><td><b>Boundary zone</b></td><td>An approximate ±5-window range around an inferred breakpoint, refined on tab 4. SCHEMA §12 reserves the term <i>exact breakpoint</i> for junction-level evidence (split reads / assembly junctions) — most refinements are zone-level.</td></tr>
+        <tr><td><b>σ verdict</b></td><td>For K≥4 candidates, classifies what causes the extra bands. SCHEMA §27 vocab: <code>TWO_INVERSIONS</code> / <code>CROSSOVER_ARTIFACTS</code> / <code>NOISY_REGION</code> / <code>NA</code> / <code>UNDETERMINED</code>. See "σ verdicts" section below for definitions.</td></tr>
+        <tr><td><b>Local launcher</b></td><td>The <code>atlas.sh</code> / <code>atlas.bat</code> scripts shipped with the codebase. Start a local HTTP server bound to <code>127.0.0.1:8765</code> and open the atlas in your browser. Compared to opening the HTML via <code>file://</code>, the launcher gives you a stable localStorage origin so saved candidates / regime registry / boundary edits persist reliably across sessions. See <code>atlas_launcher_README.md</code>. (Turn 54.)</td></tr>
+        <tr><td><b>Label vocabulary</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[v4 turn 87]</span></td><td>Two display vocabularies for K-means bands of a candidate, switchable via the <i>labels</i> toggle in the sidebar (legacy / detailed). <b>Legacy</b> is the default, neutral naming: <code>band 1 (lo)</code> / <code>band 2 (mid)</code> / <code>band 3 (hi)</code> for K=3 buttons, <code>g0 / g1 / g2</code> in the legend, <code>band 0 / band 1 / band 2</code> in karyotype-page pills. Makes no biological claim. <b>Detailed</b> is the operational H-system: <code>H1/H1</code> / <code>H1/H2</code> / <code>H2/H2</code> for K=3, extending to <code>H1/H3</code> / <code>H2/H3</code> / <code>H3/H3</code> for K=4..6. The H-labels are <i>operational</i>, ordered by median PC1, NOT confirmed biological assignments — see "Operational structural-haplotype framework" section below for caveats and manuscript-safe wording.</td></tr>
+      </table>
+
+      <h4>Operational structural-haplotype framework <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[v4 turn 87]</span></h4>
+      <p style="line-height: 1.55; margin: 0 0 10px;">
+      Local PCA bands are <b>observed clusters</b>, not biological genotypes. The mapping from band to genotype requires per-sample heterozygosity / haplotype-divergence evidence that local PCA alone cannot supply. The two display vocabularies (legacy / detailed, see Vocabulary table above) reflect this distinction: legacy labels make no claim; detailed labels offer an operational ordering by median PC1.
+      </p>
+      <p style="line-height: 1.55; margin: 0 0 10px;">
+      <b>Why a single inversion gives 3 bands.</b> A simple biallelic inversion has two haploid arrangements (call them H1 and H2). At the diploid individual level these produce three unordered classes: H1/H1, H1/H2, H2/H2 — three local-PCA bands. The traditional "REF / HET / INV" naming is replaced here by H1/H1, H1/H2, H2/H2 because local PCA does not directly prove which haplotype is reference-like or inverted; the H-system avoids that unsupported claim.
+      </p>
+      <p style="line-height: 1.55; margin: 0 0 10px;">
+      <b>Why some candidates show 4–6 bands.</b> A region may contain more than two major structural haplotypes. Three haplotypes (H1, H2, H3) produce up to six diploid combinations: H1/H1, H1/H2, H2/H2, H1/H3, H2/H3, H3/H3. Six bands does not require six orientations; it can mean three underlying haplotype classes producing six diploid combinations. Intermediate cases (4 or 5 visible bands) occur when one or more diploid combinations is rare, missing, or merged in the PCA projection.
+      </p>
+      <p style="line-height: 1.55; margin: 0 0 10px;">
+      <b>How heterozygosity disambiguates.</b> Local PCA alone cannot tell whether a band is H1/H1, H1/H2, etc. The disambiguating evidence is per-sample heterozygosity: homozygote-like classes should show low within-sample haplotype divergence, heterozygote-like classes should show elevated divergence. A band may also contain two hidden heterozygosity modes (e.g., 50% low-het + 50% high-het in the same PC band) — these need to be split into sub-bands. Per-sample heterozygosity is part of pages 2 (θπ) and is being added; until it ships, the detailed labels are operational only.
+      </p>
+      <p style="line-height: 1.55; margin: 0 0 10px;">
+      <b>Manuscript-safe wording.</b> When writing about candidates, prefer:
+      </p>
+      <ul style="line-height: 1.55; margin: 0 0 10px 22px; padding: 0; font-size: 11px;">
+        <li>"candidate regions were classified into local structural-haplotype bands; bands were further interpreted as homozygote-like, heterozygote-like, mixed, or ambiguous based on within-sample haplotype divergence" — instead of "candidate inversions were classified as REF/REF, REF/INV, and INV/INV"</li>
+        <li>"six stable bands are consistent with a multi-haplotype structural system, potentially involving three major haplotype backgrounds and their diploid combinations" — instead of "six bands indicate multiple inversions"</li>
+        <li>"this band is H1/H1-like under an operational labeling scheme" — instead of "this band is AA"</li>
+        <li>"reference-like" or "inversion-like" only if independently supported by orientation / breakpoint / long-read evidence — never as a default</li>
+      </ul>
+      <p style="line-height: 1.55; margin: 0 0 10px;">
+      <b>Caveats per band-count interpretation.</b>
+      </p>
+      <table class="help-table">
+        <tr><td><b>3 bands</b></td><td>Likely simple biallelic system: H1/H1, H1/H2, H2/H2.</td></tr>
+        <tr><td><b>4 bands</b></td><td>Could be a biallelic system plus one split class, one missing/merged class from a 3-haplotype system, asymmetry due to sample frequency, or one hidden axis not fully separated.</td></tr>
+        <tr><td><b>5 bands</b></td><td>Could be 3 homozygote-like + 2 heterozygote-like classes, with one expected heterozygote class missing, rare, selected against, or merged.</td></tr>
+        <tr><td><b>6 bands</b></td><td>Could be the full 3-haplotype diploid system: H1/H1, H1/H2, H2/H2, H1/H3, H2/H3, H3/H3.</td></tr>
+        <tr><td><b>No bands</b></td><td>No strong local structural haplotype signal, too little variation, or insufficient local contrast.</td></tr>
+      </table>
+      <p style="line-height: 1.55; margin: 8px 0 0; font-size: 11px; color: var(--ink-dim);">
+      Band order in PC1×PC2 space need not follow a biologically clean sequence. PCA is a projection — observed band order can be (e.g.) H1/H1, H1/H2, H2/H2, H1/H3 even though biologically H2/H3 might be expected to fall between H2/H2 and H3/H3. The detailed labels assigned by the resolver use the most parsimonious sub-pattern from the 3-haplotype model, ordered by median PC1; sub-pattern correctness has to be confirmed against heterozygosity evidence.
+      </p>
+
+      <h4>Manuscript vocabulary <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[v4 turn 100]</span></h4>
+      <p style="line-height: 1.55; margin: 0 0 10px;">
+      We use a tiered vocabulary that separates <b>what is observed</b> from <b>what is inferred</b>. Local PCA produces stable banding patterns at certain genomic positions — that is the observation. The inference is that those banding patterns reflect segregating haplotype classes. The further inference that those classes correspond to inversion orientations requires independent evidence and is reserved for the strongest cases.
+      </p>
+      <table class="help-table">
+        <tr>
+          <td style="width: 28%;"><b>structural-haplotype system</b></td>
+          <td>Default term — a region where individuals segregate into stable local haplotype classes across adjacent windows. Conservative; makes no orientation claim. Use this whenever stable band assignments are observed but breakpoint or orientation evidence is missing.</td>
+        </tr>
+        <tr>
+          <td><b>segregating structural-haplotype system</b></td>
+          <td>Long form, used when emphasizing that the system is polymorphic (multiple haplotype classes coexisting in the cohort), as opposed to a fixed difference between species or populations.</td>
+        </tr>
+        <tr>
+          <td><b>inversion-like structural-haplotype system</b></td>
+          <td>Stronger term — used when the system shows signatures consistent with an inversion (long-range LD block, recombination suppression, distinct PCA bands across many windows) but the breakpoints are not yet localized.</td>
+        </tr>
+        <tr>
+          <td><b>candidate polymorphic inversion</b></td>
+          <td>Reserved for systems with breakpoint or orientation evidence (DELLY/Manta calls, long-read split reads, synteny breaks, etc.). Use only when the inversion claim is independently supported.</td>
+        </tr>
+        <tr>
+          <td><b>polymorphic inversion</b></td>
+          <td>The strongest term — only when orientation is confirmed (e.g., long-read assembly of both arrangements, validated breakpoints). Almost never used in this manuscript without the "candidate" qualifier.</td>
+        </tr>
+      </table>
+      <p style="line-height: 1.55; margin: 10px 0 0;">
+      Single-paragraph methods statement (paste-ready):
+      </p>
+      <p style="margin: 6px 0 10px 14px; padding: 8px 12px; border-left: 2px solid var(--good); background: rgba(60, 192, 138, 0.06); font-style: italic; line-height: 1.55;">
+      "We first identified segregating structural-haplotype systems from stable local-PCA banding patterns. A subset of these systems showed inversion-like signatures and were further classified as candidate polymorphic inversions when independent breakpoint or orientation evidence was available. The term <b>structural-haplotype system</b> is used throughout as a conservative descriptor for regions with stable local haplotype segregation; the term <b>inversion</b> is reserved for candidates with supporting orientation or breakpoint evidence."
+      </p>
+
+      <h4>L1/L2/L3 hierarchy in the new vocabulary</h4>
+      <p style="line-height: 1.55; margin: 0 0 10px;">
+      The atlas's existing L1/L2/L3 envelope hierarchy maps cleanly onto the structural-haplotype framework:
+      </p>
+      <table class="help-table">
+        <tr>
+          <td style="width: 20%;"><b>L1</b></td>
+          <td>Broad segregating structural-haplotype <b>region</b> — a coarse chromosomal block where local PCA shows banded structure. May contain one or more L2 sub-blocks. The L1 envelope is the outer container; it does not yet imply a specific haplotype-class count or any inversion claim.</td>
+        </tr>
+        <tr>
+          <td><b>L2</b></td>
+          <td>Stable internal haplotype <b>block</b> — a sub-region of an L1 envelope where the K-means band assignments are stable (consistent across adjacent windows, low boundary signal). Each L2 has its own K, σ-verdict, and (in detailed mode) per-band heterozygosity profile. Multiple L2s within one L1 may share haplotype classes (in which case they merge under L1-merged catalogue view) or carry distinct ones.</td>
+        </tr>
+        <tr>
+          <td><b>L3</b></td>
+          <td>Refined candidate structural-haplotype <b>interval</b> — a further sub-block within an L2 where additional internal substructure is resolved (e.g., multimodal heterozygosity inside a band, sub-band splitting). L3 is the level at which detailed-mode candidates can have biologically distinct sub-haplotypes within a single PCA band.</td>
+        </tr>
+      </table>
+      <p style="line-height: 1.55; margin: 8px 0 0; font-size: 11px; color: var(--ink-dim);">
+      The atlas's column "Regimes" annotates user-curated structural-haplotype <i>systems</i>, where one regime corresponds to one segregating structural-haplotype system that may span multiple L2 envelopes. The L1/L2/L3 hierarchy is the geometric subdivision; the regime registry is the biological-system annotation on top of it.
+      </p>
+
+      <h4>Band-reach + regime breadth <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[v4 turn 103-104]</span></h4>
+      <p style="line-height: 1.55; margin: 0 0 10px;">
+      <b>Band-reach</b> is the per-fish count of distinct K-means bands visited across a contiguous region. Fish that stay in 1–2 bands across many adjacent L2 envelopes are "lane-disciplined" — they are stable carriers of a particular structural-haplotype background. Fish that visit many bands either carry recombinant chromosomes (different haplotype backgrounds in different windows) or the local PCA has lost regime structure in that region.
+      </p>
+      <p style="line-height: 1.55; margin: 0 0 10px;">
+      <b>Regime breadth</b> is the per-region summary of band-reach values across all fish:
+      </p>
+      <table class="help-table">
+        <tr>
+          <td style="width: 18%;"><b>narrow</b></td>
+          <td>≥70% of fish have band-reach ≤2 across the windowed region. The cohort segregates cleanly into stable lanes — strong segregating-structural-haplotype-system signal. Many fish stay in a single band across the L2 chain, with the cohort distributed among multiple bands.</td>
+        </tr>
+        <tr>
+          <td><b>medium</b></td>
+          <td>30–70% of fish have band-reach ≤2. Mixed regime — partial segregation with some lane-crossing fish.</td>
+        </tr>
+        <tr>
+          <td><b>wide</b></td>
+          <td>&lt;30% of fish have band-reach ≤2. Most fish visit many bands. No clean structural-haplotype segregation in this region. Could mean: high recombination, small effective sample sizes per band, or low local-PCA discrimination.</td>
+        </tr>
+        <tr>
+          <td><b>no_signal</b></td>
+          <td>Fewer than 2 bands populated (≥5 fish each). The region does not have the band structure needed to call regime breadth.</td>
+        </tr>
+      </table>
+      <p style="line-height: 1.55; margin: 8px 0 0;">
+      The <b>regime</b> toggle on the per-sample lines panel paints a thin colored strip above the plot showing per-L2 regime breadth (green=narrow, amber=medium, red=wide, grey=no_signal). On LG28, narrow regions on the left transition to wide regions on the right — this is the visible banding-discipline pattern that distinguishes segregating-structural-haplotype regions from non-segregating regions.
+      </p>
+
+      <h4>Hatchery applications <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[v4 turn 105]</span></h4>
+      <p style="line-height: 1.55; margin: 0 0 10px;">
+      Structural-haplotype systems are <b>genomic units for broodstock management</b>. They are not breeding recommendations on their own, but they define the units that breeding programs can track, preserve, and test for trait association.
+      </p>
+      <p style="line-height: 1.55; margin: 0 0 10px;">
+      <b>Use cases</b>:
+      </p>
+      <table class="help-table">
+        <tr>
+          <td style="width: 28%;"><b>1. Hidden-diversity surveillance</b></td>
+          <td>A hatchery may know that fish A is from family 1 and fish B is from family 2, but not know that only 8 fish in the entire broodstock carry haplotype H3 at candidate region X. If those 8 fish are removed, that linked block disappears and may not be quickly recreated by recombination. The atlas surfaces this hidden layer.</td>
+        </tr>
+        <tr>
+          <td><b>2. Region-specific inbreeding</b></td>
+          <td>Two fish may look unrelated by genome-wide F<sub>ROH</sub> but be H1/H1 at a candidate region containing fertility, growth, or immune genes. Mating them creates offspring with high local homozygosity. Region-specific inbreeding is invisible to overall pedigree-based metrics.</td>
+        </tr>
+        <tr>
+          <td><b>3. Marker-assisted broodstock management</b></td>
+          <td>Once candidate systems are catalogued, hatcheries can design cheap region-specific markers (KASP, amplicon sequencing, small SNP panels) and screen routine broodstock without re-running local PCA. The atlas → marker-design → routine-screen pipeline is the most direct practical value.</td>
+        </tr>
+        <tr>
+          <td><b>4. Trait-association units</b></td>
+          <td>Structural-haplotype classes are better association units than individual SNPs because each class represents a whole inherited block. Future trait studies (growth, survival, deformity, fertility, disease resistance, hybrid offspring performance) test H1/H1 vs H1/H2 vs H2/H2 directly rather than millions of correlated SNPs.</td>
+        </tr>
+        <tr>
+          <td><b>5. Mating-design support (after validation)</b></td>
+          <td>Once associations are validated, a simple decision table can guide mating. e.g.: "avoid H1/H1 × H1/H1 if that combination has low survival; prefer H1/H1 × H2/H2 if heterozygote advantage is documented." Validation is required — the atlas provides candidates, not breeding rules.</td>
+        </tr>
+      </table>
+      <p style="line-height: 1.55; margin: 10px 0 0;">
+      <b>Manuscript-safe wording for the discussion section:</b>
+      </p>
+      <p style="margin: 6px 0 10px 14px; padding: 8px 12px; border-left: 2px solid var(--good); background: rgba(60, 192, 138, 0.06); font-style: italic; line-height: 1.55;">
+      "These structural-haplotype systems are not immediately breeding recommendations, but they define genomic units that can be tracked, preserved, and tested for association with aquaculture traits. They reveal a hidden layer of broodstock diversity: stable linked haplotype backgrounds that may not be captured by family labels or genome-wide diversity summaries alone. A subset of these systems can be developed into cheap region-specific markers for routine broodstock screening, providing a practical foundation for marker-assisted broodstock management."
+      </p>
+      <p style="line-height: 1.55; margin: 10px 0 0;">
+      <b>Why these regions matter for diversity preservation:</b>
+      </p>
+      <p style="margin: 6px 0 10px 14px; padding: 8px 12px; border-left: 2px solid var(--accent); background: rgba(245, 165, 36, 0.06); font-style: italic; line-height: 1.55;">
+      "These regions represent stable segregating structural-haplotype diversity: linked genomic backgrounds that are not rapidly broken down by recombination and may therefore be lost as entire blocks if their carriers are removed from the breeding population."
+      </p>
+
+      <h4>Key metrics</h4>
+      <table class="help-table">
+        <tr><td><b>Concord</b></td><td>Fraction of samples assigned to the same K-means group in two adjacent L2s after Hungarian alignment. High = L2s are interchangeable; suggests merge.</td></tr>
+        <tr><td><b>Cramér's V</b></td><td>Effect-size measure of association between two clusterings. N-independent. <code>&lt;0.10</code> small, <code>0.10–0.30</code> medium, <code>&gt;0.30</code> large.</td></tr>
+        <tr><td><b>p-value</b></td><td>Significance of the contingency. With persistent sample structure, p ≈ 0 is expected and confirms association — read together with concord.</td></tr>
+        <tr><td><b>Conservation</b></td><td>Mean concord with left + right L2 neighbors. Low (orange) = the L2 boundary is biologically real.</td></tr>
+        <tr><td><b>Coherence</b></td><td>Correlation between two-half mean PC1 vectors within the L2. Low (red, &lt;0.60) = INCOHERENT, suggests over-merge of distinct sub-regions.</td></tr>
+        <tr><td><b>Fam purity</b></td><td>Within-cluster fraction from the dominant family. ~1.0 (red, FAM-LD?) = clusters are family-pure → likely family LD, not real inversion. ~0.2 = real biological signal.</td></tr>
+        <tr><td><b>Silhouette</b></td><td>Cluster separation quality from K-means. <code>&gt;0.5</code> good, <code>&lt;0.45</code> weak.</td></tr>
+        <tr><td><b>K used</b></td><td>The number of clusters used for this L2. In adaptive mode, picked per-L2 by silhouette.</td></tr>
+        <tr><td><b>σ verdict</b></td><td>For K≥4 L2s, classifies the source of extra bands. SCHEMA §27.</td></tr>
+      </table>
+
+      <h4>σ verdicts (K ≥ 4 L2s) — SCHEMA §27</h4>
+      <table class="help-table">
+        <tr><td><b style="color:#a78bfa;">TWO_INVERSIONS</b></td><td>All samples have low σ (q50 &lt; 0.05). Joint karyotypes are stable → two stacked inversions.</td></tr>
+        <tr><td><b style="color:#f5a524;">CROSSOVER_ARTIFACTS</b></td><td>Bimodal σ distribution with small high-σ tail (2–25% of samples drift). Suggests gene conversion / double crossovers in heterozygotes.</td></tr>
+        <tr><td><b style="color:#e0555c;">NOISY_REGION</b></td><td>Everyone has high σ. Low informative power.</td></tr>
+        <tr><td><b>NA</b></td><td>K used ≤ 3. No extra bands to explain.</td></tr>
+        <tr><td><b>UNDETERMINED</b></td><td>Profile doesn't cleanly fit any pattern.</td></tr>
+      </table>
+
+      <h4>K labels TSV (for C++ pop-stats engine)</h4>
+      <p>The <i>export K labels TSV</i> button in the sidebar produces one row per (L2, sample) with columns: <code>chrom, l2_id, l2_idx, l2_start_bp, l2_end_bp, l2_n_windows, ind, cga, family_id, k_used, k_label, k_label_fixed, silhouette, fam_purity, coherence, cluster_ok</code>.</p>
+      <p><code>k_label</code> is the adaptive-K assignment (varies per L2 if adaptive mode is on); <code>k_label_fixed</code> is always at <code>state.k</code> (default 3) for cross-L2 comparisons. Group samples by <code>k_label_fixed</code> for uniform pop-stats; by <code>k_label</code> for per-L2 natural clustering.</p>
+
+      <h4>Pop-stat tracks (--track_&lt;label&gt;)</h4>
+      <p>Pass any per-window scalar TSV at export time:</p>
+      <p style="font-family: var(--mono); font-size: 11px;">
+        <code>--track_theta theta.tsv --track_fst_K1K3 fst.tsv --track_pi pi.tsv</code>
+      </p>
+      <p>TSV must have a <code>value</code> column plus one of:<br>
+        (a) <code>chrom, start_bp, end_bp, value</code> (range form)<br>
+        (b) <code>chrom, window_idx, value</code> (1-based index form)<br>
+        (c) <code>chrom, center_bp, value</code> (center form)</p>
+      <p>Each track renders as a 60px stacked panel between the Z and PCA panels on page 1.</p>
+
+      <h4>Color codes (cluster mode)</h4>
+      <p>K-means group → blue / grey / orange / green / red (lo to hi PC1). Samples colored consistently within an L2; Hungarian-aligned to focal in mini-PCAs.</p>
+      <p>Lock button (<b>🔒 lock colors to current L2</b>) freezes labels from a reference L2 → samples keep those colors as you scrub through other L2s. Useful for tracking how a clean K=3 split holds up across boundaries.</p>
+
+      <h4>Keyboard shortcuts</h4>
+      <table class="help-table">
+        <tr><td><b>← / →</b></td><td>Step one window</td></tr>
+        <tr><td><b>n / p</b></td><td>Jump to next / previous L1 or L2 (depending on travel mode)</td></tr>
+        <tr><td><b>Space</b></td><td>Toggle play / pause auto-scrub</td></tr>
+        <tr><td colspan="2" style="padding-top:8px; color: var(--ink-dim); font-size: 11px;"><i>While drafting a candidate (tab 1, candidate mode):</i></td></tr>
+        <tr><td><b>↑ / ↓</b></td><td>Extend / shrink draft right edge</td></tr>
+        <tr><td><b>F</b></td><td>Flip draft resolution between L2 and W (per-window)</td></tr>
+        <tr><td><b>B</b></td><td>Set boundary at cursor (split point for SPLIT commit)</td></tr>
+        <tr><td><b>C</b></td><td>Cut draft at cursor — adds an L3 cut at this window</td></tr>
+        <tr><td><b>Enter</b></td><td>Commit the draft (saves all sub-intervals from cuts as siblings linked by <code>parent_split_id</code>)</td></tr>
+        <tr><td><b>Esc</b></td><td>Discard draft</td></tr>
+        <tr><td colspan="2" style="padding-top:8px; color: var(--ink-dim); font-size: 11px;"><i>While viewing a multi-track candidate (tab 3):</i></td></tr>
+        <tr><td><b>track 1 / 2 buttons</b></td><td>Switch active track for band selection. Two-track candidates show track-1 and track-2 bands separately in regime row + karyotype.</td></tr>
+      </table>
+
+      <h4>Note on manuscript writing</h4>
+      <p>Catalogue exports (TSV / Markdown) are designed to drop into Methods / Results sections. They're aids to writing — they don't write the manuscript. Nature acceptance depends on the underlying biology, the prose, and peer review.</p>
+
+      <h4 style="margin-top:28px;">Roadmap — what's shipped, what's coming</h4>
+      <p style="font-size: 11.5px; color: var(--ink-dim); margin-bottom: 12px;">
+        Tracking what's in flight across recent turns, what's pending in
+        parallel chats, and what still needs designing. Each entry lists
+        what it would take to actually build, so we don't lose the thread
+        between sessions. Faded rows = shipped. Bold rows = active or next-up.
+      </p>
+
+      <!-- ========================================================
+           SHIPPED — most recent first (turns 13-14e)
+           ======================================================== -->
+
+      <h5 style="margin-top:18px; margin-bottom:6px; color: var(--ink-dim); font-size: 11px; letter-spacing: 0.06em;">SHIPPED · turns 13–14e (current burst)</h5>
+      <table class="help-table">
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top; width:30%;"><b>Block-presence chips + JSON inspector</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[done v3.99 t14e+ continue]</span><br><span class="dim" style="font-size:10px;">20 chips per candidate · click to inspect</span></td>
+          <td>
+            <p style="margin: 0 0 6px;">Page 2 candidate focus now shows a row of <b>20 chips</b> at the top — one per known structured block file (existence A/B/C/D + boundary L/R + 12 other question blocks = 18 numbered + boundary_right sibling = 19 file types, plus the synthesis <code>final_classification</code>). Each chip:</p>
+            <ul style="margin: 0 0 6px 18px; padding: 0; line-height: 1.55;">
+              <li><b>Lit (filled)</b> when that block is loaded for the active candidate; <b>dim (outlined)</b> when missing</li>
+              <li><b>Green</b> = block contributed at least one axis to the 14-axis classification (per SCHEMA §21.6)</li>
+              <li><b>Blue</b> = block loaded but supportive-only (no axis derivation: <code>morphology</code>, <code>band_composition</code>, <code>block_detect</code>, <code>triangle_insulation</code>, <code>peel_diagnostic</code>, <code>synteny_dollo</code>)</li>
+              <li><b>Gold</b> = the synthesis block (<code>final_classification</code>), authoritative when present</li>
+              <li><b>Grey/dim</b> = not loaded; tooltip explains how to load (drop <code>structured/&lt;block&gt;.json</code> via 📦 load registry on page 4)</li>
+            </ul>
+            <p style="margin: 0 0 6px;"><b>Click a lit chip</b> → toggles an inline JSON inspector below the chip row showing the raw block content (header fields like <code>source_script</code>, <code>source_version</code>, <code>computed_at</code>, <code>groups_used.validation_level</code> surfaced separately, then a scrollable <code>&lt;pre&gt;</code> with the full JSON). Click ✕ on the inspector or the chip again to close. Multiple inspectors can be open simultaneously. Blocks larger than 200 KB stringified are truncated with a [truncated] badge — inspect the JSON file directly for the rest.</p>
+            <p style="margin: 0 0 6px;"><b>Block ordering</b> follows SCHEMA §21.3 logical groups: existence (4) → boundaries (2) → carriers (1) → internals (1) → mechanism (1) → age (1) → freq + verdict (2) → morphology + bands (2) → burden (1) → supportive (4) → synthesis (1, always last with ★ icon). Small left-margin between groups for visual sectioning.</p>
+            <p style="margin: 0;"><b>What's NOT YET</b> (chat-17+ backlog): per-block <i>renderer</i> panels (rich domain-specific rendering of e.g. <code>internal_dynamics</code>'s recombinant table or <code>mechanism</code>'s SD evidence) — the JSON inspector shows raw structure today; renderers will be added per-block as schema §21 fields become familiar. Stale-group warnings (chip turns amber when block's <code>groups_used.version</code> doesn't match current <code>sample_groups.tsv</code> <code>created</code>) — also chat-17+. SCHEMA §21.</p>
+          </td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top; width:30%;"><b>18 structured block types</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[done v3.99 t14e+ continue]</span><br><span class="dim" style="font-size:10px;">cluster-side Tier 2 storage · per-block axis derivation</span></td>
+          <td>
+            <p style="margin: 0 0 6px;">The cluster-side <code>evidence_registry/per_candidate/&lt;cid&gt;/structured/*.json</code> emits 18 distinct block types per Quentin's t14e+ continue paste. Each block has a common header (<code>block_type</code>, <code>candidate_id</code>, <code>region</code>, <code>source_script</code>, <code>source_version</code>, <code>computed_at</code>, <code>groups_used</code>, <code>keys_produced</code>, <code>raw_files</code>) plus block-specific fields.</p>
+            <p style="margin: 0 0 6px;"><b>The 18 blocks at a glance</b>: <code>existence_layer_a/b/c/d</code> (Q1, Q7, NONE), <code>boundary_left/right</code> (Q3, NONE), <code>carrier_reconciliation</code> (Q3/Q6/Q7, IS validation), <code>internal_dynamics</code> (Q2, UNCERTAIN), <code>mechanism</code> (Q4, NONE), <code>age_evidence</code> (Q5, SUPPORTED for FST sub-block), <code>frequency</code> (Q6, SUPPORTED), <code>hypothesis_verdict</code> (Q7, varies), <code>morphology</code> (Q1, supportive), <code>band_composition</code> (Q1, supportive), <code>burden</code> (Q6, VALIDATED), <code>block_detect</code> (supportive), <code>triangle_insulation</code> (supportive), <code>peel_diagnostic</code> (supportive), <code>synteny_dollo</code> (supportive). Plus the optional <code>final_classification</code> synthesis block (alias <code>classification</code>) that is the cluster-side's pre-computed 14-axis result.</p>
+            <p style="margin: 0 0 6px;"><b>What the scrubber does with each block</b>: 12 of the 18 blocks (and the synthesis block) map to one or more 14-axis values via <code>_deriveAxesFromBlock(blockType, obj)</code>. <b>Multiple blocks compose</b>: drop any subset of question blocks (e.g. just the 4 existence layers) → Tier view fills 4/14 axes; drop more (mechanism, age_evidence, frequency, etc.) → more axes fill; drop the final synthesis block → all 14 axes overwrite (synthesis is authoritative when present). 6 of the 18 blocks are supportive-only (morphology, band_composition, block_detect, triangle_insulation, peel_diagnostic, synteny_dollo) — they load into <code>state.data.evidence_blocks[cid][block_type]</code> but don't directly map to axes.</p>
+            <p style="margin: 0 0 6px;"><b>Boundary quality reconciliation</b>: <code>boundary_left.json</code> + <code>boundary_right.json</code> are independent files; the scrubber reconciles them at end-of-load. BOTH sides need <code>verdict ~ confirmed_structural</code> AND <code>hardness ≥ 0.7</code> to qualify as 'sharp'; otherwise 'fuzzy'. The reconciliation runs once per candidate after all files are processed.</p>
+            <p style="margin: 0;"><b>Per-block summary</b> on load: the alert dialog now shows known vs unknown block types loaded, count of axis derivations, count of boundary reconciliations, count of synthesis blocks that overrode per-question derivations. <b>Not yet wired</b> (chat-17+ backlog): per-block renderer panels on the candidate focus page, block-presence indicator chips, stale-group warnings (block's <code>groups_used.version</code> vs <code>sample_groups.tsv</code> current <code>created</code>), per-block JSON inspector, manuscript-bundle integration that uses block content for Methods + Results prose. SCHEMA §21.</p>
+          </td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top; width:30%;"><b>Registry interop</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[done v3.99 t14e+ continue]</span><br><span class="dim" style="font-size:10px;">📦 load registry button · multi-file picker</span></td>
+          <td>
+            <p style="margin: 0 0 6px;">Bulk-load cluster-registry artifacts directly into the scrubber. Quentin's question: "our registry its JSON ?? So I wonder if by any luck we can just load it." Honest answer: <b>partially</b>. The cluster-side registry has four tables (chat-16 design); three are TSV-mirrors of JSON schemas, one is per-candidate JSON blocks. All four load cleanly as optional top-level layers in <code>state.data</code>.</p>
+            <p style="margin: 0 0 6px;"><b>What the 📦 button does</b>: opens a multi-file picker. Drop any subset of these:</p>
+            <ul style="margin: 0 0 6px 18px; padding: 0; line-height: 1.55;">
+              <li><code>sample_registry/sample_groups.tsv</code> → <code>state.data.sample_groups</code></li>
+              <li><code>interval_registry/candidate_intervals.tsv</code> → <code>state.data.candidate_intervals</code></li>
+              <li><code>results_registry/manifest.tsv</code> → <code>state.data.results_manifest</code></li>
+              <li><code>evidence_registry/per_candidate/&lt;cid&gt;/structured/*.json</code> → <code>state.data.evidence_blocks[cid][block_type]</code></li>
+            </ul>
+            <p style="margin: 0 0 6px;"><b>Special case</b>: when a structured block of type <code>final_classification</code> (or <code>classification</code>) loads, the 14-axis values are auto-extracted into <code>state.data.final_classification[&lt;cid&gt;]</code> so the Tier sub-view (page 4) populates immediately — drop the registry's classification JSON blocks → see the 14-axis grid populated within seconds.</p>
+            <p style="margin: 0 0 6px;"><b>What does NOT load from the registry</b>: per-window local PCA (sim_mat, |Z|, λ₁/λ₂), dosage chunks, per-window tracks. These live in the precomp JSON outside the registry. Registry-load is <b>additive enrichment on top of a precomp JSON</b>, not a replacement for it.</p>
+            <p style="margin: 0 0 6px;"><b>Validation</b>: light schema-check (required columns/fields, basic types). Full JSON Schema validation is a cluster-side concern. Files that fail validation are rejected with a specific error; the rest of the load continues.</p>
+            <p style="margin: 0;"><b>Limitations</b>: <code>.tsv.gz</code>/<code>.json.gz</code> files need pre-extraction (browser can't transparently gunzip without `pako` library, not yet wired). Per-candidate Q matrices and FST scan tracks (<code>results_registry/{candidate,pairwise}/...tsv.gz</code>) are registered in the manifest but data files aren't loaded yet — chat-17+ backlog. SCHEMA §20.</p>
+          </td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top; width:30%;"><b>Karyotype / Tier sub-view scaffold</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[done v3.99 t14e+ continue]</span><br><span class="dim" style="font-size:10px;">14-axis classification empty state</span></td>
+          <td>Page 4 renamed "5 karyotype / tier". New sub-view toggle (Karyotype | Tier ▾) inside the right pane. Karyotype subview keeps its existing per-sample regime table. New <b>Tier subview</b> renders a 14-axis classification grid grouped into six sections (Existence layers A-D, Boundaries, Karyotype Groups, Population Genetics, Biology, Overall Tier). When the cluster-side <code>final_classification</code> JSON layer (planned R-pipeline output: <code>characterize_candidate.R</code> + <code>classify_inversions.R</code>) isn't loaded, the Tier view renders an empty state showing the axis schema with categories per axis but no values. When the layer ships, axis values populate automatically — no scrubber-side change needed. Color palette: green (T1 / VALIDATED / pass / sharp), teal (T2 / SUPPORTED), amber (T3 / UNCERTAIN / fuzzy), red (T4 / SUSPECT / fail), grey (unknown). State slot <code>karyoState.subview</code> ∈ {<code>karyotype</code>, <code>tier</code>}, persisted to localStorage. Read-only contract — scrubber never writes to <code>final_classification</code>. SCHEMA §19.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top; width:30%;"><b>Windows page coloring + ANGSD bi-SNP info</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[done v3.99 t14e+ continue]</span><br><span class="dim" style="font-size:10px;">column-driven histogram + provenance chip</span></td>
+          <td>The per-window strip on page 8 now recolors its bars by whichever sortable column the user clicks (one click sets both sort + color, so the histogram and the table tell the same story). New <code>_winSumColorMode</code> state. Modes: <code>z</code> (default), <code>n_snps</code>, <code>span_kb</code>, <code>snp_density</code>, <code>lam1</code>, <code>lam2</code>, <code>ratio</code>, <code>mb</code>, <code>idx</code>. The strip label updates dynamically (was hardcoded "|Z|"). String columns (L1, L2) fall back to <code>z</code> coloring since they're categorical. New ⓘ <b>ANGSD bi-SNPs</b> info chip below the strip — click to expand a panel listing the canonical MODULE_2A parameters used to call the biallelic SNP count for the <i>C. gariepinus</i> 226-sample cohort: <code>-GL 1 -minQ 25 -minMapQ 25 -baq 1 -C 50 -setMinDepthInd 3 -setMaxDepthInd 57 -minInd 200 -SNP_pval 1e-6 -minMaf 0.05 -pest &lt;folded SFS prior&gt;</code>. For other cohorts the precomp export script (planned, schema 2.15) will write these parameters as a top-level <code>angsd_bisnp_params</code> JSON object so the chip reads them generically rather than hard-coding per project.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top; width:30%;"><b>Candidate bar above L1/L2</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[done v3.99 t14e+ continue]</span><br><span class="dim" style="font-size:10px;">pending grey · validated gold ★</span></td>
+          <td>Per Quentin's request: a dedicated candidate strip now sits ABOVE the L1 and L2 zone bars in the Z panel (was previously a thin yellow ribbon below the boundary-arrow band). The new bar shows ALL candidates in <code>state.candidateList</code>, not just confirmed ones, with three visual states:
+            <ul style="margin: 4px 0 4px 18px; padding: 0; line-height: 1.55;">
+              <li><b>Pending</b> (promoted but <code>confirmed: false</code>) — muted grey fill, no glyph. Visible from the moment of promotion so the user sees their work-in-progress without having to flip to the catalogue.</li>
+              <li><b>Confirmed</b> (<code>confirmed: true</code>) — shiny gold gradient (pale shine top → mid-gold → deep gold bottom) with a warm gold outline and a ★ glyph centered in bars wider than 12 px. The "validated" state is now visually unmistakable.</li>
+              <li><b>Draft</b> (active <code>state.l3Draft</code> in candidate-mode) — dashed amber outline only, no fill. Red dashed when <code>has_warning</code> (verdict disagrees with merge).</li>
+            </ul>
+            Render order: faint baseline → all pending (grey) → all confirmed (gold ★) → draft outline. So gold sits on top of grey if they overlap, and the draft outline sits on top of everything. New <code>drawCandidateBar(ctx, d, toX, y0, h, opts)</code> function with <code>opts.dimAlpha</code> for compact-mode dimming and <code>opts.showStar</code> to suppress the glyph. Backward-compat alias <code>drawCandidateStrip</code> forwards to the new function. Layout impact: Z panel reserves <code>candBarH</code> (7 px non-collapsed, 5 px collapsed) + <code>candGap</code> (2 px / 1 px) above the L1/L2 zone bars; <code>plotH</code> shrinks accordingly. 47 new tests (22 regex + 25 runtime) cover state semantics, color stops, glyph suppression on narrow bars, pass order, opts handling.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top; width:30%;"><b>Refined catalogue export + gallery PNG</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[done v3.99 t14e+ continue]</span><br><span class="dim" style="font-size:10px;">front-matter + JSON + manuscript-ready gallery</span></td>
+          <td>
+            <p style="margin: 0 0 6px;"><b>Catalogue export refined</b>:</p>
+            <ul style="margin: 0 0 6px 18px; padding: 0; line-height: 1.55;">
+              <li><b>Front-matter metadata</b> — TSV exports get <code># comment</code> lines, Markdown gets a heading + blockquote. Includes generation timestamp, chromosome, species, schema version + layers, K distribution, σ-verdict distribution, span range, filter + sort context, display + view modes. Reviewer reading the file alone has full provenance.</li>
+              <li><b>JSON export</b> as third format — round-trippable shape <code>{meta, columns, rows}</code>; meta has the same provenance as TSV/MD; columns carry key/label/type; rows are raw values (no .fmt() truncation). Useful for tools that re-load the catalogue programmatically.</li>
+              <li><b>Filenames</b> include species slug + ISO date — e.g. <code>C_gar_LG28_Clarias_gariepinus_inversion_catalogue_2026-04-28.tsv</code>. Successive exports no longer overwrite.</li>
+              <li><b>Helpers</b>: <code>_slugForFilename()</code>, <code>_exportSummaryStats()</code>, <code>_exportFrontMatter()</code>, <code>_exportJsonObject()</code>.</li>
+            </ul>
+            <p style="margin: 0 0 6px;"><b>Gallery export</b> (📷 gallery: SVG / PNG / PDF, v4 turn 28): one panel per CONFIRMED candidate. SVG is the source of truth (vector, journal-preferred); PNG is rasterized from the SVG via canvas at 4× scale (~300+ DPI for manuscript figures); PDF opens a new window with the SVG and an A4 landscape print stylesheet, then triggers <code>window.print()</code> — user picks "Save as PDF" as destination. Each panel shows display name (turn 24 format, e.g. <code>LG28.15-16Mb.A</code>), chromosomal span (Mb), K, σ-verdict (color-coded for print: green/orange-brown/dark-red/grey/amber), and a band-count bar chart colored by <code>groupColor()</code>. Layout: 4 columns × auto rows. Sorted by <code>start_bp</code> so panels read in chromosome order, top-left to bottom-right. White background for paper printing; system + monospace fonts. Empty-state alert if no confirmed candidates.</p>
+            <p style="margin: 0 0 0;"><b>Test coverage</b>: 39 regex tests + 32 runtime tests (<code>test_v399_catalogue_export_runtime.js</code>) — verifies <code>_slugForFilename</code> handles edge cases, <code>_exportSummaryStats</code> computes correct K + verdict + span distributions, <code>_galleryVerdictColor</code> returns the print palette, <code>_galleryBandCounts</code> ignores -1 labels, <code>exportGalleryPNG</code> + <code>_buildGalleryCanvas</code> run end-to-end without throwing in a JSDOM-free sandbox.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top; width:30%;"><b>Species portability</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[done v3.99 t14e+ continue]</span><br><span class="dim" style="font-size:10px;">first concrete step toward §16</span></td>
+          <td>The scrubber no longer hardcodes "Clarias gariepinus" anywhere user-facing. New optional <code>species</code> top-level JSON field; when present, surfaces in the header bar (italicized scientific name next to the chromosome) and in the manuscript prompt template ("in a <i>{species}</i> cohort"). Fallback when absent: header omits the field; manuscript prompt reads "in the study cohort". Existing JSONs without <code>species</code> continue to work unchanged. Convention: binomial scientific name. R-side export script can populate via a <code>--species</code> CLI flag. SCHEMA §16.6. Direct support for the toolkit-portability vision (§16.1) — one of dozens of small species-agnostic fixes that need to happen. We close the easy ones now.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top; width:30%;"><b>Lines color-mode picker scaffold</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[done v3.99 t14e+ continue]</span><br><span class="dim" style="font-size:10px;">SCHEMA §15 UI scaffold for v4.0 multi-evidence renderers</span></td>
+          <td>The mode-picker UI (eight options: kmeans / dosage / ghsl / het / θπ / F_ROH / family / ⚠ confounder) is now sitting in the per-sample lines header bar, sibling to the PC1/PC2 checkboxes. State slot <code>state.linesColorMode</code> persists to localStorage. <code>refreshLinesColorMode()</code> validates the chosen mode against <code>state.layersPresent</code> and falls back to <code>kmeans</code> when the source layer's missing. Greyed-out options carry tooltips naming the missing layer (e.g. "Needs <code>dosage_chunks</code> JSON layer"). Renderer hooks <code>_resolveSampleColorByMode(si, gi, mode)</code> and <code>_resolveSampleScopeColor(si, mode)</code> are STUBS returning <code>null</code> sentinel — callers fall back to existing K-means coloring. New layer <code>per_sample_theta_pi</code> added to <code>detectSchemaAndLayers</code> so the θπ option auto-enables when the future R-side <code>STEP_R36</code> emit ships its layer. <b>v4.0 work</b>: replace stub bodies with per-mode renderers; UI is already wired so the integration is a one-step swap.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top; width:30%;"><b>L1/L2 palette unification</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[done v3.99 t14e+]</span><br><span class="dim" style="font-size:10px;">ancestry + lines mini + Z zone mode + cand mini</span></td>
+          <td>Four panels still rendered L1/L2 envelope bars in the pre-turn-13 washed-out palette (<code>rgba(79,163,255)</code> + <code>rgba(0,230,118)</code>): the ancestry page (page 7) zone bars, the per-sample lines panel mini L1/L2 strip, the Z panel "zone" color mode for individual |Z| dots, and the candidate-page mini-canvas L1 background tints. All updated to the turn-13 darker palette (<code>rgba(48,116,200)</code> + <code>rgba(34,160,80)</code>); ancestry page also got the "L1" / "L2" y-axis margin labels matching the Z panel. Sim_mat heatmap envelope rectangles deliberately kept in their distinct sim_mat-blue / brighter-green palette (different visual contract — drawn ON a colored heatmap, not next to a plain canvas).</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top; width:30%;"><b>Compact-mode V-bar fix</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[done v3.99 t14e]</span><br><span class="dim" style="font-size:10px;">applyMainGrid bails out in compact</span></td>
+          <td>The Cramér's V (anchor concord) bar disappeared in compact mode and only returned after reset-layout. Cause: <code>applyMainGrid()</code> always set inline <code>gridTemplateRows</code> from the fixed-mode panelOrder, beating the compact CSS rule (<code>40px 28px 1.5fr auto 1fr 4px var(--compact-l3fr)</code>). The 28px anchorStripPanel row collapsed. Fix: detect compact mode, clear inline style, return early.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top;"><b>Empty-state with tab guide</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[done v3.99 t14e]</span><br><span class="dim" style="font-size:10px;">first-open isn't blank anymore</span></td>
+          <td>Extended <code>#emptyState</code> with tool overview + per-tab one-line description (10 tabs). <code>drawZ</code> renders a centered "Load a precomp JSON in the sidebar (Browse…) to begin" hint when <code>state.data</code> is null instead of leaving the canvas silently blank.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top;"><b>Z panel header strip → hover tooltip</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[done v3.99 t14d/t14e]</span><br><span class="dim" style="font-size:10px;">⚙ + ▼ at canvas bottom-left</span></td>
+          <td>The "Robust |Z| · L1/L2 zone bars + boundary peaks · click to jump" strip now lives in <code>#zPanel title=</code> (panel-level hover tooltip). Settings ⚙ + collapse ▼ buttons stack at canvas bottom-left (left:6px / bottom:28px and bottom:6px). <code>#zSettingsBox</code> popover lifted out of the now-hidden parent so it actually opens. <code>pad.t</code> bumped 6 → 14 so L1/L2 bars don't hit the panel top edge.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top;"><b>Minimap hidden when no data</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[done v3.99 t14d/t14e]</span><br><span class="dim" style="font-size:10px;">no more empty-square first-open</span></td>
+          <td><code>setSimInMinimap</code> now holds back the <code>.active</code> class when <code>state.data</code> is null (persistence still works but visual stays hidden). New <code>_reapplyMinimapActiveOnDataLoad()</code> reconciles after JSON load.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top;"><b>📊 Windows jump button</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[done v3.99 t14d]</span><br><span class="dim" style="font-size:10px;">left of L2 zoom in viewModeBar</span></td>
+          <td>One-click jump to the windows-page table. Visually distinct from the genome / L1 zoom / L2 zoom buttons (different background) so users don't mistake it for another viewport mode.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top;"><b>PCA right margin fix</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[done v3.99 t14d]</span><br><span class="dim" style="font-size:10px;">scatter fills full panel width</span></td>
+          <td><code>pad.r</code> reduced 200 → 16 in both <code>drawPCA</code> and <code>onPCAClick</code> (must stay in sync for hit-detection). The 200 px gutter was reserved for an external legend; the actual legend is rendered inside the plot at top-right (<code>lx = pad.l + plotW - legendW - 3</code>), so the gutter was empty space.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top;"><b>Lock-click → immediate line recolor</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[done v3.99 t14d]</span><br><span class="dim" style="font-size:10px;">drawLinesPanel was missing</span></td>
+          <td>🔒 lock-button click now also calls <code>drawLinesPanel()</code> so per-sample lines recolor instantly. Previously locking bands had no visible effect on the lines panel until the user scrubbed.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top;"><b>Three-axis schema 2.12 + BAM evidence 2.11</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[done v3.99 t14a/t14c]</span><br><span class="dim" style="font-size:10px;">spec-only, no runtime change</span></td>
+          <td><b>SCHEMA_V2.md 2.10 → 2.12</b>. §12 = BAM evidence layer (9 IGV-style 1 kb tracks, weights pending calibration). §13 = three-axis framework (Tier × Completion × Characterization with 7 questions and 5 statuses). Registry width 45 → 64 cols. Convergence rules in <code>CHARACTERIZATION_CONVERGENCE_RULES.md</code> sibling spec.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top;"><b>Tooltip discoverability sweep</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[done v3.99 t14b]</span><br><span class="dim" style="font-size:10px;">column headers, toolbar, tabs, chips</span></td>
+          <td>Every catalogue column has a <code>tooltip</code> field; <code>&lt;th&gt;</code> rendering wires <code>title=</code>. Windows page headers all titled. Top tab bar 11/11 covered. Popstats chips compose tooltip from <code>yLabel + edgeTop/edgeBot</code>. Ancestry chips explain <code>maxQ_label</code> vs <code>delta12</code>. Catalogue toolbar (filter, exports, select-all, count info) all titled.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top;"><b>Confirmed candidates in sim_mat</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[done v3.99 t13]</span><br><span class="dim" style="font-size:10px;">green-outlined zones + ID labels</span></td>
+          <td>Confirmed candidates (provisional skipped) render as green boxes <code>rgba(60,192,138,0.85)</code> in the sim_mat heatmap, ID label on top.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top;"><b>Candidate nav strip</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[done v3.99 t13]</span><br><span class="dim" style="font-size:10px;">popstats / ancestry / boundaries pages</span></td>
+          <td>Reusable <code>_renderCandidateNavInline()</code> helper. <code>_navigateToCandidate</code> centers cursor + refreshes pages. Whole-genome button clears <code>state.candidate</code>.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top;"><b>Z-panel L1/L2 darker bars + labels</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[done v3.99 t13]</span><br><span class="dim" style="font-size:10px;">deeper blue/green</span></td>
+          <td>L1: <code>rgba(48,116,200,...)</code> (was 79,163,255). L2: <code>rgba(34,160,80,...)</code> (was 0,230,118). "L1"/"L2" text labels in y-axis margin.</td>
+        </tr>
+      </table>
+
+      <!-- ========================================================
+           SHIPPED — earlier in the v3.99 series (turns 1-12)
+           ======================================================== -->
+
+      <h5 style="margin-top:22px; margin-bottom:6px; color: var(--ink-dim); font-size: 11px; letter-spacing: 0.06em;">SHIPPED · v3.99 turns 1–12</h5>
+      <table class="help-table">
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top; width:30%;"><b>Catalogue UX overhaul</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[v3.99 t10–t12]</span><br><span class="dim" style="font-size:10px;">favorites, multi-select, simple/detailed</span></td>
+          <td>⭐ favorites column with persistent storage per-chrom. Ctrl/Cmd+click range select; Shift+click anchor select. <code>simple</code> / <code>detailed</code> column-set toggle. Confirmed-row visual: green left border + ✓ ID chip. Column-flash effect on header hover. Live "n SNPs → n bi-SNPs" relabel.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top;"><b>Z-panel ⚙ settings popover</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[v3.99 t9]</span><br><span class="dim" style="font-size:10px;">color/value/highlight controls hidden by default</span></td>
+          <td>Wrapped color-mode + value-mode + highlight-threshold controls in a collapsible <code>#zSettingsBox</code> with a ⚙ toggle. localStorage persistence. Frees Z-panel canvas space; popover restructured in t14e.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top;"><b>Performance: L3 cache + lines pre-render</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[v3.99 t7–t8]</span><br><span class="dim" style="font-size:10px;">~120 ms saved per scrub step</span></td>
+          <td>L3 panel cache via <code>_renderL3Fingerprint(curL2)</code>. Lines y-matrix cache via <code>state.__linesCache[source]</code>. Offscreen pre-render of untracked-gray cloud blits as one drawImage (~210 polylines × 4302 segments → 1 op). Both auto-invalidate on data load.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top;"><b>L2 zoom mode + viewModeBar</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[v3.99 t8]</span><br><span class="dim" style="font-size:10px;">genome / L1 / L2 viewport scopes</span></td>
+          <td>Three-state view selector: 🌍 genome (whole chromosome) / 🔎 L1 zoom (current L1 envelope) / 🔬 L2 zoom (current L2 envelope only). Persisted via localStorage. Z + tracks + lines panels all narrow to the chosen scope.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top;"><b>L3 resize handle 50% height</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[v3.99 t9]</span><br><span class="dim" style="font-size:10px;">8 → 4 px slimmer</span></td>
+          <td>Compact-mode L3 resize seam shrunk so it takes less vertical space; hover/drag highlight kept visible.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top;"><b>Karyotype focal-chips fix</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[v3.99 t6]</span><br><span class="dim" style="font-size:10px;">K=6 chip rendering bug</span></td>
+          <td>K=6 mode no longer collapses chips to K=3 colors. Focal-chips-above option corrected to compute per-pane palette using the active <code>state.k</code>.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top;"><b>Header / tab UX polish</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[v3.99 t5]</span><br><span class="dim" style="font-size:10px;">11px mono unified, no-wrap</span></td>
+          <td>All header buttons standardized to 11 px monospace. <code>viewModeBar</code> moved into the play-row from the header. Active tab gets a vertical alpha gradient. |Z| / ±Z value-mode buttons added. Tracked-samples panel collapse arrow added.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top;"><b>Layout: flex-1 instead of calc(100vh – 76px)</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[v3.99 t4]</span><br><span class="dim" style="font-size:10px;">survives zoom changes</span></td>
+          <td>Hardcoded calc didn't survive browser zoom. Now <code>body</code> = flex column, <code>.wrap</code> = flex 1, inner grid uses <code>min-height: 0</code> for proper shrink. Empty viewport at the bottom gone.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top;"><b>Boundary refinement (page 3)</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[v3.97]</span><br><span class="dim" style="font-size:10px;">12 evidence tracks + auto/manual</span></td>
+          <td>14 evidence tracks weighted into a combined score. Half-strongest-edges → left/right boundary zones. ±5-window default zone. Hotkeys: E/F = manual override, B = save, A = accept, R = reset. Schema §12. R-side <code>STEP_M06_emit_boundary_evidence.R</code> emits all source layers post-v3.98.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top;"><b>Manuscript bundle export</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[v3.18]</span><br><span class="dim" style="font-size:10px;">Markdown + TSV + JSON</span></td>
+          <td>Page 4 "📝 manuscript bundle" button. Emits a Markdown file (LLM prompt + candidate tables + per-candidate detail + BibTeX + example paragraph), a TSV (raw rows), and the JSON candidate list.</td>
+        </tr>
+      </table>
+
+      <!-- ========================================================
+           SHIPPED — earlier minor versions (v3.20 onward)
+           ======================================================== -->
+
+      <h5 style="margin-top:22px; margin-bottom:6px; color: var(--ink-dim); font-size: 11px; letter-spacing: 0.06em;">SHIPPED · earlier (v3.20 → v3.98)</h5>
+      <table class="help-table">
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top; width:30%;"><b>Schema v2 layer awareness</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[v3.20]</span><br><span class="dim" style="font-size:10px;">_layers_present + registry export</span></td>
+          <td>Scrubber detects schema version and tracks <code>state.layersPresent</code> as the source of truth for conditional UI. Schema badge in header. Page 4 has "📋 export registry (TSV+JSON)" and "+ load enrichment" drag-drop. <code>SCHEMA_V2.md</code> documents the full contract.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top;"><b>Page 7 ancestry view</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[v3.21]</span><br><span class="dim" style="font-size:10px;">drag-drop phase4_ancestry.json</span></td>
+          <td>Per-window ancestry stack (max-Q label, delta12 confidence). Drag-drop loader for <code>&lt;chrom&gt;_phase4_ancestry.json</code>. View chips for label / Q-value / delta12. Reuses the popstats stack architecture.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top;"><b>Page 6 popstats (v3.40s)</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[v3.20s]</span><br><span class="dim" style="font-size:10px;">stacked tracks aligned to chrom</span></td>
+          <td>θπ, Fst, dXY, MI, Hp, Tajima's D — one-track-per-row stack rendered to a single canvas. Drag-drop additional layers. Edge labels per track explain top/bottom range.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top;"><b>Page 4 karyotype + page 9 confirmed</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[v3.16/v3.17]</span><br><span class="dim" style="font-size:10px;">per-sample band table + confirm carousel</span></td>
+          <td>Page 4 per-candidate sample table: CGA, ind, family, ancestry, σ-profile, locked band, K-cluster. Sortable + filterable. TSV export. Page 9 confirmed-candidates carousel — once a candidate is marked confirmed on page 2 it joins the carousel.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top;"><b>Catalogue page (page 4 / now page 4)</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[v3.15]</span><br><span class="dim" style="font-size:10px;">candidate list with persistence</span></td>
+          <td><code>state.candidateList</code> = saved candidates (vs. <code>state.candidate</code> = current focus). localStorage persistence per-chrom. Add / remove buttons on page 2. Candidate JSON import/export so list survives F5 / cross-machine.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top;"><b>Page 2 candidate focus</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[v3.14/v3.15]</span><br><span class="dim" style="font-size:10px;">deep-dive on locked candidate</span></td>
+          <td>Lock colors on page 1 → ⬆ promote → page 2 shows: header (chrom, range), σ-profile chart, band composition cards, notes textarea, confirm button. Sample-σ distance chart (v3.40s) added on top.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top;"><b>Lasso selection mode (v3.39)</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[v3.39]</span><br><span class="dim" style="font-size:10px;">Shift+drag manual groups</span></td>
+          <td>Shift+drag a box on the main PCA → captures samples into a new manual group (<code>lasso_N</code>). Color mode flips to 'manual'. Existing manual-group exclusivity rule applies (one sample per group). Per-sample lines: lasso-mode dim grey for tracked, accent gold for lassoed.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top;"><b>L3 K=6 / K=3+6 modes</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[v3.31]</span><br><span class="dim" style="font-size:10px;">sub-resolved haplotypes</span></td>
+          <td>Toolbar K=3 / K=6 / K=3+6 buttons. New <code>l2GroupCacheAtK</code> Map keyed by <code>${l2idx}_${K}</code>. <code>compareL2Pair_atK</code> at K=6 brute-forces 720 permutations for Hungarian alignment (&lt;1 ms). Both stacked when K=3+6.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top;"><b>L3 contingency colors (shared/unique/dual)</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[v3.31]</span><br><span class="dim" style="font-size:10px;">pane palette modes</span></td>
+          <td>shared = focal palette across all panes (default). unique/pane = per-pane palette + swatch legend. dual = fill from pane / ring from focal-aligned. Helps visualize K cluster identity continuity vs per-pane local structure.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top;"><b>Anchor concord strip (V bar)</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[v3.52]</span><br><span class="dim" style="font-size:10px;">tracked-samples K-means continuity</span></td>
+          <td>Cramér's V between tracked-sample K-means labels at the anchor window vs all other windows. Hot = high concord, cold = low. Click-to-jump.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top;"><b>Sim minimap (sticky sidebar)</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[v3.51]</span><br><span class="dim" style="font-size:10px;">"move to minimap" toggle</span></td>
+          <td>Sim heatmap can move into a small ~200px panel above the sidebar Data section, freeing main-grid vertical space. Click-to-jump on the minimap. Restore button returns it to the main panel.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top;"><b>Layout modes: fixed / free / compact</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[v3.62/v3.63]</span><br><span class="dim" style="font-size:10px;">3-state cycle button</span></td>
+          <td><b>fixed</b> = explicit grid-template-rows (everything fits on screen). <b>free</b> = block flow, panels stack at min-heights, scrollable. <b>compact</b> = 2-column upper region (PCA left, Z + tracks + lines right) + L3 spanning both at bottom. localStorage persistence.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top;"><b>Panel reorder (▲▼ buttons)</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[v3.59]</span><br><span class="dim" style="font-size:10px;">user-defined panel order</span></td>
+          <td>State <code>state.panelOrder</code> persists user's preferred panel sequence (sim → Z → lines → anchor → PCA → L3 by default). Small ▲/▼ buttons in panel corners shift each panel up or down. Active in fixed mode (compact has its own CSS-defined order).</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top;"><b>Sidebar collapse</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[v3.50s]</span><br><span class="dim" style="font-size:10px;">320px → 28px slide</span></td>
+          <td>Sidebar collapses to a thin gutter (28 px) with a single ▶ expand arrow. <code>data-sidebar="collapsed"</code> on <code>.wrap</code> drives the grid-template-columns transition. Persists.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top;"><b>Light / dark theme toggle</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[v3.30s]</span><br><span class="dim" style="font-size:10px;">🌙 / ☀ button in header</span></td>
+          <td>Full palette swap via CSS custom properties. <code>themeColor()</code> helper used by all canvas renderers so they pick up the active theme without manual color literals.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top;"><b>11-page tab architecture</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[v3.30s]</span><br><span class="dim" style="font-size:10px;">global ⚙ + 11 tabs (1–9, 11)</span></td>
+          <td>1 diagnostic / 2 candidate focus / 3 boundaries / 4 catalogue / 5 karyotype / 6 popstats / 7 ancestry / 8 windows / 9 confirmed / 11 help. Tab buttons clone a single CSS pattern; <code>.page.active</code> shows the right container.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top;"><b>Relatedness JSON loader</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[v3.30s]</span><br><span class="dim" style="font-size:10px;">family palette + dropdown filter</span></td>
+          <td>Drag-drop ngsRelate-derived JSON (with kinship θ, family memberships). Builds <code>state.familyPalette</code> for color mode='family'. Dropdown filter narrows samples to one family or hub.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top;"><b>Color modes: cluster / family / ancestry / manual</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[v3.20s]</span><br><span class="dim" style="font-size:10px;">getSampleColor + colorModeBar</span></td>
+          <td>Toolbar bar selects how each PCA dot gets colored. cluster = K-means labels at current L2 (or locked). family = family palette. ancestry = ancestry palette. manual = user lasso groups.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top;"><b>Tracked samples + trails</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[v3.20s]</span><br><span class="dim" style="font-size:10px;">N tracked + trail back sliders</span></td>
+          <td>Sidebar (or compact-mode panel) selects up to 30 samples to render with full color + trail. Trail back N controls how many windows back show as fading dots. PCA scatter labels each tracked sample with its CGA. PCA1 sign-align reduces flip jitter.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top;"><b>Per-sample lines panel</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[v3.20s]</span><br><span class="dim" style="font-size:10px;">PC1 / PC2 / GHSL stacked</span></td>
+          <td>One row per active source (PC1 default). Untracked samples = grey cloud (offscreen pre-rendered). Tracked = full color. Locked candidate fish_calls render dashed-red break segments at L2s where the fish's K=3 vote differs from its consensus regime.</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top;"><b>Robust |Z| panel + boundary peaks</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[v3.20s]</span><br><span class="dim" style="font-size:10px;">color modes bands/gradient/zone/highlight</span></td>
+          <td>Per-window robust |Z| (or ±Z) rendered as a scatter on a chromosome x-axis. Color modes: bands (pre-set thresholds), gradient (blue→red), zone (bright in focal L2), highlight (bright above threshold). L1/L2 zone bars at top. Boundary peaks rendered as colored triangles below the bars (color = support_class).</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top;"><b>Sim_mat heatmap with smoothing scales</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[v3.20s]</span><br><span class="dim" style="font-size:10px;">precomp / nn40 / nn80 / nn160 / nn320</span></td>
+          <td>Five smoothing scales (one is precomp 200×200, four are NN bandwidths). Click-to-jump anywhere. PDF-style sim/Z split optional. Fit-square button auto-sizes panel for ~real-size view (cap 2400 px).</td>
+        </tr>
+        <tr style="opacity: 0.65;">
+          <td style="vertical-align:top;"><b>L3 contingency tables</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[v3.20s]</span><br><span class="dim" style="font-size:10px;">Hungarian-aligned mini-PCAs</span></td>
+          <td>For each focal L2, render contingency table + mini-PCA panes for ±N L2 neighbors. Layout options: Focal only / +Left / +Right / +L/R / ±2 / Dual. b.continuity carousel/draft/chrom modes. Live-dosage option. <code>compareL2Pair</code> uses Hungarian alignment so cluster labels align across panes. ⬗ unpin focal sticks the comparison to one L2.</td>
+        </tr>
+      </table>
+
+      <!-- ========================================================
+           PLANNED — schema-locked, awaiting R-side or calibration
+           ======================================================== -->
+
+      <h5 style="margin-top:22px; margin-bottom:6px; color: var(--accent); font-size: 11px; letter-spacing: 0.06em;">PLANNED — schema-locked, awaiting R-side or calibration</h5>
+      <table class="help-table">
+        <tr>
+          <td style="vertical-align:top; width:30%;"><b>Multi-evidence regime framework</b> <span style="color: var(--accent); font-family: var(--mono); font-size: 10px;">[v4.0 doctrine, t14e]</span><br><span class="dim" style="font-size:10px;">K-means bands are GEOMETRIC, not biological</span></td>
+          <td>
+            <p style="margin: 0 0 8px;"><b>Doctrine</b> (per Quentin, t14e): K-means bands are <i>provisional geometric clusters</i>, not final biological regimes. Final regime calls require <b>multi-evidence convergence</b>. K=6 frequently represents nested substructure inside three major regimes — do NOT default to interpreting K=6 as six biological regimes. The paper-level call should usually use major regimes; higher K values are diagnostic / substructure layers.</p>
+
+            <p style="margin: 0 0 6px;"><b>Workflow</b>:</p>
+            <ol style="margin: 0 0 8px 18px; padding: 0; line-height: 1.55;">
+              <li>K-means proposes local PCA bands (K=3 default; K=6 for substructure check).</li>
+              <li>Dosage + GHSL + heterozygosity + ROH/F_ROH + family/relatedness <b>each</b> independently validate or reject the biological interpretation.</li>
+              <li>Candidate-level regime calls are assigned only when <b>multiple evidence layers agree</b>.</li>
+            </ol>
+
+            <p style="margin: 0 0 6px;"><b>Per-band layer scope</b> (refinement t14e+): not every layer informs every band equally. The convergence rule is scope-aware — a layer marked <code>low_info</code> for a given band does not push toward STRONG nor toward SUSPECT. See SCHEMA_V2.md §14.2.5 for the full scope table.</p>
+            <ul style="margin: 0 0 8px 18px; padding: 0; line-height: 1.55;">
+              <li><b>GHSL</b> — informs ALL bands (every band has a haplotype signature).</li>
+              <li><b>Heterozygosity</b> — primary scope is the HET band; homozygous bands have ~0% het by definition, so any apparent het differentiation in HOMOs is dosage noise, not signal.</li>
+              <li><b>θπ (per-band π)</b> — informative for HET (mixing two haplotype families) and as a cross-band asymmetry probe (reduced π in INV-fixed bands).</li>
+              <li><b>F_ROH</b> — primary scope is HOMO bands (high F_ROH there can mask the band identity as IBD).</li>
+              <li><b>Family</b> — confounder check for all bands; family LD can produce any band.</li>
+            </ul>
+
+            <p style="margin: 0 0 6px;"><b>UI plan</b> — a single mode-switcher above the L3 panes (and on the karyotype page), with one button per evidence layer:</p>
+            <ul style="margin: 0 0 8px 18px; padding: 0; line-height: 1.55;">
+              <li><b>K-means</b> — current behavior. PCA-derived geometric bands. Always available.</li>
+              <li><b>Dosage</b> — per-band marker dosage pattern (mean dose by group, dose distribution). Validates geometric bands as REF/HET/INV-like.</li>
+              <li><b>GHSL</b> — per-band haplotype-similarity-by-locus. Validates whether bands diverge in haplotype space.</li>
+              <li><b>Heterozygosity</b> — per-band dosage heterozygosity. The HET band should sit between the two homozygous bands.</li>
+              <li><b>ROH / F_ROH</b> — inbreeding / IBD confounder check. A "band" that is just a high-F_ROH cluster is not a regime.</li>
+              <li><b>Family / relatedness</b> — kinship confounder check. A "band" that is family-pure (high <code>fam_purity</code>) is family LD, not a regime.</li>
+            </ul>
+
+            <p style="margin: 0 0 6px;"><b>Convergence rule</b> (provisional, lock after 226-sample LG28 calibration):</p>
+            <ul style="margin: 0 0 8px 18px; padding: 0; line-height: 1.55;">
+              <li><b>Strong regime</b> = K-means + dosage + GHSL all consistent <i>AND</i> ROH + family layers do NOT explain the band geometry.</li>
+              <li><b>Suspect regime</b> = K-means alone, with ≥1 confounder layer flagged.</li>
+              <li><b>Rejected band</b> = ROH or family fully explains the apparent K-means band → it is NOT a biological regime.</li>
+            </ul>
+
+            <p style="margin: 0 0 6px;"><b>R-side prerequisites</b> (NOT YET WRITTEN — parallel chat needed):</p>
+            <ul style="margin: 0 0 8px 18px; padding: 0; line-height: 1.55;">
+              <li><code>STEP_R30_emit_per_band_dosage.R</code> — for each L2 × K-band, mean / median / quartile of marker dose; emit to <code>per_band_dosage</code> JSON layer.</li>
+              <li><code>STEP_R31_emit_per_band_ghsl.R</code> — per-band GHSL summary (mean within / between divergence).</li>
+              <li><code>STEP_R32_emit_per_band_het.R</code> — per-band heterozygosity (per-sample, then per-band aggregate).</li>
+              <li><code>STEP_R33_emit_per_band_froh.R</code> — per-band mean / max F_ROH (uses MODULE_3 output).</li>
+              <li><code>STEP_R34_emit_per_band_family.R</code> — per-band family composition + <code>fam_purity</code>.</li>
+              <li><code>STEP_R35_compute_convergence_call.R</code> — applies the convergence rule, emits per-(L2, band) status (STRONG / SUSPECT / REJECTED) into the candidates registry under <code>characterization.regime_calls</code> (Q1 in schema §13).</li>
+            </ul>
+
+            <p style="margin: 0 0 6px;"><b>Schema impact</b>: extends SCHEMA_V2.md §13 (three-axis framework) Q1 "What is it" — the regime call answer is the multi-evidence convergence verdict, not the K-means assignment. K-means assignment becomes a <i>component</i> of the answer (alongside dosage / GHSL / het / ROH / family). Per-band registry keys ~6 × n_bands × n_candidates. Catalogue gains a <code>regime_evidence</code> column showing which layers supported / rejected.</p>
+
+            <p style="margin: 0 0 6px;"><b>Already in flight (turn 14e)</b>: Tooltip on the K=3 / K=6 / K=3+6 buttons explicitly warns that K-means bands are geometric. K=6 button shows ⚠ icon. Help → roadmap (this entry) documents the doctrine. <i>The mode switcher itself, the per-evidence renderers, and the convergence verdict are v4.0 work.</i></p>
+
+            <p style="margin: 0;"><b>Why this matters</b>: avoids the systematic risk of over-calling regimes from PCA geometry alone — a known failure mode in hatchery cohorts where ROH (inbreeding) and family LD can both produce "clean" K-means bands that are NOT inversions. Treating K-means as provisional protects the manuscript from peer-review rejection on confounder grounds.</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="vertical-align:top; width:30%;"><b>Three-axis evidence framework</b> <span style="color: var(--accent); font-family: var(--mono); font-size: 10px;">[schema 2.12]</span><br><span class="dim" style="font-size:10px;">tier × completion × characterization</span></td>
+          <td>The big one. <b>Three independent axes</b> per candidate, not one tier number:
+            <b>Axis 1 — Confidence tier</b> (Tier 1/2/3/4/SV-only from independence layers A=local PCA, B=SV callers, C=GHSL, D=Fisher genotype-breakpoint association);
+            <b>Axis 2 — Completion</b> (~320–370 registry keys per candidate, % filled, per-question breakdown);
+            <b>Axis 3 — Characterization</b> (7-question convergence engine: Q1 What is it · Q2 What's inside · Q3 Boundaries · Q4 How formed · Q5 How old · Q6 How common · Q7 Is it real, with five statuses ANSWERED / PARTIAL / MEASURED / CONTRADICTED / EMPTY).
+            Counter-evidence is first-class (CONTRADICTED is the most valuable status — it surfaces internal inconsistency).
+            R-side scripts <code>STEP_R20–R23</code> in parallel chat. Scrubber displays only — does not compute. New catalogue columns + filters + a per-candidate dashboard panel. <i>Final values + thresholds locked after 226-sample LG28 calibration. See SCHEMA_V2.md §13 for the full contract.</i>
+          </td>
+        </tr>
+        <tr>
+          <td style="vertical-align:top;"><b>BAM evidence layer</b> <span style="color: var(--accent); font-family: var(--mono); font-size: 10px;">[schema 2.11]</span><br><span class="dim" style="font-size:10px;">coverage_dip + discordant pairs + split reads</span></td>
+          <td>9 IGV-style tracks at 1 kb resolution per candidate scan region: coverage_dip, discordant_orient_FF/RR/RF, tlen_anomaly, split_read_density, clip_density, mapq_drop (the only down-weighter, polarity -1), pair_orient_inv_rate (composite). R-side <code>STEP_M07_emit_bam_evidence.R</code> uses mosdepth + samtools view flag filters. Boundary scoring weights NOT YET LOCKED — pending real-data calibration. SCHEMA_V2.md §12.</td>
+        </tr>
+        <tr>
+          <td style="vertical-align:top;"><b>IGV.js embedded viewer</b> <span style="color: var(--accent); font-family: var(--mono); font-size: 10px;">[schema 2.11]</span><br><span class="dim" style="font-size:10px;">per-candidate BAM slice rendering</span></td>
+          <td>Embed igv.js below the boundaries-page tracks. Three deployment options: local-file picker, local-server (LANTA serve.py + SSH port forward), or pre-extracted region BAM slices via planned <code>STEP_M08_extract_region_bams.sh</code>. Recommended default: pre-extracted slices (no infrastructure dependency). Schema-adjacent (not part of JSON contract).</td>
+        </tr>
+        <tr>
+          <td style="vertical-align:top;"><b>Marker module phase 13</b> <span style="color: var(--accent); font-family: var(--mono); font-size: 10px;">[schema 2.2]</span><br><span class="dim" style="font-size:10px;">PCR diagnostic panels per candidate</span></td>
+          <td>3–10 markers per candidate K=3 regime, panel quality scoring, leave-one-fish-out validation, multiplex Tm checks. R-side <code>STEP_M01/M02/M03</code> planned. Page 10 already exists in the scrubber but stays hidden until <code>marker_panel_summary</code> JSON is loaded. SCHEMA_V2.md §10.</td>
+        </tr>
+        <tr>
+          <td style="vertical-align:top;"><b>Band-diagnostics source layers</b> <span style="color: var(--accent); font-family: var(--mono); font-size: 10px;">[schema 2.3]</span><br><span class="dim" style="font-size:10px;">θπ + ROH + FROH</span></td>
+          <td>Three R-side emits parked as planned: <code>STEP_T06_emit_theta_pi_panel.R</code>, <code>STEP_R12_emit_roh_intervals.R</code>, <code>STEP_R13_emit_sample_froh.R</code>. Power the het-shape sub-module on page 2. SCHEMA_V2.md §11.</td>
+        </tr>
+        <tr>
+          <td style="vertical-align:top;"><b>Dosage heatmap (page 8 windows)</b> <span style="color: var(--accent); font-family: var(--mono); font-size: 10px;">[schema 2.4]</span><br><span class="dim" style="font-size:10px;">v3.94 detection done, R emit pending</span></td>
+          <td>Detection logic + canvas renderer + colorbars + 5 left tracks + 1 top track + stripe-quality scoring built in v3.94 turn 1. Toolbar (100/200/500 bin + stripe-quality button), region-binding (static + live with debounce) built in v3.94 turn 2. R-side dosage_chunks emit script not yet written. STEP29 ordering layers exist but no JSON shim emits them.</td>
+        </tr>
+        <tr>
+          <td style="vertical-align:top;"><b>L3 view in catalogue</b><br><span class="dim" style="font-size:10px;">sub-L2 cluster groupings</span></td>
+          <td>Toggle exists in toolbar but renders "coming soon" until row-builder is specified. Need: per-(L2 × sub-cluster) row schema, sub-cluster labels (HOMO_1_sub1, HET_sub_noise, etc. per schema 2.10), then column set + sort logic.</td>
+        </tr>
+        <tr>
+          <td style="vertical-align:top;"><b>Per-sample line coloring modes</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[scaffold done, v4.0 renderers pending]</span><br><span class="dim" style="font-size:10px;">color by K-means / het / GHSL / θπ / dosage / F_ROH / family</span></td>
+          <td>
+            <p style="margin: 0 0 6px;">Per-sample lines panel + L3 contingency panes + tracked-samples scatter share a UI-wide coloring mode. Eight modes:</p>
+            <ul style="margin: 0 0 6px 18px; padding: 0; line-height: 1.55;">
+              <li><b>kmeans</b> (default) — current behavior; categorical K-means band identity</li>
+              <li><b>dosage</b> — per-window dosage value, blue→red diverging ramp</li>
+              <li><b>ghsl</b> — per-window GHSL divergence, viridis sequential</li>
+              <li><b>het</b> — per-window het indicator (0 / 1 / NA), categorical</li>
+              <li><b>theta_pi</b> — per-sample π contribution, plasma sequential</li>
+              <li><b>froh</b> — per-sample F_ROH, ice→red ramp (IBD load)</li>
+              <li><b>family</b> — per-sample family ID, categorical (one color per family)</li>
+              <li><b>confounder_alert</b> — derived flag: red when F_ROH high OR family dominant</li>
+            </ul>
+            <p style="margin: 0 0 6px;"><b>Status (turn 14e+ continue)</b>: UI scaffold IS LIVE. The mode picker (<code>color: [kmeans ▾]</code> dropdown) sits next to the PC1/PC2 checkboxes in the per-sample lines header bar. State slot <code>state.linesColorMode</code> persists to localStorage. Validator <code>refreshLinesColorMode()</code> falls back to <code>kmeans</code> when the chosen mode's source layer isn't loaded; runs after every JSON load. Greyed-out options have explanatory tooltips like "Needs <code>per_sample_theta_pi</code> JSON layer". The dispatch hooks <code>_resolveSampleColorByMode(si, gi, mode)</code> + <code>_resolveSampleScopeColor(si, mode)</code> are STUBS that return <code>null</code> sentinels — callers fall back to existing K-means coloring. Switching modes today triggers redraws but visible behavior doesn't change. <b>v4.0 work</b>: replace the stub function bodies with per-mode renderers; no UI refactor needed at that point.</p>
+            <p style="margin: 0 0 6px;"><b>Per-window vs per-sample dispatch</b> handled inside <code>_resolveSampleColorByMode(si, gi, mode)</code>: modes that vary by window (dosage, het, ghsl, θπ) get per-window colors along the trace; modes that are per-sample (kmeans, family, F_ROH, confounder_alert) get one color per trace.</p>
+            <p style="margin: 0 0 6px;"><b>Why this matters for §14</b>: flipping the coloring mode is literally "show me what this evidence layer sees" for the focal candidate. The mode picker is the visual companion to the multi-evidence regime framework. Per §14.2.5 scope, modes annotate themselves with primary scope (e.g., "het primary scope: HET band") so users don't misread expected null contrast on out-of-scope bands as mode failure.</p>
+            <p style="margin: 0 0 0;"><b>R-side prerequisites</b>: <code>STEP_R36_emit_per_sample_theta_pi.R</code> (new); <code>STEP_R13_emit_sample_froh.R</code> (already gating §11). The per-sample dosage-het derivation reuses existing <code>dosage_chunks</code> with no new R script. <code>per_sample_theta_pi</code> layer detection added to <code>detectSchemaAndLayers</code> in turn 14e+ continue — when the R script eventually emits it, the picker option auto-enables. SCHEMA_V2.md §15.</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="vertical-align:top;"><b>Toolkit containerization</b> <span style="color: var(--ink-dim); font-family: var(--mono); font-size: 10px;">[schema 2.14, post-v4.0]</span><br><span class="dim" style="font-size:10px;">turnkey for any species</span></td>
+          <td>
+            <p style="margin: 0 0 6px;"><b>Vision</b> (per Quentin, t14e): the entire inversion-discovery toolkit packaged so another lab can run it on their own catfish, fish, animals, or plants without reimplementing infrastructure. Schema-neutral pin — no JSON contract impact.</p>
+            <p style="margin: 0 0 6px;"><b>Order of attack</b> (sketch only):</p>
+            <ol style="margin: 0 0 6px 18px; padding: 0; line-height: 1.55;">
+              <li><b>MODULE_2 + MODULE_3</b> first — variants/structure + ROH foundation. Single Apptainer image driven by YAML config.</li>
+              <li><b>R emit scripts</b> — pure R, easy to package as Docker. Lets users scrub their own data without running the full cluster pipeline.</li>
+              <li><b>MODULE_4 (SV)</b> — DELLY + Manta inherit from upstream containers; main work is conda env orchestration.</li>
+              <li><b>MODULE_5A2</b> — deepest integration. Dense window registry + multi-mode MDS + snake families + GHSL + breakpoint validation. Most code we own directly.</li>
+              <li><b>L1 / L2 detection</b> — currently embedded in MODULE_5A2; expose as standalone steps for envelope-only users.</li>
+              <li><b>Catalogue + manuscript bundle</b> — already portable; just reproducible HTML rendering for the catalogue export.</li>
+            </ol>
+            <p style="margin: 0;"><b>Stack split</b>: Apptainer (Singularity) for HPC, Docker for single-machine. Most academic clusters refuse rootful Docker but accept Apptainer. Container hashes + Dockerfiles will live in their own repos when built; this is a roadmap pin only. Scrubber itself is already portable (single HTML, no infra needed). SCHEMA_V2.md §16.</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="vertical-align:top;"><b>Atlas mode switching</b> <span style="color: var(--ink-dim); font-family: var(--mono); font-size: 10px;">[schema 2.15, post-v4.0]</span><br><span class="dim" style="font-size:10px;">Inversion Atlas ⇄ Diversity Atlas</span></td>
+          <td>
+            <p style="margin: 0 0 6px;"><b>Vision</b> (per Quentin, t14e+ continue): a single button at the top of the scrubber toggles between two views of the same JSON.</p>
+            <ul style="margin: 0 0 6px 18px; padding: 0; line-height: 1.55;">
+              <li><b>Inversion Atlas</b> (current default) — every page focuses on chromosomal inversion candidates: L1/L2 envelopes, K-means karyotype, σ-profile verdicts, breakpoint zones, marker panels, regime evidence. This is what v3.99 ships today.</li>
+              <li><b>Diversity Atlas</b> (planned) — every page focuses on genome-wide diversity: θπ, F_ROH, ROH atlas, ancestry-Q stratification, kinship/relatedness, family-LD patterns. The same JSON, different interpretation layer.</li>
+            </ul>
+            <p style="margin: 0 0 6px;"><b>How it works</b>: the JSON stays loaded in memory — not freed, not refetched, not reparsed. Only the rendering layer flips. Per-page cache (<code>state._l3CacheFp</code>, <code>state.__linesCache</code>) stays populated so switching back is instant. New UI-only <code>state.atlas</code> slot ∈ {<code>inversion</code>, <code>diversity</code>}, persisted to localStorage. Per Quentin's wording: "the JSON is unloaded — I mean loaded but in stand by."</p>
+            <p style="margin: 0 0 6px;"><b>Page mapping</b>: most tabs have an analogue in both atlases (e.g. tab 3 is "boundaries" in inversion mode and "ROH atlas" in diversity mode; tab 9 is "confirmed candidates carousel" vs "saved regions carousel"; tab 11 is hidden in diversity mode). Catalogue forks: inversion catalogue (today) vs region catalogue. Manuscript bundles fork too. Tabs 5 (reports), 6 (help), 7 (ancestry) are atlas-shared.</p>
+            <p style="margin: 0 0 6px;"><b>What stays the same</b>: schema, candidate registry (saved candidates keep IDs + confirmed flags; in Diversity Atlas they read as "regions of interest"), favorites, theme, layout, lasso selections.</p>
+            <p style="margin: 0;"><b>Phasing</b>: Phase A schema-only (now). Phase B toggle button + state slot. Phase C per-page Diversity-mode renderers (multiple chats). Phase D catalogue/bundle forking. Estimate ~3-5 weeks of post-v4.0 work for the full Diversity Atlas. SCHEMA_V2.md §17.</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="vertical-align:top;"><b>Thai language support (i18n)</b> <span style="color: var(--ink-dim); font-family: var(--mono); font-size: 10px;">[schema 2.16, later]</span><br><span class="dim" style="font-size:10px;">Lab in Thailand · nice-to-have</span></td>
+          <td>
+            <p style="margin: 0 0 6px;"><b>Vision</b> (per Quentin, t14e+ continue): the scrubber's strings (button labels, tooltips, panel headers, help-page content) available in Thai for the lab in Thailand. Tagged "later" — the lab can read English. Thai font is a known typographic challenge.</p>
+            <p style="margin: 0 0 6px;"><b>Architecture</b>: <code>state.lang</code> ∈ {<code>en</code>, <code>th</code>}, persisted to localStorage. <code>data-i18n="key"</code> attribute pattern on HTML markup; <code>t(key)</code> lookup helper for dynamic JS strings. Translation table is a flat key/value map per locale, ~300-400 strings total at full coverage.</p>
+            <p style="margin: 0 0 6px;"><b>Font handling</b>: extend the <code>--font-base</code> CSS variable's fallback chain to include <code>"Noto Sans Thai"</code>, <code>"IBM Plex Sans Thai"</code>. Thai-specific CSS (<code>line-height: 1.6</code>, <code>word-break: keep-all</code>) applied to <code>html[lang="th"]</code>. Easy path: rely on system fonts (most modern Thai users have Noto installed). Bundled path: ~80 KB woff2 from Google Fonts CDN. Self-hosted path: vendor inline as base64 (offline-friendly).</p>
+            <p style="margin: 0 0 6px;"><b>Coverage tiers</b>: T1 nav (~30 strings) · T2 nav tooltips (~30) · T3 page-2 candidate focus (~50) · T4 catalogue + windows (~80) · T5 help page (~150) · T6 status messages (~50). MVP = T1 + T2 + Thai font CSS = ~60 strings, manageable scope, big visible payoff.</p>
+            <p style="margin: 0;"><b>What stays English regardless</b>: code identifiers, JSON field names, scientific terminology (haplotype, PCA, F_ROH), citation strings, gene names, file paths, numeric formatting (Arabic numerals universal in scientific contexts). SCHEMA_V2.md §18.</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="vertical-align:top;"><b>14-axis classification (R-side)</b> <span style="color: var(--ink-dim); font-family: var(--mono); font-size: 10px;">[schema 2.16, post-v4.0]</span><br><span class="dim" style="font-size:10px;">scrubber UI shipped · R emit pending</span></td>
+          <td>
+            <p style="margin: 0 0 6px;"><b>Status</b>: scrubber-side UI scaffold IS shipped (Karyotype/Tier sub-view on page 4). What's PLANNED is the cluster-side R-pipeline that emits the <code>final_classification</code> JSON layer the Tier view consumes.</p>
+            <p style="margin: 0 0 6px;"><b>The 14 axes</b> (recovered from past chat history of <code>characterize_candidate.R</code> + <code>classify_inversions.R</code>):</p>
+            <ol style="margin: 0 0 6px 18px; padding: 0; line-height: 1.55; font-size: 11.5px;">
+              <li>existence_layer_a / b / c / d — pass/fail per layer (Local PCA, SV callers, GHSL, Fisher genotype-bp)</li>
+              <li>boundary_quality — sharp / fuzzy</li>
+              <li>group_validation — NONE / UNCERTAIN / SUPPORTED / VALIDATED / SUSPECT</li>
+              <li>internal_structure — clean / gradient / composite_undecomposed</li>
+              <li>recombinant_class — none / gene_conversion / double_crossover / mixed</li>
+              <li>family_linkage — multi_family / few_family / single_family / pca_family_confounded</li>
+              <li>polymorphism_class — cohort_wide / lineage_restricted / family_restricted</li>
+              <li>mechanism_class — NAHR / NHEJ / MMBIR</li>
+              <li>age_class — young / intermediate / ancient (Tajima D coalescent proxy)</li>
+              <li>burden_class — enriched / neutral / depleted (deleterious-variant load)</li>
+              <li>confidence_tier — T1 / T2 / T3 / T4 / SV_only / Layer_C_only (synthesis)</li>
+            </ol>
+            <p style="margin: 0 0 6px;"><b>R-side TODO</b>: migrate <code>characterize_candidate.R</code> and <code>classify_inversions.R</code> to phase 4e of the cluster pipeline, populate the registry per §13's three-axis framework, emit <code>final_classification</code> JSON layer + sibling TSV (<code>final_catalog.tsv</code>) keyed by candidate_id. Both scripts exist in past sessions but consume "old ad-hoc TSVs" — migration is mechanical once the v10 phase 4 library is in place.</p>
+            <p style="margin: 0;"><b>Coexistence</b>: <code>final_classification.confidence_tier</code> === §13 Axis 1 tier (must agree). §13 is the WORKFLOW (Q1-Q7 questions); §19 is the OUTPUT catalog. Read-only — scrubber never writes. SCHEMA_V2.md §19.</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="vertical-align:top;"><b>Local PCA scrubbers — page 1 (|z|) + page 2 (thetapi)</b> <span style="color: var(--good); font-family: var(--mono); font-size: 10px;">[scaffold shipped, schema 2.19]</span><br><span class="dim" style="font-size:10px;">two-scrubber design · genotype + diversity · orthogonal validation</span></td>
+          <td>
+            <p style="margin: 0 0 6px;"><b>Two scrubbers, symmetric naming</b>: page 1 ("local PCA |z|") runs local PCA on dosage. Page 2 NEW ("local PCA thetapi") runs the SAME pipeline on per-sample θπ instead. Same panel layout (sim_mat heatmap, |Z| waveform, per-sample lines, K-means scatter, L3 contingency). A region that hits BOTH scrubbers' candidate lists is ~certainly real biology — that's the orthogonal validation. A region that hits ONLY the θπ scrubber is something the genotype scrubber can't see (sweeps, balancing selection, Het-class subdivisions, mis-assemblies) — that's where new biology lives.</p>
+            <p style="margin: 0 0 6px;"><b>Where it lives</b>: NEW user-visible tab position 2 ("local PCA thetapi"). DOM id is <code>page12</code>; existing pages 2-11 shift one slot right in the tab bar's user-visible numbering, but their DOM ids stay unchanged so all existing code references continue to work.</p>
+            <p style="margin: 0 0 6px;"><b>Panel layout mirrors page 1</b> (same vertical sequence, parameterized by which layer to read):</p>
+            <ul style="margin: 0 0 6px 18px; padding: 0; line-height: 1.55; font-size: 11.5px;">
+              <li><code>#thCtrlBar</code> — scrubber slider (mirrors <code>#ctrlBar</code>)</li>
+              <li><code>#thSimPanel</code> — θπ_sim_mat heatmap with L1/L2 overlays (mirrors <code>#simPanel</code>)</li>
+              <li><code>#thZPanel</code> — diversity-|Z| waveform (mirrors <code>#zPanel</code>)</li>
+              <li><code>#thLinesPanel</code> — per-sample θπ-PC1 lines (mirrors <code>#linesPanel</code>)</li>
+              <li><code>#thPcaPanel</code> — θπ-PC1 vs θπ-PC2 K-means scatter (mirrors <code>#pcaPanel</code>)</li>
+              <li><code>#thL3Panel</code> — diversity L3 contingency (mirrors <code>#l3Panel</code>)</li>
+            </ul>
+            <p style="margin: 0 0 6px;"><b>Data sources — what already exists</b> (per SCHEMA §22.13): <code>theta_pi_per_window</code> ALREADY EXISTS in production. <code>STEP_Q05_aggregate_theta.sh</code> in <code>phase_5_qc_triage/</code> produces <code>theta.&lt;CHR&gt;.&lt;SCALE&gt;.tsv.gz</code> (per-sample per-window θπ from ANGSD pestPG). <code>export_precomp_to_json.R --theta &lt;Q05_output&gt;</code> already embeds this as <code>w.theta</code> (an array of n_samples values per window) inside each window object. The scrubber's reader auto-detects this Shape A even without an explicit <code>_layers_present</code> declaration. So if your JSON was exported with <code>--theta</code>, the page-12 scrubber's first-required-layer indicator already flips to 🟢.</p>
+            <p style="margin: 0 0 6px;"><b>What's still needed</b>: <code>theta_pi_local_pca</code> (NEW, R-side STEP_R40 — per-window local PCA on θπ profiles, emitting z, lam1, lam2, ratio, pc1, pc2, sim_mat, mds_coords with same shapes as page 1's top-level dosage arrays); <code>theta_pi_envelopes</code> (NEW, R-side STEP_R41 — L1, L2, candidate_intervals from thresholding the diversity-|Z|). Both ~150 lines of R, structurally mirroring the existing dosage local-PCA scripts with the input matrix swapped.</p>
+            <p style="margin: 0 0 6px;"><b>What's NOT this page</b>: <code>STEP_Q07_popstats.sh</code> + <code>region_popstats.c</code> (Engine F) produce per-window per-GROUP population stats (Hudson Fst, dXY, Tajima's D for Hom1/Het/Hom2 groups). That's pooled-per-group, NOT per-sample — useful for the per-candidate concordance figure (§22.7, deferred) but NOT what page 12's chromosome-wide scrubber needs.</p>
+            <p style="margin: 0 0 6px;"><b>Cross-method validation</b> (deferred): when BOTH dosage <code>candidate_intervals</code> (page 1) AND <code>theta_pi_envelopes.candidate_intervals</code> (page 2) load, the catalogue gains a "method" column with each candidate's provenance: <code>dosage_only</code>, <code>theta_pi_only</code>, <code>both</code>, or <code>both_overlap_partial</code>.</p>
+            <p style="margin: 0;"><b>Status</b>: structural scaffold IS shipped (page 12 DOM, tab button "local PCA thetapi", empty-state placeholder with live ⚪/🟢 layer-status indicators, layer detection extended for the three layers including Shape A auto-detection). Panel renderers ship as follow-up turns when STEP_R40/R41 emit data — reuses page 1's draw functions parameterized by which layer to read. SCHEMA_V2.md §22.</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="vertical-align:top;"><b>internal_ancestry_composition panel</b> <span style="color: var(--ink-dim); font-family: var(--mono); font-size: 10px;">[planned, schema §22.14]</span><br><span class="dim" style="font-size:10px;">L2/L3 zoom-trigger · per-candidate panel</span></td>
+          <td>
+            <p style="margin: 0 0 6px;"><b>What</b>: a per-sample composition classifier that, given a parent interval (L2 envelope, L3 sub-envelope, or any candidate), classifies each sample's internal Q-window pattern as one of: <code>homogeneous</code>, <code>dominant_plus_secondary</code>, <code>two_block_composite</code>, <code>continuous_gradient</code>, <code>multi_block_fragmented</code>, <code>diffuse_mixed</code>. Plus per-sample fragmentation score, internal entropy, block analysis. Existing Python implementation: <code>internal_ancestry_composition.py</code> (formerly <code>nested_composition.py</code>) in the inversion-popgen-toolkit.</p>
+            <p style="margin: 0 0 6px;"><b>Quentin's t14e+ continue framing</b>: "Maybe it can be for page 1 and page 2 like activate nested composition detection ?? When in L2 or L3 or ?" — yes. Two render paths planned: (a) page 1 + page 12 zoom-trigger panel that activates when <code>state.viewMode === 'l2'</code> or <code>'l3'</code>; (b) page 3 candidate-focus persistent panel.</p>
+            <p style="margin: 0 0 6px;"><b>Data already loaded</b>: the same <code>data.ancestry_sample</code> matrix that page 7 (ancestry view) reads — already shipped via <code>export_precomp_to_json.R --ancestry_samples</code>. No new data dependency. Algorithm port to JS is ~100 lines of pure functions translating <code>classify_structure()</code> + <code>analyze_parent_composition()</code>.</p>
+            <p style="margin: 0 0 6px;"><b>Naming care</b>: the script's docstring carefully separates "internal ancestry composition" (data-structure: Q windows nested inside parent intervals) from "nested inversion" (the stronger biological claim of inversion-inside-inversion). The scrubber respects this distinction — a <code>two_block_composite</code> verdict is a diagnostic finding, NOT a classification. The interpretation step (mapping composite verdict → "this looks like a nested inversion") is a downstream inference layer that lives in the §21 <code>internal_dynamics</code> block + §19 <code>internal_structure</code> axis, not in the panel.</p>
+            <p style="margin: 0;"><b>Status</b>: NOT shipped. Schema §22.14 documents the design + render placement + algorithm sketch. Algorithm port + panel renderer + zoom-trigger wiring all wait for a follow-up turn. When §21 <code>internal_dynamics</code> blocks are loaded via §20 registry interop, the panel will prefer the precomputed result over re-running the classifier in JS.</p>
+          </td>
+        </tr>
+      </table>
+
+      <!-- ========================================================
+           DESIGN OPEN
+           ======================================================== -->
+
+      <h5 style="margin-top:22px; margin-bottom:6px; color: var(--ink-dim); font-size: 11px; letter-spacing: 0.06em;">DESIGN OPEN — needs spec before building</h5>
+      <table class="help-table">
+        <tr>
+          <td style="vertical-align:top;"><b>Custom 3-second tooltip popover</b><br><span class="dim" style="font-size:10px;">slower delay than native title=</span></td>
+          <td>User asked for 3-second hover delay; native browser <code>title=</code> attribute uses ~1s OS-controlled delay (not configurable). Building a custom popover means: hover state machine, timeout management, positioning logic, accessibility (ARIA), keyboard navigation. Useful but a full feature on its own.</td>
+        </tr>
+        <tr>
+          <td style="vertical-align:top;"><b>Per-sample H per band</b><br><span class="dim" style="font-size:10px;">inversion vs not inversion</span></td>
+          <td>Compute heterozygosity for each sample inside the candidate window range, grouped by their locked band. Needs per-sample H emitted as a track (e.g. <code>--track_h_persample</code>). Once available, scrubber renders one bar chart per band on page 2 below the band-composition cards.</td>
+        </tr>
+        <tr>
+          <td style="vertical-align:top;"><b>π / θ curve per band</b><br><span class="dim" style="font-size:10px;">nucleotide diversity profile</span></td>
+          <td>Per-band θ along the candidate span requires the engine to compute θ separately for each k-label group. Then scrubber renders overlaid lines on the candidate page. Could also do this on page 1 as multi-track overlay if tracks are flagged as "stratified by band".</td>
+        </tr>
+        <tr>
+          <td style="vertical-align:top;"><b>Gene annotations</b><br><span class="dim" style="font-size:10px;">GFF overlay + breakpoint genes</span></td>
+          <td>Exporter reads a GFF3 file passed via <code>--annotation file.gff3</code>, embeds gene coords + symbols as <code>genes</code> array in JSON. Scrubber adds (a) thin gene track on page 1, (b) "genes spanned by candidate" panel on page 2, (c) "breakpoint-disrupted features" list. Multi-turn: parsing in R, schema extension, three rendering surfaces.</td>
+        </tr>
+        <tr>
+          <td style="vertical-align:top;"><b>Breakpoint nucleotide context</b><br><span class="dim" style="font-size:10px;">±50 bp facets, left + right</span></td>
+          <td>Needs reference FASTA piped into the exporter (<code>--reference ref.fa</code>). JSON gets <code>breakpoint_context: { left_seq, right_seq, flanking_bp }</code>. Scrubber renders a sequence panel on page 2. Lighter than IGV but still real work.</td>
+        </tr>
+        <tr>
+          <td style="vertical-align:top;"><b>Resize handles between panels</b><br><span class="dim" style="font-size:10px;">drag every interface boundary</span></td>
+          <td>Currently sim, Z, lines, PCA, L3 panels each have one handle. Adding handles between every interface element (sidebar/main divider, compact-mode column resize, every panel pair) means: (a) consistent split-pane logic, (b) min/max enforcement, (c) per-handle persistence, (d) graceful redraw on every drag end. Most done; remaining pairs need audit.</td>
+        </tr>
+      </table>
+
+      <!-- ========================================================
+           BLOCKED ON DATA
+           ======================================================== -->
+
+      <h5 style="margin-top:22px; margin-bottom:6px; color: var(--ink-dim); font-size: 11px; letter-spacing: 0.06em;">BLOCKED ON DATA — awaiting 226-sample LG28 calibration</h5>
+      <table class="help-table">
+        <tr>
+          <td style="vertical-align:top; width:30%;"><b>v4.0 release</b><br><span class="dim" style="font-size:10px;">production lock-in</span></td>
+          <td>Gating items: real-data validation on the 226-sample LG28 cohort across all 28 chromosomes; final weights calibrated for the BAM evidence layer (schema 2.11) and the three-axis framework (schema 2.12); per-cohort threshold values for the 7-question convergence rules. v3.99 is feature-complete for v4.0 except for these calibration steps.</td>
+        </tr>
+      </table>
+    </div>
+  </div>

@@ -1,0 +1,68 @@
+  <div id="page16b" class="page">
+    <div id="page16bHeader" style="padding: 22px 32px 0;">
+      <h2 style="margin: 0 0 4px; font-size: 16px;">Multi-species classification cockpit</h2>
+      <div id="page16bSubtitle" style="color: var(--ink-dim); font-size: 11px; font-family: var(--mono);">
+        Place each Cgar↔Cmac breakpoint on the catfish phylogeny. Click a species in the tree to see
+        how its homologous region compares — chromosome context, orientation, boundary status.
+        Auto-suggests <b>architecture class</b> (A–F) from the lineage distribution.
+        <span style="margin-left: 4px; color: var(--ink-dimmer);">·</span>
+        <a href="#" id="msClassificationFrameworkLink"
+           style="color: var(--accent); text-decoration: none; border-bottom: 1px dotted var(--accent);"
+           title="Two-layer classification: architecture (A-F) + age model. See help page for full schema.">
+          ⓘ classification framework
+        </a>
+      </div>
+    </div>
+    <div id="page16bContent"
+         style="padding: 12px 28px 28px; height: calc(100% - 76px);
+                box-sizing: border-box; display: flex; flex-direction: column;
+                gap: 10px;">
+      <!-- Active-breakpoint header: shows what's currently being classified. -->
+      <div id="msActiveHeader"
+           style="padding: 8px 12px; background: var(--panel-2); border-radius: 4px;
+                  font-family: var(--mono); font-size: 11px; min-height: 24px;
+                  display: flex; align-items: center; gap: 12px;"></div>
+      <!-- Three-column body: phylo tree (left), classification + lineage (center), per-species detail (right). -->
+      <div id="msBody"
+           style="flex: 1 1 auto; min-height: 0; display: grid;
+                  grid-template-columns: minmax(220px, 26%) minmax(0, 1fr) minmax(280px, 32%);
+                  gap: 12px;">
+        <div id="msTree"
+             style="overflow-y: auto; background: var(--panel-2); border-radius: 4px;
+                    padding: 10px;"></div>
+        <div id="msCenter"
+             style="overflow-y: auto; background: var(--panel-2); border-radius: 4px;
+                    padding: 14px 18px; display: flex; flex-direction: column; gap: 14px;">
+          <div id="msEmpty"
+               style="padding: 60px 20px; text-align: center; color: var(--ink-dim);
+                      font-family: var(--serif);">
+            <div style="font-size: 14px; margin-bottom: 10px; color: var(--ink);">
+              No active breakpoint.
+            </div>
+            <div style="font-size: 12px; line-height: 1.7; max-width: 520px; margin: 0 auto;">
+              Select a breakpoint on <b>page 13 cross-species</b> first
+              (or load a <code>cs_breakpoints_v1.json</code>), then return to this page.
+              Optional: drop a <code>synteny_multispecies_v1.json</code> and/or
+              <code>phylo_tree_v1.json</code> to populate the comparative analysis.
+              Until then, a default 9-species reference tree is shown for navigation.
+            </div>
+          </div>
+          <div id="msClassification" style="display: none;"></div>
+          <div id="msLineageTable" style="display: none;"></div>
+        </div>
+        <div id="msDetail"
+             style="overflow-y: auto; background: var(--panel-2); border-radius: 4px;
+                    padding: 14px 18px; display: flex; flex-direction: column; gap: 12px;">
+          <div id="msDetailEmpty"
+               style="padding: 30px 12px; text-align: center; color: var(--ink-dim);
+                      font-family: var(--serif); font-size: 12px; line-height: 1.6;">
+            Click a species in the tree to see its homologous region detail here.
+          </div>
+          <div id="msDetailHeader" style="display: none;"></div>
+          <div id="msDetailDotplot" style="display: none;"></div>
+          <div id="msDetailBoundary" style="display: none;"></div>
+          <div id="msDetailFocalVsBg" style="display: none;"></div>
+        </div>
+      </div>
+    </div>
+  </div>

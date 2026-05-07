@@ -1,0 +1,25 @@
+{
+  "_comment": "Synthetic LG28-shaped projections fixture for driver verification. K_locus = 6 (3 windows x 2 arrangements). Expected: CLEAN_PARTITION with {0,1,2} vs {3,4,5}.",
+  "projections": [
+    { "source_k": 0, "per_window": [
+      { "w": 0, "ve": {"visited_bands": [0, 1, 2], "excluded_bands": [3, 4, 5]}, "cls": {"pattern_class": "SUBSET"}, "pv": {"n_source": 60} },
+      { "w": 1, "ve": {"visited_bands": [0, 1, 2], "excluded_bands": [3, 4, 5]}, "cls": {"pattern_class": "SUBSET"}, "pv": {"n_source": 60} },
+      { "w": 2, "ve": {"visited_bands": [0, 1, 2], "excluded_bands": [3, 4, 5]}, "cls": {"pattern_class": "SUBSET"}, "pv": {"n_source": 60} }
+    ]},
+    { "source_k": 1, "per_window": [
+      { "w": 0, "ve": {"visited_bands": [0, 1, 2], "excluded_bands": [3, 4, 5]}, "cls": {"pattern_class": "SUBSET"}, "pv": {"n_source": 60} },
+      { "w": 1, "ve": {"visited_bands": [0, 1, 2], "excluded_bands": [3, 4, 5]}, "cls": {"pattern_class": "SUBSET"}, "pv": {"n_source": 60} },
+      { "w": 2, "ve": {"visited_bands": [0, 1, 2], "excluded_bands": [3, 4, 5]}, "cls": {"pattern_class": "SUBSET"}, "pv": {"n_source": 60} }
+    ]},
+    { "source_k": 2, "per_window": [
+      { "w": 0, "ve": {"visited_bands": [3, 4, 5], "excluded_bands": [0, 1, 2]}, "cls": {"pattern_class": "SUBSET"}, "pv": {"n_source": 60} },
+      { "w": 1, "ve": {"visited_bands": [3, 4, 5], "excluded_bands": [0, 1, 2]}, "cls": {"pattern_class": "SUBSET"}, "pv": {"n_source": 60} },
+      { "w": 2, "ve": {"visited_bands": [3, 4, 5], "excluded_bands": [0, 1, 2]}, "cls": {"pattern_class": "SUBSET"}, "pv": {"n_source": 60} }
+    ]},
+    { "source_k": 3, "per_window": [
+      { "w": 0, "ve": {"visited_bands": [3, 4, 5], "excluded_bands": [0, 1, 2]}, "cls": {"pattern_class": "SUBSET"}, "pv": {"n_source": 60} },
+      { "w": 1, "ve": {"visited_bands": [3, 4, 5], "excluded_bands": [0, 1, 2]}, "cls": {"pattern_class": "SUBSET"}, "pv": {"n_source": 60} },
+      { "w": 2, "ve": {"visited_bands": [3, 4, 5], "excluded_bands": [0, 1, 2]}, "cls": {"pattern_class": "SUBSET"}, "pv": {"n_source": 60} }
+    ]}
+  ]
+}

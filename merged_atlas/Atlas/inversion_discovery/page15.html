@@ -1,0 +1,67 @@
+  <div id="page15" class="page">
+    <div style="padding: 24px 32px; max-width: 1200px;">
+      <h2 style="margin: 0 0 4px; font-size: 16px; font-weight: 600; color: var(--ink);">
+        Local PCA scrubber on GHSL <span style="color: var(--ink-dim); font-weight: 400; font-size: 13px;">— phased haplotype similarity stream</span>
+      </h2>
+      <div style="font-size: 11px; color: var(--ink-dim); margin-bottom: 18px;">
+        Third of the four discovery streams (dosage · θπ · GHSL · Q). Mirrors the page 1 pipeline (per-window analysis → window×window similarity → MDS → cluster → candidate intervals) but driven by Group-level Haplotype Similarity by Locus instead of dosage or θπ.
+      </div>
+
+      <div style="background: var(--panel-2); border: 1px solid var(--rule);
+                  border-radius: 4px; padding: 16px 18px; margin-bottom: 18px;">
+        <div style="font-size: 12px; font-weight: 600; color: var(--ink); margin-bottom: 12px;">
+          Required data layers
+        </div>
+        <div style="display: grid; grid-template-columns: 1.6fr 1.0fr 1.0fr 2.4fr; gap: 6px 14px;
+                    font-size: 10.5px; align-items: baseline;">
+          <div style="font-weight: 600; color: var(--ink-dim);">layer</div>
+          <div style="font-weight: 600; color: var(--ink-dim);">R-side script</div>
+          <div style="font-weight: 600; color: var(--ink-dim);">status</div>
+          <div style="font-weight: 600; color: var(--ink-dim);">feeds panels</div>
+
+          <div><code>ghsl_panel</code></div>
+          <div><code>export_ghsl_to_json_v3</code></div>
+          <div data-gh-layer="ghsl_panel"
+               style="color: var(--ink-dimmer);">⚪ not loaded</div>
+          <div style="color: var(--ink-dim);">div_roll matrix · per-window aggregates</div>
+
+          <div><code>ghsl_kstripes</code></div>
+          <div><code>export_ghsl_to_json_v3</code></div>
+          <div data-gh-layer="ghsl_kstripes"
+               style="color: var(--ink-dimmer);">⚪ not loaded</div>
+          <div style="color: var(--ink-dim);">per-K stripe partitioning</div>
+
+          <div><code>ghsl_karyotype_runs</code></div>
+          <div><code>export_ghsl_to_json_v3</code></div>
+          <div data-gh-layer="ghsl_karyotype_runs"
+               style="color: var(--ink-dimmer);">⚪ not loaded</div>
+          <div style="color: var(--ink-dim);">per-sample karyotype run-length encoding</div>
+
+          <div><code>ghsl_d17_envelopes</code></div>
+          <div><code>STEP_C04d → export_v3</code></div>
+          <div data-gh-layer="ghsl_d17_envelopes"
+               style="color: var(--ink-dimmer);">⚪ not loaded</div>
+          <div style="color: var(--ink-dim);">L1 / L2 envelopes from D17 boundary detection</div>
+
+          <div><code>cusum_ghsl</code></div>
+          <div><code>STEP_R02 (NOT YET BUILT)</code></div>
+          <div data-gh-layer="cusum_ghsl"
+               style="color: var(--ink-dimmer);">⚪ not loaded</div>
+          <div style="color: var(--ink-dim);">CUSUM per-carrier boundary distributions</div>
+        </div>
+        <div style="font-size: 10.5px; color: var(--ink-dim); margin-top: 12px; line-height: 1.55;">
+          Drag-drop <code>&lt;chr&gt;_phase2_ghsl.json</code> on this atlas to populate. Layers marked ⚪ activate the panels they feed; the rest stay in empty-state. Click the green schema badge in the header for the full registry of all known layers.
+        </div>
+      </div>
+
+      <div style="background: var(--panel-2); border: 1px solid var(--rule);
+                  border-radius: 4px; padding: 16px 18px;">
+        <div style="font-size: 12px; font-weight: 600; color: var(--ink); margin-bottom: 10px;">
+          Panel layout (mirrors page 1 / page 12)
+        </div>
+        <div style="font-size: 10.5px; color: var(--ink-dim); line-height: 1.65;">
+          When the GHSL layers load, this page will render the same six-panel layout as page 1 and page 12: <b>(top)</b> per-window |Z| waveform with cand / L1 / L2 / win zone bars; <b>(middle)</b> per-sample lines colored by GHSL K-cluster assignment, with PC1 / PC2 toggle; <b>(left)</b> sim_mat heatmap of GHSL window×window similarity (multi-scale: nn40 → nn320, default nn320); <b>(right)</b> K-means scatter on PC1 / PC2 of the GHSL local-PCA loadings; <b>(bottom)</b> L3 contingency tables — same recluster + Hungarian-aligned coloring as page 1.
+        </div>
+      </div>
+    </div>
+  </div>

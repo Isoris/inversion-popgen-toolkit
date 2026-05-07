@@ -1,0 +1,292 @@
+inversion_catalogue/page_overview.js:23:    // TODO_MISSING(synthesis_overview_design) — legacy ships an empty stub.
+inversion_catalogue/page18.js:18://   TODO_MISSING(_esc)  — HTML-escape helper (high frequency, candidate for
+inversion_catalogue/page21.js:17://   TODO_MISSING(_gatherActiveCandidatesForInheritance)
+inversion_catalogue/page21.js:21://   TODO_MISSING(_wireCandidateHaplotypeAnnotations)
+inversion_catalogue/page21.js:25://   TODO_MISSING(candidateHaplotypeAnnotationsHtml)
+inversion_catalogue/page21.js:28://   TODO_MISSING(computeTrackedLinkageProjection)
+inversion_catalogue/page3.js:37://   without overstepping this batch's scope. Marked TODO_MISSING.
+inversion_catalogue/page3.js:42:// all real catalogue logic is left as TODO_MISSING for the merge chat.
+inversion_catalogue/page3.js:44:// External dependencies (TODO_MISSING):
+inversion_catalogue/page3.js:46://   TODO_MISSING(_buildCatalogueRows)
+inversion_catalogue/page3.js:49://   TODO_MISSING(_filterCatalogueRows)
+inversion_catalogue/page3.js:52://   TODO_MISSING(_sortCatalogueRows)
+inversion_catalogue/page3.js:54://   TODO_MISSING(_paintCatalogueRow)
+inversion_catalogue/page3.js:57://   TODO_MISSING(_exportCatalogueTSV)
+inversion_catalogue/page3.js:59://   TODO_MISSING(_exportCatalogueMarkdown)
+inversion_catalogue/page3.js:61://   TODO_MISSING(_exportCatalogueJSON)
+inversion_catalogue/page3.js:63://   TODO_MISSING(_exportCatalogueGallerySVG / PNG / PDF)
+inversion_catalogue/page3.js:65://   TODO_MISSING(_wireCatalogueBreedingExportBtns)
+inversion_catalogue/page3.js:68://   TODO_MISSING(_exportBreedingCardsHTML)
+inversion_catalogue/page3.js:70://   TODO_MISSING(_exportBreedingCardsJSON)
+inversion_catalogue/page3.js:72://   TODO_MISSING(_filterCandsForBreedingExport)
+inversion_catalogue/page3.js:74://   TODO_MISSING(_buildBreedingCardsCombinedHTML)
+inversion_catalogue/page3.js:76://   TODO_MISSING(_buildBreedingCardsJSONBundle)
+inversion_catalogue/page3.js:78://   TODO_MISSING(_BREEDING_EXPORT_TIER_MODES)
+inversion_catalogue/page3.js:80://   TODO_MISSING(_openRegimeRegistryDialog)
+inversion_catalogue/page3.js:82://   TODO_MISSING(_assignSelectedToRegime)
+inversion_catalogue/page3.js:84://   TODO_MISSING(_promoteSelectedAsCandidate)
+inversion_catalogue/page3.js:86://   TODO_MISSING(makeShelfLDPanel)
+inversion_catalogue/page3.js:89://   TODO_MISSING(makeLDSplitPanel)
+inversion_catalogue/page3.js:126:  // TODO_MISSING(_buildCatalogueRows) — fill #catHead and #catBody.
+inversion_catalogue/page3.js:152:  // TODO_MISSING(_wireCatalogueToolbar)
+inversion_catalogue/page3.js:153:  // TODO_MISSING(_wireCatalogueBreedingExportBtns) — legacy lines 23668–23715
+inversion_catalogue/BATCH_4_NOTES.md:42:than being marked `TODO_PROMOTE_TO_SHARED`. The merge chat can hoist it
+inversion_catalogue/BATCH_4_NOTES.md:52:**No TODO_MISSING markers were emitted for page10** — the function is
+inversion_catalogue/BATCH_4_NOTES.md:79:TODO_MISSING(*)                       count
+inversion_catalogue/BATCH_4_NOTES.md:83:TODO_PROMOTE_TO_SHARED(*)             count
+inversion_catalogue/page9.js:31://   TODO_MISSING(_renderConfirmedCarousel)
+inversion_catalogue/page9.js:33://   TODO_MISSING(_wireConfirmedCarouselNav)
+inversion_catalogue/page9.js:35://   TODO_MISSING(renderCandidateFocus)  — owned by Batch 1 (page2)
+inversion_catalogue/page9.js:53: * full carousel is TODO_MISSING.
+inversion_catalogue/page9.js:61:  // TODO_MISSING(_renderConfirmedCarousel) — full carousel implementation.
+inversion_catalogue/page9.js:97: * TODO_MISSING(_wireConfirmedCarouselNav) — full handler wiring.
+inversion_catalogue/page9.js:100:  // TODO_MISSING(_wireConfirmedCarouselNav)
+inversion_catalogue/page17.js:10:// External dependencies — marked TODO_MISSING. These are referenced by the
+inversion_catalogue/page17.js:14://   TODO_MISSING(_csGetSyntenyBlocks) — likely legacy line ~? (cross-species
+inversion_catalogue/page17.js:17://   TODO_MISSING(_csPermutationTest)  — likely legacy line ~? (cross-species
+inversion_catalogue/page17.js:20://   TODO_MISSING(_esc)                — HTML-escape helper. High frequency
+inversion_catalogue/page17.js:23://   TODO_MISSING(_mpDeriveAutoPanel)  — exported by sibling page18.js in this
+inversion_catalogue/BATCH_3_NOTES.md:86:  overstepping batch scope and is left as `TODO_MISSING(_wireCatalogue...)`
+inversion_catalogue/BATCH_3_NOTES.md:93:## TODO_MISSING markers — frequency table
+inversion_comparative/BATCH_5_NOTES.md:36:## TODO_MISSING summary (frequency-sorted, both pages combined)
+inversion_comparative/BATCH_5_NOTES.md:40:| `_esc` | **108** | 13925 | HTML-escape helper. Used by every page in the atlas. **TODO_PROMOTE_TO_SHARED** — belongs in `shared/dom.js` or `shared/format.js`. |
+inversion_comparative/page16.js:9:// All function bodies are unmodified. No imports yet — see TODO_MISSING markers below.
+inversion_comparative/page16.js:14:// TODO_MISSING markers (frequency × symbol — likely legacy line)
+inversion_comparative/page16.js:20://  TODO_MISSING(_esc)                  ×61   legacy line 13925   HTML escape helper, used everywhere
+inversion_comparative/page16.js:21://  TODO_MISSING(_getRepeatDensity)     × 3   legacy line 14477   accessor for state.repeatDensity by chrom
+inversion_comparative/page16.js:22://  TODO_MISSING(setCur)                × 1   legacy line 51747   scrubber: set current window index (jump)
+inversion_comparative/page16.js:23://  TODO_MISSING(drawZ)                 × 1   legacy line 31839   scrubber: |Z| panel draw
+inversion_comparative/page16.js:24://  TODO_MISSING(drawSim)               × 1   legacy line 31331   scrubber: similarity-matrix panel draw
+inversion_comparative/page16.js:25://  TODO_MISSING(drawLinesPanel)        × 1   legacy line 34894   scrubber: lines/strip panel draw
+inversion_comparative/page16.js:26://  TODO_MISSING(drawWinSumStrip)       × 1   not defined in legacy — guarded by typeof check, optional hook
+inversion_comparative/page16.js:29://  TODO_MISSING(window.popgenDotplot)        external — popgen dotplot library (csDotplot wiring)
+inversion_comparative/page16.js:30://  TODO_MISSING(window.popgenFocalVsBg)      external — popgen focal-vs-background library
+inversion_comparative/page16b.js:17:// TODO_MISSING markers (frequency × symbol — likely legacy line)
+inversion_comparative/page16b.js:23://  TODO_MISSING(_esc)                  ×47   legacy line 13925   HTML escape helper, used everywhere
+inversion_comparative/page16b.js:24://  TODO_PROMOTE_TO_SHARED(_esc)        — used by every page, belongs in shared/
+inversion_comparative/page16b.js:27://  TODO_MISSING(window.popgenDotplot)        external — popgen dotplot library (referenced by ms dotplot panel)
+inversion_comparative/page16b.js:60:// _clearDotplotMashmap) keep working without TODO_MISSING markers.
+inversion_discovery/page8.js:9:// All other unresolved references are flagged TODO_MISSING — the merge chat
+inversion_discovery/page1.js:8:// All other unresolved references are flagged TODO_MISSING — the merge chat
+inversion_discovery/page1.js:47:// TODO_MISSING — functions referenced but not defined in this module or shared/*.
+inversion_discovery/page1.js:51:// TODO_MISSING(_assignCandidateLanes)
+inversion_discovery/page1.js:52:// TODO_MISSING(_buildJumpMask)
+inversion_discovery/page1.js:53:// TODO_MISSING(_drawBandTraceStrip)
+inversion_discovery/page1.js:54:// TODO_MISSING(_drawDiamondOverlay)
+inversion_discovery/page1.js:55:// TODO_MISSING(_drawInheritanceLabelsStrip)
+inversion_discovery/page1.js:56:// TODO_MISSING(_drawLineageStrip)
+inversion_discovery/page1.js:57:// TODO_MISSING(_drawRegimeBreadthStrip)
+inversion_discovery/page1.js:58:// TODO_MISSING(_drawSnpDensityShade)
+inversion_discovery/page1.js:59:// TODO_MISSING(_drawSnpDensityStrip)
+inversion_discovery/page1.js:60:// TODO_MISSING(_drawTrackedLinkageStrip)
+inversion_discovery/page1.js:61:// TODO_MISSING(_drawTransitionRateStrip)
+inversion_discovery/page1.js:62:// TODO_MISSING(_drawWRow)
+inversion_discovery/page1.js:63:// TODO_MISSING(_drawWinNavLane)
+inversion_discovery/page1.js:64:// TODO_MISSING(_ensureCsOverlayIndex)
+inversion_discovery/page1.js:65:// TODO_MISSING(_paintCandidateBands)
+inversion_discovery/page1.js:66:// TODO_MISSING(_refreshScreeInset)
+inversion_discovery/page1.js:67:// TODO_MISSING(_resolveSampleScopeColor)
+inversion_discovery/page1.js:68:// TODO_MISSING(_vColor)
+inversion_discovery/page1.js:69:// TODO_MISSING(_wRowBand)
+inversion_discovery/page1.js:70:// TODO_MISSING(_winNavBand)
+inversion_discovery/page1.js:71:// TODO_MISSING(allSampleIdx)
+inversion_discovery/page1.js:72:// TODO_MISSING(currentMbRange)
+inversion_discovery/page1.js:73:// TODO_MISSING(dataset)
+inversion_discovery/page1.js:74:// TODO_MISSING(drawCandidateBar)
+inversion_discovery/page1.js:75:// TODO_MISSING(drawRect)
+inversion_discovery/page1.js:76:// TODO_MISSING(escapeHtml)
+inversion_discovery/page1.js:77:// TODO_MISSING(families)
+inversion_discovery/page1.js:78:// TODO_MISSING(fitCanvas)
+inversion_discovery/page1.js:79:// TODO_MISSING(flushRun)
+inversion_discovery/page1.js:80:// TODO_MISSING(formatTrackVal)
+inversion_discovery/page1.js:81:// TODO_MISSING(getActiveSimScale)
+inversion_discovery/page1.js:82:// TODO_MISSING(getL2Cluster)
+inversion_discovery/page1.js:83:// TODO_MISSING(getLinesGrid)
+inversion_discovery/page1.js:84:// TODO_MISSING(getLinesSignAt)
+inversion_discovery/page1.js:85:// TODO_MISSING(getLinesValuesAt)
+inversion_discovery/page1.js:86:// TODO_MISSING(getPCRender)
+inversion_discovery/page1.js:87:// TODO_MISSING(getSampleColor)
+inversion_discovery/page1.js:88:// TODO_MISSING(hubs)
+inversion_discovery/page1.js:89:// TODO_MISSING(jittered)
+inversion_discovery/page1.js:90:// TODO_MISSING(layer)
+inversion_discovery/page1.js:91:// TODO_MISSING(mbAt)
+inversion_discovery/page1.js:92:// TODO_MISSING(niceTicks)
+inversion_discovery/page1.js:93:// TODO_MISSING(recomputeAnchorConcord)
+inversion_discovery/page1.js:94:// TODO_MISSING(samples)
+inversion_discovery/page1.js:95:// TODO_MISSING(simColor)
+inversion_discovery/page1.js:96:// TODO_MISSING(simColorPDF)
+inversion_discovery/page1.js:97:// TODO_MISSING(strokeSamplePath)
+inversion_discovery/page1.js:98:// TODO_MISSING(strokeSamplePathStyled)
+inversion_discovery/page1.js:99:// TODO_MISSING(themeColor)
+inversion_discovery/page1.js:100:// TODO_MISSING(toPx)
+inversion_discovery/page1.js:101:// TODO_MISSING(toPy)
+inversion_discovery/page1.js:102:// TODO_MISSING(toX)
+inversion_discovery/page1.js:103:// TODO_MISSING(toY)
+inversion_discovery/page1.js:104:// TODO_MISSING(trackedColor)
+inversion_discovery/page1.js:105:// TODO_MISSING(withAlpha)
+inversion_discovery/page1.js:106:// TODO_MISSING(xOfWin)
+inversion_discovery/page1.js:107:// TODO_MISSING(zColorPDF)
+inversion_discovery/page1.js:110:// TODO_MISSING_SLOT — state.<slot> references that are NOT in
+inversion_discovery/page1.js:115:// TODO_MISSING_SLOT(state._l3CacheFp)
+inversion_discovery/page1.js:116:// TODO_MISSING_SLOT(state._l3CacheRendered)
+inversion_discovery/page1.js:117:// TODO_MISSING_SLOT(state._lineageComputeScheduled)
+inversion_discovery/page1.js:118:// TODO_MISSING_SLOT(state._simGeom)
+inversion_discovery/page1.js:119:// TODO_MISSING_SLOT(state._simMinimapGeom)
+inversion_discovery/page1.js:120:// TODO_MISSING_SLOT(state.ancestryPalette)
+inversion_discovery/page1.js:121:// TODO_MISSING_SLOT(state.cacheKey)
+inversion_discovery/page1.js:122:// TODO_MISSING_SLOT(state.candidateMode)
+inversion_discovery/page1.js:123:// TODO_MISSING_SLOT(state.colorMode)
+inversion_discovery/page1.js:124:// TODO_MISSING_SLOT(state.compareUnit)
+inversion_discovery/page1.js:125:// TODO_MISSING_SLOT(state.crossSpecies)
+inversion_discovery/page1.js:126:// TODO_MISSING_SLOT(state.hubFamilies)
+inversion_discovery/page1.js:127:// TODO_MISSING_SLOT(state.l2GroupCache)
+inversion_discovery/page1.js:128:// TODO_MISSING_SLOT(state.l3Draft)
+inversion_discovery/page1.js:129:// TODO_MISSING_SLOT(state.l3Mode)
+inversion_discovery/page1.js:130:// TODO_MISSING_SLOT(state.l3ReclusterMode)
+inversion_discovery/page1.js:131:// TODO_MISSING_SLOT(state.l3SecondaryMetric)
+inversion_discovery/page1.js:132:// TODO_MISSING_SLOT(state.scaleStabilityPanes)
+inversion_discovery/page1.js:133:// TODO_MISSING_SLOT(state.schemaVersion)
+inversion_discovery/page1.js:134:// TODO_MISSING_SLOT(state.secondaryL2)
+inversion_discovery/page1.js:135:// TODO_MISSING_SLOT(state.simInMinimap)
+inversion_discovery/page1.js:136:// TODO_MISSING_SLOT(state.singletonFamilyIds)
+inversion_discovery/page1.js:137:// TODO_MISSING_SLOT(state.smallFamilyIds)
+inversion_discovery/page1.js:138:// TODO_MISSING_SLOT(state.trackedN)
+inversion_discovery/page1.js:139:// TODO_MISSING_SLOT(state.windowToL1)
+inversion_discovery/page1.js:140:// TODO_MISSING_SLOT(state.windowToL2)
+inversion_discovery/page1.js:141:// TODO_MISSING_SLOT(state.zColorMode)
+inversion_discovery/page1.js:142:// TODO_MISSING_SLOT(state.zHighlightThr)
+inversion_discovery/page1.js:143:// TODO_MISSING_SLOT(state.zValueMode)
+inversion_discovery/page2.js:6://   etc — all flagged TODO_MISSING below.
+inversion_discovery/page2.js:10:// All other unresolved references are flagged TODO_MISSING — the merge chat
+inversion_discovery/page2.js:25:// TODO_MISSING — functions referenced but not defined in this module or shared/*.
+inversion_discovery/page2.js:29:// TODO_MISSING(_navigateToCandidate)
+inversion_discovery/page2.js:30:// TODO_MISSING(_wireCandidateBandClicks)
+inversion_discovery/page2.js:31:// TODO_MISSING(_wireCandidateBlockChips)
+inversion_discovery/page2.js:32:// TODO_MISSING(_wireCandidateDosageHeatmap)
+inversion_discovery/page2.js:33:// TODO_MISSING(_wireCandidateHaplotypeAnnotations)
+inversion_discovery/page2.js:34:// TODO_MISSING(_wireCandidateRegimeRow)
+inversion_discovery/page2.js:35:// TODO_MISSING(addCandidateToList)
+inversion_discovery/page2.js:36:// TODO_MISSING(candidateAgeOriginHtml)
+inversion_discovery/page2.js:37:// TODO_MISSING(candidateAncestryConfoundHtml)
+inversion_discovery/page2.js:38:// TODO_MISSING(candidateBandComposition)
+inversion_discovery/page2.js:39:// TODO_MISSING(candidateBandsHtml)
+inversion_discovery/page2.js:40:// TODO_MISSING(candidateBlockChipsHtml)
+inversion_discovery/page2.js:41:// TODO_MISSING(candidateDosageHeatmapHtml)
+inversion_discovery/page2.js:42:// TODO_MISSING(candidateFromJSON)
+inversion_discovery/page2.js:43:// TODO_MISSING(candidateHaplotypeAnnotationsHtml)
+inversion_discovery/page2.js:44:// TODO_MISSING(candidateHeaderHtml)
+inversion_discovery/page2.js:45:// TODO_MISSING(candidateHetShapeHtml)
+inversion_discovery/page2.js:46:// TODO_MISSING(candidateListClosestIndex)
+inversion_discovery/page2.js:47:// TODO_MISSING(candidateListIndexOf)
+inversion_discovery/page2.js:48:// TODO_MISSING(candidateListSortedByPos)
+inversion_discovery/page2.js:49:// TODO_MISSING(candidateNavHtml)
+inversion_discovery/page2.js:50:// TODO_MISSING(candidateNotesHtml)
+inversion_discovery/page2.js:51:// TODO_MISSING(candidateProfileHtml)
+inversion_discovery/page2.js:52:// TODO_MISSING(candidateRegimeRowHtml)
+inversion_discovery/page2.js:53:// TODO_MISSING(candidateRichCardHtml)
+inversion_discovery/page2.js:54:// TODO_MISSING(candidateSigmaChartHtml)
+inversion_discovery/page2.js:55:// TODO_MISSING(candidateSubbandHtml)
+inversion_discovery/page2.js:56:// TODO_MISSING(candidateSummaryHtml)
+inversion_discovery/page2.js:57:// TODO_MISSING(candidateToJSON)
+inversion_discovery/page2.js:58:// TODO_MISSING(drawCandGHSLPerBand)
+inversion_discovery/page2.js:59:// TODO_MISSING(drawCandLinesPanel)
+inversion_discovery/page2.js:60:// TODO_MISSING(drawCandLocalPCA)
+inversion_discovery/page2.js:61:// TODO_MISSING(drawCandidateLocationStrip)
+inversion_discovery/page2.js:62:// TODO_MISSING(drawCandidateSigmaChart)
+inversion_discovery/page2.js:63:// TODO_MISSING(persistCandidateList)
+inversion_discovery/page2.js:64:// TODO_MISSING(refreshCandidateListUI)
+inversion_discovery/page2.js:65:// TODO_MISSING(refreshCandidateUI)
+inversion_discovery/page2.js:66:// TODO_MISSING(renderCatalogue)
+inversion_discovery/page2.js:67:// TODO_MISSING(sigmaProfileCandidate)
+inversion_discovery/page2.js:68:// TODO_MISSING(wireCandidateAncestryConfound)
+inversion_discovery/page2.js:69:// TODO_MISSING(wireCandidateButtons)
+inversion_discovery/page2.js:72:// TODO_MISSING_SLOT — state.<slot> references that are NOT in
+inversion_discovery/page2.js:77:// TODO_MISSING_SLOT(state.candidatePageMode)
+inversion_discovery/page19.js:9:// All other unresolved references are flagged TODO_MISSING — the merge chat
+inversion_discovery/page12.js:8:// All other unresolved references are flagged TODO_MISSING — the merge chat
+inversion_discovery/page12.js:29:// TODO_MISSING — functions referenced but not defined in this module or shared/*.
+inversion_discovery/page12.js:33:// TODO_MISSING(colorFor)
+inversion_discovery/page12.js:34:// TODO_MISSING(fillFor)
+inversion_discovery/page12.js:35:// TODO_MISSING(has)
+inversion_discovery/page12.js:36:// TODO_MISSING(kColor)
+inversion_discovery/page12.js:37:// TODO_MISSING(palette)
+inversion_discovery/page12.js:38:// TODO_MISSING(q)
+inversion_discovery/page12.js:39:// TODO_MISSING(showHide)
+inversion_discovery/page12.js:40:// TODO_MISSING(toX)
+inversion_discovery/page12.js:41:// TODO_MISSING(toY)
+inversion_discovery/page12.js:42:// TODO_MISSING(xAt)
+inversion_discovery/page12.js:43:// TODO_MISSING(xToPx)
+inversion_discovery/page12.js:44:// TODO_MISSING(yAt)
+inversion_discovery/page12.js:45:// TODO_MISSING(yToPx)
+inversion_discovery/page12.js:48:// TODO_MISSING_SLOT — state.<slot> references that are NOT in
+inversion_discovery/page12.js:53:// TODO_MISSING_SLOT(state._simGeom)
+inversion_discovery/page12.js:54:// TODO_MISSING_SLOT(state._thSimGeom)
+inversion_discovery/BATCH_1_NOTES.md:19:## TODO_MISSING summary
+inversion_discovery/BATCH_1_NOTES.md:142:grep -rh 'TODO_MISSING(' inversion_discovery/page*.js | sort | uniq -c | sort -rn
+inversion_discovery/BATCH_1_NOTES.md:195:  module bodies are tighter and TODO_MISSING dropped by ~14 in page1.
+inversion_discovery/BATCH_1_NOTES.md:216:  flagged TODO_MISSING and left for the merge chat (most are likely reused by
+inversion_discovery/BATCH_1_NOTES.md:226:- **The 57 + slot-level TODO_MISSING references.** Some will resolve once
+inversion_discovery/page15.js:8:// All other unresolved references are flagged TODO_MISSING — the merge chat
+inversion_review/page4.js:45:// ...). It's left as TODO_MISSING — it's a plain copy-port and the merge
+inversion_review/page4.js:81:// TODO_MISSING(_renderCandidateKaryotypeBody)        — legacy line 63091
+inversion_review/page4.js:82:// TODO_MISSING(buildKaryotypeRows)                   — legacy line 62703
+inversion_review/page4.js:83:// TODO_MISSING(_isKaryoTwoTrack)                     — likely sigma helpers
+inversion_review/page4.js:84:// TODO_MISSING(sigmaProfileCandidate)                — sigma-profile helper
+inversion_review/page4.js:85:// TODO_MISSING(getKaryotypeLabel)                    — legacy line 37022
+inversion_review/page4.js:86:// TODO_MISSING(getKaryotypeLabelCaveat)              — legacy line 37040
+inversion_review/page4.js:87:// TODO_MISSING(groupColor)                           — palette helper
+inversion_review/page4.js:88:// TODO_MISSING(refreshCandidateListUI)               — legacy line 62528
+inversion_review/page4.js:93:// TODO_MISSING(_renderTierAxesGrid)                  — legacy ~63495 (right
+inversion_review/page4.js:177://           14-axis grid via _renderTierAxesGrid (TODO_MISSING).
+inversion_review/page4.js:295://                              (filtered out as TODO_MISSING).
+inversion_review/page11.js:27:// are marked TODO_MISSING below — the merge chat decides whether to promote
+inversion_review/page11.js:37:// TODO_MISSING(_ensureBoundariesState)         — legacy line 17763
+inversion_review/page11.js:38:// TODO_MISSING(_boundaryScanRange)             — legacy line 17813
+inversion_review/page11.js:39:// TODO_MISSING(_findSVAnchorsInZone)           — legacy line 17895
+inversion_review/page11.js:40:// TODO_MISSING(_buildBoundaryTrackScores)      — legacy line 17942
+inversion_review/page11.js:41:// TODO_MISSING(_computeBoundaryEdges)          — legacy line 18127
+inversion_review/page11.js:42:// TODO_MISSING(_buildBoundaryRecord)           — legacy line 18256
+inversion_review/page11.js:43:// TODO_MISSING(_bndFindCandidate)              — legacy line 18297
+inversion_review/page11.js:44:// TODO_MISSING(_bndFmtBp)                      — legacy line 18308
+inversion_review/page11.js:45:// TODO_MISSING(_bndCloneRecord)                — legacy line 18317
+inversion_review/page11.js:46:// TODO_MISSING(_bndStageFromCandidate)         — legacy line 18337
+inversion_review/page11.js:47:// TODO_MISSING(_bndPopulateCandidateSelect)    — legacy line 18351
+inversion_review/page11.js:48:// TODO_MISSING(_bndUpdateRadiusButtons)        — legacy line 18383
+inversion_review/page11.js:49:// TODO_MISSING(_bndUpdateSaveButton)           — legacy line 18394
+inversion_review/page11.js:50:// TODO_MISSING(_bndUpdateStatusSelect)         — legacy line 18404
+inversion_review/page11.js:51:// TODO_MISSING(_bndSelectCandidate)            — legacy line 18415
+inversion_review/page11.js:52:// TODO_MISSING(_bndAutoPropose)                — legacy line 18424
+inversion_review/page11.js:53:// TODO_MISSING(_bndManualOverride)             — legacy line 18479
+inversion_review/page11.js:54:// TODO_MISSING(_bndOverrideLeft)               — legacy line 18622
+inversion_review/page11.js:55:// TODO_MISSING(_bndOverrideRight)              — legacy line 18623
+inversion_review/page11.js:56:// TODO_MISSING(_bndReset)                      — legacy line 18626
+inversion_review/page11.js:57:// TODO_MISSING(_bndSave)                       — legacy line 18640
+inversion_review/page11.js:58:// TODO_MISSING(_bndRefreshSummary)             — legacy line 18658
+inversion_review/page11.js:59:// TODO_MISSING(_bndDrawTracks)                 — legacy line 18726
+inversion_review/page11.js:60:// TODO_MISSING(_bndRefreshUI)                  — legacy line 18911
+inversion_review/page11.js:61:// TODO_MISSING(_renderBndFocalVsBg)            — legacy line 20507
+inversion_review/page11.js:62:// TODO_MISSING(_wireRepeatDensityEscapeReset)  — legacy line 20583
+inversion_review/page11.js:63:// TODO_MISSING(_wireRepeatDensityClassCycle)   — legacy line 20856
+inversion_review/page11.js:64:// TODO_MISSING(_wireRepeatDensityAllTeToggle)  — legacy line 20895
+inversion_review/page11.js:65:// TODO_MISSING(_wireRepeatDensityArrowNav)     — legacy line 20941
+inversion_review/page11.js:66:// TODO_MISSING(_renderCandidateNavInline)      — shared candidate-nav helper
+inversion_review/page7.js:49:// TODO_MISSING(renderAncestryPage)         — external (sibling of atlas_page6_wiring)
+inversion_review/page7.js:53:// TODO_MISSING(ancestry layer loader)      — drag-drop loader for
+inversion_review/page7.js:73:      // TODO_MISSING(renderAncestryPage)
+inversion_review/BATCH_2_NOTES.md:15:| `inversion_review/page11.js` | ~245 | 30175–30314 (`renderBoundariesPage`) + 30318–30345 (hotkey wiring) | Verbatim entry-point + 5-key hotkey handler. ~25 `_bnd*` helpers marked TODO_MISSING. |
+inversion_review/BATCH_2_NOTES.md:19:| `inversion_review/page4.js` | ~250 | 62508–62526 (`karyoState`) + 62800–62836 (`renderCandidateKaryotype`) + 62840–62861 (`_refreshSubviewButtonStyles`) + 63411–63492 (`renderCandidateTier`) | Verbatim dispatcher, tier renderer, button styler, page-local state. Body + grid helpers marked TODO_MISSING. |
+inversion_review/BATCH_2_NOTES.md:50:## TODO_MISSING markers — frequency-sorted
+inversion_review/BATCH_2_NOTES.md:52:Every TODO_MISSING is referenced once at its declaration site, by design
+inversion_review/BATCH_2_NOTES.md:218:   legacy (line ~63495); marked TODO_MISSING so the merge chat picks it up.
+inversion_review/BATCH_2_NOTES.md:227:3. ✅ Every unresolved reference marked `TODO_MISSING(name) — legacy line N`.
+inversion_review/page_sv_evidence.js:44:// TODO_MISSING(AtlasSVEvidence.init)            — js/atlas_sv_evidence.js
+inversion_review/page_sv_evidence.js:45:// TODO_MISSING(AtlasSVEvidence.loadCandidate)   — js/atlas_sv_evidence.js
+inversion_review/page_sv_evidence.js:46:// TODO_MISSING(AtlasSVEvidence.destroy)         — js/atlas_sv_evidence.js
+inversion_review/page_sv_evidence.js:95:      // TODO_MISSING(AtlasSVEvidence.init)
+inversion_review/page_sv_evidence.js:109:      // TODO_MISSING(AtlasSVEvidence.loadCandidate)
+inversion_review/page_sv_evidence.js:131:      // TODO_MISSING(AtlasSVEvidence.destroy)
+inversion_review/page6.js:56:// TODO_MISSING(renderPopstatsPage)        — js/atlas_page6_wiring.js
+inversion_review/page6.js:58:// TODO_MISSING(popgenLive)                — js/atlas_request_layer.js
+inversion_review/page6.js:60:// TODO_MISSING(popgenPage6)               — js/atlas_page6_wiring.js
+inversion_review/page6.js:61:// TODO_MISSING(popgenGallery)             — js/atlas_track_gallery.js
+inversion_review/page6.js:79:      // TODO_MISSING(renderPopstatsPage)

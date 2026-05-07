@@ -1,0 +1,194 @@
+  <div id="page19" class="page">
+    <div class="nr-content">
+      <div class="nr-header-row">
+        <div class="nr-title">Negative regions <span class="nr-subtitle">complement of the catalogue &middot; multi-layer evidence battery</span></div>
+        <div class="nr-toolbar">
+          <button class="nr-tb-btn" id="nrLoadBtn" title="Upload a negative_regions.json or .tsv with region entries.">load negative_regions&hellip;</button>
+          <input type="file" id="nrLoadInput" style="display:none" accept=".json,.tsv,.txt">
+          <button class="nr-tb-btn" id="nrExportCsvBtn" title="Download the loaded region table as CSV.">export CSV</button>
+          <button class="nr-tb-btn" id="nrResetBtn" title="Drop all loaded regions.">reset</button>
+        </div>
+      </div>
+
+      <div class="caution-banner" role="note" aria-label="Interpretation notice">
+        <div class="caution-banner-icon" aria-hidden="true">&#9888;</div>
+        <div class="caution-banner-body">
+          <div class="caution-banner-title">What "no detectable inversion" means &mdash; and what it does not</div>
+          <div>
+            You can never prove <i>no inversions</i> in a region with 100% certainty. What this
+            page shows is regions where <b>no inversion signal was detected above the
+            study&rsquo;s resolution, sample size, and callability limits</b>. Tiny inversions, very
+            rare inversions (carried by 1&ndash;2 fish), inversions in repetitive or low-callability
+            regions, and inversions whose breakpoints fall outside short-read mappability can all
+            be missed. The <code>region_status</code> field is the right level of claim
+            (e.g. <code>no_detectable_inversion_high_confidence</code>), not a binary positive / negative.
+          </div>
+        </div>
+      </div>
+
+      <div class="nr-summary-cards" id="nrSummaryCards">
+        <!-- Auto-populated by _nrRender(): per-region_status counts. -->
+      </div>
+
+      <div class="card card-stripe-roh">
+        <div class="card-header">
+          <div class="card-title">region_status — the five values</div>
+          <div class="card-status">vocabulary</div>
+        </div>
+        <div class="pg" style="grid-template-columns: 1.4fr 0.5fr 1.6fr;">
+          <div class="pg-header">value</div>
+          <div class="pg-header">color</div>
+          <div class="pg-header">meaning</div>
+
+          <div><code>inversion_candidate</code></div>
+          <div><span class="nr-status nr-status-positive">positive</span></div>
+          <div>Positive call from the catalogue — cross-listed here for completeness.</div>
+
+          <div><code>complex_candidate</code></div>
+          <div><span class="nr-status nr-status-complex">complex</span></div>
+          <div>Multi-arrangement / overlapping calls — evidence is consistent with rearrangement but the structure is not a simple inversion.</div>
+
+          <div><code>no_detectable_inversion_high_confidence</code></div>
+          <div><span class="nr-status nr-status-good">high-conf neg</span></div>
+          <div>Region passes <i>all</i> evidence layers cleanly: high callable coverage, sufficient SNP density, no local-PCA bands, no GHSL block, no SV support, no abnormal heterozygosity.</div>
+
+          <div><code>no_detectable_inversion_low_power</code></div>
+          <div><span class="nr-status nr-status-low-power">low-power neg</span></div>
+          <div>No inversion detected, <i>but power was limited</i>: low SNP density, repetitive / low-mappability sequence, low coverage, assembly gaps, or missing data.</div>
+
+          <div><code>not_testable</code></div>
+          <div><span class="nr-status nr-status-untested">not testable</span></div>
+          <div>Region cannot be assessed at all — e.g. assembly gap, fully masked, complete dropout. Do not interpret.</div>
+        </div>
+      </div>
+
+      <div class="card card-stripe-roh">
+        <div class="card-header">
+          <div class="card-title">Evidence layers</div>
+          <div class="card-status">multi-layer battery</div>
+        </div>
+        <div style="margin-bottom: 8px; color: var(--ink-dim);">
+          Each region is evaluated against the following evidence layers. A high-confidence
+          negative passes all of them; a low-power negative may have one or more layers in
+          a "limited" state.
+        </div>
+        <div class="pg" style="grid-template-columns: 1fr 2fr;">
+          <div class="pg-header">layer</div>
+          <div class="pg-header">expected pattern if no inversion</div>
+
+          <div><b>Local PCA / MDS</b></div>
+          <div>no 3-band or multi-band inversion structure</div>
+
+          <div><b>GHSL</b></div>
+          <div>no stable high/low haplotype-divergence block</div>
+
+          <div><b>SV callers</b></div>
+          <div>no supported INV / BND breakpoint evidence (DELLY2 + Manta)</div>
+
+          <div><b>Heterozygosity</b></div>
+          <div>no inversion-like heterozygote excess block</div>
+
+          <div><b>LD / haplotype structure</b></div>
+          <div>no long divergent haplotype block (when phased data available)</div>
+
+          <div><b>Synteny</b></div>
+          <div>no internal rearrangement signal in cross-species alignment (when applicable)</div>
+
+          <div><b>Read depth / mapping</b></div>
+          <div>no suspicious coverage or mapping artifact</div>
+
+          <div><b>Callable mask</b></div>
+          <div>region is well covered and analyzable</div>
+        </div>
+      </div>
+
+      <div class="card card-stripe-roh">
+        <div class="card-header">
+          <div class="card-title">Region inventory</div>
+          <div class="card-status" id="nrTableBadge">populated when JSON loads</div>
+        </div>
+        <div id="nrTableSlot">
+          <!-- Auto-populated table or empty state. -->
+        </div>
+      </div>
+
+      <div class="card card-stripe-roh">
+        <div class="card-header">
+          <div class="card-title">Upload format — <code>negative_regions.json</code></div>
+          <div class="card-status">region schema</div>
+        </div>
+        <div style="margin-bottom: 8px; color: var(--ink-dim);">
+          One row per region. <code>chr / start_bp / end_bp</code> define the interval.
+          <code>region_status</code> is one of the five values above. <code>evidence</code> is an object
+          with one boolean (or <code>"limited"</code>) per layer. <code>notes</code> and
+          <code>citation</code> are optional.
+        </div>
+        <pre style="background: var(--panel-3); padding: 10px 12px; border-radius: 3px; font-size: 10px; line-height: 1.55; color: var(--ink); overflow-x: auto;">{
+  "metadata": { "panel_name": "negative regions — LG28 sweep", "date": "..." },
+  "regions": [
+    { "region_id": "LG28:0-1.5Mb",
+      "chr": "LG28",
+      "start_bp": 0,
+      "end_bp": 1500000,
+      "region_status": "no_detectable_inversion_high_confidence",
+      "evidence": {
+        "local_pca": "pass",
+        "ghsl":      "pass",
+        "sv_callers": "pass",
+        "heterozygosity": "pass",
+        "ld":        "pass",
+        "callable_mask": "pass"
+      },
+      "snp_density": 0.012,
+      "callable_fraction": 0.94,
+      "n_samples": 226,
+      "notes": "stable, high-coverage region; manuscript Fig. S3 control" },
+    { "region_id": "LG28:5.0-7.5Mb",
+      "chr": "LG28",
+      "start_bp": 5000000,
+      "end_bp": 7500000,
+      "region_status": "no_detectable_inversion_low_power",
+      "evidence": {
+        "local_pca": "pass",
+        "ghsl":      "limited",
+        "sv_callers": "pass",
+        "heterozygosity": "pass",
+        "callable_mask": "limited"
+      },
+      "snp_density": 0.0035,
+      "callable_fraction": 0.62,
+      "notes": "repetitive, low SNP density — absence call carries reduced confidence" }
+  ]
+}</pre>
+        <div style="color: var(--ink-dim); font-size: 10.5px;">
+          TSV variant accepted with header
+          <code>region_id &middot; chr &middot; start_bp &middot; end_bp &middot; region_status</code>
+          (optional <code>snp_density</code>, <code>callable_fraction</code>, <code>n_samples</code>, <code>notes</code>, <code>citation</code>).
+        </div>
+      </div>
+
+      <div class="card card-stripe-roh">
+        <div class="card-header">
+          <div class="card-title">Methods note</div>
+          <div class="card-status">manuscript-ready</div>
+        </div>
+        <div style="color: var(--ink-dim); font-size: 10.5px; line-height: 1.6;">
+          Suggested manuscript wording (Methods):
+          <blockquote style="border-left: 2px solid var(--accent); margin: 8px 0; padding: 4px 14px; color: var(--ink); font-style: italic;">
+            We classified regions as <i>inversion-negative</i> when no candidate was detected
+            across all evidence layers (local PCA, GHSL, SV calls, heterozygosity-block,
+            haplotype-divergence) given the study&rsquo;s resolution of <span class="nr-todo">[X SNPs / window, N samples]</span>
+            and the available callable mask. Regions without inversion candidates were not
+            interpreted as definitively inversion-free; rather, they were classified as showing
+            no detectable polymorphic inversion signal under the resolution, sample size, and
+            callability limits of our multi-layer framework.
+          </blockquote>
+          Or shorter (Discussion):
+          <blockquote style="border-left: 2px solid var(--accent); margin: 8px 0; padding: 4px 14px; color: var(--ink); font-style: italic;">
+            Absence calls indicate no detectable inversion signal in our cohort, not proof of
+            absolute inversion absence.
+          </blockquote>
+        </div>
+      </div>
+    </div>
+  </div>

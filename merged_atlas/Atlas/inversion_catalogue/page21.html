@@ -1,0 +1,38 @@
+  <div id="page21" class="page">
+    <div id="annotationCockpitHeader"
+         style="padding:8px 16px; background:var(--panel); border-bottom:1px solid var(--rule);
+                display:flex; gap:14px; align-items:center; flex-wrap:wrap;
+                font-family:var(--mono); font-size:11.5px;">
+      <span id="annoCockpitTitle" style="color:var(--ink-dim);"><b>annotation cockpit</b></span>
+      <span id="annoCursorReadout" style="color:#a8b1c4;">cursor: — Mb · no candidate</span>
+      <span id="annoCohortReadout" style="color:var(--ink-dimmer);">— candidates</span>
+      <span style="margin-left:auto; color:var(--ink-dimmer); font-size:10.5px;">
+        ←/→ step cursor · Shift+←/→ jump 5 · click canvas to jump · Esc to clear</span>
+    </div>
+    <div id="annotationCockpitEmpty"
+         style="padding:40px; text-align:center; color:var(--ink-dim); display:none;">
+      <div style="font-size:14px; margin-bottom:14px;">No candidates on this chromosome yet.</div>
+      <div style="font-size:12px; line-height:1.7; max-width:540px; margin:0 auto;">
+        Promote candidates from page 1 (lock colors → promote) or page 4 (catalogue → view as candidate).
+        Then return here to walk through the chromosome.
+      </div>
+    </div>
+    <div id="annotationCockpitBody" style="padding:8px 16px; display:none;">
+      <canvas id="annoCockpitCanvas" width="1200" height="500"
+              style="background:#1c2231; border:1px solid var(--rule); border-radius:3px;
+                     width:100%; max-width:100%; cursor:crosshair; outline:none;"
+              tabindex="0"></canvas>
+      <div id="annoCockpitFooter" style="margin-top:10px; display:flex; gap:12px; align-items:flex-start;">
+        <div id="annoCandidateInfo"
+             style="flex:1; min-width:0; padding:10px; background:#161b28; border:1px solid var(--rule); border-radius:3px;
+                    font-family:var(--mono); font-size:11px; color:var(--ink-dim);">
+          Move the cursor over a candidate to see its info here.
+        </div>
+        <div id="annoLinkagePanel"
+             style="flex:1; min-width:0; padding:10px; background:#161b28; border:1px solid var(--rule); border-radius:3px;
+                    font-family:var(--mono); font-size:11px; color:var(--ink-dim);">
+          Band selection and annotation come in next iteration.
+        </div>
+      </div>
+    </div>
+  </div>

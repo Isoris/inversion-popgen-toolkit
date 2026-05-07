@@ -1,0 +1,103 @@
+  <div id="page8" class="page">
+    <div id="winSummaryToolbar" class="winsum-toolbar">
+      <span class="label">windows summary:</span>
+      <span id="winSumChips"></span>
+      <span id="winSumMeta" class="winsum-meta"></span>
+    </div>
+    <div id="winSumNoChrom" class="winsum-no-chrom" style="display:none;">
+      Load a precomp JSON to view the per-window summary.
+    </div>
+    <div id="winSumStrip" class="winsum-strip" style="display:none;">
+      <canvas id="winSumStripCanvas"></canvas>
+      <div class="winsum-strip-label">
+        <b>per-window strip</b> · color = <span id="winSumColorModeLabel" title="Click any sortable column header in the table below to recolor the strip by that column.">|Z|</span> · click a tick to jump · L1/L2 zone bars on top
+      </div>
+      <!-- v3.99 t14e+ continue: ANGSD bi-SNP provenance annotation. The
+           "n bi-SNPs" column shows the count of biallelic SNPs ANGSD called
+           per window. For the C. gariepinus 226-sample cohort the exact
+           parameters are known (recovered from the project's MODULE_2A
+           history); for other cohorts the export script writes the
+           parameters into the precomp JSON (planned, schema 2.15 §8.x).
+           The chip below opens an inline panel with the gariepinus
+           parameters — click to expand. -->
+      <div class="winsum-bisnp-note" style="margin-top: 4px; font-size: 11px; color: var(--ink-dim);">
+        <button id="winSumBisnpInfoBtn" type="button"
+                title="Click to show the ANGSD parameters used to call these biallelic SNPs"
+                style="background: var(--panel-2); color: var(--ink-dim);
+                       border: 1px solid var(--rule); border-radius: 3px;
+                       padding: 2px 8px; font-family: var(--mono); font-size: 10.5px;
+                       cursor: help; margin-right: 8px;">ⓘ ANGSD bi-SNPs</button>
+        <span style="color: var(--ink-dimmer);">biallelic SNPs called from genotype likelihoods (low-coverage WGS).</span>
+        <div id="winSumBisnpInfoPanel" style="display: none; margin-top: 8px; padding: 10px 14px;
+             background: var(--panel); border: 1px solid var(--rule); border-radius: 4px;
+             font-family: var(--mono); font-size: 11px; line-height: 1.55; color: var(--ink-dim);
+             max-width: 720px;">
+          <div style="color: var(--ink); font-weight: 600; margin-bottom: 4px;">ANGSD biSNP discovery — <i>C. gariepinus</i> 226-sample hatchery cohort</div>
+          <div style="margin-bottom: 6px;">SNP discovery on per-chromosome chunks of <code>fClaHyb_Gar_LG.fa</code> (28 pseudochromosomes, 963.9 Mb). Computed from BAMs filtered through MODULE_1 QC (depth, mapping rate, t-len). Per-chromosome chunked array runs (<code>S06_run_bisnp_discovery_chunks.slurm</code>), output as <code>.mafs.gz</code> for downstream BEAGLE imputation + PCA.</div>
+          <div style="margin-bottom: 4px;"><b style="color: var(--ink);">Parameters</b> (MODULE_2A canonical, applied uniformly across all 28 chromosomes):</div>
+          <table style="width: 100%; border-collapse: collapse; font-size: 10.5px;">
+            <tr><td style="padding: 1px 8px 1px 0; color: var(--ink-dimmer);"><code>-GL 1</code></td><td>SAMtools genotype-likelihood model — standard for low-coverage WGS</td></tr>
+            <tr><td style="padding: 1px 8px 1px 0; color: var(--ink-dimmer);"><code>-minQ 25</code></td><td>Minimum base quality</td></tr>
+            <tr><td style="padding: 1px 8px 1px 0; color: var(--ink-dimmer);"><code>-minMapQ 25</code></td><td>Minimum mapping quality</td></tr>
+            <tr><td style="padding: 1px 8px 1px 0; color: var(--ink-dimmer);"><code>-baq 1</code></td><td>BAQ recalibration</td></tr>
+            <tr><td style="padding: 1px 8px 1px 0; color: var(--ink-dimmer);"><code>-C 50</code></td><td>Excessive-mismatch downweight</td></tr>
+            <tr><td style="padding: 1px 8px 1px 0; color: var(--ink-dimmer);"><code>-setMinDepthInd 3</code></td><td>Min per-individual depth (from MODULE_1 QC distribution)</td></tr>
+            <tr><td style="padding: 1px 8px 1px 0; color: var(--ink-dimmer);"><code>-setMaxDepthInd 57</code></td><td>Max per-individual depth (from MODULE_1 QC distribution)</td></tr>
+            <tr><td style="padding: 1px 8px 1px 0; color: var(--ink-dimmer);"><code>-minInd 200</code></td><td>Min individuals with data per site (200/226 = 88%)</td></tr>
+            <tr><td style="padding: 1px 8px 1px 0; color: var(--ink-dimmer);"><code>-SNP_pval 1e-6</code></td><td>SNP significance threshold</td></tr>
+            <tr><td style="padding: 1px 8px 1px 0; color: var(--ink-dimmer);"><code>-minMaf 0.05</code></td><td>Minimum minor allele frequency</td></tr>
+            <tr><td style="padding: 1px 8px 1px 0; color: var(--ink-dimmer);"><code>-pest</code></td><td>Folded SFS prior (no outgroup; F₁ hybrid hatchery violates HWE — folded by design)</td></tr>
+          </table>
+          <div style="margin-top: 6px; color: var(--ink-dimmer);">For other cohorts, the precomp export script (planned, schema 2.15 §8.x) emits these parameters as a top-level <code>angsd_bisnp_params</code> object so this panel can read them generically. <i>This particular tooltip text is hard-coded for the gariepinus project's known canonical run.</i></div>
+        </div>
+      </div>
+    </div>
+    <div id="winSumTableWrap" class="winsum-table-wrap" style="display:none;">
+      <div class="winsum-table-controls">
+        <span class="label">filter by L2:</span>
+        <select id="winSumL2Filter"
+                title="Restrict the table to windows that fall inside an L2 envelope. 'in any L2' = any of the 48 envelopes; 'in current focal L2' = only the L2 the cursor is currently on (page 1).">
+          <option value="">(all windows)</option>
+          <option value="in_l2">in any L2 envelope</option>
+          <option value="in_focal">in current focal L2</option>
+        </select>
+        <span class="label" style="margin-left: 12px;">min |Z|:</span>
+        <input id="winSumZFilter" type="number" step="0.1" min="0" value="0"
+               title="Hide windows whose |Z| score is below this threshold. 0 = show all. Useful for surfacing only candidate inversion peaks."
+               style="width: 60px; padding: 1px 4px; font-family: var(--mono);
+                      font-size: 11px; background: var(--panel-2); color: var(--ink);
+                      border: 1px solid var(--rule); border-radius: 3px;">
+        <span class="winsum-count" id="winSumCount" title="Live count of windows passing the active filters."></span>
+      </div>
+      <div class="winsum-table-scroll">
+        <table id="winSumTable">
+          <thead>
+            <tr>
+              <th data-sort="idx" class="sortable" title="Window index — 0-based position of this window in the precomp grid. Click to sort.">w#</th>
+              <th data-sort="mb" class="sortable" title="Center of the window in megabases (center_bp / 1e6). Click to sort.">center Mb</th>
+              <!-- v3.99 turn 5: per-window SNP stats added per Quentin's request:
+                   raw count, span in kb (end_bp - start_bp), and density per kb.
+                   span and density use the window boundaries, n_snps comes from
+                   the window object (defaults applied when absent, see
+                   WINDOW_DEFAULT_SNPS_FALLBACK).
+                   v3.99 turn 12 ask 4: relabeled to bi-SNPs (the underlying
+                   count is bi-allelic SNPs only — that's the input the local
+                   PCA pipeline runs on). The data field name stays n_snps for
+                   backward compatibility with the existing R-side schema. -->
+              <th data-sort="n_snps" class="sortable" title="Number of bi-allelic SNPs in this window (from window.n_snps; falls back to default when missing). Click to sort.">n bi-SNPs</th>
+              <th data-sort="span_kb" class="sortable" title="Window span in kb: (end_bp − start_bp) / 1000. Click to sort.">span kb</th>
+              <th data-sort="snp_density" class="sortable" title="bi-SNP density: n_snps / span_kb. Window-by-window measure of how SNP-rich the local interval is. Click to sort.">bi-SNPs / kb</th>
+              <th data-sort="z" class="sortable" title="Robust |Z| score for the window — abs(z) where z is computed from the local PCA's leading eigenvalue ratio. High |Z| = strong local PCA structure (candidate inversion signal). Click to sort.">|Z|</th>
+              <th data-sort="lam1" class="sortable" title="First eigenvalue (λ₁) of the local PCA covariance matrix — variance explained by PC1. Higher = more dominant first axis. Click to sort.">λ₁</th>
+              <th data-sort="lam2" class="sortable" title="Second eigenvalue (λ₂) — variance explained by PC2. Click to sort.">λ₂</th>
+              <th data-sort="ratio" class="sortable" title="Eigenvalue ratio λ₁/λ₂ — measure of how dominant PC1 is over PC2. Higher = clearer single-axis structure (typical inversion signature is λ₁ ≫ λ₂). Click to sort.">λ₁/λ₂</th>
+              <th data-sort="l1" class="sortable" title="L1 envelope ID this window belongs to (or empty if outside any L1). L1 = coarse chromosomal block. Click to sort.">L1</th>
+              <th data-sort="l2" class="sortable" title="L2 envelope ID this window belongs to (or empty if outside any L2). L2 = refined sub-block of L1. Click to sort.">L2</th>
+              <th title="Action button column — click 'go' on a row to jump to that window on page 1."></th>
+            </tr>
+          </thead>
+          <tbody id="winSumTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>

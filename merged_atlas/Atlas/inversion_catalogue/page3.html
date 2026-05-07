@@ -1,0 +1,108 @@
+  <div id="page3" class="page">
+    <div class="cat-toolbar">
+      <div class="view-mode-row" style="display:flex; gap:0; border:1px solid var(--rule); border-radius:3px; overflow:hidden;">
+        <!-- v3.99 turn 10: two new view buttons left of "L2 raw":
+               ⭐ favorites filter (yellow star) — shows only rows the user has starred
+               L3 view — placeholder for L3-level (sub-L2) catalogue view
+             Per Quentin's request. -->
+        <button id="catViewFav" title="Show only favorited rows (toggle stars in the leftmost column)"
+                style="color: #f5a524;">⭐</button>
+        <button id="catViewL3" title="L3 view — sub-L2 cluster groupings (placeholder; will populate when wired)">L3</button>
+        <button id="catViewL2" class="active" title="One row per raw L2 envelope">L2 raw</button>
+        <button id="catViewL1" title="L2s merged left-to-right by concord ≥ merge_thr (final-style catalogue)">L1 merged</button>
+      </div>
+      <!-- v3.99 turn 12 ask 3: simple/detailed display toggle. Hides
+           parent_l1, silhouette, coherence, fam_purity, cluster_ok, n_windows
+           in 'simple' mode for a cleaner scan. Default 'detailed' (all
+           columns visible). -->
+      <div class="display-mode-row" style="display:flex; gap:0; border:1px solid var(--rule); border-radius:3px; overflow:hidden;">
+        <button id="catDispSimple" title="Hide secondary columns (parent_l1, silhouette, coherence, fam_purity, cluster_ok, n_windows)">simple</button>
+        <button id="catDispDetailed" class="active" title="Show all columns (default)">detailed</button>
+      </div>
+      <!-- v4 turn 93: Diamond strictness toggle. Controls what counts as a
+           diamond in the new "Diamond" column. Loose = any band that splits
+           and re-merges. Strict = split + ≥1 stable parallel band. Strict2 =
+           split + ≥2 stable parallel bands. Persists in localStorage. -->
+      <div class="display-mode-row" id="catDiamondModeRow"
+           style="display:flex; gap:0; border:1px solid var(--rule); border-radius:3px; overflow:hidden;"
+           title="Diamond detection strictness — controls the Diamond column count">
+        <button id="catDiamondLoose" class="active"
+                title="Loose: any band that splits into two and re-merges, regardless of what other bands do.">◆ loose</button>
+        <button id="catDiamondStrict"
+                title="Strict: split + ≥1 stable parallel band (other bands stay flat through the split windows).">◆ strict</button>
+        <button id="catDiamondStrict2"
+                title="Strict-2: split + ≥2 stable parallel bands. Strongest diamond signal — matches the multi-haplotype-system pattern from Quentin's framework doc.">◆ strict-2</button>
+      </div>
+      <input type="text" id="catFilter"
+             placeholder="filter (id, chr, verdict, family...)"
+             title="Free-text filter — matches against L2 ID, chromosome, verdict, parent L1, and other string fields. Substring match, case-insensitive." />
+      <select id="catVerdictFilter"
+              title="Filter rows by σ-band-diagnostics verdict (see σ verdict column tooltip for definitions).">
+        <option value="">all verdicts</option>
+        <option value="TWO_INVERSIONS">TWO_INVERSIONS</option>
+        <option value="CROSSOVER_ARTIFACTS">CROSSOVER_ARTIFACTS</option>
+        <option value="NOISY_REGION">NOISY_REGION</option>
+        <option value="NA">NA (K≤3)</option>
+        <option value="UNDETERMINED">UNDETERMINED</option>
+      </select>
+      <button id="catSelectAll" title="Select all currently-visible rows (respects active filters).">select all</button>
+      <button id="catClearSel" title="Clear all row selections (does not affect favorites).">clear</button>
+      <button id="catRegimeRegistry" title="Open the regime registry — create, edit, or delete regime annotations (Deliverable C). Each regime is a user-curated annotation of &quot;this group of L2s belongs to inversion-system X&quot;.">🏷 regimes</button>
+      <button id="catRegimeAssignSel" title="Assign all currently-selected rows to a regime. In L2 / favorites view, each selected row contributes its L2 envelope. In L1-merged view, each selected row contributes ALL its constituent L2 envelopes. Opens the regime dialog in assign mode with the L2 IDs staged. Requires at least one row checkbox checked.">🏷 assign sel</button>
+      <button id="catViewAsCandidate" class="export" title="Promote the selected interval(s) to provisional candidates and open the first one on page 2 candidate-focus">👁 view as candidate</button>
+      <button id="catExportTSV" class="export" title="Export the currently-visible rows (after filter + sort) as a tab-separated file. Includes a metadata header (chromosome, species, schema version, filter+sort context, K + verdict distribution, span range, generated timestamp).">⬇ export TSV</button>
+      <button id="catExportMD" class="export" title="Export the currently-visible rows as a Markdown table — handy for pasting into a manuscript or Slack. Includes a metadata blockquote header above the table.">⬇ export Markdown</button>
+      <!-- v3.99 t14e+ continue: JSON export — same row content as TSV but
+           with structured metadata block; round-trippable for tools that
+           want to programmatically reload the catalogue. -->
+      <button id="catExportJSON" class="export" title="Export as JSON — { meta: { chrom, species, schema_version, filter context, ... }, columns: [...], rows: [...] }. Round-trippable for programmatic catalogue analysis or re-loading.">⬇ export JSON</button>
+      <!-- v3.99 t14e+ continue: gallery figure — a single PNG montage with
+           one panel per CONFIRMED candidate. Useful for manuscript figures.
+           Uses the catalogue's confirmed-candidate filter (state.candidateList
+           where confirmed=true). -->
+      <!-- v4 turn 28: publication-ready gallery export. Three formats:
+           SVG (vector, journals love this), PNG @ ~300+ DPI (raster fallback
+           when journals demand it), PDF (print-to-PDF flow — opens a new
+           window with the SVG and an A4 landscape print stylesheet, then
+           triggers window.print(); user picks "Save as PDF" as the
+           destination). Internal IDs drive _galleryExport(format). -->
+      <span class="export-group" title="Multi-panel gallery export — one panel per CONFIRMED candidate, sorted by start_bp. Choose format below.">
+        <span class="export-group-label">📷 gallery</span>
+        <button id="catExportGallerySVG" class="export export-fmt" title="Export gallery as SVG (vector format, infinitely scalable, journal-preferred). The SVG file is the source of truth for the PNG and PDF exports too.">SVG</button>
+        <button id="catExportGalleryPNG" class="export export-fmt" title="Export gallery as PNG raster image at ~300 DPI equivalent (rasterized from the SVG via HTML5 Canvas at 4× scale). Use when a journal demands raster.">PNG</button>
+        <button id="catExportGalleryPDF" class="export export-fmt" title="Export gallery as PDF via the browser's print-to-PDF flow. Opens a new window with the SVG sized to A4 landscape; press Ctrl/Cmd+P then choose 'Save as PDF'. Browsers handle font rendering natively, producing high-quality vector PDF.">PDF</button>
+      </span>
+      <!-- turn 146 (Turn D) — bulk breeding-card export. Two formats:
+           HTML (single combined doc, paginated A4, browse-or-print),
+           JSON (per-card data envelope for downstream pipelines). The
+           tier dropdown gates which candidates land in the bundle;
+           default Tier 1+2 = "breeding-ready set". -->
+      <span class="export-group" title="Bulk breeding-readiness card export. One card per candidate, gated by the tier dropdown. HTML = combined doc (one card per A4 page, browse or Ctrl+P → Save as PDF). JSON = bundle of card data envelopes (per-candidate _buildBreedingCard output, for downstream tooling).">
+        <span class="export-group-label">🧬 breeding cards</span>
+        <select id="catBreedingTierSel" class="export export-fmt"
+                title="Which tiers to include in the export. Tier 1+2 (default) is the breeding-ready set — Tier 3/4 are exploratory and not for direct breeding decisions."
+                style="min-width: 78px;">
+          <option value="tier_1_2" selected>Tier 1+2</option>
+          <option value="tier_1">Tier 1 only</option>
+          <option value="tier_1_2_3">Tier 1+2+3</option>
+          <option value="all">all tiers</option>
+        </select>
+        <button id="catExportBreedingHTML" class="export export-fmt" title="Combined HTML document (one card per A4 page, with a table-of-contents page first). Open in a browser to scroll, or Ctrl/Cmd+P → Save as PDF for distribution.">HTML</button>
+        <button id="catExportBreedingJSON" class="export export-fmt" title="JSON bundle — { schema, generated_at, chrom, n_cards, filter, cards: [...] }. Each card entry is the exact _buildBreedingCard output. Round-trippable for downstream pipelines.">JSON</button>
+      </span>
+      <span class="sel-info" id="catSelInfo" title="Live counts of selected rows / visible rows / total rows in the catalogue.">0 selected of 0</span>
+    </div>
+    <table class="cat" id="catTable">
+      <thead><tr id="catHead"></tr></thead>
+      <tbody id="catBody"></tbody>
+    </table>
+    <div class="cat-empty" id="catEmpty">Load a JSON to populate the catalogue.</div>
+    <!-- Turn 7: Q09b shelf-LD test panel mount slot. Populated by
+         atlas_turn7.js's makeShelfLDPanel(). Reads candidate fish_calls +
+         the dosage-chunk cache via window.popgenDosage.getCachedChunk(). -->
+    <div id="page3_q09b_slot" style="margin: 12px 24px;"></div>
+    <!-- Turn 11c: fast_ld split-heatmap panel mount slot. Populated by
+         atlas_ld.js's makeLDSplitPanel(). Lower triangle = ALL cohort,
+         upper triangle = HOM1 / HOM2 / HET (picker). -->
+    <div id="page3_ld_slot" style="margin: 12px 24px;"></div>
+  </div>

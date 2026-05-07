@@ -1,0 +1,343 @@
+  <div id="page12" class="page">
+    <!-- Empty-state placeholder. Visible until at least one of the three
+         theta_pi_* layers loads. When the first layer lands, this hides
+         and the corresponding panel(s) render from real data. -->
+    <div id="thetaPiEmpty" style="padding: 40px 32px; max-width: 920px; margin: 0 auto;
+                                   color: var(--ink); font-family: var(--mono);
+                                   font-size: 11.5px; line-height: 1.65;">
+      <div style="font-size: 16px; font-weight: 600; margin-bottom: 4px; color: var(--ink);">
+        local PCA θπ — chromosome-wide diversity scanner
+      </div>
+      <div style="font-size: 11.5px; color: var(--ink-dim); margin-bottom: 24px;
+                  letter-spacing: 0.02em;">
+        SCHEMA §22 · structural scaffold · panel renderers ship as R-side data lands
+      </div>
+
+      <div style="background: var(--panel-2); border: 1px solid var(--rule);
+                  border-radius: 4px; padding: 16px 18px; margin-bottom: 18px;">
+        <div style="font-size: 12px; font-weight: 600; color: var(--ink); margin-bottom: 10px;">
+          The idea
+        </div>
+        <div style="margin-bottom: 8px;">
+          This page mirrors page 1's pipeline (per-window analysis → window×window
+          similarity → MDS → cluster → candidate intervals) but reads
+          <b>per-sample nucleotide diversity (θπ)</b> instead of dosage. Two scrubbers,
+          two independent input signals, same shape of output.
+        </div>
+        <div style="margin-bottom: 0;">
+          A region that hits BOTH scrubbers' candidate lists is ~certainly real biology
+          — that's the orthogonal validation. A region that hits ONLY this scrubber is
+          something the genotype scrubber can't see (sweeps, balancing selection,
+          Het-class subdivisions, mis-assemblies) — that's where new biology lives.
+        </div>
+      </div>
+
+      <div style="background: var(--panel-2); border: 1px solid var(--rule);
+                  border-radius: 4px; padding: 16px 18px; margin-bottom: 18px;">
+        <div style="font-size: 12px; font-weight: 600; color: var(--ink); margin-bottom: 10px;">
+          Required JSON layers (from cluster-side R-pipeline)
+        </div>
+        <div id="thetaPiLayerStatus" style="display: grid;
+             grid-template-columns: 1.1fr 1fr 1.1fr 1.4fr; gap: 6px 12px;
+             font-size: 10.5px; align-items: baseline;">
+          <div style="font-weight: 600; color: var(--ink-dim);">layer</div>
+          <div style="font-weight: 600; color: var(--ink-dim);">R-side script</div>
+          <div style="font-weight: 600; color: var(--ink-dim);">status</div>
+          <div style="font-weight: 600; color: var(--ink-dim);">feeds panels</div>
+
+          <div><code>theta_pi_per_window</code></div>
+          <div><code>STEP_R39</code></div>
+          <div data-th-layer="theta_pi_per_window"
+               style="color: var(--ink-dimmer);">⚪ not loaded</div>
+          <div style="color: var(--ink-dim);">per-sample lines · θπ-PC inputs</div>
+
+          <div><code>theta_pi_local_pca</code></div>
+          <div><code>STEP_R40</code></div>
+          <div data-th-layer="theta_pi_local_pca"
+               style="color: var(--ink-dimmer);">⚪ not loaded</div>
+          <div style="color: var(--ink-dim);">sim_mat · |Z| · K-means scatter</div>
+
+          <div><code>theta_pi_envelopes</code></div>
+          <div><code>STEP_R41</code></div>
+          <div data-th-layer="theta_pi_envelopes"
+               style="color: var(--ink-dimmer);">⚪ not loaded</div>
+          <div style="color: var(--ink-dim);">L1/L2 envelopes · candidate intervals</div>
+
+          <!-- v4 turn 132: cusum_theta layer feeds the hero panel
+               (per-carrier CUSUM boundary strip + boundary-distribution
+               histogram). Spec: chat 487c7f04 turn 125, the page 12
+               atlas-side companion to STEP_T05_theta_cusum.R. The hero
+               is the slightly-different-from-page-1 panel: page 1
+               doesn't have CUSUM because dosage breakpoints are sharp
+               steps; θπ breakpoints are diffuse gradients, so the
+               per-carrier changepoint distribution becomes the
+               headline visualization. -->
+          <div><code>cusum_theta</code></div>
+          <div><code>STEP_T05</code></div>
+          <div data-th-layer="cusum_theta"
+               style="color: var(--ink-dimmer);">⚪ not loaded</div>
+          <div style="color: var(--ink-dim);">hero panel · per-carrier CUSUM strip + boundary histogram</div>
+        </div>
+      </div>
+
+      <div style="background: var(--panel-2); border: 1px solid var(--rule);
+                  border-radius: 4px; padding: 16px 18px; margin-bottom: 18px;">
+        <div style="font-size: 12px; font-weight: 600; color: var(--ink); margin-bottom: 10px;">
+          Panel layout (mirrors page 1, top to bottom)
+        </div>
+        <div style="display: grid; grid-template-columns: 1.2fr 1.2fr 1.4fr;
+                    gap: 8px 14px; font-size: 10.5px;">
+          <div style="font-weight: 600; color: var(--ink-dim);">panel</div>
+          <div style="font-weight: 600; color: var(--ink-dim);">page 1 equivalent</div>
+          <div style="font-weight: 600; color: var(--ink-dim);">what it shows</div>
+
+          <div><code>#thCtrlBar</code></div>
+          <div><code>#ctrlBar</code></div>
+          <div style="color: var(--ink-dim);">scrubber slider · play · view-mode (genome / L1 / L2 zoom)</div>
+
+          <div><code>#thCusumHeroPanel</code></div>
+          <div style="color: var(--ink-dim);">— (page 1 has none)</div>
+          <div style="color: var(--ink-dim);">per-carrier CUSUM strip · boundary-distribution histogram · spread badge</div>
+
+          <div><code>#thSimPanel</code></div>
+          <div><code>#simPanel</code></div>
+          <div style="color: var(--ink-dim);">θπ_sim_mat heatmap · L1 (blue) / L2 (green) overlays</div>
+
+          <div><code>#thZPanel</code></div>
+          <div><code>#zPanel</code></div>
+          <div style="color: var(--ink-dim);">diversity-|Z| waveform · click to jump to window</div>
+
+          <div><code>#thLinesPanel</code></div>
+          <div><code>#linesPanel</code></div>
+          <div style="color: var(--ink-dim);">per-sample θπ-PC1 lines · K=3 / K=6 coloring</div>
+
+          <div><code>#thAnchorStripPanel</code></div>
+          <div><code>#anchorStripPanel</code></div>
+          <div style="color: var(--ink-dim);">θπ envelope anchor strip · L1 / L2 boundary marks</div>
+
+          <div><code>#thPcaPanel</code></div>
+          <div><code>#pcaPanel</code></div>
+          <div style="color: var(--ink-dim);">θπ-PC1 vs θπ-PC2 K-means scatter · current window</div>
+
+          <div><code>#thTrackedSamplesPanelCompact</code></div>
+          <div><code>#trackedSamplesPanelCompact</code></div>
+          <div style="color: var(--ink-dim);">tracked samples · θπ trajectory across windows</div>
+
+          <div><code>#thL3Panel</code></div>
+          <div><code>#l3Panel</code></div>
+          <div style="color: var(--ink-dim);">diversity L3 contingency · per-band θπ subdivision</div>
+        </div>
+      </div>
+
+      <div style="background: var(--panel-2); border: 1px solid var(--rule);
+                  border-radius: 4px; padding: 16px 18px; margin-bottom: 18px;">
+        <div style="font-size: 12px; font-weight: 600; color: var(--ink); margin-bottom: 10px;">
+          Scale — locked to <code>win50000.step10000</code>
+        </div>
+        <div style="margin-bottom: 8px;">
+          ANGSD <code>thetaStat</code> emits θπ at four scales (in
+          <code>02_heterozygosity/03_theta/</code>): <code>win5000.step1000</code>,
+          <code>win10000.step2000</code>, <code>win50000.step10000</code> (multiscale)
+          and <code>win500000.step500000</code> (main). The chromosome-wide scrubber
+          locks to <b><code>win50000.step10000</code></b> for three reasons:
+        </div>
+        <div style="display: grid; grid-template-columns: 1.2fr 0.8fr 0.9fr 1.1fr 1.4fr;
+                    gap: 5px 12px; font-size: 10.5px; margin-bottom: 8px;
+                    align-items: baseline;">
+          <div style="font-weight: 600; color: var(--ink-dim);">scale</div>
+          <div style="font-weight: 600; color: var(--ink-dim);">windows / chr</div>
+          <div style="font-weight: 600; color: var(--ink-dim);">sim_mat size</div>
+          <div style="font-weight: 600; color: var(--ink-dim);">θπ noise floor</div>
+          <div style="font-weight: 600; color: var(--ink-dim);">verdict</div>
+
+          <div><code>win5000.step1000</code></div>
+          <div>~33 000</div>
+          <div style="color: #c43e3e;">~4.4 GB</div>
+          <div style="color: #c43e3e;">~50–200 sites/win → noise</div>
+          <div style="color: #c43e3e;">infeasible in browser</div>
+
+          <div><code>win10000.step2000</code></div>
+          <div>~16 500</div>
+          <div style="color: #c43e3e;">~1.1 GB</div>
+          <div style="color: #c43e3e;">marginal</div>
+          <div style="color: #c43e3e;">infeasible in browser</div>
+
+          <div style="color: var(--good); font-weight: 600;"><code>win50000.step10000</code></div>
+          <div style="color: var(--good);">~3 300</div>
+          <div style="color: var(--good);">~44 MB</div>
+          <div style="color: var(--good);">~500–2 000 sites/win → stable</div>
+          <div style="color: var(--good); font-weight: 600;">DEFAULT</div>
+
+          <div><code>win500000.step500000</code></div>
+          <div>~66</div>
+          <div>trivial</div>
+          <div>very stable</div>
+          <div style="color: var(--ink-dim);">too coarse for breakpoints</div>
+        </div>
+        <div style="margin-bottom: 6px; color: var(--ink-dim);">
+          <b>Browser memory</b>: <code>sim_mat</code> is n_windows². Page 1 already
+          handles ~5 000 windows ≈ 100 M cells; doubling that crashes most browsers.
+          Below 50 kb, the matrix exceeds 1 GB.
+        </div>
+        <div style="margin-bottom: 6px; color: var(--ink-dim);">
+          <b>Per-window θπ stability</b>: at 9× coverage with ~10–40 sites/kb of
+          callable density, a 5 kb window has 50–200 callable sites — the per-sample
+          θπ variance is large enough that local-PCA on those values mostly captures
+          noise. At 50 kb you have ~500–2 000 sites per window; the per-sample
+          estimates are stable enough to PCA meaningfully. Below ~30 kb you embed
+          noise, not biology.
+        </div>
+        <div style="color: var(--ink-dim);">
+          <b>Why finer step doesn't buy you breakpoint resolution</b>: page 1's
+          breakpoints are sharp because the local-PCA clustering signal is binary
+          (in/out of inversion). The θπ analog is a <b>diversity gradient</b> across
+          the inversion's flanks, not a step. Even at 1 kb step, the θπ-PCA breakpoint
+          is diffuse over 20–50 kb of genomic space — the underlying biological
+          gradient sets the floor. The finer scales (5/10 kb) are still useful for
+          <b>per-candidate breakpoint inspection</b> (planned, post-v4.0 boundary
+          panel) but not for the chromosome-wide scrubber.
+        </div>
+      </div>
+
+      <div style="background: rgba(245,165,36,0.06); border: 1px solid rgba(245,165,36,0.4);
+                  border-radius: 4px; padding: 14px 18px;">
+        <div style="font-size: 12px; font-weight: 600; color: var(--ink); margin-bottom: 8px;">
+          What's shipped now (v3.99 t14e+ continue)
+        </div>
+        <div style="margin-bottom: 6px;">
+          Structural scaffold only — this empty-state, the tab button, layer detection
+          for the three new layers, schema documentation in §22.
+        </div>
+        <div style="margin-bottom: 6px; color: var(--ink-dim);">
+          <b>Coming in follow-up turns</b>: the six panel renderers (largely reusing page 1's
+          draw functions parameterized by which layer to read), the cross-method
+          candidate-list merge in the catalogue (dosage-only / θπ-only / both /
+          both_overlap_partial), and the per-candidate concordance sub-view (the figure
+          mockups A-F) on the candidate-focus page.
+        </div>
+        <div style="color: var(--ink-dim);">
+          <b>Blocking</b>: the three R-side scripts. STEP_R39 packages
+          <code>STEP_Q05_aggregate_theta.sh</code>'s <code>theta.&lt;CHR&gt;.win50000.step10000.tsv.gz</code>
+          (per-sample θπ at 50 kb / 10 kb step from ANGSD pestPG) into the
+          <code>theta_pi_per_window</code> JSON layer; STEP_R40 runs local PCA on
+          those θπ profiles per window with the same neighbourhood as page 1's
+          dosage local PCA; STEP_R41 thresholds the diversity-|Z| into L1
+          envelopes, re-decomposes inside each, promotes L2s passing thresholds.
+        </div>
+      </div>
+    </div>
+
+    <!-- =====================================================================
+         v4 turn 132 — Slice 1: mirrored panel scaffold for page 12 (θπ).
+         Layout follows page 1 top-to-bottom, with one extra hero panel
+         (#thCusumHeroPanel) inserted between #thCtrlBar and #thSimPanel.
+         The hero is the slightly-different-from-page-1 panel: page 1 has
+         no CUSUM because dosage breakpoints are sharp steps, while θπ
+         breakpoints are diffuse gradients — so the per-carrier
+         changepoint distribution becomes the headline visualization
+         (per chat 487c7f04 turn 125 + STEP_T05_theta_cusum.R spec).
+
+         All panels start display: none. Visibility wires to layer
+         availability in Slice 2. Inner renderers (canvas drawing,
+         toolbars, resize seams) ship in Slices 3+ as the corresponding
+         R-side data lands. For this slice the panels are structural
+         placeholders only: each carries a single inner element
+         (canvas / svg / div) with the documented `th`-prefixed id, plus
+         a panel-label. No JS is wired in this slice.
+
+         Naming: panel ids use a `th` prefix (θπ) to distinguish from
+         page 1's bare ids; canvas children carry `thCanvas` analogues
+         (e.g. #thSimPanel > #thSimCanvas). Page 15 (GHSL) uses `gh`
+         analogously; the boundaries page (TBD) will use `bp`.
+         ===================================================================== -->
+
+    <!-- mirrored ctrl bar — scrubber / play / viewmode. Empty in Slice 1. -->
+    <div id="thCtrlBar" style="display: none;
+         padding: 6px 14px; border-bottom: 1px solid var(--rule);
+         background: var(--panel); align-items: center; gap: 12px;
+         font-family: var(--mono); font-size: 11px;">
+      <button class="play" id="thPlayBtn" disabled>▶ Play</button>
+      <input type="range" id="thScrubber" min="0" max="0" value="0" step="1" disabled />
+      <span id="thViewModeBar" title="View scope for the θπ Z panel + tracks: genome | L1 zoom | L2 zoom.">
+        <button data-thviewmode="genome" class="active">🌍 genome</button>
+        <button data-thviewmode="l1">🔎 L1 zoom</button>
+        <button data-thviewmode="l2" title="Zoom to the current θπ L2 envelope only">🔬 L2 zoom</button>
+      </span>
+      <div id="thWinLabel"><span class="dim">window</span>
+        <span class="big" id="thWinIdx">—</span>
+        <span class="dim" id="thWinBp"></span></div>
+    </div>
+
+    <!-- HERO panel — per-carrier CUSUM strip + boundary-distribution histogram
+         + spread-class badge. Layer-gated on cusum_theta. -->
+    <div class="panel" id="thCusumHeroPanel" style="display: none;
+         position: relative; min-height: 220px; padding: 12px 16px;
+         background: var(--panel); border-bottom: 1px solid var(--rule);">
+      <canvas id="thCusumStripCanvas"
+              title="Per-carrier CUSUM strip: each row is one carrier; tick = changepoint position. Sorted by changepoint position."
+              style="display: block; width: 100%; height: 110px;"></canvas>
+      <canvas id="thCusumHistCanvas"
+              title="Boundary-distribution histogram: KDE across all carrier changepoint positions. Median + IQR shading."
+              style="display: block; width: 100%; height: 70px; margin-top: 4px;"></canvas>
+      <div id="thCusumBadgeRow" style="display: flex; gap: 8px; margin-top: 6px;
+           font-family: var(--mono); font-size: 10.5px; align-items: center;">
+        <span id="thCusumSpreadBadge"
+              title="Spread class — tight / intermediate / ragged — based on IQR of carrier changepoint positions"
+              style="padding: 2px 8px; border-radius: 3px; background: var(--panel-2);
+                     border: 1px solid var(--rule); color: var(--ink-dim);">spread —</span>
+        <span id="thCusumConcordBadge"
+              title="Cross-stream concordance with GHSL CUSUM — fraction of carriers whose θπ + GHSL changepoints land within 50 kb"
+              style="padding: 2px 8px; border-radius: 3px; background: var(--panel-2);
+                     border: 1px solid var(--rule); color: var(--ink-dim);">concord —</span>
+      </div>
+      <div class="panel-label"><b>θπ CUSUM hero</b> · per-carrier changepoint strip + boundary distribution · spread + GHSL concordance badges</div>
+    </div>
+
+    <!-- mirrored sim_mat heatmap. Layer-gated on theta_pi_local_pca. -->
+    <div class="panel" id="thSimPanel" style="display: none; position: relative;">
+      <canvas id="thSimCanvas"></canvas>
+      <div class="panel-label"><b>θπ_sim_mat</b> · L1 (blue) / L2 (green) overlays · click to jump · drag bottom edge to resize</div>
+      <div id="thSimResize" title="Drag to resize · double-click to reset"></div>
+    </div>
+
+    <!-- mirrored |Z| waveform. Layer-gated on theta_pi_local_pca. -->
+    <div class="panel" id="thZPanel" style="display: none; position: relative;"
+         title="Diversity |Z| · θπ-PCA local-PCA waveform. Click to jump. Drag bottom edge to resize.">
+      <canvas id="thZCanvas"></canvas>
+      <div class="panel-label"><b>diversity |Z|</b> · θπ-PCA waveform · click to jump</div>
+    </div>
+
+    <!-- mirrored per-sample θπ-PC1 lines. Layer-gated on theta_pi_per_window. -->
+    <div class="panel" id="thLinesPanel" style="display: none; position: relative;">
+      <div id="thLinesCanvasContainer" style="display: flex; flex-direction: column; gap: 1px;"></div>
+      <div class="panel-label"><b>per-sample θπ-PC1 lines</b> · K=3 / K=6 coloring · drag bottom edge to resize</div>
+      <div id="thLinesResize" title="Drag to resize · double-click to reset"></div>
+    </div>
+
+    <!-- mirrored anchor strip. Layer-gated on theta_pi_envelopes. -->
+    <div class="panel" id="thAnchorStripPanel" style="display: none; overflow: hidden;
+         position: relative; background: var(--panel);
+         border-bottom: 1px solid var(--rule);">
+      <canvas id="thAnchorStripCanvas" title="θπ envelope anchor strip · click to jump"
+              style="display: block; width: 100%; height: 100%; cursor: crosshair;"></canvas>
+    </div>
+
+    <!-- mirrored θπ-PC1 vs θπ-PC2 K-means scatter. Layer-gated on theta_pi_local_pca. -->
+    <div class="panel" id="thPcaPanel" style="display: none; position: relative;">
+      <canvas id="thPcaCanvas"></canvas>
+      <div class="panel-label"><b>θπ-PCA scatter</b> · θπ-PC1 vs θπ-PC2 · K-means · current window</div>
+    </div>
+
+    <!-- mirrored tracked samples panel. Layer-gated on theta_pi_per_window. -->
+    <div class="panel" id="thTrackedSamplesPanelCompact" style="display: none; position: relative;">
+      <div id="thTrackedSamplesContainer" style="padding: 8px;"></div>
+      <div class="panel-label"><b>tracked samples · θπ</b> · per-sample θπ trajectory across windows</div>
+    </div>
+
+    <!-- mirrored L3 contingency. Layer-gated on theta_pi_local_pca. -->
+    <div class="panel" id="thL3Panel" style="display: none; position: relative;">
+      <div id="thL3Container" style="padding: 8px;"></div>
+      <div class="panel-label"><b>θπ L3 contingency</b> · per-band θπ subdivision · diversity-driven sub-clusters</div>
+    </div>
+
+  </div>

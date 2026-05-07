@@ -1,0 +1,31 @@
+  <div id="page9" class="page">
+    <div id="confirmedNavBar" style="display:none; padding: 8px 16px;
+         background: var(--panel); border-bottom: 1px solid var(--rule);
+         display: flex; gap: 12px; align-items: center;
+         font-family: var(--mono); font-size: 11.5px;">
+      <button id="confirmedNavPrev"
+              style="background: var(--panel-2); color: var(--ink-dim);
+                     border: 1px solid var(--rule); border-radius: 3px;
+                     padding: 3px 10px; font-family: var(--mono);
+                     font-size: 11px; cursor: pointer;">‹ prev</button>
+      <span id="confirmedNavInfo" style="color: var(--ink-dim);">— / —</span>
+      <button id="confirmedNavNext"
+              style="background: var(--panel-2); color: var(--ink-dim);
+                     border: 1px solid var(--rule); border-radius: 3px;
+                     padding: 3px 10px; font-family: var(--mono);
+                     font-size: 11px; cursor: pointer;">next ›</button>
+      <span style="margin-left: auto; color: var(--ink-dimmer); font-size: 10.5px;">
+        confirmed candidates · ←/→ to navigate · uncheck "mark confirmed" on page 2 to remove</span>
+    </div>
+    <div id="confirmedCandidateMeta" style="display:none;"></div>
+    <div id="confirmedEmpty"
+         style="padding:40px; text-align:center; color:var(--ink-dim);">
+      <div style="font-size:14px; margin-bottom:14px;">No confirmed candidates yet.</div>
+      <div style="font-size:12px; line-height:1.7; max-width:540px; margin:0 auto;">
+        Mark candidates as <i>confirmed</i> using the checkbox on
+        <b>page 2 candidate focus</b>. Confirmed candidates appear here in
+        a carousel — useful for stepping through the final inversion set
+        for manuscript figures.
+      </div>
+    </div>
+  </div>

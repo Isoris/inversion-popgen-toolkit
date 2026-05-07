@@ -1,0 +1,1344 @@
+  <main id="page1" class="page active">
+    <div id="ctrlBar">
+      <button class="play" id="playBtn">▶ Play</button>
+      <input type="range" id="scrubber" min="0" max="0" value="0" step="1" disabled />
+      <!-- v3.99 turn 5: viewModeBar moved here from header. Sits between
+           slider and window stats.
+           v3.99 turn 8: added L2 zoom button — shows only the current L2
+           envelope's window range. Useful for fine-grained inspection of
+           a specific L2 candidate without manually zooming.
+           v4 turn 1 ask 8: reordered to genome / L1 / L2 / Windows (was
+           genome / L1 / Windows / L2). The Windows button has been
+           repurposed (see ask 7) — it now cycles arrow-key step size,
+           not jumps to the windows tab. Placing it AFTER the zoom modes
+           visually reflects "zoom controls then nav-step control". -->
+      <span id="viewModeBar"
+            title="View scope for the Z panel + tracks: genome (whole chromosome) | L1 zoom (current L1 envelope) | L2 zoom (current L2 envelope only). The 📊 Windows button is the arrow-key step-size cycler (1 / 5 / 10).">
+        <button data-viewmode="genome" class="active">🌍 genome</button>
+        <button data-viewmode="l1">🔎 L1 zoom</button>
+        <button data-viewmode="l2" title="Zoom to the current L2 envelope only — tightest scope, useful for boundary inspection">🔬 L2 zoom</button>
+        <!-- v4 turn 1 ask 7: repurposed from "jump to Windows page" to
+             arrow-key step-size cycler. Single click cycles 1 → 5 → 10 → 1.
+             Mutates state.stepMode + state.stepModeN; persists to localStorage.
+             The label dynamically updates to "📊 Windows (N)" so the user
+             always sees current step size at a glance. The old "jump to
+             Windows tab" function is gone — the regular numbered tab "9
+             windows" remains the way to reach the windows page. Kept the
+             same DOM id (jumpToWindowsBtn) for backward-compat with tests
+             that check for its presence; the click handler is rebound to
+             the new step-cycler logic. Visual styling is also distinct
+             from the viewmode buttons (different background) so the user
+             doesn't mistake it for another zoom level. -->
+        <button id="jumpToWindowsBtn"
+                title="Arrow-key step size for ←/→ navigation. Click to cycle 1 → 5 → 10 → 1. Hold Shift while arrowing for a 20-window quick-skip regardless of this setting."
+                style="background: var(--panel-2); border: 1px solid var(--rule);
+                       color: var(--ink-dim); border-radius: 3px;
+                       padding: 4px 10px; font-family: var(--mono);
+                       font-size: 11px; cursor: pointer; margin-left: 6px;">📊 Windows (1)</button>
+      </span>
+      <div id="winLabel"><span class="dim">window</span>
+        <span class="big" id="winIdx">—</span>
+        <span class="dim" id="winBp"></span></div>
+    </div>
+
+    <div class="panel" id="simPanel">
+      <canvas id="simCanvas"></canvas>
+      <div class="panel-label"><b>sim_mat</b> · L1 (blue) / L2 (green) overlays · click to jump · drag bottom edge to resize</div>
+      <button id="simFitSquare" title="Auto-size panel so the heatmap is a perfect square at full window width. With v3.99 turn 7 max cap raised to 2400px, this gives a near-real-size sim_mat (e.g. ~1700×1700 on a 1920px-wide viewport).">⛶ fit square</button>
+      <button id="simMoveMinimapBtn" title="Move sim heatmap into a small sticky panel above the sidebar Data section. Frees vertical space in the main panel area.">▤ move to minimap</button>
+      <div id="simResize" title="Drag to resize · double-click to reset"></div>
+    </div>
+
+    <div class="panel" id="zPanel"
+         title="Robust |Z| · L1/L2 zone bars + boundary peaks · click anywhere on the waveform to jump that window. The blue bar shows the L1 envelope under the cursor; the green bar shows the L2 envelope; small triangles below them are L2 boundary markers (color-coded by support_class). Drag the bottom edge to resize.">
+      <!-- v4 turn 113 (Ask 1) → v4 turn 123: candidate-edit cluster
+           (#candidateEditRow with F flip / B / C / track 1/2) was briefly
+           hosted here at the top of #zPanel. Per Quentin's follow-up,
+           it now lives in #l3ReclusterMode (in the L3 contingency bar)
+           next to the merge ↑ / separate ↓ / confirm cluster — all
+           candidate-mode editing in one visual cluster. -->
+      <canvas id="zCanvas"></canvas>
+      <!-- v3.99 turn 14d ask 5: gear (⚙) and collapse (▼) buttons moved to
+           the canvas bottom-left, stacked vertically just under the "|Z|"
+           y-axis label. The previous header strip (#zPanelLabel) that
+           held the explanation text + buttons is hidden — the explanation
+           now lives in the panel's title= tooltip above. This frees ~24 px
+           of vertical space so the Z waveform touches the per-sample-lines
+           panel below it. Z canvas keeps its existing pad.b for X-axis
+           ticks; the buttons sit at left:6px so they don't overlap ticks. -->
+      <button id="zSettingsToggleBtn" type="button"
+              title="Toggle Z panel settings (color mode / value mode / highlight threshold)"
+              style="position: absolute; left: 6px; bottom: 28px; z-index: 12;
+                     background: var(--panel-2); color: var(--ink-dim);
+                     border: 1px solid var(--rule); border-radius: 3px;
+                     padding: 1px 6px; font-family: var(--mono); font-size: 10px;
+                     cursor: pointer; line-height: 1;">⚙</button>
+      <button id="zCollapseBtn" title="Collapse / expand the Z panel"
+              style="position: absolute; left: 6px; bottom: 6px; z-index: 12;
+                     background: var(--panel-2); color: var(--ink-dim);
+                     border: 1px solid var(--rule); border-radius: 3px;
+                     padding: 1px 6px; font-family: var(--mono); font-size: 10px;
+                     cursor: pointer; line-height: 1;">▼</button>
+      <!-- v3.99 turn 14e: settings popover lifted OUT of #zPanelLabel (which
+           is now display:none and would otherwise hide the popover via DOM
+           cascade). It's now a direct child of #zPanel, absolutely
+           positioned as a floating tray that opens UP from above the ⚙
+           button. The toggle handler in JS still finds it by id. -->
+      <span id="zSettingsBox"
+            style="display: none; position: absolute; left: 6px; bottom: 56px; z-index: 13;
+                   background: var(--panel-2); border: 1px solid var(--rule);
+                   border-radius: 4px; padding: 6px 10px;
+                   align-items: center; gap: 6px; flex-wrap: wrap;
+                   font-family: var(--mono); font-size: 10.5px;
+                   box-shadow: 0 4px 12px rgba(0,0,0,0.18);">
+        <span style="opacity: 0.85;">color:</span>
+        <span id="zColorMode" class="z-toolbar">
+          <button data-zcolor="bands"     class="active" title="Banded thresholds (default)">bands</button>
+          <button data-zcolor="gradient"  title="Continuous gradient blue→red">gradient</button>
+          <button data-zcolor="zone"      title="Bright in current focal L2; dim outside">zone</button>
+          <button data-zcolor="highlight" title="Bright above threshold; dim below">highlight</button>
+        </span>
+        <span style="margin-left: 8px; opacity: 0.85;">value:</span>
+        <span id="zValueMode" class="z-toolbar">
+          <button data-zvalue="abs"    class="active" title="Robust |Z| — absolute deviation, always positive (default)">|Z|</button>
+          <button data-zvalue="signed" title="Signed Z — direction-aware, can go negative; useful for asymmetric inversion signals">±Z</button>
+        </span>
+        <span id="zHighlightCtrl" style="display: none; margin-left: 6px;">
+          <span style="opacity:0.7;">≥</span>
+          <input id="zHighlightInput" type="number" step="0.1" min="0" max="10" value="1.8"
+                 style="width: 50px; padding: 1px 4px; font-family: var(--mono);
+                        font-size: 10.5px; background: var(--panel-2); color: var(--ink);
+                        border: 1px solid var(--rule); border-radius: 3px;">
+        </span>
+      </span>
+      <!-- v3.99 turn 14e: #zPanelLabel kept in DOM (display:none) because
+           a few handlers query it for rendering anchor points. Its content
+           is now an empty stub — the explanation text moved to #zPanel
+           title= and the settings popover moved out (above). -->
+      <div class="panel-label" id="zPanelLabel" style="display: none;"></div>
+      <div id="zResize" title="Drag to resize · double-click to reset"></div>
+    </div>
+
+    <div id="tracksContainer"></div>
+
+    <!-- v3.70: tracked-samples panel for compact mode. Hidden in fixed/free
+         modes (sidebar wins). In compact mode this fills the left column lower
+         half with a mirror of the sidebar's tracked-samples controls — same
+         IDs would conflict, so we use distinct IDs and wire delegating handlers
+         that mutate state via the same code paths. -->
+    <!-- v3.78: vertical drag-to-resize seam between (PCA + tracked-samples)
+         and (Z + lines) in compact mode. Spans rows 2-5 on grid col 3. Only
+         visible when body[data-layout-mode="compact"]. CSS variable
+         --compact-leftpct on main#page1.active drives the boundary; drag
+         updates the variable; double-click resets to 50%. -->
+    <div id="compactColumnResize"
+         title="Drag to resize · double-click to reset"></div>
+
+    <div class="panel" id="linesPanel" style="display: none;">
+      <!-- v3.99 turn 6: tightened the header bar's vertical padding from
+           6px to 3px so PC1/PC2/lasso checkboxes sit closer to the plot.
+           Quentin's request: "less to no margin between options and plot". -->
+      <div id="linesYsourceBar" class="pca-axis-bar" style="display: flex; gap: 12px; align-items: center; padding: 3px 10px; font-size: 12px; flex-wrap: wrap; border-bottom: 1px solid var(--rule, #2a3242);">
+        <span style="color: var(--dim, #888); font-weight: 500;">per-sample lines:</span>
+        <span id="linesYsourceCheckboxes" style="display: flex; gap: 8px; flex-wrap: wrap;"></span>
+        <!-- v3.99 turn 14e+ continue: per-SCHEMA §15.6 mode picker scaffold.
+             Eight modes; non-kmeans modes activate only when their JSON
+             source layer is loaded (refreshLinesColorMode validates).
+             Today the picker is wired but the renderer dispatch
+             (_resolveSampleColorByMode) is a stub that returns K-means
+             colors regardless — actual per-mode rendering ships v4.0
+             alongside R-side STEP_R30..R36 emit pipeline. Putting the
+             picker UI here NOW means the v4.0 integration is a one-step
+             swap (replace stub bodies with real renderers); no UI
+             refactor needed at that point. -->
+        <label id="linesColorModeLabel" style="display: flex; align-items: center; gap: 4px; padding-left: 6px; border-left: 1px solid var(--rule); color: var(--ink-dim);"
+               title="UI-wide coloring mode for per-sample lines, L3 panes, and tracked-samples scatter. K-means (default) is always available. Other modes light up when their source JSON layer is loaded — see SCHEMA §15 for the per-mode source layer mapping.">
+          <span>color:</span>
+          <select id="linesColorModeSelect"
+                  style="font-size: 11px; padding: 1px 4px; background: var(--panel-2);
+                         color: var(--ink); border: 1px solid var(--rule); border-radius: 3px;
+                         font-family: var(--mono);">
+            <option value="kmeans">kmeans</option>
+            <option value="dosage" disabled title="Needs dosage_chunks JSON layer (schema 2.6, v4.0 R-side)">dosage</option>
+            <option value="ghsl" disabled title="Needs ghsl_panel JSON layer">GHSL</option>
+            <option value="het" disabled title="Needs dosage_chunks JSON layer (schema 2.6, v4.0 R-side)">het</option>
+            <option value="theta_pi" disabled title="Needs per_sample_theta_pi JSON layer (schema 2.14, v4.0 R-side STEP_R36)">θπ</option>
+            <option value="froh" disabled title="Needs sample_froh JSON layer (schema 2.3, planned R-side STEP_R13)">F_ROH</option>
+            <option value="family">family</option>
+            <option value="confounder_alert" disabled title="Needs sample_froh layer (schema 2.3) — derived flag combining F_ROH and family signals">⚠ confounder</option>
+            <option value="lineage" title="Color each fish by its inheritance lineage — clusters fish whose K-means band-trajectory tracks together across all L2 envelopes on this chromosome (turn 130). Always available; no JSON layer prerequisite.">lineage</option>
+          </select>
+        </label>
+        <!-- v3.76: lasso mode. When checked, the per-sample lines (PC1 panel)
+             render tracked samples in dim grey instead of their tracked-color
+             (so the user can pick by trajectory shape, not by what's already
+             in the watchlist). User drags a rectangle on the PC1 sub-canvas;
+             samples whose path passes through the rectangle (at any window in
+             its x-span) are flagged as lassoed. The CONFIRM button below
+             replaces state.tracked with the lassoed set. -->
+        <label id="linesLassoLabel" style="display: flex; align-items: center; gap: 4px; cursor: pointer; padding-left: 6px; border-left: 1px solid var(--rule);"
+               title="Lasso mode: drag a rectangle on the PC1 panel to select samples by trajectory. Tracked-color highlights are suppressed while ON.">
+          <input type="checkbox" id="linesLassoToggle" />
+          <span style="color: var(--ink-dim);">lasso</span>
+        </label>
+        <span id="linesLassoBadge"
+              title="Number of samples currently lassoed (not yet committed)"
+              style="display: none; font-family: var(--mono); font-size: 10.5px;
+                     padding: 2px 7px; border-radius: 3px;
+                     background: rgba(245,165,36,0.15);
+                     border: 1px solid rgba(245,165,36,0.5);
+                     color: var(--accent); white-space: nowrap;">0 selected</span>
+        <button id="linesLassoConfirmBtn"
+                title="Replace the tracked-samples list with the lassoed set"
+                style="display: none; background: var(--accent); color: #0e1116;
+                       border: 1px solid var(--accent); border-radius: 3px;
+                       padding: 2px 10px; font-family: var(--mono); font-size: 10.5px;
+                       cursor: pointer; font-weight: 600;">Confirm</button>
+        <button id="linesLassoClearBtn"
+                title="Clear the current lasso selection without committing"
+                style="display: none; background: var(--panel-2); color: var(--ink-dim);
+                       border: 1px solid var(--rule); border-radius: 3px;
+                       padding: 2px 10px; font-family: var(--mono); font-size: 10.5px;
+                       cursor: pointer;">Clear</button>
+        <!-- v4 turn 95+99: SNP-density visualization. Three modes:
+             off   — no SNP-density rendering (default, lines panel uncluttered)
+             strip — thin gradient bar above PC1 sub-panel showing per-window density
+             shade — translucent vertical bars across plot HEIGHT for low-density
+                     windows; shows where bands lose resolution. Per-line coloring
+                     was considered but the per-segment refactor on the hot path
+                     is large; the shade mode achieves the same diagnostic goal
+                     without touching the line stroke path. -->
+        <span id="linesSnpDensityBar"
+              style="display: flex; gap: 0; align-items: center; padding-left: 6px;
+                     border-left: 1px solid var(--rule);"
+              title="SNP density visualization mode (zoom required to be useful). Off / strip / shade.">
+          <span style="color: var(--ink-dim); margin-right: 4px; font-size: 10px;">SNP dens:</span>
+          <button data-snpdens-mode="off" class="active"
+                  style="font-size: 9.5px; padding: 2px 6px;"
+                  title="No SNP-density rendering on the per-sample lines panel.">off</button>
+          <button data-snpdens-mode="strip"
+                  style="font-size: 9.5px; padding: 2px 6px;"
+                  title="Thin gradient bar above PC1 panel: cool blue (low SNP density) → warm yellow (high). Useful for spotting density troughs that may explain band compression. Visible only when zoomed in.">strip</button>
+          <button data-snpdens-mode="shade"
+                  style="font-size: 9.5px; padding: 2px 6px;"
+                  title="Translucent vertical bars across the plot height for low-density windows. Highlights the columns where local PCA loses resolution — useful for interpreting diamond patterns where bands compress in low-density windows.">shade</button>
+        </span>
+        <!-- v4 turn 102: structural-haplotype transition-rate strip toggle.
+             When ON, paints a thin red-graded strip just below the SNP-density
+             strip showing per-L2-boundary transition_rate (fraction of fish
+             that change band at that boundary). Tall red bars = many fish
+             change → structural-haplotype regime boundary. -->
+        <label id="linesTransRateLabel"
+               style="display: flex; align-items: center; gap: 4px; cursor: pointer; padding-left: 6px; border-left: 1px solid var(--rule);"
+               title="Structural-haplotype transition-rate strip: per-L2-boundary fraction of fish that change band assignment. Tall red bars = regime boundaries where many fish switch state simultaneously. Useful for finding boundaries between segregating structural-haplotype systems.">
+          <input type="checkbox" id="linesTransRateToggle" />
+          <span style="color: var(--ink-dim);">trans-rate</span>
+        </label>
+        <!-- v4 turn 104: regime-breadth strip toggle. Per-L2 categorical
+             classification: narrow (most fish stay in 1-2 bands → segregating
+             cleanly), medium, wide (fish visit many bands → no clean
+             segregation). Operationalises Quentin's observation that LG28
+             starts narrow on the left and becomes wide on the right. -->
+        <label id="linesRegimeBreadthLabel"
+               style="display: flex; align-items: center; gap: 4px; cursor: pointer; padding-left: 6px; border-left: 1px solid var(--rule);"
+               title="Regime-breadth strip: per-L2 categorical classification of band-reach. Green tint = narrow regime (most fish stay in ≤2 bands → cohort segregates into stable lanes). Red tint = wide regime (most fish visit many bands → no clean segregation). Grey = no signal (≤1 band populated).">
+          <input type="checkbox" id="linesRegimeBreadthToggle" />
+          <span style="color: var(--ink-dim);">regime</span>
+        </label>
+        <!-- turn 130 Slice 2: lineage strip toggle. Default ON. Per-L2
+             colored bar showing the dominant fish-trajectory lineage
+             (computed via runLineageCompute on the K-means labels the
+             atlas already produces). Hatched grey = chain break (Hungarian
+             agreement < 0.5). Helps identify where the underlying
+             inversion-system identity shifts along the chromosome. -->
+        <label id="linesLineageStripLabel"
+               style="display: flex; align-items: center; gap: 4px; cursor: pointer; padding-left: 6px; border-left: 1px solid var(--rule);"
+               title="Lineage strip (turn 130): per-L2 dominant fish-trajectory lineage. Each L2 painted with the color of the lineage that dominates its largest band. Color changes along the chromosome where inheritance lineages re-organize. Grey-hatched gaps = Hungarian-chain breaks (algorithm couldn't bridge across these L2s). Computed via runLineageCompute() on K-means band-trajectories — no JSON layer prerequisite.">
+          <input type="checkbox" id="linesLineageStripToggle" checked />
+          <span style="color: var(--ink-dim);">lineage</span>
+        </label>
+        <!-- turn 161 — band-trace strip toggle. Default OFF.
+             Per-L2 stacked bar of band_fractions for a chosen fish-set
+             (state.bandTraceFishSet), with regime-color top stripe.
+             The "trace" button next to it auto-fills the fish-set
+             from the focal candidate's largest band.
+             Observation-only: shows where the chosen fish co-segregate
+             vs fan out across the chromosome. Does NOT label runs as
+             inversions. -->
+        <label id="linesBandTraceLabel"
+               style="display: flex; align-items: center; gap: 4px; cursor: pointer; padding-left: 6px; border-left: 1px solid var(--rule);"
+               title="Band-trace strip (turn 161, Slice 4 UI): per-L2 stacked bar showing how a chosen fish-set distributes across K bands at each L2 along the chromosome. Top stripe color = regime (green=co-segregating, amber=partial, grey=fanned). Co-segregating runs are candidate inversion footprints. Use the 🔍 trace button to fill the fish-set from the focal candidate's largest band, or call window.setBandTraceFishSet([...sis]) from the console.">
+          <input type="checkbox" id="linesBandTraceToggle" />
+          <span style="color: var(--ink-dim);">band trace</span>
+        </label>
+        <button id="linesBandTraceFromCandBtn"
+                style="display: flex; align-items: center; gap: 3px; cursor: pointer;
+                       background: transparent; border: 1px solid var(--rule); color: var(--ink-dim);
+                       padding: 1px 6px; font-family: var(--mono); font-size: 10px;
+                       border-radius: 3px; margin-left: 2px;"
+                title="Trace from focal candidate: copies the focal candidate's selected band (see picker to the right) into state.bandTraceFishSet, turns the strip on, and re-draws. Quentin's flow: focus a candidate on page 1 → optionally pick a band → click this → see where those fish co-segregate at every other L2. Disabled when no candidate is focused.">
+          🔍 trace
+        </button>
+        <!-- turn 163 — band-picker dropdown. Default "largest" matches the
+             turn 161 behaviour (the trace button picks the focal candidate's
+             largest band). Other options expose the per-band fish counts
+             (e.g. "b2 (n=3)") so Quentin can trace the small HOM_INV band
+             directly without dropping into the console. Options are rebuilt
+             whenever the focal candidate changes via _updateBandTracePickOptions(). -->
+        <select id="linesBandTracePickSelect"
+                style="background: transparent; border: 1px solid var(--rule); color: var(--ink-dim);
+                       padding: 1px 4px; font-family: var(--mono); font-size: 10px;
+                       border-radius: 3px; margin-left: 2px;"
+                title="Pick which band of the focal candidate to trace. Default 'largest' = the band with the most fish (the turn 161 default). Other options expose every band by index plus its fish count, so you can trace the small HOM_INV band (often b1 or b2 at K=3) directly. Updates automatically when you focus a different candidate.">
+          <option value="largest">largest</option>
+        </select>
+        <!-- turn 162 — TSV export of the band-trace per-L2 table.
+             One row per L2 (chrom, l2_idx, chain_idx, start_bp, end_bp,
+             n_valid, regime, dominant_band, dominant_fraction, entropy,
+             band_fraction_0..K-1). Manuscript-ready supplementary data.
+             Disabled-looking when no fish-set or no cached trace; click
+             still runs the download path which no-ops cleanly in that
+             case (returns null without raising). -->
+        <button id="linesBandTraceExportBtn"
+                style="display: flex; align-items: center; gap: 3px; cursor: pointer;
+                       background: transparent; border: 1px solid var(--rule); color: var(--ink-dim);
+                       padding: 1px 6px; font-family: var(--mono); font-size: 10px;
+                       border-radius: 3px; margin-left: 2px;"
+                title="Export the current band-trace as TSV (one row per L2 envelope along the chromosome). Columns: chrom, l2_idx, chain_idx, chain_position, start_bp, end_bp, n_valid, n_fish_selected, regime, dominant_band, dominant_fraction, entropy, band_fraction_0..K-1. Filename: band_trace_<chrom>_n<n_fish>_K<K>.tsv. Designed for Quentin's manuscript supplementary data + R-pipe analysis. No-op when no fish-set is active.">
+          📊 TSV
+        </button>
+        <!-- turn 163 — runs TSV export. Sibling of 📊 TSV but emits
+             one row per detected co-segregation run (output of
+             _bandTraceRegimeRuns). Columns: chrom, run_idx, chain_idx,
+             start_l2_idx, end_l2_idx, start_bp, end_bp, n_L2, n_co_seg,
+             n_partial, dominant_band, mean_dominant_fraction, mean_entropy.
+             This is the manuscript supplementary table — one row per
+             "we observed N co-segregating haplotype blocks" entry. -->
+        <button id="linesBandTraceExportRunsBtn"
+                style="display: flex; align-items: center; gap: 3px; cursor: pointer;
+                       background: transparent; border: 1px solid var(--rule); color: var(--ink-dim);
+                       padding: 1px 6px; font-family: var(--mono); font-size: 10px;
+                       border-radius: 3px; margin-left: 2px;"
+                title="Export detected co-segregation runs as TSV. One row per run (consecutive L2s with regime co_seg or partial, dominant band stable, not crossing chain breaks). Columns: chrom, run_idx, chain_idx, start_l2_idx, end_l2_idx, start_bp, end_bp, n_L2, n_co_seg, n_partial, dominant_band, mean_dominant_fraction, mean_entropy. Filename: band_trace_runs_<chrom>_n<n_fish>_K<K>.tsv. Manuscript supplementary table — one row per observed co-segregating block. No-op when no fish-set is active.">
+          📊 runs
+        </button>
+        <!-- turn 164 — fish-set linkage popover. Opens a modal table showing,
+             for the current fish-set (driven by state.bandTraceFishSet from
+             turns 161-163, falls back to nothing when unset), what fraction
+             of those fish land in each band of every confirmed candidate
+             across the whole saved candidate list. The "linkage table" the
+             SPEC_lasso_inheritance_backgrounds.md draft calls for, but
+             without lasso integration (deferred until a lasso surface
+             ships) — for now the fish-set source is the band-trace
+             selection. Observation-only — reports purity numbers, doesn't
+             label anything as "linked." -->
+        <button id="linesBandTraceLinkageBtn"
+                style="display: flex; align-items: center; gap: 3px; cursor: pointer;
+                       background: transparent; border: 1px solid var(--rule); color: var(--ink-dim);
+                       padding: 1px 6px; font-family: var(--mono); font-size: 10px;
+                       border-radius: 3px; margin-left: 2px;"
+                title="Open the linkage table popover. For the current fish-set (state.bandTraceFishSet from 🔍 trace), shows per-confirmed-candidate purity: which band of each candidate the fish-set falls into, what fraction, and how many fish. Click 🔍 trace first to populate the fish-set. Useful for asking 'these fish co-segregate at I3 — do they ALSO co-segregate at I7 / I12 / etc?'">
+          🔗 linkage
+        </button>
+        <!-- turn 141 Slice 1: candidate-band highlights. Default ON.
+             Each confirmed candidate on the current chrom paints a faint
+             full-height vertical band over its [start_bp, end_bp] span,
+             so multiple inversions on one chrom can be told apart at a
+             glance. Palette: yellow / green / blue at α≈0.10, cycled with
+             golden-angle HSL rotation for ≥4 candidates. SPEC reading 2:
+             low-alpha full-height (NOT stacked thirds — see SPEC §2.1). -->
+        <label id="linesCandBandsLabel"
+               style="display: flex; align-items: center; gap: 4px; cursor: pointer; padding-left: 6px; border-left: 1px solid var(--rule);"
+               title="Candidate-band highlights (turn 141): faint vertical bands behind the per-sample lines, one per confirmed candidate on this chrom, colored yellow / green / blue (then golden-angle cycle for ≥4). Tells you at a glance which bp range belongs to which candidate without looking up to the candidate strip. Drafts get the existing yellow active-overlay; bands here only render confirmed candidates.">
+          <input type="checkbox" id="linesCandBandsToggle" checked />
+          <span style="color: var(--ink-dim);">cand bands</span>
+        </label>
+        <!-- v3.84: candidate overlay badge. Visible when a candidate is active
+             (state.candidate set). Shows "candidate · g0a/g0b/... " inline as
+             a legend for the amber band + ⚠ markers on the PC1 sub-panel.
+             Hover tooltip explains the markers. -->
+        <span id="candOverlayBadge"
+              title="Active candidate overlay: amber band shows candidate's bp-span. Vertical dashed lines = L2 boundaries. ⚠ marker on a tracked fish = subband_stability < 1 (fish crossed K=3 parents within this candidate). Shift+click on a tracked fish line to inspect its votes / sub-band path."
+              style="display: none; font-family: var(--mono); font-size: 10.5px;
+                     padding: 2px 7px; border-radius: 3px;
+                     background: rgba(245,196,58,0.10);
+                     border: 1px solid rgba(245,196,58,0.40);
+                     color: var(--accent); white-space: nowrap;
+                     cursor: help;">candidate –</span>
+        <span id="linesYsourceNote" style="margin-left: auto; color: var(--dim, #888); font-size: 11px;"></span>
+        <!-- v3.71: concord V badge. Reads state.anchorConcord[state.cur] —
+             Cramér's V between tracked-samples' K-means labels at the anchor
+             window vs the current window. Empty (V –) when no anchor / no
+             tracked samples. Color-coded: green ≥ 0.7, yellow 0.4–0.7, red < 0.4. -->
+        <span id="concordBadge" title="Cramér's V — concord between the tracked samples' K-means labels at the anchor window and at the current window. High = same sample-grouping; low = sample-grouping has reshuffled."
+              style="font-family: var(--mono); font-size: 10.5px;
+                     padding: 2px 7px; border-radius: 3px;
+                     background: var(--panel-2); border: 1px solid var(--rule);
+                     color: var(--ink-dim); white-space: nowrap;
+                     cursor: help;">V –</span>
+        <button id="linesCollapseBtn" title="Collapse / expand the per-sample-lines panel"
+                style="background: var(--panel-2); color: var(--ink-dim);
+                       border: 1px solid var(--rule); border-radius: 3px;
+                       padding: 1px 8px; font-family: var(--mono); font-size: 10.5px;
+                       cursor: pointer;">▼</button>
+      </div>
+      <div id="linesCanvasContainer" style="display: flex; flex-direction: column; gap: 1px;"></div>
+      <!-- v3.50: legacy <div class="panel-label"> removed. linesYsourceBar above
+           already serves as the header (it has the "per-sample lines:" prefix
+           plus the per-source checkboxes). Two competing labels at position:absolute
+           were stacking text on top of each other. -->
+      <div id="linesResize" title="Drag to resize · double-click to reset"></div>
+    </div>
+
+    <!-- v3.52: anchor concord strip — thin canvas showing Cramér's V between
+         the tracked samples' K-means labels at the anchor window (where the
+         user first started tracking) and at each other window. Hot = high
+         concord, cold = low. Click to jump. -->
+    <div class="panel" id="anchorStripPanel" style="overflow: hidden;
+         position: relative; background: var(--panel);
+         border-bottom: 1px solid var(--rule);">
+      <canvas id="anchorStripCanvas" title="Anchor concord · click to jump"
+              style="display: block; width: 100%; height: 100%; cursor: crosshair;"></canvas>
+    </div>
+
+    <!-- v3.79: compact-mode left stack. Wraps pcaPanel + horizontal-resize seam +
+         trackedSamplesPanelCompact so they stack vertically inside the left
+         column. In non-compact (fixed/free) modes the wrapper has
+         `display: contents` so it disappears from layout — pcaPanel and the
+         tracked panel behave as direct children of <main>. In compact mode the
+         wrapper becomes a flex column occupying grid col 1 rows 2-5; PCA on
+         top (flex-grow with --compact-leftupperpct as the basis), drag seam
+         in the middle (8px), tracked-samples menu at the bottom. -->
+    <div id="compactLeftStack">
+
+    <div class="panel" id="pcaPanel">
+      <!-- v3.76: bottom-edge resize handle (mirrors linesResize). Adjusts
+           state.pcaPanelH directly. Position: absolute relative to pcaPanel,
+           sits over the bottom edge so drag-down grows PCA, drag-up shrinks. -->
+      <div id="pcaResize" title="Drag to resize · double-click to reset"></div>
+      <div id="pcaAxisBar" class="pca-axis-bar" style="display: flex; gap: 8px; align-items: center; padding: 4px 8px; font-size: 10px; flex-wrap: wrap; border-bottom: 1px solid var(--rule, #2a3242);">
+        <span style="color: var(--dim, #888); font-weight: 500;">scatter axes:</span>
+        <label style="display: flex; align-items: center; gap: 3px;">X:
+          <select id="pcaXSelect" data-axis="X" style="font-size: 9.5px; padding: 1px 2px;"></select>
+        </label>
+        <label style="display: flex; align-items: center; gap: 3px;">Y:
+          <select id="pcaYSelect" data-axis="Y" style="font-size: 9.5px; padding: 1px 2px;"></select>
+        </label>
+        <label style="display: flex; align-items: center; gap: 3px; margin-left: 6px;">
+          <input type="checkbox" id="viewControlsLinked" />
+          <span title="When linked, the lines panel above (stage 2) tracks the same PCs as the scatter">link with lines panel</span>
+        </label>
+        <span id="pcaAxisAvailNote" style="margin-left: auto; color: var(--dim, #888); font-size: 9.5px;"></span>
+        <button id="pcaCollapseBtn" title="Collapse / expand the PCA panel — drag the L3 panel up to take its space"
+                style="background: var(--panel-2); color: var(--ink-dim);
+                       border: 1px solid var(--rule); border-radius: 3px;
+                       padding: 1px 8px; font-family: var(--mono); font-size: 10.5px;
+                       cursor: pointer; margin-left: 6px;">▼</button>
+      </div>
+      <!-- v3.73: split body — canvas left, optional tracked-samples aside right.
+           In fixed mode the aside is shown at 30% width (canvas takes 70%).
+           In compact/free modes the aside is hidden (compact mode uses
+           #trackedSamplesPanelCompact in its own grid cell instead).
+           In all modes #pcaCanvas keeps `width: 100%; height: 100%` of its
+           wrapper, so fitCanvas reads the right plot dimensions. -->
+      <div id="pcaPanelBody" style="flex: 1 1 auto; min-height: 0; display: flex; flex-direction: row;">
+        <div id="pcaCanvasWrap" style="flex: 1 1 70%; min-width: 0; min-height: 0; position: relative;">
+          <canvas id="pcaCanvas" style="width: 100%; height: 100%; display: block;"></canvas>
+          <!-- turn 120: PCA scree inset. Absolutely positioned in the
+               upper-right corner of #pcaCanvasWrap. Hidden by default
+               (display:none) and only shown when state.screePlotEnabled
+               is true AND a window is selected. Renderer is
+               _renderScreeInset() which writes inline SVG to the inner
+               div. Width 110px, height 70px, translucent panel
+               background. -->
+          <div id="screeInset" class="scree-inset" style="display: none;"></div>
+      <!-- v3.50: legacy <div class="panel-label"> removed. pcaAxisBar above
+           already shows X/Y dropdowns and the linked-views checkbox.
+           pcaPanelLabelAxes lookups in JS are null-safe so this removal is OK. -->
+      <div class="empty" id="emptyState">
+        <h3>Inversion Atlas</h3>
+        <p style="max-width: 560px; line-height: 1.55; margin: 0 0 18px;">
+          Browse local PCA windows across a chromosome to identify and characterize
+          inversion candidates. Load a precomp JSON in the sidebar
+          (<b>Browse…</b> on the left) to begin scrubbing.
+        </p>
+
+        <!-- v3.99 turn 14e ask 2: what each tab does, in one line each, so a
+             user opening the scrubber for the first time can orient. Mirrors
+             the tab-bar tooltips added in turn 14b but visible-by-default
+             when no data is loaded. -->
+        <div style="text-align: left; max-width: 600px; margin: 0 auto 18px;
+                    font-size: 11.5px; color: var(--ink-dim); line-height: 1.65;">
+          <div style="font-family: var(--mono); font-size: 10px; letter-spacing: 0.06em;
+                      text-transform: uppercase; margin-bottom: 8px; color: var(--ink-dim);">tabs</div>
+          <div><b style="color: var(--ink);">1 diagnostic</b> · main scrubber: sim_mat, robust |Z|, per-sample lines, K-means PCA, L3 contingency tables</div>
+          <div><b style="color: var(--ink);">2 candidate focus</b> · deep-dive on a single promoted candidate</div>
+          <div><b style="color: var(--ink);">3 boundaries</b> · refine each candidate's start/end into approximate boundary zones</div>
+          <div><b style="color: var(--ink);">4 catalogue</b> · sortable, filterable table of inversions; export TSV / Markdown</div>
+          <div><b style="color: var(--ink);">5 karyotype</b> · per-candidate sample-level regime breakdown</div>
+          <div><b style="color: var(--ink);">6 popstats</b> · stack of population-genetic tracks aligned to the chromosome</div>
+          <div><b style="color: var(--ink);">7 ancestry</b> · per-window ancestry view (K-cluster + delta12 confidence)</div>
+          <div><b style="color: var(--ink);">8 windows</b> · per-window summary table (|Z|, λ₁/λ₂, SNP counts, L1/L2 membership)</div>
+          <div><b style="color: var(--ink);">9 confirmed</b> · carousel of candidates marked confirmed on page 2</div>
+          <div><b style="color: var(--ink);">11 help</b> · vocabulary, hotkeys, and the full feature roadmap</div>
+        </div>
+
+        <p style="margin: 0 0 4px; font-size: 11.5px;">To produce a precomp JSON on the cluster:</p>
+        <p style="margin: 0;">
+          <code>Rscript export_precomp_to_json_v3.R --precomp &lt;LGNN.rds&gt; \<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;--l1_envelopes ..._d17L1_envelopes.tsv \<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;--l2_envelopes ..._d17L2_envelopes.tsv \<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;--l2_boundaries ..._d17L2_boundaries.tsv \<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;--out LG28.json</code>
+        </p>
+      </div>
+        </div><!-- /#pcaCanvasWrap -->
+        <!-- v4 turn 1 ask 4: resize handle between the scatter and the
+             tracked-samples aside. Quentin's request: "we add a grab to
+             drag mini button so we can resize left right between tracked
+             samples pca and its setting panels in fixed layout mode."
+             Sits as a flex-item between #pcaCanvasWrap and #pcaTrackedAside.
+             4px wide vertical strip with a 1px-wide ::before handle line
+             that brightens on hover; cursor changes to col-resize. Hidden
+             in compact + free modes (matches #pcaTrackedAside's own
+             visibility — see lines ~1719-1720 CSS). -->
+        <div id="pcaAsideResize"
+             title="Drag to resize left/right between the PCA scatter and the tracked-samples settings · double-click to reset to default 70/30 split"></div>
+        <!-- v3.99 turn 4: compact-mode-only right-side band-pick column. Sits
+             tight against the PCA scatter (~88px wide) so the canvas takes
+             ~95% of the panel width and these buttons take just enough space
+             to read. Hidden in fixed mode (the existing #pcaTrackedAside
+             handles full-width tracked-samples controls there) and free mode.
+             Mirrors data-band-compact / autoPickRadialCompact / clearPicksCompact
+             so the existing wiring fires (delegated via querySelectorAll). -->
+        <div id="pcaBandPickColCompact"
+             style="display: none; flex: 0 0 88px; min-width: 0;
+                    border-left: 1px solid var(--rule);
+                    background: var(--panel);
+                    padding: 6px 5px;
+                    flex-direction: column; gap: 3px;
+                    font-family: var(--mono);">
+          <button data-band-compact="all"   class="active"
+                  style="font-size: 10px; padding: 3px 4px;"
+                  title="Show all bands in tracked-samples picker">all bands</button>
+          <button data-band-compact="0" data-vocab-band-k3="0"
+                  style="font-size: 10px; padding: 3px 4px;"
+                  title="Pick from band 1 (low PC1) only">band 1 (lo)</button>
+          <button data-band-compact="1" data-vocab-band-k3="1"
+                  style="font-size: 10px; padding: 3px 4px;"
+                  title="Pick from band 2 (mid PC1) only">band 2 (mid)</button>
+          <button data-band-compact="2" data-vocab-band-k3="2"
+                  style="font-size: 10px; padding: 3px 4px;"
+                  title="Pick from band 3 (high PC1) only">band 3 (hi)</button>
+          <button id="autoPickRadialCompact2"
+                  style="font-size: 10px; padding: 3px 4px; margin-top: 4px;"
+                  title="Auto-pick samples spread radially across PC1/PC2">Auto-pick</button>
+          <button id="clearPicksCompact2"
+                  style="font-size: 10px; padding: 3px 4px;"
+                  title="Clear all tracked samples">Clear</button>
+        </div>
+        <!-- v3.73: tracked-samples aside (right 30% of pcaPanel in fixed mode).
+             Shown only when body[data-layout-mode="fixed"] (default). In compact
+             mode the aside is hidden and #trackedSamplesPanelCompact takes the
+             role in the dedicated grid cell. In free mode the aside is also
+             hidden — the sidebar's tracked-samples controls are sufficient when
+             panels are stacked vertically with full width each.
+             Controls mirror the sidebar IDs (use Aside suffix); handlers
+             delegate to the same state-mutating functions.
+             v4 turn 2 ask 2/3/4: compact rework. (3) fits without scrolling
+             via reduced font/padding/gap. (4) 6 K-colored band buttons + a
+             small K(N) cycle button that recolors PCA & lines on click;
+             Clear is styled dark. (2) Lasso checkbox + Confirm/Clear mirror
+             the per-sample-lines lasso pattern. -->
+        <div id="pcaTrackedAside" style="flex: 0 0 30%; min-width: 200px; max-width: 360px;
+                                          border-left: 1px solid var(--rule);
+                                          background: var(--panel);
+                                          overflow-y: hidden;
+                                          font-family: var(--mono); font-size: 10px;">
+          <div style="padding: 3px 8px; border-bottom: 1px solid var(--rule);
+                      color: var(--ink-dim); text-transform: uppercase;
+                      letter-spacing: 0.05em; font-size: 9.5px;
+                      display: flex; justify-content: space-between; align-items: center;">
+            <span>tracked samples</span>
+            <span id="trackedCountInfoAsideCompact"
+                  style="color: var(--ink-dim); font-size: 9.5px;
+                         font-family: var(--mono); text-transform: none;
+                         letter-spacing: 0;">0/10</span>
+          </div>
+          <div style="padding: 4px 8px; display: flex; flex-direction: column; gap: 4px;">
+            <!-- Row A: trails + sign-align PC1 + lasso (compact) -->
+            <div style="display: flex; gap: 6px; align-items: center; font-size: 10px; flex-wrap: wrap;">
+              <label style="display: flex; align-items: center; gap: 2px; cursor: pointer;">
+                <input type="checkbox" id="trailOnAside" style="margin: 0;" /> trails
+              </label>
+              <label style="display: flex; align-items: center; gap: 2px; cursor: pointer;">
+                <input type="checkbox" id="flipPC1Aside" style="margin: 0;" /> sign-align PC1
+              </label>
+              <!-- v4 turn 2 ask 2: lasso mode for the tracked-samples PCA scatter.
+                   When ON, drag a rectangle on the scatter to select samples by
+                   their position in PC1/PC2 space. The Confirm button replaces
+                   state.tracked with the lassoed set; Clear discards. Mirrors
+                   the per-sample-lines lasso UX (linesLassoToggle). -->
+              <label id="pcaLassoLabel" style="display: flex; align-items: center; gap: 2px;
+                                                cursor: pointer; padding-left: 4px;
+                                                border-left: 1px solid var(--rule);"
+                     title="Lasso mode: drag a rectangle on the PCA scatter to select samples by their PC1/PC2 position. Tracked highlights are suppressed while ON.">
+                <input type="checkbox" id="pcaLassoToggle" style="margin: 0;" /> lasso
+              </label>
+              <!-- turn 120: scree-plot inset toggle. When ON, a mini bar plot of
+                   the top-k local-PCA eigenvalues for the current window appears
+                   in the upper-right corner of the PCA scatter. Reads
+                   w.lam_top_k (schema 2.16) when present, falls back to a 2-bar
+                   [lam1, lam2] inset with a "spectrum k>=3 needs precomp >=2.16"
+                   hint when only the legacy fields are loaded. -->
+              <label id="screeToggleLabel" style="display: flex; align-items: center; gap: 2px;
+                                                  cursor: pointer; padding-left: 4px;
+                                                  border-left: 1px solid var(--rule);"
+                     title="Scree inset: top-k local-PCA eigenvalues for the current window. Steep bar drop = clean inversion structure; flat bars = noisy/unstable window. Needs precomp schema >=2.16 for k>=3 bars; falls back to 2 bars with a hint on older precomps.">
+                <input type="checkbox" id="screeToggle" style="margin: 0;" /> scree
+              </label>
+            </div>
+            <!-- Lasso confirm/clear (hidden until a selection exists) -->
+            <div id="pcaLassoBar" style="display: none; gap: 4px; align-items: center; font-size: 10px;">
+              <span id="pcaLassoBadge"
+                    title="Number of samples currently lassoed (not yet committed)"
+                    style="font-family: var(--mono); font-size: 10px;
+                           padding: 1px 6px; border-radius: 3px;
+                           background: rgba(245,165,36,0.15);
+                           border: 1px solid rgba(245,165,36,0.5);
+                           color: var(--accent); white-space: nowrap;">0 selected</span>
+              <button id="pcaLassoConfirmBtn"
+                      title="Replace the tracked-samples list with the lassoed set"
+                      style="background: var(--accent); color: #0e1116;
+                             border: 1px solid var(--accent); border-radius: 3px;
+                             padding: 1px 8px; font-family: var(--mono); font-size: 10px;
+                             cursor: pointer; font-weight: 600;">Confirm</button>
+              <button id="pcaLassoClearBtn"
+                      title="Clear the current lasso selection without committing"
+                      style="background: var(--panel-2); color: var(--ink-dim);
+                             border: 1px solid var(--rule); border-radius: 3px;
+                             padding: 1px 8px; font-family: var(--mono); font-size: 10px;
+                             cursor: pointer;">Clear</button>
+            </div>
+            <!-- Row B: trail back slider — single line -->
+            <div style="display: flex; gap: 4px; align-items: center; font-size: 10px;">
+              <span style="color: var(--ink-dim); flex: 0 0 48px;">trail bk</span>
+              <input type="range" id="trailNAside" min="0" max="80" value="15" step="1"
+                     style="flex: 1 1 auto; min-width: 0;" />
+              <span class="val" id="trailNValAside" style="flex: 0 0 22px; text-align: right;">15</span>
+            </div>
+            <!-- Row C: N tracked slider — single line -->
+            <div style="display: flex; gap: 4px; align-items: center; font-size: 10px;">
+              <span style="color: var(--ink-dim); flex: 0 0 48px;">N trk</span>
+              <input type="range" id="trackedNAside" min="0" max="30" step="1" value="10"
+                     style="flex: 1 1 auto; min-width: 0;" />
+              <span class="val" id="trackedNValAside" style="flex: 0 0 22px; text-align: right;">10</span>
+            </div>
+            <!-- Row D: K(N) cycle button + 6 K-colored band buttons.
+                 Each button shows just the K-index ("1".."6") in its actual
+                 cluster color (groupColor(k)). The "all" button stays as a
+                 wide button. The K(N) button cycles state.k 3→4→5→6→2→3. -->
+            <div style="display: flex; gap: 3px; align-items: center; font-size: 10px;">
+              <button id="kCycleBtnAside"
+                      title="Click to cycle K (number of K-means clusters): 3 → 4 → 5 → 6 → 2 → 3. Recolors the PCA scatter, the per-sample lines, and all band buttons. Mirrors the sidebar K selector."
+                      style="flex: 0 0 auto; padding: 2px 6px;
+                             background: linear-gradient(180deg, rgba(245,165,36,0.30), rgba(245,165,36,0.10));
+                             color: var(--ink); border: 1px solid var(--accent);
+                             border-radius: 3px; font-family: var(--mono); font-size: 10px;
+                             cursor: pointer; font-weight: 600;
+                             box-shadow: inset 0 0 6px rgba(245,165,36,0.18);
+                             text-shadow: 0 0 3px rgba(245,165,36,0.4);">K=3</button>
+              <button data-band-aside="all" class="active"
+                      title="Show all bands"
+                      style="flex: 1 1 auto; padding: 2px 6px;
+                             background: var(--panel-2); color: var(--ink);
+                             border: 1px solid var(--rule); border-radius: 3px;
+                             font-family: var(--mono); font-size: 10px;
+                             cursor: pointer;">all</button>
+              <!-- 6 band buttons (K=0..5). Colors set in JS via _refreshBandPickAsideColors -->
+              <button data-band-aside="0" data-k-band="0"
+                      title="Pick from K-cluster 1"
+                      style="flex: 0 0 22px; padding: 2px 0;
+                             background: var(--panel-2); border: 1px solid var(--rule);
+                             border-radius: 3px; font-family: var(--mono); font-size: 10px;
+                             cursor: pointer;">1</button>
+              <button data-band-aside="1" data-k-band="1"
+                      title="Pick from K-cluster 2"
+                      style="flex: 0 0 22px; padding: 2px 0;
+                             background: var(--panel-2); border: 1px solid var(--rule);
+                             border-radius: 3px; font-family: var(--mono); font-size: 10px;
+                             cursor: pointer;">2</button>
+              <button data-band-aside="2" data-k-band="2"
+                      title="Pick from K-cluster 3"
+                      style="flex: 0 0 22px; padding: 2px 0;
+                             background: var(--panel-2); border: 1px solid var(--rule);
+                             border-radius: 3px; font-family: var(--mono); font-size: 10px;
+                             cursor: pointer;">3</button>
+              <button data-band-aside="3" data-k-band="3"
+                      title="Pick from K-cluster 4 (only available at K=4+)"
+                      style="flex: 0 0 22px; padding: 2px 0;
+                             background: var(--panel-2); border: 1px solid var(--rule);
+                             border-radius: 3px; font-family: var(--mono); font-size: 10px;
+                             cursor: pointer;">4</button>
+              <button data-band-aside="4" data-k-band="4"
+                      title="Pick from K-cluster 5 (only available at K=5+)"
+                      style="flex: 0 0 22px; padding: 2px 0;
+                             background: var(--panel-2); border: 1px solid var(--rule);
+                             border-radius: 3px; font-family: var(--mono); font-size: 10px;
+                             cursor: pointer;">5</button>
+              <button data-band-aside="5" data-k-band="5"
+                      title="Pick from K-cluster 6 (only available at K=6)"
+                      style="flex: 0 0 22px; padding: 2px 0;
+                             background: var(--panel-2); border: 1px solid var(--rule);
+                             border-radius: 3px; font-family: var(--mono); font-size: 10px;
+                             cursor: pointer;">6</button>
+            </div>
+            <!-- Row E: Auto-pick + Clear (dark) -->
+            <div style="display: flex; gap: 3px;">
+              <button id="autoPickRadialAside"
+                      title="Auto-pick samples spread radially across PC1/PC2"
+                      style="flex: 1 1 auto; padding: 2px 6px;
+                             background: var(--panel-2); color: var(--ink);
+                             border: 1px solid var(--rule); border-radius: 3px;
+                             font-family: var(--mono); font-size: 10px;
+                             cursor: pointer;">Auto-pick</button>
+              <button id="clearPicksAside"
+                      title="Clear all tracked samples"
+                      style="flex: 0 0 auto; padding: 2px 8px;
+                             background: #0a0d12; color: var(--ink-dim);
+                             border: 1px solid #1a1f26; border-radius: 3px;
+                             font-family: var(--mono); font-size: 10px;
+                             cursor: pointer;">Clear</button>
+            </div>
+            <!-- Footer count info — superseded by header badge but kept for
+                 backward compat with sidebar listeners that target these IDs. -->
+            <div style="display: none;">
+              <span id="trackedCountInfoAside">0</span> /
+              <span id="trackedNInfoAside">10</span>
+            </div>
+          </div>
+        </div>
+      </div><!-- /#pcaPanelBody -->
+    </div>
+
+    <!-- v3.79: horizontal drag-resize seam between PCA (above) and tracked-
+         samples menu (below) within the compactLeftStack. Only visible in
+         compact mode. Drives --compact-leftupperpct. -->
+    <div id="compactStackResize"
+         title="Drag to resize · double-click to reset"></div>
+
+    <div class="panel" id="trackedSamplesPanelCompact">
+      <div id="trackedSamplesPanelCompactHead"
+           style="padding: 4px 8px; border-bottom: 1px solid var(--rule);
+                  font-size: 10px; color: var(--ink-dim); font-family: var(--mono);
+                  text-transform: uppercase; letter-spacing: 0.05em;
+                  display: flex; align-items: center; justify-content: space-between;
+                  cursor: pointer; user-select: none;"
+           title="Click to collapse / expand the tracked samples controls">
+        <span>tracked samples</span>
+        <!-- v3.99 turn 4: collapse arrow. Toggles
+             #trackedSamplesPanelCompactBody display between block and none.
+             Default expanded; persisted in localStorage. -->
+        <span id="trackedSamplesPanelCompactArrow"
+              style="font-size: 9px; color: var(--ink-dim);">▼</span>
+      </div>
+      <!-- v3.78: tightened spacing for the narrow column in compact mode.
+           Rows use 4px gap, 4px 8px padding; text 10.5px; band buttons wrap to
+           2 columns so longer labels stay readable.
+           v4 turn 73c: parity with fixed-mode sidebar — added lock / promote /
+           export buttons + color-mode picker + tracked list + manual-groups
+           section. All IDs use `Compact` suffix; `_syncTrackedCompactUI` and
+           `renderTrackedList` mirror state from the sidebar. -->
+      <div id="trackedSamplesPanelCompactBody"
+           style="padding: 4px 8px; display: flex; flex-direction: column; gap: 4px;
+                  overflow-y: auto;">
+        <!-- v4 turn 128d: ported the fixed-mode settings layout to compact —
+             previously compact had only [trails][sign-align PC1] + a 4-band
+             grid with no K-cycle, no lasso, no scree. The new layout matches
+             the in-pcaPanel fixed-mode aside one-for-one:
+               Row A: trails | sign-align PC1 | lasso | scree
+               Lasso confirm/clear bar (hidden until lasso selection exists)
+               Row B: trail back slider
+               Row C: N tracked slider
+               Row D: K(N) cycle button + "all" + 6 K-colored band buttons
+               Row E: Auto-pick + Clear (dark)
+             Compact-suffix IDs delegate to the fixed-mode handlers via
+             _wireCompactCheckboxMirror (added below in the script section).
+             The K-band buttons use data-k-band so _syncTrackedCompactUI's
+             color-and-enable loop picks them up automatically. -->
+        <div style="display: flex; gap: 6px; align-items: center; font-size: 10.5px; flex-wrap: wrap;">
+          <label style="display: flex; align-items: center; gap: 2px; cursor: pointer;">
+            <input type="checkbox" id="trailOnCompact" style="margin: 0;" /> trails
+          </label>
+          <label style="display: flex; align-items: center; gap: 2px; cursor: pointer;">
+            <input type="checkbox" id="flipPC1Compact" style="margin: 0;" /> sign-align PC1
+          </label>
+          <label id="pcaLassoLabelCompact"
+                 style="display: flex; align-items: center; gap: 2px; cursor: pointer;
+                        padding-left: 4px; border-left: 1px solid var(--rule);"
+                 title="Lasso mode: drag a rectangle on the PCA scatter to select samples by their PC1/PC2 position. Tracked highlights are suppressed while ON.">
+            <input type="checkbox" id="pcaLassoToggleCompact" style="margin: 0;" /> lasso
+          </label>
+          <label id="screeToggleLabelCompact"
+                 style="display: flex; align-items: center; gap: 2px; cursor: pointer;
+                        padding-left: 4px; border-left: 1px solid var(--rule);"
+                 title="Scree inset: top-k local-PCA eigenvalues for the current window. Steep bar drop = clean inversion structure; flat bars = noisy/unstable window.">
+            <input type="checkbox" id="screeToggleCompact" style="margin: 0;" /> scree
+          </label>
+        </div>
+        <!-- Lasso confirm/clear bar — hidden until selection exists. The
+             fixed-mode lasso handler pcaLassoSetBadge() updates display
+             on #pcaLassoBar; we mirror onto #pcaLassoBarCompact here. -->
+        <div id="pcaLassoBarCompact" style="display: none; gap: 4px; align-items: center; font-size: 10px;">
+          <span id="pcaLassoBadgeCompact"
+                title="Number of samples currently lassoed (not yet committed)"
+                style="font-family: var(--mono); font-size: 10px;
+                       padding: 1px 6px; border-radius: 3px;
+                       background: rgba(245,165,36,0.15);
+                       border: 1px solid rgba(245,165,36,0.5);
+                       color: var(--accent); white-space: nowrap;">0 selected</span>
+          <button id="pcaLassoConfirmBtnCompact"
+                  title="Replace the tracked-samples list with the lassoed set"
+                  style="background: var(--accent); color: #0e1116;
+                         border: 1px solid var(--accent); border-radius: 3px;
+                         padding: 1px 8px; font-family: var(--mono); font-size: 10px;
+                         cursor: pointer; font-weight: 600;">Confirm</button>
+          <button id="pcaLassoClearBtnCompact"
+                  title="Clear the current lasso selection without committing"
+                  style="background: var(--panel-2); color: var(--ink-dim);
+                         border: 1px solid var(--rule); border-radius: 3px;
+                         padding: 1px 8px; font-family: var(--mono); font-size: 10px;
+                         cursor: pointer;">Clear</button>
+        </div>
+        <div style="display: flex; gap: 4px; align-items: center; font-size: 10.5px;">
+          <span style="color: var(--ink-dim); flex: 0 0 56px;">trail back</span>
+          <input type="range" id="trailNCompact" min="0" max="80" value="15" step="1"
+                 style="flex: 1 1 auto; min-width: 0;" />
+          <span class="val" id="trailNValCompact" style="flex: 0 0 22px; text-align: right;">15</span>
+        </div>
+        <div style="display: flex; gap: 4px; align-items: center; font-size: 10.5px;">
+          <span style="color: var(--ink-dim); flex: 0 0 56px;">N tracked</span>
+          <input type="range" id="trackedNCompact" min="0" max="30" step="1" value="10"
+                 style="flex: 1 1 auto; min-width: 0;" />
+          <span class="val" id="trackedNValCompact" style="flex: 0 0 22px; text-align: right;">10</span>
+        </div>
+        <!-- K(N) cycle button + 6 K-colored band buttons. data-k-band="0..5"
+             matches the existing fixed-mode buttons so _syncTrackedCompactUI
+             auto-colors and auto-enables them based on state.k. The "all"
+             button uses data-band-compact="all" for the same handler.
+             K-cycle button id "kCycleBtnCompact" delegates to kCycleBtnAside. -->
+        <div style="display: flex; gap: 3px; align-items: center; font-size: 10px;">
+          <button id="kCycleBtnCompact"
+                  title="Click to cycle K (number of K-means clusters): 3 → 4 → 5 → 6 → 2 → 3. Recolors the PCA scatter, the per-sample lines, and all band buttons. Mirrors the sidebar K selector."
+                  style="flex: 0 0 auto; padding: 2px 6px;
+                         background: linear-gradient(180deg, rgba(245,165,36,0.30), rgba(245,165,36,0.10));
+                         color: var(--ink); border: 1px solid var(--accent);
+                         border-radius: 3px; font-family: var(--mono); font-size: 10px;
+                         cursor: pointer; font-weight: 600;
+                         box-shadow: inset 0 0 6px rgba(245,165,36,0.18);
+                         text-shadow: 0 0 3px rgba(245,165,36,0.4);">K=3</button>
+          <button data-band-compact="all" class="active"
+                  title="Show all bands"
+                  style="flex: 1 1 auto; padding: 2px 6px;
+                         background: var(--panel-2); color: var(--ink);
+                         border: 1px solid var(--rule); border-radius: 3px;
+                         font-family: var(--mono); font-size: 10px;
+                         cursor: pointer;">all</button>
+          <button data-band-compact="0" data-k-band="0"
+                  title="Pick from K-cluster 1"
+                  style="flex: 0 0 22px; padding: 2px 0;
+                         background: var(--panel-2); border: 1px solid var(--rule);
+                         border-radius: 3px; font-family: var(--mono); font-size: 10px;
+                         cursor: pointer;">1</button>
+          <button data-band-compact="1" data-k-band="1"
+                  title="Pick from K-cluster 2"
+                  style="flex: 0 0 22px; padding: 2px 0;
+                         background: var(--panel-2); border: 1px solid var(--rule);
+                         border-radius: 3px; font-family: var(--mono); font-size: 10px;
+                         cursor: pointer;">2</button>
+          <button data-band-compact="2" data-k-band="2"
+                  title="Pick from K-cluster 3"
+                  style="flex: 0 0 22px; padding: 2px 0;
+                         background: var(--panel-2); border: 1px solid var(--rule);
+                         border-radius: 3px; font-family: var(--mono); font-size: 10px;
+                         cursor: pointer;">3</button>
+          <button data-band-compact="3" data-k-band="3"
+                  title="Pick from K-cluster 4 (only available at K=4+)"
+                  style="flex: 0 0 22px; padding: 2px 0;
+                         background: var(--panel-2); border: 1px solid var(--rule);
+                         border-radius: 3px; font-family: var(--mono); font-size: 10px;
+                         cursor: pointer;">4</button>
+          <button data-band-compact="4" data-k-band="4"
+                  title="Pick from K-cluster 5 (only available at K=5+)"
+                  style="flex: 0 0 22px; padding: 2px 0;
+                         background: var(--panel-2); border: 1px solid var(--rule);
+                         border-radius: 3px; font-family: var(--mono); font-size: 10px;
+                         cursor: pointer;">5</button>
+          <button data-band-compact="5" data-k-band="5"
+                  title="Pick from K-cluster 6 (only available at K=6)"
+                  style="flex: 0 0 22px; padding: 2px 0;
+                         background: var(--panel-2); border: 1px solid var(--rule);
+                         border-radius: 3px; font-family: var(--mono); font-size: 10px;
+                         cursor: pointer;">6</button>
+        </div>
+        <div style="display: flex; gap: 3px;">
+          <button id="autoPickRadialCompact"
+                  title="Auto-pick samples spread radially across PC1/PC2"
+                  style="flex: 1 1 auto; padding: 2px 6px;
+                         background: var(--panel-2); color: var(--ink);
+                         border: 1px solid var(--rule); border-radius: 3px;
+                         font-family: var(--mono); font-size: 10px;
+                         cursor: pointer;">Auto-pick</button>
+          <button id="clearPicksCompact"
+                  title="Clear all tracked samples"
+                  style="flex: 0 0 auto; padding: 2px 8px;
+                         background: #0a0d12; color: var(--ink-dim);
+                         border: 1px solid #1a1f26; border-radius: 3px;
+                         font-family: var(--mono); font-size: 10px;
+                         cursor: pointer;">Clear</button>
+        </div>
+        <div style="font-size: 9.5px; color: var(--ink-dim); line-height: 1.3;">
+          tracked: <span id="trackedCountInfoCompact">0</span> /
+          <span id="trackedNInfoCompact">10</span>
+        </div>
+
+        <!-- v4 turn 73c: action buttons mirroring sidebar — stacked vertically
+             so the labels read fully even at narrow column widths. Each
+             button is a thin proxy that delegates to the existing sidebar
+             handler (no logic duplication). -->
+        <div style="border-top: 1px solid var(--rule); margin-top: 4px; padding-top: 4px;
+                    display: flex; flex-direction: column; gap: 3px;">
+          <button id="lockColorsBtnCompact"
+                  title="Freeze cluster colors using current L2's labels — stay stable as you scrub"
+                  style="font-size: 10px; padding: 3px 6px; text-align: left;">🔒 lock colors</button>
+          <button id="promoteCandidateBtnCompact" disabled
+                  title="Lock colors on an L2 first (🔒 button above)"
+                  style="font-size: 10px; padding: 3px 6px; text-align: left;">⬆ promote to candidate</button>
+          <button id="exportKLabelsBtnCompact"
+                  title="Download per-(L2, sample) K-means labels as TSV — feed into C++ pop-stats engine"
+                  style="font-size: 10px; padding: 3px 6px; text-align: left;">⬇ export K labels TSV</button>
+        </div>
+
+        <!-- v4 turn 73c: color-mode picker. Same five buttons as sidebar. -->
+        <div style="border-top: 1px solid var(--rule); margin-top: 4px; padding-top: 4px;">
+          <div style="font-size: 10px; color: var(--ink-dim); margin-bottom: 3px;">color samples by</div>
+          <div class="color-mode-row" id="colorModeBarCompact"
+               style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2px;">
+            <button data-mode-compact="cluster" class="active"
+                    style="font-size: 9.5px; padding: 2px 4px;">cluster</button>
+            <button data-mode-compact="family"
+                    style="font-size: 9.5px; padding: 2px 4px;">family</button>
+            <button data-mode-compact="ancestry"
+                    style="font-size: 9.5px; padding: 2px 4px;">ancestry</button>
+            <button data-mode-compact="manual"
+                    title="Manually-curated groups (set in 'Manual groups' below)"
+                    style="font-size: 9.5px; padding: 2px 4px;">manual</button>
+            <button data-mode-compact="residual"
+                    title="v4 turn 83 — Diagnostic mode. Recolors PCA + L3 strip by per-fish residual_z from band centroid. Cool blue = clean homozygote; red = suspicious carrier (≥2.5σ)."
+                    style="font-size: 9.5px; padding: 2px 4px;">⚡ residual</button>
+            <button data-mode-compact="none"
+                    style="font-size: 9.5px; padding: 2px 4px;">none</button>
+          </div>
+        </div>
+
+        <!-- v4 turn 73c: tracked-sample list. Renderer dual-writes from
+             renderTrackedList → both #trackedList (sidebar) and #trackedListCompact. -->
+        <div style="border-top: 1px solid var(--rule); margin-top: 4px; padding-top: 4px;">
+          <div style="font-size: 10px; color: var(--ink-dim); margin-bottom: 3px;">tracked samples</div>
+          <div id="trackedListCompact" style="font-size: 10px; max-height: 140px; overflow-y: auto;"></div>
+        </div>
+
+        <!-- v4 turn 73c: manual groups section. Renderer dual-writes into
+             #manualGroupsListCompact when present. -->
+        <div style="border-top: 1px solid var(--rule); margin-top: 4px; padding-top: 4px;">
+          <div style="font-size: 10px; color: var(--ink-dim); margin-bottom: 3px;"
+               title="Manually-curated sample groups — overrides K-means coloring when 'manual' color mode is active.">
+            manual groups
+          </div>
+          <div id="manualGroupsListCompact"
+               style="display: flex; flex-direction: column; gap: 3px; font-size: 10px; max-height: 100px; overflow-y: auto;"></div>
+          <div style="display: flex; gap: 3px; margin-top: 4px;">
+            <button id="mgAddBtnCompact"
+                    title="Create a new manual group from the current tracked samples"
+                    style="font-size: 9.5px; padding: 2px 4px; flex: 1 1 auto;">+ from tracked</button>
+            <button id="mgClearAllBtnCompact"
+                    title="Delete all manual groups (cannot be undone)"
+                    style="font-size: 9.5px; padding: 2px 4px; flex: 0 0 auto; color: var(--bad);">×</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    </div><!-- /#compactLeftStack -->
+
+    <!-- v3.99 turn 2: compact-mode L3 resize handle. Sits at grid-row 6
+         (between upper panels and L3 panel) in compact mode; hidden in
+         fixed/free modes. Drag adjusts --compact-l3h CSS variable. -->
+    <div id="compactL3Resize" title="Drag to resize the L3 contingency tables panel · double-click to reset"></div>
+
+    <div class="panel l3-more-collapsed" id="l3Panel">
+      <div id="l3Resize" title="Drag to resize · double-click to reset"></div>
+      <div class="l3-head">
+        <!-- v3.58: title doubles as a collapse-toggle. Clicking anywhere on
+             "L3 contingency tables · Hungarian-aligned · pick a layout →"
+             expands a collapsed panel or collapses an open one. Provides a
+             redundant affordance in case the small ▼ button at the right gets
+             scrolled off in narrow viewports. -->
+        <div class="title" id="l3TitleClickable"
+             style="cursor: pointer; user-select: none; flex: 0 0 auto;"
+             title="Click to collapse / expand the L3 panel"><b>L3 contingency tables</b> · Hungarian-aligned · pick a layout →</div>
+        <div class="l3-layout" id="l3Layout">
+          <button data-layout="focal">Focal only</button>
+          <button data-layout="left">     +Left</button>
+          <button data-layout="right">    +Right</button>
+          <button data-layout="leftright" class="active">+L/R</button>
+          <button data-layout="four">     ±2</button>
+          <button data-layout="dual" disabled title="Pin a 2nd L2 first">Dual</button>
+        </div>
+        <div class="l3-layout l3-more-item" id="l3ColorMode" style="margin-left: 12px;"
+             title="Pane coloring: shared (focal palette everywhere), unique (per-pane palettes), dual (fill=pane / ring=focal)">
+          <button data-l3color="shared" class="active">shared colors</button>
+          <button data-l3color="unique">unique/pane</button>
+          <button data-l3color="dual">dual</button>
+        </div>
+        <div class="l3-layout l3-more-item" id="l3KMode" style="margin-left: 12px;"
+             title="L3 K-means resolution. K=3 (default) gives a coarse INV/HET/REF-style geometric split. K=6 sub-resolves into nested haplotype-level clusters. ⚠ IMPORTANT — K-means bands are PROVISIONAL GEOMETRIC clusters, not biological regimes. Final regime calls (paper-level) require multi-evidence convergence: dosage (marker pattern), GHSL (haplotype divergence), heterozygosity, ROH/F_ROH (inbreeding/IBD confounder), and family/relatedness (kinship confounder). K=6 frequently represents nested substructure inside three major regimes — do NOT default to interpreting it as six biological regimes. See help → roadmap → 'Multi-evidence regime framework' for the planned mode switcher (v4.0).">
+          <button data-l3k="k3" class="active"
+                  title="K=3 — coarse geometric split, usually maps to {REF, HET, INV}-like bands. Provisional only; validate with dosage/GHSL/het/ROH/family before calling regimes.">K=3</button>
+          <button data-l3k="k6"
+                  title="K=6 — sub-resolves into nested haplotype-level clusters. ⚠ Often nested substructure inside three major regimes; do NOT interpret as six biological regimes by default. Use as a diagnostic/substructure layer.">K=6 ⚠</button>
+          <button data-l3k="both"
+                  title="K=3+6 — both K-means resolutions stacked side-by-side. Useful for spotting whether K=6 sub-clusters are coherent (= real substructure) or noise.">K=3+6</button>
+        </div>
+        <!-- turn 128d Slice 1 (SPEC_l3_het_dosage_coloring.md): het-coloring
+             toggle. When ON, every L3 mini-PCA paints dot fills by per-sample
+             het-rate computed from the dosage_chunks layer (instead of the
+             K-means band color). The K-cluster halo on tracked dots stays
+             K-cluster-colored so the user can see "this sample is in band g0
+             BUT its het rate suggests g1". The toggle disables when the
+             dosage_chunks layer is missing (with a tooltip naming the layer).
+             State: state.l3HetColoring (boolean, default false). Persisted
+             to localStorage.pca_scrubber_v3.l3HetColoring. -->
+        <label id="l3HetToggleLabel" class="l3-more-item" style="margin-left: 12px; display: flex;
+                                            align-items: center; gap: 4px;
+                                            font-family: var(--mono); font-size: 10.5px;
+                                            color: var(--ink-dim); cursor: pointer;
+                                            user-select: none;"
+               title="Color L3 mini-PCA dots by per-sample heterozygosity rate (computed from dosage_chunks layer). Cold blue = low het (homozygous), neutral = expected ~0.5 het (HET band), warm red = excess het. The K-cluster halo on tracked dots stays K-cluster-colored. Disabled until a dosage_chunks JSON layer is loaded.">
+          <input type="checkbox" id="l3HetToggle" style="margin: 0;" />
+          <span>het</span>
+        </label>
+        <!-- turn 133 Slice 1 (SPEC_l2_sweep_inheritance.md): auto-sweep
+             toggle. When ON, every chromosome load runs the inheritance
+             algorithm against ALL usable L2 envelopes (not just user-
+             promoted candidates) and auto-promotes the L2s that pass the
+             5-gate filter (silhouette, ≥2 inheritance groups, min band
+             size, not-already-saved, dedupe radius). Auto-promoted
+             candidates are tagged source='auto_l2_sweep', confirmed=false
+             — they appear in the catalogue with a distinct chip but
+             don't feed runInheritanceCompute() until the user confirms.
+             State: state.l2SweepEnabled (boolean, default false).
+             Persisted to localStorage.pca_scrubber_v3.l2SweepEnabled.
+             Per-chrom dismissed-set persisted under
+             pca_scrubber_v3.l2SweepDismissed.<chrom>. -->
+        <label id="l2SweepToggleLabel" class="l3-more-item" style="margin-left: 12px; display: flex;
+                                              align-items: center; gap: 4px;
+                                              font-family: var(--mono); font-size: 10.5px;
+                                              color: var(--ink-dim); cursor: pointer;
+                                              user-select: none;"
+               title="Auto-run inheritance clustering against ALL usable L2 envelopes on the chromosome (not just user-promoted candidates), and auto-promote L2s that pass the 5-gate filter (silhouette ≥0.30, ≥2 inheritance groups touched, min band size ≥5, not already saved, ≥100 kb from existing candidates). Auto-promoted candidates are tagged 'auto_l2_sweep' and appear in the catalogue with a distinct chip; they do NOT feed the I·g pills until you confirm them. Default OFF.">
+          <input type="checkbox" id="l2SweepToggle" style="margin: 0;" />
+          <span>L2-sweep 🤖</span>
+        </label>
+        <!-- turn 134 Slice 2: inspector trigger button. Opens the
+             L2-sweep inspector modal showing every L2 in the current
+             sweep result with per-row promote/dismiss + filters + bulk
+             actions. Disabled (greyed) when no sweep result is on
+             state.l2SweepResult — i.e. before the L2-sweep toggle is
+             enabled, or before any chrom is loaded. -->
+        <button id="l2SweepInspectBtn"
+                class="l3-more-item"
+                style="margin-left: 4px; background: transparent;
+                       border: 1px solid var(--rule); color: var(--ink-dim);
+                       padding: 1px 6px; cursor: pointer; font-family: var(--mono);
+                       font-size: 10.5px; border-radius: 3px;"
+                title="Open the L2-sweep inspector — review every L2 in the sweep with per-row promote/dismiss buttons, filter by silhouette / group count, bulk actions, and re-sweep. Disabled until the L2-sweep toggle has run at least once on the current chrom."
+                disabled>🔍 inspect</button>
+        <!-- turn 135 Slice 1 (SPEC_g_panel_unified_groups.md): G-panel
+             trigger button. Opens the unified groups popup with three
+             tabs (karyotype / inheritance / manual). Slice 1 ships the
+             popup scaffold + manual tab re-host only; karyotype and
+             inheritance tabs show a "Slice N pending" empty-state for
+             now. Hotkey: lowercase 'g' (no modifiers, not in input
+             field) toggles the popup. Cohort-level — works whether or
+             not data is loaded. Manual tab works always; karyotype tab
+             will need a focused candidate; inheritance tab will need
+             ≥2 confirmed candidates (Slices 2 + 3). -->
+        <button id="gPanelOpenBtn"
+                class="l3-more-item"
+                style="margin-left: 12px; background: transparent;
+                       border: 1px solid var(--rule); color: var(--ink-dim);
+                       padding: 1px 6px; cursor: pointer; font-family: var(--mono);
+                       font-size: 10.5px; border-radius: 3px;"
+                title="Open the unified groups popup — three tabs covering karyotype groups (per-candidate band membership), inheritance groups (cross-candidate Jaccard clusters), and manual groups (user-curated cohort splits). Hotkey: g. Slice 1 implements the manual tab; karyotype and inheritance ship in later slices.">G ▾</button>
+        <!-- turn 147 — manual line-break removed. With the ⋯ more
+             disclosure collapsing the secondary controls by default,
+             the toolbar fits comfortably on one line; the previous
+             flex-basis:100% break was forcing a wasteful empty row.
+             flex-wrap: wrap on the parent still handles narrow viewports. -->
+        <div class="l3-layout" id="l3CompareUnit" style="margin-left: 12px;"
+             title="Comparison unit for L3 panes. L2 = whole envelopes (default). win1/5/10 = slabs of N windows centered on the scrubber. winN = user-defined slab size.">
+          <button data-l3unit="L2"    class="active" title="Compare whole L2 envelopes (default)">L2</button>
+          <button data-l3unit="win1"  title="Each pane = 1 window; ±1 panes are adjacent windows">1w</button>
+          <button data-l3unit="win5"  title="Each pane = 5-window slab; ±1 panes are adjacent slabs (refine default)">5w</button>
+          <button data-l3unit="win10" title="Each pane = ~10-window slab; ±1 panes are adjacent slabs">10w</button>
+          <button data-l3unit="winN"  title="Custom slab size — use the input to the right">N w</button>
+          <input type="number" id="l3CompareUnitN" min="1" max="100" value="5" step="1"
+                 title="Custom slab size (number of windows per slab)"
+                 style="width: 38px; padding: 1px 4px; margin-left: 4px;
+                        font-family: var(--mono); font-size: 10.5px;
+                        background: var(--panel-2); color: var(--ink);
+                        border: 1px solid var(--rule); border-radius: 3px;">
+        </div>
+        <!-- v3.69: band-continuity scope selector. Picks which span of L2s
+             the focal-pane "band continuity" metric is computed over. Default
+             is 'carousel' (the 5-pane neighborhood); 'draft' uses the active
+             candidate-mode draft (only enabled when one exists); 'chrom' is
+             the whole-chromosome aggregate. -->
+        <div class="l3-layout l3-more-item" id="l3BcScope" style="margin-left: 12px;"
+             title="Scope for the band-continuity metric in the focal L3 pane. carousel = 5-pane neighborhood (default). draft = the interval currently being assembled in candidate mode (only when building one). chrom = whole-chromosome aggregate.">
+          <span class="dim" style="font-size: 9px; margin-right: 4px; align-self: center;">b.continuity:</span>
+          <button data-l3bc="carousel" class="active" title="5-pane carousel neighborhood">carousel</button>
+          <button data-l3bc="draft"    title="Span of the interval currently being assembled in candidate mode (only when building one)">draft</button>
+          <button data-l3bc="chrom"    title="Whole-chromosome aggregate">chrom</button>
+        </div>
+        <!-- v4 turn 12a (Deliverable D): scale-stability mode toggle + pane
+             scale pickers. When the ⤢ scale button is active, the L3 carousel
+             switches from spatial neighbors of the focal L2 to three different
+             SCALES centered on the focal — fine / medium / coarse — and runs
+             cluster-comparison metrics across them. The three dropdowns let
+             the user pick each pane's unit independently (windows, SNP-bands,
+             kb-bands, L1/L2/candidate envelopes). All math helpers shipped
+             in turn 11; this row is the wiring + UI layer. -->
+        <div class="l3-layout l3-more-item" id="l3ScaleMode" style="margin-left: 12px;"
+             title="Scale-stability test: same focal, three different zoom levels (fine / medium / coarse). Toggle ON to swap the L3 carousel from spatial neighbors to scale neighbors. Sankey + contingency between adjacent panes shows fuse/split structure. Verdict cascade: STABLE_3BAND / STABLE_6BAND / NESTED_3IN6 / OVERLAP_BREAKS_3 / UNSTABLE.">
+          <button data-l3scale-toggle="off" class="active" title="Spatial-neighbor mode (default — existing L3 carousel)">⤢ off</button>
+          <button data-l3scale-toggle="on" title="Scale-stability mode — three panes show fine / medium / coarse on the same focal window">⤢ scale</button>
+        </div>
+        <div class="l3-layout l3-more-item" id="l3ScalePanes" style="margin-left: 12px; display: none;"
+             title="Three scale dropdowns. Each pane picks its own unit independently. Defaults: 5w fine / L2 medium / candidate coarse (or L1 if no candidate active).">
+          <span class="dim" style="font-size: 9px; margin-right: 4px; align-self: center;">Σ:</span>
+          <select id="l3ScaleSel0" data-l3scale-pane="0" class="l3-scale-sel"></select>
+          <select id="l3ScaleSel1" data-l3scale-pane="1" class="l3-scale-sel" style="margin-left: 4px;"></select>
+          <select id="l3ScaleSel2" data-l3scale-pane="2" class="l3-scale-sel" style="margin-left: 4px;"></select>
+        </div>
+        <!-- v4.1: L3 re-clustering mode picker. Lets the user re-cluster
+             each L2's samples with an alternative method before building
+             the contingency table — useful when the default K=3 K-means is
+             too coarse and two bands sit on top of each other relative to
+             the focal band. Quentin's diagnostic: "sometimes K=3 is too
+             coarse, says merge when really the next 2 bands are on each
+             other relative to focal band." Three modes shipped (kmeans-K3
+             default, kmeans-K6, distance-uv); six modes scaffold-only
+             (gmm-3/4/5/6, dbscan, dosage) with tooltips naming what each
+             will do. SCHEMA §11.3 documents the mode table. -->
+        <div class="l3-layout" id="l3ReclusterMode" style="margin-left: 12px; flex-direction: column; align-items: flex-start; gap: 0;"
+             title="Re-clustering method for the L3 contingency table. Default kmeans-K3 = current behavior; alternatives let you re-cluster each L2's samples differently before computing concord / Cramér's V / NMI / AMI / ARI to test whether the merge call is robust to the clustering method.">
+          <!-- v4 turn 113 (Ask 2): #l3ReclusterMode flipped to column layout
+               so the merge ↑ / separate ↓ / confirm action row can sit
+               directly UNDER the recluster dropdown — Quentin's request:
+               "its just to show visually like can merge interval, separate
+               or enter to confirm bc now its below at the bottom of the
+               panel its not convenient." Top row keeps the original
+               label-+-select horizontal pairing inside #l3ReclusterTopRow
+               so it reads identically to the previous single-row layout. -->
+          <div id="l3ReclusterTopRow" style="display: flex; gap: 2px; align-items: center;">
+            <span class="dim" style="font-size: 9px; margin-right: 4px; align-self: center;">recluster:</span>
+            <select id="l3ReclusterSel"
+                    style="background: var(--panel-2); color: var(--ink);
+                           border: 1px solid var(--rule); border-radius: 3px;
+                           padding: 2px 6px; font-family: var(--mono);
+                           font-size: 10.5px; cursor: pointer;">
+              <option value="kmeans-K3" title="K-means with K=3 on PC1/PC2 (default — current behavior)">kmeans-K3</option>
+              <option value="kmeans-K6" title="K-means with K=6 on PC1/PC2 — sub-resolves the three K=3 bands into nested haplotype-level clusters; useful when K=3 over-merges nested substructure">kmeans-K6</option>
+              <option value="distance-uv" title="Rotate (PC1, PC2) so the Hom1↔Hom2 axis is horizontal (u-axis), with Het anchored near u≈0. Then K-means2D in rotated (u, v) space. Mirrors STEP20b_anchor_geometry_module.R rotate_to_stripe_axis(). The v-axis carries real biological information — samples that deviate perpendicular signal recombinants, rare alleles, second overlying inversions, or gene-conversion tracts.">uv-rotated (distance-uv)</option>
+              <option value="uv-denoise" title="Rotated (u, v) + DBSCAN as pre-filter. DBSCAN identifies noise samples first (auto-eps = median k-NN × 0.8, minPts = max(3, ⌊N·0.08⌋)); then K-means3 runs on survivors only. Noise samples get assigned to the nearest centroid for the final contingency. Useful when family outliers or rare admixed samples drag K-means centroids; this mode filters them out of the centroid computation but still places them in the contingency.">uv-denoise</option>
+              <option value="uv-dbscan" title="Rotated (u, v) + K-means3 → DBSCAN within each stripe. Mirrors STEP22_candidate_subclustering.R within-stripe DBSCAN on v values. Auto-eps = median k-NN × 0.8 per stripe. Samples in the dominant subcluster keep the stripe label; samples in minority subclusters or noise get reassigned to the second-closest stripe — visible as off-diagonal contingency mass when DBSCAN finds internal structure that K-means hard-assignment hides.">uv-dbscan</option>
+              <option value="uv-dist-rank" title="Rotated (u, v) + K-means3 → within each Hom stripe, the closest tercile to the Het centroid gets relabeled as Het. Reveals samples that DRIFT toward Het (recombinants, admixture, intermediate states) by moving them into the Het cell of the contingency. Het stripe samples stay as Het.">uv-dist-rank</option>
+              <option value="uv-dist-fuzzy" title="Rotated (u, v) + soft inverse-distance weights to all three centroids. Hard label = argmax(weights), but if the max weight < 0.45 (sample is within ~10% of being equidistant from two centroids), reassign to the second-best centroid. Reveals contingency cells where K-means hard assignment was forced on truly ambiguous samples.">uv-dist-fuzzy</option>
+              <option value="gmm-3" disabled title="[v4.x planned] Gaussian Mixture Model with K=3, diagonal covariance EM. Better for elongated or overlapping bands than K-means hard assignment. Implementation: ~80 lines of JS EM, in design.">gmm-3 (planned)</option>
+              <option value="gmm-4" disabled title="[v4.x planned] Gaussian Mixture Model with K=4. Resolves cases where one of the K=3 bands has internal structure.">gmm-4 (planned)</option>
+              <option value="gmm-5" disabled title="[v4.x planned] Gaussian Mixture Model with K=5.">gmm-5 (planned)</option>
+              <option value="gmm-6" disabled title="[v4.x planned] Gaussian Mixture Model with K=6 — soft analog of the kmeans-K6 mode.">gmm-6 (planned)</option>
+              <option value="dbscan-raw" disabled title="[v4.x planned] DBSCAN density clustering on RAW (PC1, PC2) without rotation. Variable-K — produces uneven contingency tables that need extended Hungarian alignment or noise-cluster handling. Use uv-dbscan or uv-denoise instead for shipped DBSCAN behavior.">dbscan-raw (planned)</option>
+              <option value="dosage" disabled title="[v4.x planned] Re-cluster on the per-sample dosage matrix instead of PC space. Catches dosage-defined regimes the PC space hides. Requires dosage_chunks JSON layer (R-side STEP_R30 emit, planned).">dosage (planned)</option>
+            </select>
+          </div>
+          <!-- v4 turn 113 (Ask 2): three action buttons under the recluster
+               dropdown — visible affordances for the existing keyboard
+               actions in candidate mode:
+                 Merge ↑   = ArrowUp     = extendL3DraftRight()  (extend draft to next L2 / next window)
+                 Separate ↓ = ArrowDown  = shrinkL3DraftRight()  (shrink draft from rightmost edge)
+                 Confirm [Enter] = Enter = commitL3Draft()       (promote draft to candidate list)
+               Colors mirror the .verdict.merge / .verdict.separate palette
+               (green / red); confirm uses --accent (amber). The confirm
+               button picks up .attention-pulse whenever a draft exists
+               (state.l3Draft != null) so the user gets a visual cue that
+               an action is staged and Enter will commit it. All three
+               buttons disable when candidate mode is off (no draft can
+               exist outside candidate mode). -->
+          <div class="l3-act-row" id="l3ActionRow"
+               title="Candidate-draft action buttons — same actions as the keyboard hotkeys (↑ extend / ↓ shrink / Enter promote). Visible affordance for the keyboard flow when working close to the recluster dropdown.">
+            <span class="l3-act-row-label">draft:</span>
+            <button id="l3ActMergeBtn" class="l3-act-btn l3-act-merge" disabled
+                    title="Merge ↑ — extend the draft candidate to include the next neighbor on the right. Same as ArrowUp in candidate mode. Creates a draft on first click if none exists.">merge ↑</button>
+            <button id="l3ActSeparateBtn" class="l3-act-btn l3-act-separate" disabled
+                    title="Separate ↓ — shrink the draft candidate from the rightmost edge. Same as ArrowDown in candidate mode. No-op when the draft is already at minimum width.">separate ↓</button>
+            <button id="l3ActConfirmBtn" class="l3-act-btn l3-act-confirm" disabled
+                    title="Confirm [Enter] — commit the current draft as a candidate (adds to state.candidateList, marks confirmed, appears on the candidate strip + catalogue). Pulses while a draft is staged.">confirm [Enter]</button>
+          </div>
+          <!-- v4 turn 113 (Ask 1) → v4 turn 123: candidate-edit cluster
+               (F flip / B set boundary / C cut / track 1/2) — relocated
+               from the top of #zPanel into the L3 contingency toolbar so
+               all candidate-mode editing lives in one visual cluster
+               next to merge / separate / confirm. Per Quentin: "buttons
+               are not beautiful and old style and also maybe they would
+               be better placed like in the L3 contingency bar." Buttons
+               restyled with semantic color: F=teal (mode toggle),
+               B=blue (precision/snap), C=orange (cut/split). Track 1/2
+               keep their neutral pill-pair styling with active inversion. -->
+          <div id="candidateEditRow">
+            <span class="cm-edit-row-label">edit:</span>
+            <button id="cmFlipBtn" class="cm-edit-btn cm-edit-flip"
+                    title="F — flip the active draft between L2 and W (window) resolution. In W mode, the draft has window-precision start/end edges that can be nudged with B or refined by clicking the W-row at a specific window.">F flip L2↔W</button>
+            <button id="cmBoundaryBtn" class="cm-edit-btn cm-edit-boundary"
+                    title="B — snap the nearer edge (start_w or end_w) of the active W-resolution draft to the cursor's window. Auto-flips L2→W if needed. Useful for shrinking a draft to a precise boundary inside an L2.">B set boundary</button>
+            <button id="cmCutBtn" class="cm-edit-btn cm-edit-cut"
+                    title="C — toggle a cut marker at the cursor's window inside the active W-resolution draft. Cuts render as 1-px amber lines on the W-row and are persisted with the candidate. Note: cuts are visual + persisted in this turn; commit-time SPLIT (turning N cuts into N+1 candidates on promotion) ships in a future turn.">C ✂ cut</button>
+            <!-- v4 turn 38 (Ask C step 3): track switcher pair (track 1 / 2). -->
+            <span class="cm-track-switcher" style="display: inline-flex; gap: 0; align-items: center; margin-left: 4px;"
+                  title="Track switcher (Ask C). Track 1 = default candidate. Click 'track 2' to build a parallel candidate for an overlapping inversion in the same region. Both tracks commit together as a single two-axes candidate. Mutual exclusivity enforced — a band can belong to at most one track at a time.">
+              <span style="font-family: var(--mono); font-size: 9px; color: var(--ink-dimmer); margin-right: 3px;">tracks:</span>
+              <button id="cmTrack1Btn" class="cm-edit-btn cm-edit-track"
+                      data-active="1"
+                      title="Edit track 1 (default). Click band swatches on the focal L3 pane to add/remove bands from this track.">1</button>
+              <button id="cmTrack2Btn" class="cm-edit-btn cm-edit-track"
+                      data-active="0"
+                      title="Edit track 2 (for overlapping inversions). Clicking activates a 2nd parallel track on the active draft. Add bands to it via the focal-pane band selector. Empty track 2 is dropped at commit time."
+                      style="margin-left: -1px;">2</button>
+            </span>
+          </div>
+        </div>
+        <!-- v4 turn 5 ask 1: Promote-to-candidate button. Builds a candidate
+             from the current focal L2 (or pinned-L2 merge when Dual is active),
+             marks confirmed:true, adds to state.candidateList, persists. The
+             candidate bar atop L1/L2 already renders confirmed candidates as
+             gold-shiny-with-star (drawCandidateBar), so visual update is
+             automatic on the next draw cycle. Also auto-favorites the L2 row
+             in the catalogue (one source of truth: confirmed in candidateList
+             ⇔ favorited star in catalogue). Quentin: "We need a button
+             Promote to candidate (golden) ... appears in the Candidate page
+             and also in the catalogue." -->
+        <button id="l3PromoteCandBtn"
+                title="Promote the current focal L2 to a confirmed candidate. Adds to the candidate list, marks it gold with a ★ on the candidate bar, and appears as a starred row in the Catalogue + on the Candidate Focus page."
+                style="background: linear-gradient(180deg, rgba(245,200,60,0.95), rgba(190,145,25,0.95));
+                       color: #2a1a02; border: 1px solid rgba(140,95,10,0.85);
+                       border-radius: 3px; padding: 3px 10px; font-family: var(--mono);
+                       font-size: 10.5px; cursor: pointer; font-weight: 600;
+                       margin-left: 8px; white-space: nowrap; flex: 0 0 auto;
+                       box-shadow: inset 0 0 6px rgba(255,230,130,0.35);
+                       text-shadow: 0 0 3px rgba(255,250,230,0.5);">★ promote</button>
+        <!-- v3.75: detailed toggle. When active, focal pane reveals the
+             tracked-samples readout (CGA### → g# rows for every watchlist
+             sample). Hidden by default to keep the focal pane compact —
+             tracked samples can take many vertical lines when there are 20+
+             on the watchlist. Persisted via localStorage. -->
+        <button id="l3DetailedBtn"
+                class="l3-more-item"
+                title="Show detailed view: reveals the per-tracked-sample → group readout in the focal pane"
+                style="background: var(--panel-2); color: var(--ink-dim);
+                       border: 1px solid var(--rule); border-radius: 3px;
+                       padding: 3px 10px; font-family: var(--mono);
+                       font-size: 10.5px; cursor: pointer;
+                       margin-left: 8px; white-space: nowrap; flex: 0 0 auto;">detailed</button>
+        <!-- v4 turn 6: Show tracked + Clear spotlight buttons. Show tracked
+             toggles state.spotlightTrackedAll — when ON, every tracked
+             sample gets a label in every L3 mini-PCA pane and its cell in
+             the contingency tables glows soft amber. Clear spotlight
+             removes both the single-sample spotlight and the tracked-all
+             mode. The L3 panel re-renders so the post-processor
+             _applySpotlightHighlights re-applies (or removes) the cell
+             classes. -->
+        <button id="l3SpotlightTrackedBtn"
+                class="l3-more-item"
+                title="Show tracked: label every tracked sample in each L3 mini-PCA + light up their cells in the contingency tables. Click again to turn off."
+                style="background: var(--panel-2); color: var(--ink-dim);
+                       border: 1px solid var(--rule); border-radius: 3px;
+                       padding: 3px 10px; font-family: var(--mono);
+                       font-size: 10.5px; cursor: pointer;
+                       margin-left: 8px; white-space: nowrap; flex: 0 0 auto;">⊕ show tracked</button>
+        <button id="l3SpotlightClearBtn"
+                class="l3-more-item"
+                title="Clear the cross-pane sample spotlight (single-sample + tracked-all)."
+                style="background: var(--panel-2); color: var(--ink-dim);
+                       border: 1px solid var(--rule); border-radius: 3px;
+                       padding: 3px 10px; font-family: var(--mono);
+                       font-size: 10.5px; cursor: pointer;
+                       margin-left: 4px; white-space: nowrap; flex: 0 0 auto;">⊘ clear spot</button>
+        <button id="pinL2Btn" class="l3-more-item" style="background: var(--panel-2); color: var(--ink-dim);
+                                       border: 1px solid var(--rule); border-radius: 3px;
+                                       padding: 3px 10px; font-family: var(--mono);
+                                       font-size: 10.5px; cursor: pointer;
+                                       margin-left: 8px; white-space: nowrap; flex: 0 0 auto;"
+                title="Pin current L2 as 2nd focal for direct comparison">📌 pin 2nd</button>
+        <!-- v3.94: live dosage heatmap toggle. Opens/closes the docked strip
+             below the L3 contingency. Strip is hidden by default — only
+             useful when dosage_chunks index is loaded. -->
+        <button id="dhCursorToggleBtn"
+                class="l3-more-item"
+                title="Toggle live dosage heatmap (±5 windows around cursor). Requires dosage_chunks layer."
+                style="background: var(--panel-2); color: var(--ink-dim);
+                       border: 1px solid var(--rule); border-radius: 3px;
+                       padding: 3px 10px; font-family: var(--mono);
+                       font-size: 10.5px; cursor: pointer;
+                       margin-left: 6px; white-space: nowrap; flex: 0 0 auto;">▦ live dosage</button>
+        <!-- turn 147 — ⋯ more disclosure. Toggles the secondary
+             cluster of L3 controls (color / K-mode / het / L2-sweep /
+             G-panel / b.continuity / scale / detailed / spotlights /
+             pin / live dosage). Defaults collapsed; persists state to
+             localStorage 'pca_scrubber_v3.l3MoreExpanded'. The hidden
+             items keep their event listeners + state — only their
+             visibility changes. -->
+        <button id="l3MoreToggleBtn"
+                title="Show / hide secondary L3 controls (color, K-mode, het, L2-sweep, G-panel, band-continuity, scale-stability, detailed, spotlights, pin, live dosage). Hidden by default to keep the toolbar compact. Click to reveal — your choice persists.">⋯ more</button>
+        <!-- v3.58: collapse button is position:sticky so it stays visible at
+             the right edge even when the toolbar overflows horizontally. Without
+             this, on narrow viewports the user could collapse the panel via the
+             button, but couldn't see it again to expand because the overflow
+             scroll had pushed it off-screen. -->
+        <button id="l3CollapseBtn" title="Collapse / expand the L3 panel — drag the PCA panel up to take its space"
+                style="background: var(--panel-2); color: var(--ink-dim);
+                       border: 1px solid var(--rule); border-radius: 3px;
+                       padding: 1px 8px; font-family: var(--mono); font-size: 10.5px;
+                       cursor: pointer; margin-left: 6px; white-space: nowrap; flex: 0 0 auto;
+                       position: sticky; right: 0; z-index: 5;">▼</button>
+        <!-- v3.61: l3Meta forced single-line. Previously it got squeezed into
+             a narrow column on the right (toolbar uses space-between) and
+             wrapped over many lines, ballooning the toolbar height. Now it
+             stays on one line and scrolls horizontally with the rest of the
+             toolbar if the viewport is too narrow to fit everything.
+             v3.75: hidden by default — the K/agg/merge/alpha/minN values are
+             redundant with the focal pane's K-specific chip block (from v3.72)
+             and were forcing a horizontal scrollbar on the L3 head when the
+             viewport wasn't wide enough. Element kept in DOM so existing
+             metaEl.textContent / .innerHTML calls don't crash; just not shown. -->
+        <div class="num dim" id="l3Meta"
+             style="display: none;">—</div>
+      </div>
+      <div class="l3-body" id="l3Body">
+        <div class="l3-col" id="l3FocalCol">
+          <div class="dim" style="padding: 12px;">scroll into an L2 envelope</div>
+        </div>
+      </div>
+    </div>
+  </main>

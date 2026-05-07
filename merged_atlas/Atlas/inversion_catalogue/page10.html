@@ -1,0 +1,23 @@
+  <div id="page10" class="page">
+    <div id="page10Header" style="padding: 22px 32px 0;">
+      <div style="display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; margin-bottom: 14px;">
+        <h2 style="margin: 0; font-family: var(--serif); font-weight: 500; font-size: 22px;">
+          Marker panels
+        </h2>
+        <span id="page10Subtitle" style="color: var(--ink-dim); font-size: 12px; font-family: var(--mono);">
+          (no marker layer loaded)
+        </span>
+      </div>
+      <div style="color: var(--ink-dim); font-size: 12px; line-height: 1.5; margin-bottom: 14px; max-width: 880px;">
+        Diagnostic PCR marker panels for each candidate inversion regime. Panels
+        reproduce the genome-based regime call (g0 / g1 / g2 from
+        <code>fish_regime_calls.tsv</code>) using 3–10 markers per candidate.
+        See SCHEMA §10 for column contracts. Activates when
+        <code>marker_panel_summary</code> is in <code>_layers_present</code>.
+      </div>
+    </div>
+    <div id="page10Content" style="padding: 0 32px 32px;">
+      <!-- Populated by renderMarkerPage() — one card per candidate that has
+           a panel summary entry. Empty state handled inside that function. -->
+    </div>
+  </div>

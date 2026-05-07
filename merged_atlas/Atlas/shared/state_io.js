@@ -1,0 +1,505 @@
+// shared/state_io.js
+// =====================================================================
+// Canonical I/O for Atlas data folder layout.
+//
+// One module that knows where everything lives. Every Atlas imports
+// from here. Layout doc: data/README.md.
+//
+// Five data folders (read access to four, write access to one):
+//   - data/precomp/<chrom>/      — R pipeline output, per chromosome  (read)
+//   - data/cohort/               — cohort-level metadata               (read)
+//   - data/candidates/<cid>/     — per-candidate evidence              (read)
+//   - data/comparative/          — cross-species                       (read)
+//   - data/review/<workflow>/    — atlas-side curation                 (write)
+//
+// All reads route through fetch() against a base URL (typically
+// `./data/`). All writes are JSON-blob downloads; the user re-uploads
+// to commit. Browsers cannot write to the local filesystem
+// — that's by design, the user explicitly chooses what to commit.
+//
+// Caller workflow:
+//
+//   import { State } from '../shared/state_io.js';
+//   const state = new State({ workflow: 'inversion' });
+//   await state.loadCohort();
+//   await state.loadPrecomp('LG28');
+//   const cands = await state.loadCandidates();
+//   ...user edits...
+//   state.saveReview('manual_overrides.json', state.overrides);
+//
+// =====================================================================
+
+// ---------------------------------------------------------------------
+// SHARED_VERSION — bumped whenever shared/ has a breaking change.
+// Workflow packs assert on this so an old inversion pack dropped on top
+// of a newer shared/ doesn't silently misbehave.
+//
+// Versioning rule: append-only. Adding a new entry to KNOWN_LAYERS does
+// NOT bump the version; renaming or removing an entry DOES bump it.
+// Older packs continue to work because they only consult layer names
+// they know about.
+// ---------------------------------------------------------------------
+export const SHARED_VERSION = 1;
+
+/**
+ * Workflow packs call this in their main.js to fail loudly when the
+ * shared/ they were built against is older than what's installed.
+ *
+ *   import { assertSharedVersion } from '../shared/state_io.js';
+ *   assertSharedVersion(1, 'inversion');
+ */
+export function assertSharedVersion(required, callerName) {
+  if (typeof required !== 'number') return;
+  if (SHARED_VERSION < required) {
+    const msg = `[${callerName || 'workflow'}] shared/state_io.js is v${SHARED_VERSION} ` +
+                `but this pack needs v${required}. Drop the latest workflow pack to update shared/.`;
+    if (typeof console !== 'undefined') console.error(msg);
+    throw new Error(msg);
+  }
+}
+
+// ---------------------------------------------------------------------
+// Known layer names (per data/README.md §3).
+// Adding a new layer here is the canonical place; UIs read this.
+// ---------------------------------------------------------------------
+export const KNOWN_LAYERS = Object.freeze({
+  // Core scrubber data — present in <chrom>.json
+  scrubber: [
+    'windows', 'envelopes', 'tracks', 'samples',
+    'candidate_proposals',
+    'cluster_labels_ghsl', 'cusum_ghsl',
+    'ghsl_karyotype_runs', 'ghsl_heatmap', 'ghsl_panel', 'ghsl_kstripes',
+    'ancestry_window', 'ancestry_sample', 'ancestry_q_means',
+    'ancestry_q_global', 'ancestry_q_chrom', 'snp_q_support',
+    'cluster_labels_theta', 'cusum_theta',
+    'dosage_dip', 'dosage_chunks',
+    'concordance_tables', 'cusum_concordance',
+    'subcandidates_emitted', 'candidates_registry',
+    'sv_evidence', 'bnd_rescue', 'boundaries_refined', 'qc_flags',
+    'groups_validated', 'classification', 'gene_cargo',
+    'marker_panel_summary', 'marker_catalogue', 'marker_primers',
+    'theta_pi_panel', 'roh_intervals', 'sample_froh',
+    'candidate_sample_coherence', 'candidate_marker_polarity',
+    'per_sample_theta_pi', 'final_classification',
+    'theta_pi_per_window', 'theta_pi_local_pca', 'theta_pi_envelopes',
+    'relatedness',
+  ],
+  // Per-chromosome standalone files (not layers inside <chrom>.json).
+  //
+  // The `workflow` tag on each entry tells build/package_workflow.py
+  // which release pack this file belongs to. Files tagged `core` ship
+  // in every pack (they're infrastructure any workflow consumes); the
+  // others ship only in their workflow's pack.
+  precompFiles: [
+    // Repeat density — used by inversion (TE-flanking) AND by diversity (annotation):
+    { stem: 'repeat_density.scrubber_windows', ext: 'json', workflow: 'core' },
+    // SPEC BLOCK 1 R-module outputs (inversion-only):
+    { stem: 'band_nodes',                    ext: 'tsv',  workflow: 'inversion' },
+    { stem: 'band_edges',                    ext: 'tsv',  workflow: 'inversion' },
+    { stem: 'transition_events',             ext: 'tsv',  workflow: 'inversion' },
+    { stem: 'band_trajectories',             ext: 'tsv',  workflow: 'inversion' },
+    { stem: 'het_band_backbones',            ext: 'tsv',  workflow: 'inversion' },
+    { stem: 'candidate_track_proposals',     ext: 'tsv',  workflow: 'inversion' },
+    { stem: 'candidate_tracks',              ext: 'json', workflow: 'inversion' },
+    { stem: 'manual_review_queue',           ext: 'tsv',  workflow: 'inversion' },
+  ],
+  // cohort/ files. All `core` — the cohort is one cohort regardless of
+  // which workflow you're running.
+  cohort: [
+    { name: 'relatedness',         file: 'relatedness.json',         workflow: 'core' },
+    { name: 'cohort_diversity_v1', file: 'cohort_diversity_v1.json', workflow: 'core' },
+    { name: 'sample_froh',         file: 'sample_froh.json',         workflow: 'core' },
+    { name: 'sample_manifest',     file: 'sample_manifest.tsv',      workflow: 'core' },
+    { name: 'sample_groups',       file: 'sample_groups.tsv',        workflow: 'core' },
+    { name: 'natora_pruned',       file: 'natora_pruned.tsv',        workflow: 'core' },
+  ],
+  // candidates/<cid>/ files (inversion workflow — these are inversion candidates).
+  // If diversity ever has its own "candidates" (e.g. selective-sweep candidates),
+  // tag those `diversity`.
+  candidate: [
+    { name: 'sv_genotype_counts',      workflow: 'inversion' },
+    { name: 'boundaries_refined',      workflow: 'inversion' },
+    { name: 'gene_cargo',              workflow: 'inversion' },
+    { name: 'marker_primers',          workflow: 'inversion' },
+    { name: 'breeding_readiness_card', workflow: 'inversion' },
+    { name: 'final_classification',    workflow: 'inversion' },
+  ],
+  // comparative/ files (cross-species, used by inversion's comparative pack
+  // and assembly's synteny pack).
+  comparative: [
+    { name: 'cs_breakpoints_v1',         file: 'cs_breakpoints_v1.json',       workflow: 'inversion' },
+    { name: 'synteny_multispecies_v1',   file: 'synteny_multispecies_v1.json', workflow: 'assembly'  },
+    { name: 'phylo_tree_v1',             file: 'phylo_tree_v1.json',           workflow: 'core'      },
+    { name: 'te_fragility_v1',           file: 'te_fragility_v1.json',         workflow: 'inversion' },
+    // comparative_breakpoint_fragility/ is a folder; listed via listFolder()
+  ],
+  // review/<workflow>/ files (the canonical write set per workflow)
+  reviewInversion: [
+    'manual_overrides.json',
+    'candidate_review_decisions.json',
+    'locked_karyotype_groups.json',
+    'confirmed_candidates.json',
+  ],
+});
+
+// ---------------------------------------------------------------------
+// Path helpers — every path the atlas ever touches goes through these.
+// Keeps the layout encoded in one place.
+// ---------------------------------------------------------------------
+export function pathPrecomp(baseUrl, chrom, filename) {
+  // filename optional; if omitted, returns the chromosome folder url
+  return joinUrl(baseUrl, 'precomp', chrom, filename || '');
+}
+export function pathPrecompMain(baseUrl, chrom) {
+  return pathPrecomp(baseUrl, chrom, `${chrom}.json`);
+}
+export function pathPrecompLayer(baseUrl, chrom, stem, ext = 'json') {
+  return pathPrecomp(baseUrl, chrom, `${chrom}.${stem}.${ext}`);
+}
+export function pathCohort(baseUrl, file) {
+  return joinUrl(baseUrl, 'cohort', file);
+}
+export function pathCandidate(baseUrl, cid, file) {
+  return joinUrl(baseUrl, 'candidates', cid, file);
+}
+export function pathComparative(baseUrl, file) {
+  return joinUrl(baseUrl, 'comparative', file);
+}
+export function pathReview(baseUrl, workflow, file) {
+  return joinUrl(baseUrl, 'review', workflow, file);
+}
+
+function joinUrl(...parts) {
+  return parts
+    .filter(p => p !== null && p !== undefined && p !== '')
+    .map((p, i) => i === 0
+      ? p.replace(/\/+$/, '')
+      : p.replace(/^\/+|\/+$/g, ''))
+    .join('/');
+}
+
+// ---------------------------------------------------------------------
+// Fetch helpers
+// ---------------------------------------------------------------------
+
+/**
+ * Fetch a JSON file. Returns null if 404 — the canonical "this layer
+ * is absent" signal. Throws on other errors so configuration mistakes
+ * surface immediately.
+ */
+export async function fetchJson(url, { tolerant = true } = {}) {
+  let resp;
+  try {
+    resp = await fetch(url, { cache: 'no-cache' });
+  } catch (e) {
+    // Network error / file:// access denied / CORS blocked — treat as absent
+    if (tolerant) return null;
+    throw e;
+  }
+  if (resp.status === 404) return tolerant ? null : (() => { throw new Error(`404 ${url}`); })();
+  if (!resp.ok) {
+    if (tolerant) return null;
+    throw new Error(`${resp.status} ${resp.statusText} ${url}`);
+  }
+  try {
+    return await resp.json();
+  } catch (e) {
+    if (tolerant) return null;
+    throw new Error(`bad json at ${url}: ${e.message}`);
+  }
+}
+
+/**
+ * Fetch a TSV file as text (no parsing — caller decides). Returns null
+ * if absent. SPEC BLOCK 1 R-module outputs lots of TSVs and we don't
+ * want to bake one parser into this module.
+ */
+export async function fetchText(url, { tolerant = true } = {}) {
+  let resp;
+  try {
+    resp = await fetch(url, { cache: 'no-cache' });
+  } catch (e) {
+    if (tolerant) return null;
+    throw e;
+  }
+  if (resp.status === 404) return tolerant ? null : (() => { throw new Error(`404 ${url}`); })();
+  if (!resp.ok) {
+    if (tolerant) return null;
+    throw new Error(`${resp.status} ${resp.statusText} ${url}`);
+  }
+  return await resp.text();
+}
+
+/**
+ * Minimal TSV parser — header row + rows of strings. Numeric coercion
+ * is the caller's job (we don't know which columns are numeric without
+ * a schema). For files SPEC BLOCK 1 R-module produces, the first comment
+ * lines (#-prefixed) are parameters; we strip them and expose them on
+ * the result object.
+ */
+export function parseTsv(text) {
+  if (!text) return { params: {}, header: [], rows: [] };
+  const lines = text.split(/\r?\n/);
+  const params = {};
+  let i = 0;
+  // Skip / collect comment lines `# key = value`
+  while (i < lines.length && lines[i].startsWith('#')) {
+    const m = lines[i].match(/^#\s*([A-Za-z_][\w]*)\s*=\s*(.+?)\s*$/);
+    if (m) params[m[1]] = m[2];
+    i++;
+  }
+  if (i >= lines.length) return { params, header: [], rows: [] };
+  const header = lines[i++].split('\t');
+  const rows = [];
+  for (; i < lines.length; i++) {
+    if (lines[i] === '') continue;
+    const fields = lines[i].split('\t');
+    const row = {};
+    for (let j = 0; j < header.length; j++) row[header[j]] = fields[j];
+    rows.push(row);
+  }
+  return { params, header, rows };
+}
+
+// ---------------------------------------------------------------------
+// Write helpers — browser-side. Atlases write only to data/review/ and
+// the only mechanism is "download a JSON blob, user re-uploads to
+// commit." That keeps the data folder authoritative on disk and avoids
+// any need for a server.
+// ---------------------------------------------------------------------
+
+/**
+ * Trigger a JSON download with the appropriate filename for the
+ * canonical review/<workflow>/<file>.json. Returns the filename used.
+ *
+ * The headless flag suppresses DOM use (for unit tests / Node-side
+ * round-trip checks); when headless, just returns the JSON string.
+ */
+export function downloadReviewJson(workflow, file, obj, { headless = false } = {}) {
+  const filename = `${workflow}__${file}`;   // double-underscore so a glob can split workflow/file
+  const text = JSON.stringify(obj, null, 2);
+  if (headless) return { filename, text };
+  const blob = new Blob([text], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return { filename, text };
+}
+
+/**
+ * Trigger a TSV download (SPEC BLOCK 1 review queue, decision logs).
+ * Caller passes { params, header, rows } shape (same as parseTsv output).
+ */
+export function downloadReviewTsv(workflow, file, { params = {}, header, rows }, { headless = false } = {}) {
+  const filename = `${workflow}__${file}`;
+  const lines = [];
+  for (const k of Object.keys(params)) lines.push(`# ${k} = ${params[k]}`);
+  if (header && header.length) lines.push(header.join('\t'));
+  for (const r of (rows || [])) {
+    lines.push(header.map(h => (r[h] === undefined || r[h] === null) ? '' : String(r[h])).join('\t'));
+  }
+  const text = lines.join('\n') + '\n';
+  if (headless) return { filename, text };
+  const blob = new Blob([text], { type: 'text/tab-separated-values' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return { filename, text };
+}
+
+// ---------------------------------------------------------------------
+// State class — high-level convenience wrapper
+// ---------------------------------------------------------------------
+
+export class State {
+  /**
+   * @param {object} opts
+   * @param {string} opts.workflow   - 'inversion' | 'diversity' | 'population' | 'assembly'
+   * @param {string} [opts.baseUrl]  - root of the data folder (default './data')
+   */
+  constructor({ workflow, baseUrl = './data' }) {
+    if (!workflow || typeof workflow !== 'string') {
+      throw new Error('State: workflow is required, e.g. "inversion"');
+    }
+    this.workflow = workflow;
+    this.baseUrl = baseUrl.replace(/\/+$/, '');
+
+    // Loaded data slots — null until the corresponding load*() call ran.
+    this.cohort      = null;          // { relatedness, cohort_diversity_v1, sample_froh, ... }
+    this.precomp     = {};            // chrom → { main, repeatDensity, bandNodes, bandEdges, ... }
+    this.candidates  = null;          // cid → { sv_genotype_counts, boundaries_refined, ... }
+    this.comparative = null;
+    this.review      = {};            // file → object   (all read from review/<workflow>/)
+
+    // Layer presence — Set<string> per chromosome; the UI keys panels off this.
+    this.layersPresent = {};          // chrom → Set<string>
+  }
+
+  // -------------------------------------------------------------------
+  // Cohort
+  // -------------------------------------------------------------------
+  async loadCohort() {
+    const out = {};
+    for (const entry of KNOWN_LAYERS.cohort) {
+      const url = pathCohort(this.baseUrl, entry.file);
+      out[entry.name] = entry.file.endsWith('.json')
+        ? await fetchJson(url)
+        : await fetchText(url);
+    }
+    this.cohort = out;
+    return out;
+  }
+
+  // -------------------------------------------------------------------
+  // Precomp — per-chromosome
+  // -------------------------------------------------------------------
+  async loadPrecomp(chrom) {
+    const main = await fetchJson(pathPrecompMain(this.baseUrl, chrom));
+    const slot = { main };
+    const layers = new Set();
+    if (main && Array.isArray(main._layers_present)) {
+      for (const n of main._layers_present) {
+        if (typeof n === 'string') layers.add(n);
+      }
+    }
+
+    // Per-chromosome standalone files (R-module outputs etc.)
+    for (const f of KNOWN_LAYERS.precompFiles) {
+      const url = pathPrecompLayer(this.baseUrl, chrom, f.stem, f.ext);
+      const data = f.ext === 'json'
+        ? await fetchJson(url)
+        : (() => null)();   // tsv loaded lazily via loadPrecompTsv()
+      if (data !== null) {
+        slot[f.stem] = data;
+        layers.add(f.stem);
+      }
+    }
+
+    this.precomp[chrom] = slot;
+    this.layersPresent[chrom] = layers;
+    return slot;
+  }
+
+  /**
+   * Lazy-load a TSV from precomp/. Used for the SPEC BLOCK 1 R-module
+   * outputs that we don't want to ship eagerly with loadPrecomp() —
+   * they can be huge (band_edges.tsv on a dense chromosome is 10s of MB).
+   */
+  async loadPrecompTsv(chrom, stem) {
+    const url = pathPrecompLayer(this.baseUrl, chrom, stem, 'tsv');
+    const text = await fetchText(url);
+    if (text === null) return null;
+    const parsed = parseTsv(text);
+    if (!this.precomp[chrom]) this.precomp[chrom] = {};
+    this.precomp[chrom][stem] = parsed;
+    if (this.layersPresent[chrom]) this.layersPresent[chrom].add(stem);
+    return parsed;
+  }
+
+  // -------------------------------------------------------------------
+  // Candidates — per-candidate-id
+  // -------------------------------------------------------------------
+  /**
+   * Discover candidate folders by reading the optional manifest at
+   * data/candidates/_manifest.json (a flat array of candidate ids).
+   * If absent, returns []; the UI shows an empty-state and the user
+   * can drop a candidate id in manually.
+   */
+  async listCandidates() {
+    const manifestUrl = joinUrl(this.baseUrl, 'candidates', '_manifest.json');
+    const manifest = await fetchJson(manifestUrl);
+    return (manifest && Array.isArray(manifest.candidates)) ? manifest.candidates : [];
+  }
+
+  async loadCandidate(cid) {
+    const out = { id: cid };
+    for (const entry of KNOWN_LAYERS.candidate) {
+      const layerName = (typeof entry === 'string') ? entry : entry.name;
+      const url = pathCandidate(this.baseUrl, cid, `${layerName}.json`);
+      const data = await fetchJson(url);
+      if (data !== null) out[layerName] = data;
+    }
+    if (!this.candidates) this.candidates = {};
+    this.candidates[cid] = out;
+    return out;
+  }
+
+  async loadCandidates() {
+    const cids = await this.listCandidates();
+    const out = {};
+    for (const cid of cids) out[cid] = await this.loadCandidate(cid);
+    this.candidates = out;
+    return out;
+  }
+
+  // -------------------------------------------------------------------
+  // Comparative
+  // -------------------------------------------------------------------
+  async loadComparative() {
+    const out = {};
+    for (const entry of KNOWN_LAYERS.comparative) {
+      out[entry.name] = await fetchJson(pathComparative(this.baseUrl, entry.file));
+    }
+    this.comparative = out;
+    return out;
+  }
+
+  // -------------------------------------------------------------------
+  // Review (read + write)
+  // -------------------------------------------------------------------
+  async loadReview(file) {
+    const url = pathReview(this.baseUrl, this.workflow, file);
+    const data = file.endsWith('.json') ? await fetchJson(url) : await fetchText(url);
+    if (data !== null) this.review[file] = data;
+    return data;
+  }
+
+  async loadReviewAll() {
+    if (this.workflow !== 'inversion') {
+      // For other workflows, no canonical file list yet — caller asks per file.
+      return {};
+    }
+    for (const f of KNOWN_LAYERS.reviewInversion) {
+      await this.loadReview(f);
+    }
+    return this.review;
+  }
+
+  saveReview(file, obj, opts = {}) {
+    this.review[file] = obj;
+    return downloadReviewJson(this.workflow, file, obj, opts);
+  }
+
+  saveReviewTsv(file, tsvShape, opts = {}) {
+    this.review[file] = tsvShape;
+    return downloadReviewTsv(this.workflow, file, tsvShape, opts);
+  }
+
+  /**
+   * Autosave: write a session snapshot to
+   * data/review/<workflow>/sessions/session_<timestamp>.json
+   * (filename only — the user has to commit to disk).
+   */
+  saveSession(snapshot, opts = {}) {
+    const ts = new Date().toISOString().replace(/[:T]/g, '-').replace(/\..+$/, '');
+    return this.saveReview(`sessions/session_${ts}.json`, snapshot, opts);
+  }
+
+  // -------------------------------------------------------------------
+  // Layer queries — used by panel components to decide if they have
+  // enough data to render.
+  // -------------------------------------------------------------------
+  hasLayer(chrom, layerName) {
+    const set = this.layersPresent[chrom];
+    return set ? set.has(layerName) : false;
+  }
+
+  layerNames(chrom) {
+    const set = this.layersPresent[chrom];
+    return set ? Array.from(set).sort() : [];
+  }
+}

@@ -1,0 +1,73 @@
+  <div id="page4" class="page">
+    <div id="page4Inner">
+      <!-- LEFT: saved candidates list -->
+      <aside id="candListPane">
+        <div class="cand-list-head">
+          <h2 style="margin: 0; font-size: 12px; text-transform: uppercase;
+                     letter-spacing: 0.1em; color: var(--ink-dim);
+                     font-family: var(--mono); font-weight: 600;">saved candidates</h2>
+          <span class="dim" id="candListCount" style="font-family: var(--mono); font-size: 10px;">0</span>
+        </div>
+        <div id="candListContainer"></div>
+        <div class="cand-list-actions">
+          <button id="candListImportBtn" title="Load a previously-exported candidate list JSON">⬆ import JSON</button>
+          <button id="candListExportBtn" title="Download all saved candidates as JSON (load anywhere)">⬇ export JSON</button>
+          <button id="candListRegistryBtn" title="Export the canonical candidate registry (TSV + JSON) — this is the contract input for cluster phases 6+">📋 export registry (TSV+JSON)</button>
+          <!-- v3.99 t14e+ continue: registry interop. Drop a folder/multi-file
+               selection of registry artifacts (sample_groups.tsv,
+               candidate_intervals.tsv, results_registry/manifest.tsv, and any
+               number of evidence_registry/per_candidate/<cid>/structured/*.json
+               files) and the scrubber merges them into state.data as the
+               corresponding optional layers. Schema-validated against the
+               4 registry schemas (registries/schemas/*.schema.json). -->
+          <button id="loadRegistryBtn" title="Bulk-load registry artifacts: pick any subset of sample_groups.tsv, candidate_intervals.tsv, results_registry/manifest.tsv, and per-candidate structured/*.json files. Each artifact is recognized by filename pattern + schema validation, then merged into state.data as the corresponding optional layer. SCHEMA §20.">📦 load registry</button>
+          <button id="enrichmentImportBtn" title="Load an enrichment JSON from cluster phases 6+ (e.g. breakpoints_refined, groups_validated)">+ load enrichment</button>
+          <button id="candListBundleBtn" title="Generate a Markdown + TSV bundle to paste into an LLM for Methods/Results writing">📝 manuscript bundle</button>
+          <button id="candListClearBtn" class="danger" title="Wipe all saved candidates for this chromosome">✕ clear all</button>
+        </div>
+        <input type="file" id="candListImportInput" accept=".json,application/json" style="display:none;" />
+        <input type="file" id="enrichmentImportInput" accept=".json,application/json" style="display:none;" />
+        <!-- v3.99 t14e+ continue: registry import accepts MULTIPLE files at once.
+             Accepts .tsv, .json. Click the button to open a multi-file picker. -->
+        <input type="file" id="loadRegistryInput" accept=".tsv,.json,.gz,application/json,text/tab-separated-values" multiple style="display:none;" />
+      </aside>
+      <!-- RIGHT: karyotype + tier views for the active candidate -->
+      <div id="candKaryoPane">
+        <div id="candKaryoEmpty" style="padding: 60px 24px; text-align: center; color: var(--ink-dim);">
+          <div style="font-size: 14px; margin-bottom: 12px;">No active candidate.</div>
+          <div style="font-size: 12px; line-height: 1.7; max-width: 480px; margin: 0 auto;">
+            Pick a promoted candidate from the list on the left, or promote a new one via:<br>
+            — <b>page 1</b> (lock colors → <i>⬆ promote to candidate</i>), or<br>
+            — <b>page 4 catalogue</b> (<i>👁 view as candidate</i>).
+          </div>
+        </div>
+        <!-- v3.99 t14e+ continue: sub-view toggle. Karyotype is the existing
+             per-sample regime table. Tier is the new 14-axis classification
+             view (cluster-side R-pipeline output: characterize_candidate.R +
+             classify_inversions.R, planned). When no final_classification
+             layer is loaded, the Tier panel renders an empty state. -->
+        <div id="candKaryoSubviewBar"
+             style="display: none; padding: 8px 16px; border-bottom: 1px solid var(--rule);
+                    background: var(--panel); display: flex; gap: 8px; align-items: center;
+                    font-family: var(--mono); font-size: 11.5px;">
+          <span style="color: var(--ink-dim); margin-right: 4px;">view:</span>
+          <button id="candSubviewKaryoBtn" data-subview="karyotype" class="subview-btn active"
+                  title="Per-sample regime breakdown — which sample carries which K=3 regime (HOMO_1 / HET / HOMO_2)."
+                  style="background: var(--accent-soft, rgba(245,165,36,0.15));
+                         color: var(--ink); border: 1px solid var(--accent, #f5a524);
+                         border-radius: 3px; padding: 3px 12px;
+                         font-family: var(--mono); font-size: 11px;
+                         cursor: pointer; font-weight: 600;">Karyotype</button>
+          <button id="candSubviewTierBtn" data-subview="tier" class="subview-btn"
+                  title="14-axis classification — existence layers, boundary quality, group validation, internal structure, recombinant class, family linkage, polymorphism class, mechanism, age, burden, confidence tier. Renders an empty state until the final_classification layer is loaded (cluster-side R-pipeline output, planned)."
+                  style="background: var(--panel-2); color: var(--ink-dim);
+                         border: 1px solid var(--rule); border-radius: 3px;
+                         padding: 3px 12px; font-family: var(--mono); font-size: 11px;
+                         cursor: pointer;">Tier ▾</button>
+          <span id="candTierLayerStatus" class="dim" style="margin-left: auto; font-size: 10.5px; color: var(--ink-dimmer);"></span>
+        </div>
+        <div id="candKaryoContent" style="display: none;"></div>
+        <div id="candTierContent" style="display: none;"></div>
+      </div>
+    </div>
+  </div>
