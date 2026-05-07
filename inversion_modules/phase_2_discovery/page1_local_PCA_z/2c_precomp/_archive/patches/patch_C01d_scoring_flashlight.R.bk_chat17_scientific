@@ -1,0 +1,172 @@
+#!/usr/bin/env Rscript
+# =============================================================================
+# PATCH: Flashlight integration for STEP_C01d_candidate_scoring.R
+#
+# Adds dimension D11: SV FLASHLIGHT SUPPORT
+#
+# For each candidate interval, queries the flashlight to determine:
+#   sv_support_level         — STRONG / MODERATE / NONE
+#   sv_genotype_concordance  — do SV genotypes match PCA bands?
+#   sv_carrier_overlap       — fraction of SV carriers in band 3
+#   het_del_breakpoint_count — number of het-DELs at boundaries (Cheat 2)
+#   n_sv_anchors             — number of samples with SV genotype info
+#
+# The D11 score is a weighted combination of:
+#   40%: SV genotype concordance with PCA bands
+#   30%: SV call confidence level
+#   20%: het-DEL breakpoint support (Cheat 2)
+#   10%: number of confirming callers (DELLY+Manta concordance)
+#
+# INSERT: Inside score_candidates(), as a new dimension after D10.
+# Also update the composite score weights.
+# =============================================================================
+
+# ─── Source flashlight loader (add at script top) ────────────────────
+# <<< INSERT after library() calls
+
+fl_loader <- Sys.getenv("FLASHLIGHT_LOADER", "")
+if (!nzchar(fl_loader)) {
+  for (p in c(
+    file.path(dirname(outdir), "utils", "flashlight_loader_v2.R")
+    if (!file.exists(fl_loader_path)) fl_loader_path <- sub("_v2", "", fl_loader_path),
+    file.path(dirname(dirname(outdir)), "utils", "flashlight_loader_v2.R")
+    if (!file.exists(fl_loader_path)) fl_loader_path <- sub("_v2", "", fl_loader_path)
+  )) if (file.exists(p)) { fl_loader <- p; break }
+}
+.scoring_has_flashlight <- FALSE
+if (nzchar(fl_loader) && file.exists(fl_loader)) {
+  tryCatch({
+    source(fl_loader)
+    .scoring_has_flashlight <- TRUE
+    message("[C01d] Flashlight loader sourced")
+  }, error = function(e) message("[C01d] Flashlight: ", e$message))
+}
+
+# ─── D11: FLASHLIGHT SUPPORT ────────────────────────────────────────
+# This function is called for each candidate inside score_candidates().
+# It returns a named list of flashlight metrics.
+
+compute_flashlight_score <- function(chr, start_mb, end_mb, band_sizes_vec) {
+  result <- list(
+    d11 = 0, sv_support = "NONE",
+    sv_concordance = NA_real_, sv_carrier_frac = NA_real_,
+    het_del_bp_count = 0L, n_sv_anchors = 0L,
+    n_callers = 0L, best_confidence = NA_character_
+  )
+
+  if (!.scoring_has_flashlight) return(result)
+
+  start_bp <- start_mb * 1e6
+  end_bp   <- end_mb * 1e6
+
+  fl <- load_flashlight(chr)
+  if (is.null(fl)) return(result)
+
+  # ── Overlapping SV INV calls ──
+  overlapping <- fl$inv_calls[bp1 <= end_bp & bp2 >= start_bp]
+  if (nrow(overlapping) == 0) return(result)
+
+  n_callers <- length(unique(overlapping$caller))
+  conf_levels <- overlapping$confidence_level
+  conf_order <- c("VERY_HIGH", "HIGH", "MEDIUM", "LOW", "MINIMAL", "UNKNOWN")
+  best_conf_rank <- min(match(conf_levels, conf_order), na.rm = TRUE)
+  best_confidence <- conf_order[best_conf_rank]
+
+  # Confidence score: 0-1
+  conf_score <- c(VERY_HIGH = 1.0, HIGH = 0.8, MEDIUM = 0.5,
+                  LOW = 0.2, MINIMAL = 0.1, UNKNOWN = 0.0)
+  s_conf <- conf_score[best_confidence]
+
+  # ── SV anchor concordance with PCA bands ──
+  # Get anchor samples for this region
+  anchors <- fl$sample_inv_states[
+    inv_id %in% overlapping$inv_id &
+    sv_genotype != "MISSING" &
+    sv_confidence %in% c("HIGH", "MEDIUM")
+  ]
+  n_anchors <- nrow(anchors)
+
+  # SV carrier fraction: what fraction of SV carriers are in the candidate?
+  sv_carriers <- unique(anchors[sv_genotype %in% c("HET", "HOM_INV")]$sample_id)
+  sv_carrier_frac <- length(sv_carriers) / max(1, n_anchors)
+
+  # Concordance: computed downstream when PCA bands are available
+  # For now, use the cheat2 verification as proxy
+  s_concordance <- 0
+  if (nrow(fl$cheat2_verification) > 0) {
+    c2_for_region <- fl$cheat2_verification[inv_id %in% overlapping$inv_id]
+    if (nrow(c2_for_region) > 0) {
+      n_confirmed <- sum(c2_for_region$cheat2_concordant, na.rm = TRUE)
+      s_concordance <- n_confirmed / nrow(c2_for_region)
+    }
+  }
+
+  # ── Het-DEL breakpoint support (Cheat 2) ──
+  bp_dels_left  <- fl$breakpoint_dels[abs(bp_pos - start_bp) <= 50000]
+  bp_dels_right <- fl$breakpoint_dels[abs(bp_pos - end_bp) <= 50000]
+  het_del_bp_count <- nrow(bp_dels_left) + nrow(bp_dels_right)
+  s_hetdel <- pmin(1, het_del_bp_count / 5)  # saturates at 5 het-DELs
+
+  # ── Caller concordance ──
+  s_callers <- if (n_callers >= 2) 1.0 else 0.5
+
+  # ── Composite D11 score ──
+  d11 <- 0.40 * s_concordance +
+         0.30 * s_conf +
+         0.20 * s_hetdel +
+         0.10 * s_callers
+  d11 <- pmin(1, pmax(0, d11))
+
+  sv_support <- if (d11 >= 0.6 && n_anchors >= 10) "STRONG"
+                else if (d11 >= 0.3 && n_anchors >= 5) "MODERATE"
+                else "WEAK"
+  if (nrow(overlapping) == 0) sv_support <- "NONE"
+
+  list(
+    d11 = round(d11, 3),
+    sv_support = sv_support,
+    sv_concordance = round(s_concordance, 3),
+    sv_carrier_frac = round(sv_carrier_frac, 3),
+    het_del_bp_count = het_del_bp_count,
+    n_sv_anchors = n_anchors,
+    n_callers = n_callers,
+    best_confidence = best_confidence
+  )
+}
+
+# ─── INTEGRATION: Inside score_candidates() ─────────────────────────
+# After computing D10 (GHSL), add:
+#
+#   # --- D11: Flashlight SV support ---
+#   fl_result <- compute_flashlight_score(chr, iv$start_mb, iv$end_mb, band_sizes)
+#   d11 <- fl_result$d11
+#   sv_support <- fl_result$sv_support
+#
+# Then update the composite score formula:
+#
+#   # OLD (10 dimensions):
+#   # final_score <- 0.18 * d1 + 0.15 * d2 + 0.10 * d3 + ...
+#   #
+#   # NEW (11 dimensions — reallocate weights):
+#   final_score <- 0.16 * d1 + 0.13 * d2 + 0.09 * d3 +
+#                  0.06 * d4 + 0.04 * d5 + 0.04 * d6_bridge + 0.04 * d7 +
+#                  0.14 * d8 + 0.10 * d9 + 0.07 * d10 +
+#                  0.13 * d11  # <── flashlight gets 13% weight
+#
+# And update the tier assignment to consider D11:
+#
+#   # Tier upgrade: if flashlight strongly supports, allow tier 1
+#   if (d11 >= 0.7 && sv_support == "STRONG" && tier >= 2) {
+#     tier <- tier - 1L  # upgrade by one tier
+#   }
+#   # Tier downgrade protection: don't downgrade if flashlight confirms
+#   # (family-like pattern but SV says it's a real inversion)
+#
+# And add columns to the output data.table:
+#
+#   d11_flashlight = round(d11, 3),
+#   sv_support = sv_support,
+#   sv_concordance = fl_result$sv_concordance,
+#   het_del_bp_count = fl_result$het_del_bp_count,
+#   n_sv_anchors = fl_result$n_sv_anchors,
+#   sv_best_confidence = fl_result$best_confidence,

@@ -1,0 +1,871 @@
+#!/usr/bin/env Rscript
+
+# =============================================================================
+# STEP_C00_build_sv_prior.R
+#
+# Phase 2 / 2c — precomputation. Build the SV-derived evidence prior per
+# chromosome, used as an informed Bayesian-style prior by downstream modules.
+#
+# Codebase:    inversion_modules v8.5 / script v9.3.2
+# Upstream:    DELLY2 INV/DEL/BND VCFs (MODULE_4D / MODULE_4B / MODULE_4F)
+#              Manta INV/DEL VCFs      (MODULE_4H)
+#              annotate_population_confidence output (POP_CONF_DIR)
+# Downstream:  STEP_C01a (region precompute — stamps SV overlap onto windows)
+#              phase_4/4b decomposition (seeds k-means clustering)
+#              phase_4/4a C01g boundary catalog consults it for D7 layer
+# Formerly:    STEP_C00_build_flashlight_wired8_registry.R
+#              The pipeline's "sv_prior" terminology has been retired in
+#              favour of "sv_prior". See RENAMING.md for the full map.
+#
+# Purpose
+# -------
+# Parse DELLY2 + Manta catalogs once and package everything needed for
+# sample- and locus-level SV evidence lookup. The output is consumed:
+#   - At the window level (who overlaps which SV) by precompute (C01a)
+#   - At the candidate level (which samples are anchor carriers) by
+#     decomposition and group validation
+#   - Standalone for Fisher OR tests (genotype ↔ breakpoint association)
+#
+# Not to be confused with MODULE_5A2 breakpoint_validation, which also reads
+# these VCFs but answers a different question (WHERE the breakpoints are at
+# bp resolution), not WHO carries what. See 2c_precomp/README.md.
+#
+# Evidence tests integrated into this script
+# ------------------------------------------
+# These are the 4-layer framework Layer B components that the sv_prior
+# records. Numbers correspond to the test catalogue in phase_4_catalog/.
+#
+#   Test 01: DELLY/Manta INV per-sample genotypes                  (anchors)
+#   Test 02: het-DELs within ±BP_MATCH_WINDOW of INV breakpoints   (markers)
+#   Test 03: het-DELs internal to the INV                          (deferred
+#            to decomposition — stored here but not scored)
+#   Test 08: BND paired-breakpoint triangulation — rescues INVs
+#            that DELLY classified as BND instead of INV
+#
+# Inputs
+# ------
+#   Env:       BASE, DELLY_INV_VCF, DELLY_DEL_VCF, DELLY_BND_VCF,
+#              MANTA_INV_VCF, MANTA_DEL_VCF, POP_CONF_DIR, SAMPLES_IND, INVDIR
+#   CLI:       [--chr <chrom>]   restrict to one chromosome (default: all)
+#
+# Outputs (in $INVDIR/06_mds_candidates/snake_regions_multiscale/sv_prior/)
+# -------------------------------------------------------------------------
+#   sv_prior_<chr>.rds           per-chromosome list:
+#                                  inv_calls / gt_matrix / breakpoint_dels /
+#                                  test02_verification / internal_dels /
+#                                  bnd_triangulated / sample_inv_states /
+#                                  params / built (timestamp)
+#   sv_prior_summary.tsv         genome-wide summary (one row per chr)
+#
+# Usage
+# -----
+#   Rscript STEP_C00_build_sv_prior.R                # all chromosomes
+#   Rscript STEP_C00_build_sv_prior.R --chr C_gar_LG01
+#
+# Launcher (SLURM) handles env propagation and logging — see launchers/.
+# =============================================================================
+
+suppressPackageStartupMessages({
+  library(data.table)
+})
+
+# ── Source load_bridge.R (provides reg for evidence registry) ──
+.bridge_file <- Sys.getenv("LOAD_BRIDGE", "")
+if (!nzchar(.bridge_file)) {
+  for (.bp in c("utils/load_bridge.R", "../utils/load_bridge.R",
+                 file.path(Sys.getenv("BASE", "/scratch/lt200308-agbsci/Quentin_project_KEEP_2026-02-04"),
+                           "inversion_codebase_v8.5/utils/load_bridge.R"))) {
+    if (file.exists(.bp)) { .bridge_file <- .bp; break }
+  }
+}
+.bridge_available <- FALSE
+if (nzchar(.bridge_file) && file.exists(.bridge_file)) {
+  tryCatch({ source(.bridge_file); .bridge_available <- TRUE
+    message("[sv_prior] load_bridge.R sourced")
+  }, error = function(e) message("[sv_prior] load_bridge.R failed: ", conditionMessage(e)))
+}
+
+`%||%` <- function(a, b) if (is.null(a) || length(a) == 0 || identical(a, "")) b else a
+
+# =============================================================================
+# CONFIG (from environment / defaults)
+# =============================================================================
+
+BASE <- Sys.getenv("BASE", "/scratch/lt200308-agbsci/Quentin_project_KEEP_2026-02-04")
+
+# SV catalogs
+DELLY_INV_VCF <- Sys.getenv("DELLY_INV_VCF",
+  file.path(BASE, "delly_sv_INV/07_final_catalogs/catalog_226.INV.vcf.gz"))
+DELLY_DEL_VCF <- Sys.getenv("DELLY_DEL_VCF",
+  file.path(BASE, "delly_sv/07_final_catalogs/catalog_226.DEL.vcf.gz"))
+MANTA_INV_VCF <- Sys.getenv("MANTA_INV_VCF",
+  file.path(BASE, "MODULE_4H_ALL_Manta/05_final_catalogs/catalog_226.INV.PASS.vcf.gz"))
+MANTA_DEL_VCF <- Sys.getenv("MANTA_DEL_VCF",
+  file.path(BASE, "MODULE_4H_ALL_Manta/05_final_catalogs/catalog_226.DEL.PASS.vcf.gz"))
+
+# Test 08 (was cheat8): BND VCF for triangulation
+DELLY_BND_VCF <- Sys.getenv("DELLY_BND_VCF",
+  file.path(BASE, "delly_sv_BND/07_final_catalogs/catalog_226.BND.vcf.gz"))
+
+# Population confidence (pre-computed)
+POP_CONF_DIR <- Sys.getenv("POP_CONF_DIR",
+  file.path(BASE, "MODULE_4H_ALL_Manta/10_population_confidence"))
+
+# Sample list
+SAMPLES_IND <- Sys.getenv("SAMPLES_IND",
+  file.path(BASE, "het_roh/01_inputs_check/samples.ind"))
+
+# Output
+INVDIR <- Sys.getenv("INVDIR", file.path(BASE, "inversion_localpca_v7"))
+SV_PRIOR_DIR <- Sys.getenv("SV_PRIOR_DIR",
+  file.path(INVDIR, "06_mds_candidates/snake_regions_multiscale/sv_prior"))
+dir.create(SV_PRIOR_DIR, recursive = TRUE, showWarnings = FALSE)
+
+# Parameters
+BP_MATCH_WINDOW <- 50000L   # ±50 kb: het-DEL within this of INV breakpoint = Test 02
+MIN_DEL_SIZE    <- 5000L    # minimum het-DEL size for Test 02/03
+MIN_INV_SIZE    <- 5000L    # minimum INV size to include
+MAX_INV_SIZE    <- 20e6     # maximum INV size
+
+# CLI args
+args <- commandArgs(trailingOnly = TRUE)
+chr_filter <- NULL
+i <- 1L
+while (i <= length(args)) {
+  if (args[i] == "--chr" && i < length(args)) { chr_filter <- args[i + 1]; i <- i + 2L }
+  else { i <- i + 1L }
+}
+
+# =============================================================================
+# LOAD SAMPLE NAMES
+# =============================================================================
+
+if (!file.exists(SAMPLES_IND)) stop("[sv_prior] SAMPLES_IND not found: ", SAMPLES_IND)
+sample_ids <- trimws(readLines(SAMPLES_IND))
+sample_ids <- sample_ids[nzchar(sample_ids)]
+n_samples <- length(sample_ids)
+message("[sv_prior] Samples: ", n_samples)
+
+# =============================================================================
+# TEST 08: BND PAIRED BREAKPOINT TRIANGULATION
+# =============================================================================
+# Parse DELLY BND VCF for same-chromosome 3to3 + 5to5 pairs that define
+# inversion breakpoints. These are inversions DELLY detected as BND pairs
+# rather than direct INV calls.
+
+BND_MIN_INV_SIZE    <- 5000L
+BND_MAX_INV_SIZE    <- 20e6
+BND_MIN_CARRIER_OVL <- 0.30  # minimum Jaccard between left+right BND carriers
+BND_MIN_CARRIERS    <- 3L
+
+parse_bnd_pairs <- function(bnd_vcf_path) {
+  if (!file.exists(bnd_vcf_path)) {
+    message("[sv_prior] BND VCF not found: ", bnd_vcf_path, " — skipping")
+    return(data.table())
+  }
+
+  message("[sv_prior] Parsing BND VCF: ", bnd_vcf_path)
+
+  # Use bcftools for robust parsing
+  cmd_samples <- paste0("bcftools query -l ", bnd_vcf_path, " 2>/dev/null")
+  vcf_samples <- tryCatch(fread(cmd = cmd_samples, header = FALSE)[[1]],
+                           error = function(e) NULL)
+  if (is.null(vcf_samples) || length(vcf_samples) == 0) {
+    message("[sv_prior] Cannot read sample names from BND VCF")
+    return(data.table())
+  }
+
+  # Extract: CHROM, POS, ID, INFO/CT, INFO/CHR2, INFO/POS2 or INFO/END, and all GTs
+  cmd <- paste0("bcftools query -f '%CHROM\\t%POS\\t%ID\\t%INFO/CT\\t%INFO/CHR2\\t",
+                "%INFO/END\\t[%GT\\t]\\n' ", bnd_vcf_path, " 2>/dev/null")
+  raw <- tryCatch(fread(cmd = cmd, header = FALSE, sep = "\t", fill = TRUE),
+                   error = function(e) NULL)
+  if (is.null(raw) || nrow(raw) == 0) {
+    message("[sv_prior] No BND records parsed")
+    return(data.table())
+  }
+
+  n_samp <- length(vcf_samples)
+  if (ncol(raw) < 6 + n_samp) {
+    message("[sv_prior] Column count mismatch — expected ", 6 + n_samp, " got ", ncol(raw))
+    return(data.table())
+  }
+
+  setnames(raw, 1:6, c("chrom", "pos", "id", "ct", "chr2", "end"))
+  raw[, pos := as.integer(pos)]
+  raw[, end := as.integer(end)]
+
+  # Filter: same chromosome, inversion orientations only
+  raw <- raw[chrom == chr2 & ct %in% c("3to3", "5to5")]
+  if (nrow(raw) == 0) {
+    message("[sv_prior] No same-chr inversion-oriented BNDs found")
+    return(data.table())
+  }
+  message("[sv_prior] Same-chr inv BNDs: ", nrow(raw),
+          " (3to3: ", sum(raw$ct == "3to3"), " 5to5: ", sum(raw$ct == "5to5"), ")")
+
+  # Parse carriers per BND
+  gt_cols <- 7:(6 + n_samp)
+  raw[, carriers := lapply(seq_len(.N), function(ri) {
+    gts <- as.character(raw[ri, ..gt_cols])
+    vcf_samples[gts %in% c("0/1", "0|1", "1|0", "1/1", "1|1")]
+  })]
+  raw[, n_carriers := sapply(carriers, length)]
+
+  # Split by orientation
+  left_bps  <- raw[ct == "3to3"]   # left inversion breakpoints
+  right_bps <- raw[ct == "5to5"]   # right inversion breakpoints
+
+  # Pair matching: find left-right pairs with carrier overlap
+  pairs <- list()
+  for (li in seq_len(nrow(left_bps))) {
+    lb <- left_bps[li]
+    candidates <- right_bps[
+      chrom == lb$chrom &
+      pos > lb$pos &
+      (pos - lb$pos) >= BND_MIN_INV_SIZE &
+      (pos - lb$pos) <= BND_MAX_INV_SIZE
+    ]
+    if (nrow(candidates) == 0) next
+
+    for (ri in seq_len(nrow(candidates))) {
+      rb <- candidates[ri]
+      l_carr <- lb$carriers[[1]]; r_carr <- rb$carriers[[1]]
+      shared <- length(intersect(l_carr, r_carr))
+      union_n <- length(union(l_carr, r_carr))
+      jaccard <- if (union_n > 0) shared / union_n else 0
+
+      if (jaccard < BND_MIN_CARRIER_OVL || shared < BND_MIN_CARRIERS) next
+
+      pairs[[length(pairs) + 1]] <- data.table(
+        chrom = lb$chrom,
+        bp1 = lb$pos, bp2 = rb$pos,
+        svlen = rb$pos - lb$pos,
+        bnd_left_id = lb$id, bnd_right_id = rb$id,
+        n_carriers_left = lb$n_carriers,
+        n_carriers_right = rb$n_carriers,
+        n_shared_carriers = shared,
+        carrier_jaccard = round(jaccard, 3),
+        shared_carriers = list(intersect(l_carr, r_carr)),
+        source = "BND_triangulation"
+      )
+    }
+  }
+
+  if (length(pairs) == 0) {
+    message("[sv_prior] No matching BND pairs found")
+    return(data.table())
+  }
+  pairs_dt <- rbindlist(pairs)
+  message("[sv_prior] Triangulated ", nrow(pairs_dt), " candidate inversions from BND pairs")
+  pairs_dt
+}
+
+# Run BND parsing once (genome-wide)
+bnd_pairs_all <- parse_bnd_pairs(DELLY_BND_VCF)
+message("[sv_prior] Total BND-triangulated inversions: ", nrow(bnd_pairs_all))
+
+# =============================================================================
+# HELPER: Parse VCF, extract per-sample GT for a given SVTYPE
+# =============================================================================
+
+parse_sv_vcf <- function(vcf_path, caller_name, svtype_filter = NULL,
+                          min_size = 0, max_size = Inf) {
+  if (!file.exists(vcf_path)) {
+    message("[sv_prior] VCF not found: ", vcf_path)
+    return(data.table())
+  }
+
+  message("[sv_prior] Parsing ", caller_name, ": ", vcf_path)
+
+  con <- if (grepl("\\.gz$", vcf_path)) gzfile(vcf_path, "rt") else file(vcf_path, "rt")
+  on.exit(close(con))
+
+  vcf_samples <- character(0)
+  records <- list()
+  n_total <- 0L; n_pass <- 0L
+
+  while (TRUE) {
+    line <- readLines(con, n = 1L)
+    if (length(line) == 0) break
+    if (startsWith(line, "##")) next
+
+    fields <- strsplit(line, "\t", fixed = TRUE)[[1]]
+
+    if (startsWith(line, "#CHROM")) {
+      vcf_samples <- fields[10:length(fields)]
+      next
+    }
+
+    n_total <- n_total + 1L
+
+    chrom <- fields[1]
+    pos   <- as.integer(fields[2])
+    sv_id <- fields[3]
+    qual  <- suppressWarnings(as.numeric(fields[6]))
+    if (is.na(qual)) qual <- 0
+    filt  <- fields[7]
+
+    # Parse INFO
+    info_str <- fields[8]
+    info_pairs <- strsplit(info_str, ";", fixed = TRUE)[[1]]
+    info <- list()
+    flags <- character(0)
+    for (ip in info_pairs) {
+      if (grepl("=", ip, fixed = TRUE)) {
+        kv <- strsplit(ip, "=", fixed = TRUE)[[1]]
+        info[[kv[1]]] <- kv[2]
+      } else {
+        flags <- c(flags, ip)
+      }
+    }
+
+    svtype <- info[["SVTYPE"]] %||% ""
+    if (!is.null(svtype_filter) && svtype != svtype_filter) next
+
+    end_pos <- as.integer(info[["END"]] %||% as.character(pos))
+    svlen <- abs(as.integer(info[["SVLEN"]] %||% as.character(end_pos - pos)))
+    if (svlen < min_size || svlen > max_size) next
+
+    is_precise <- "PRECISE" %in% flags
+    cipos <- info[["CIPOS"]] %||% "."
+    ciend <- info[["CIEND"]] %||% "."
+    pe <- as.integer(info[["PE"]] %||% "0")
+    sr <- as.integer(info[["SR"]] %||% "0")
+    ct <- info[["CT"]] %||% "."
+
+    # Parse per-sample GT
+    format_fields <- strsplit(fields[9], ":", fixed = TRUE)[[1]]
+    gt_idx <- match("GT", format_fields)
+    pr_idx <- match("PR", format_fields)
+    sr_idx <- match("SR", format_fields)
+
+    gt_vec <- character(length(vcf_samples))
+    pr_alt_vec <- integer(length(vcf_samples))
+    sr_alt_vec <- integer(length(vcf_samples))
+
+    for (si in seq_along(vcf_samples)) {
+      sample_data <- strsplit(fields[9 + si], ":", fixed = TRUE)[[1]]
+
+      # GT
+      gt_raw <- if (!is.na(gt_idx) && gt_idx <= length(sample_data)) {
+        sample_data[gt_idx]
+      } else "./."
+      gt_vec[si] <- gt_raw
+
+      # PR alt (Manta-style)
+      if (!is.na(pr_idx) && pr_idx <= length(sample_data)) {
+        pr_parts <- strsplit(sample_data[pr_idx], ",", fixed = TRUE)[[1]]
+        if (length(pr_parts) >= 2) pr_alt_vec[si] <- suppressWarnings(as.integer(pr_parts[2]))
+      }
+
+      # SR alt
+      if (!is.na(sr_idx) && sr_idx <= length(sample_data)) {
+        sr_parts <- strsplit(sample_data[sr_idx], ",", fixed = TRUE)[[1]]
+        if (length(sr_parts) >= 2) sr_alt_vec[si] <- suppressWarnings(as.integer(sr_parts[2]))
+      }
+    }
+
+    # Classify genotypes
+    gt_class <- ifelse(gt_vec %in% c("0/0", "0|0"), "HOM_REF",
+                ifelse(gt_vec %in% c("0/1", "0|1", "1|0"), "HET",
+                ifelse(gt_vec %in% c("1/1", "1|1"), "HOM_INV", "MISSING")))
+    names(gt_class) <- vcf_samples
+
+    n_carriers <- sum(gt_class %in% c("HET", "HOM_INV"))
+    n_hom_inv  <- sum(gt_class == "HOM_INV")
+    n_het      <- sum(gt_class == "HET")
+    af <- (n_het + 2 * n_hom_inv) / (2 * length(vcf_samples))
+
+    n_pass <- n_pass + 1L
+
+    records[[n_pass]] <- list(
+      inv_id = sv_id, chrom = chrom, bp1 = pos, bp2 = end_pos,
+      svlen = svlen, qual = qual, filter = filt,
+      caller = caller_name, svtype = svtype,
+      is_precise = is_precise, cipos = cipos, ciend = ciend,
+      pe = pe, sr = sr, ct = ct,
+      n_carriers = n_carriers, n_het = n_het, n_hom_inv = n_hom_inv,
+      af = round(af, 4),
+      gt_class = list(gt_class),
+      pr_alt = list(pr_alt_vec),
+      sr_alt = list(sr_alt_vec)
+    )
+  }
+
+  message("[sv_prior]   Total records: ", n_total, " → ", n_pass, " pass filters")
+
+  if (n_pass == 0) return(data.table())
+  rbindlist(records)
+}
+
+# =============================================================================
+# HELPER: Map VCF sample names to CGA sample IDs
+# =============================================================================
+
+map_vcf_to_cga <- function(vcf_gt_list, vcf_samples, cga_ids) {
+  # VCF samples might be file paths or different format
+  # Try direct match first
+  direct <- match(cga_ids, vcf_samples)
+  if (sum(!is.na(direct)) > length(cga_ids) * 0.8) {
+    return(list(mapping = direct, method = "direct"))
+  }
+
+  # Try basename match (remove path components)
+  vcf_base <- basename(sub("\\..*$", "", vcf_samples))
+  base_match <- match(cga_ids, vcf_base)
+  if (sum(!is.na(base_match)) > length(cga_ids) * 0.8) {
+    return(list(mapping = base_match, method = "basename"))
+  }
+
+  # Try positional (assume same BAM list order)
+  if (length(vcf_samples) == length(cga_ids)) {
+    return(list(mapping = seq_along(cga_ids), method = "positional"))
+  }
+
+  message("[sv_prior] WARNING: cannot map VCF samples to CGA IDs")
+  return(list(mapping = rep(NA, length(cga_ids)), method = "failed"))
+}
+
+# =============================================================================
+# HELPER: Extract per-sample genotype matrix (samples × inversions)
+# =============================================================================
+
+build_genotype_matrix <- function(inv_dt, sample_ids) {
+  if (nrow(inv_dt) == 0) return(matrix("MISSING", nrow = length(sample_ids), ncol = 0,
+                                        dimnames = list(sample_ids, character(0))))
+
+  n_inv <- nrow(inv_dt)
+  n_samp <- length(sample_ids)
+  gt_mat <- matrix("MISSING", nrow = n_samp, ncol = n_inv,
+                   dimnames = list(sample_ids, inv_dt$inv_id))
+
+  for (ii in seq_len(n_inv)) {
+    gt <- inv_dt$gt_class[[ii]]
+    vcf_names <- names(gt)
+    # Match by position (VCF samples in BAM list order = CGA order)
+    if (length(gt) == n_samp) {
+      gt_mat[, ii] <- unname(gt)
+    } else {
+      # Try name matching
+      matched <- match(sample_ids, vcf_names)
+      for (si in seq_len(n_samp)) {
+        if (!is.na(matched[si])) gt_mat[si, ii] <- gt[matched[si]]
+      }
+    }
+  }
+
+  gt_mat
+}
+
+# =============================================================================
+# PARSE ALL VCFs
+# =============================================================================
+
+message("\n[sv_prior] ═══ TEST 01: Loading INV genotypes ═══")
+
+delly_inv <- parse_sv_vcf(DELLY_INV_VCF, "delly", "INV", MIN_INV_SIZE, MAX_INV_SIZE)
+manta_inv <- parse_sv_vcf(MANTA_INV_VCF, "manta", "INV", MIN_INV_SIZE, MAX_INV_SIZE)
+
+# Combine (keep both callers — concordance is useful information)
+all_inv <- rbind(delly_inv, manta_inv, fill = TRUE)
+message("[sv_prior] Total INV calls: ", nrow(all_inv),
+        " (DELLY: ", nrow(delly_inv), ", Manta: ", nrow(manta_inv), ")")
+
+message("\n[sv_prior] ═══ TEST 02: Loading het-DELs ═══")
+
+delly_del <- parse_sv_vcf(DELLY_DEL_VCF, "delly", "DEL", MIN_DEL_SIZE, Inf)
+manta_del <- parse_sv_vcf(MANTA_DEL_VCF, "manta", "DEL", MIN_DEL_SIZE, Inf)
+all_del <- rbind(delly_del, manta_del, fill = TRUE)
+
+# Filter to het-DELs only (at least one sample is HET for the deletion)
+het_del_rows <- list()
+for (di in seq_len(nrow(all_del))) {
+  gt <- all_del$gt_class[[di]]
+  het_samples <- names(gt)[gt == "HET"]
+  if (length(het_samples) > 0) {
+    het_del_rows[[length(het_del_rows) + 1L]] <- data.table(
+      del_id = all_del$inv_id[di],
+      chrom = all_del$chrom[di],
+      del_start = all_del$bp1[di],
+      del_end = all_del$bp2[di],
+      del_svlen = all_del$svlen[di],
+      caller = all_del$caller[di],
+      n_het_carriers = length(het_samples),
+      het_carriers = list(het_samples)
+    )
+  }
+}
+het_dels <- if (length(het_del_rows) > 0) rbindlist(het_del_rows) else {
+  data.table(del_id = character(), chrom = character(), del_start = integer(),
+             del_end = integer(), del_svlen = integer(), caller = character(),
+             n_het_carriers = integer(), het_carriers = list())
+}
+message("[sv_prior] Het-DELs ≥", MIN_DEL_SIZE / 1000, " kb: ", nrow(het_dels))
+
+# =============================================================================
+# LOAD POPULATION CONFIDENCE (if available)
+# =============================================================================
+
+pop_conf <- data.table()
+inv_conf_file <- file.path(POP_CONF_DIR, "226.INV.population_confidence.tsv")
+if (file.exists(inv_conf_file)) {
+  pop_conf <- tryCatch(fread(inv_conf_file), error = function(e) data.table())
+  if (nrow(pop_conf) > 0) {
+    message("[sv_prior] Population confidence: ", nrow(pop_conf), " INV records")
+  }
+}
+
+# =============================================================================
+# BUILD PER-CHROMOSOME SV PRIOR
+# =============================================================================
+
+chroms <- sort(unique(c(all_inv$chrom, het_dels$chrom)))
+if (!is.null(chr_filter)) chroms <- intersect(chroms, chr_filter)
+message("\n[sv_prior] Building SV prior for ", length(chroms), " chromosomes")
+
+summary_rows <- list()
+
+for (chr in chroms) {
+  message("\n[sv_prior] ═══ ", chr, " ═══")
+
+  # ── Test 01 (was cheat1): INV genotypes for this chromosome ──
+  chr_inv <- all_inv[chrom == chr]
+  if (nrow(chr_inv) > 0) {
+    gt_matrix <- build_genotype_matrix(chr_inv, sample_ids)
+    message("[sv_prior]   INV calls: ", nrow(chr_inv),
+            " | carriers range: ", min(chr_inv$n_carriers), "-", max(chr_inv$n_carriers))
+
+    # Add population confidence if available
+    if (nrow(pop_conf) > 0) {
+      conf_match <- pop_conf[chrom == chr, .(id, confidence_level, precision_class,
+                                              pop_signal_score)]
+      chr_inv[conf_match, on = c(inv_id = "id"),
+        `:=`(confidence_level = i.confidence_level,
+             precision_class = i.precision_class,
+             pop_signal_score = as.numeric(i.pop_signal_score))]
+    }
+
+    # Fill missing confidence
+    if (!"confidence_level" %in% names(chr_inv)) {
+      chr_inv[, confidence_level := "UNKNOWN"]
+    }
+    chr_inv[is.na(confidence_level), confidence_level := "UNKNOWN"]
+  } else {
+    gt_matrix <- matrix("MISSING", nrow = n_samples, ncol = 0,
+                        dimnames = list(sample_ids, character(0)))
+  }
+
+  # ── Test 02 (was cheat2): Het-DELs at INV breakpoints ──
+  chr_del <- het_dels[chrom == chr]
+  bp_del_rows <- list()
+
+  if (nrow(chr_inv) > 0 && nrow(chr_del) > 0) {
+    for (ii in seq_len(nrow(chr_inv))) {
+      inv_bp1 <- chr_inv$bp1[ii]
+      inv_bp2 <- chr_inv$bp2[ii]
+      inv_id  <- chr_inv$inv_id[ii]
+
+      # Search for het-DELs within BP_MATCH_WINDOW of either breakpoint
+      for (bp_pos in c(inv_bp1, inv_bp2)) {
+        bp_side <- if (bp_pos == inv_bp1) "left" else "right"
+
+        nearby <- chr_del[abs(del_start - bp_pos) <= BP_MATCH_WINDOW |
+                          abs(del_end - bp_pos) <= BP_MATCH_WINDOW]
+
+        for (di in seq_len(nrow(nearby))) {
+          # Distance: closest edge of DEL to breakpoint
+          dist_start <- abs(nearby$del_start[di] - bp_pos)
+          dist_end   <- abs(nearby$del_end[di] - bp_pos)
+          min_dist   <- min(dist_start, dist_end)
+
+          bp_del_rows[[length(bp_del_rows) + 1L]] <- data.table(
+            del_id = nearby$del_id[di],
+            near_inv_id = inv_id,
+            bp_side = bp_side,
+            bp_pos = bp_pos,
+            del_start = nearby$del_start[di],
+            del_end = nearby$del_end[di],
+            del_svlen = nearby$del_svlen[di],
+            distance_to_bp = min_dist,
+            n_het_carriers = nearby$n_het_carriers[di],
+            het_carriers = nearby$het_carriers[[di]]
+          )
+        }
+      }
+    }
+  }
+
+  breakpoint_dels <- if (length(bp_del_rows) > 0) rbindlist(bp_del_rows) else {
+    data.table(del_id = character(), near_inv_id = character(),
+               bp_side = character(), bp_pos = integer(),
+               del_start = integer(), del_end = integer(),
+               del_svlen = integer(), distance_to_bp = integer(),
+               n_het_carriers = integer(), het_carriers = list())
+  }
+
+  if (nrow(breakpoint_dels) > 0) {
+    message("[sv_prior]   Breakpoint het-DELs: ", nrow(breakpoint_dels),
+            " (near ", length(unique(breakpoint_dels$near_inv_id)), " INVs)")
+  }
+
+  # ── Test 02 verification: het-DEL carriers vs INV genotypes ──
+  # For each INV with breakpoint het-DELs:
+  # Check if het-DEL carriers are enriched in HOM_REF/HET (not HOM_INV)
+  test02_verification <- list()
+
+  if (nrow(breakpoint_dels) > 0 && ncol(gt_matrix) > 0) {
+    for (inv_id_check in unique(breakpoint_dels$near_inv_id)) {
+      if (!inv_id_check %in% colnames(gt_matrix)) next
+
+      inv_gt <- gt_matrix[, inv_id_check]
+      bp_dels_for_inv <- breakpoint_dels[near_inv_id == inv_id_check]
+      all_del_carriers <- unique(unlist(bp_dels_for_inv$het_carriers))
+
+      if (length(all_del_carriers) < 3) next
+
+      # What INV genotype do het-DEL carriers have?
+      carrier_gt <- inv_gt[intersect(all_del_carriers, sample_ids)]
+      carrier_gt <- carrier_gt[carrier_gt != "MISSING"]
+
+      if (length(carrier_gt) < 3) next
+
+      n_ref_het <- sum(carrier_gt %in% c("HOM_REF", "HET"))
+      n_hom_inv <- sum(carrier_gt == "HOM_INV")
+      frac_ref_het <- n_ref_het / length(carrier_gt)
+
+      # Test 02 predicts: het-DEL carriers should be HOM_REF or HET (not HOM_INV)
+      # Because het-DEL at breakpoint means reference arrangement on ≥1 haplotype
+      test02_works <- frac_ref_het >= 0.7
+
+      test02_verification[[inv_id_check]] <- data.table(
+        inv_id = inv_id_check,
+        n_del_carriers = length(carrier_gt),
+        n_ref_or_het = n_ref_het,
+        n_hom_inv = n_hom_inv,
+        frac_ref_het = round(frac_ref_het, 3),
+        test02_concordant = test02_works
+      )
+
+      if (test02_works) {
+        message("[sv_prior]   Test 02 CONFIRMED for ", inv_id_check,
+                ": ", n_ref_het, "/", length(carrier_gt),
+                " het-DEL carriers are REF/HET (", round(frac_ref_het * 100), "%)")
+      }
+    }
+  }
+
+  test02_dt <- if (length(test02_verification) > 0) {
+    rbindlist(test02_verification)
+  } else {
+    data.table(inv_id = character(), n_del_carriers = integer(),
+               n_ref_or_het = integer(), n_hom_inv = integer(),
+               frac_ref_het = numeric(), test02_concordant = logical())
+  }
+
+  # ── Het-DELs INSIDE inversions (for Test 03 — stored, used by decomposition) ──
+  internal_del_rows <- list()
+  if (nrow(chr_inv) > 0 && nrow(chr_del) > 0) {
+    for (ii in seq_len(nrow(chr_inv))) {
+      inv_start <- chr_inv$bp1[ii]
+      inv_end   <- chr_inv$bp2[ii]
+      inv_id    <- chr_inv$inv_id[ii]
+
+      # DELs fully contained inside the inversion
+      inside <- chr_del[del_start >= inv_start & del_end <= inv_end]
+      for (di in seq_len(nrow(inside))) {
+        internal_del_rows[[length(internal_del_rows) + 1L]] <- data.table(
+          del_id = inside$del_id[di],
+          overlapping_inv_id = inv_id,
+          del_start = inside$del_start[di],
+          del_end = inside$del_end[di],
+          del_svlen = inside$del_svlen[di],
+          n_het_carriers = inside$n_het_carriers[di],
+          het_carriers = inside$het_carriers[[di]]
+        )
+      }
+    }
+  }
+
+  internal_dels <- if (length(internal_del_rows) > 0) {
+    rbindlist(internal_del_rows)
+  } else {
+    data.table(del_id = character(), overlapping_inv_id = character(),
+               del_start = integer(), del_end = integer(),
+               del_svlen = integer(), n_het_carriers = integer(),
+               het_carriers = list())
+  }
+
+  if (nrow(internal_dels) > 0) {
+    message("[sv_prior]   Internal het-DELs: ", nrow(internal_dels),
+            " inside ", length(unique(internal_dels$overlapping_inv_id)), " INVs")
+  }
+
+  # ── Build per-sample INV state summary ──
+  sample_states_rows <- list()
+  if (ncol(gt_matrix) > 0) {
+    for (inv_col in colnames(gt_matrix)) {
+      gt <- gt_matrix[, inv_col]
+      inv_row <- chr_inv[inv_id == inv_col]
+
+      for (si in seq_len(n_samples)) {
+        sid <- sample_ids[si]
+        gt_val <- gt[si]
+
+        # Check Test 02 (was cheat2): does this sample have het-DEL at this INV's breakpoints?
+        has_bp_del <- FALSE
+        if (nrow(breakpoint_dels) > 0) {
+          bp_for_inv <- breakpoint_dels[near_inv_id == inv_col]
+          if (nrow(bp_for_inv) > 0) {
+            has_bp_del <- sid %in% unlist(bp_for_inv$het_carriers)
+          }
+        }
+
+        # Check Test 03 (was cheat3): does this sample have het-DEL inside this INV?
+        has_internal_del <- FALSE
+        if (nrow(internal_dels) > 0) {
+          int_for_inv <- internal_dels[overlapping_inv_id == inv_col]
+          if (nrow(int_for_inv) > 0) {
+            has_internal_del <- sid %in% unlist(int_for_inv$het_carriers)
+          }
+        }
+
+        # Evidence count
+        n_ev <- sum(c(
+          gt_val != "MISSING",           # Test 01 (was cheat1): has SV genotype
+          has_bp_del,                     # Test 02 (was cheat2): het-DEL at breakpoint
+          has_internal_del               # Test 03 (was cheat3): het-DEL inside
+        ))
+
+        # Confidence
+        sv_conf <- if (gt_val == "MISSING") "NONE"
+                   else if (n_ev >= 2) "HIGH"
+                   else if (gt_val %in% c("HOM_REF", "HOM_INV")) "MEDIUM"
+                   else "LOW"
+
+        # Consistency check: het-DEL at breakpoint + HOM_INV = discordant
+        is_discordant <- has_bp_del && gt_val == "HOM_INV"
+        if (is_discordant) sv_conf <- "DISCORDANT"
+
+        sample_states_rows[[length(sample_states_rows) + 1L]] <- list(
+          sample_id = sid,
+          inv_id = inv_col,
+          sv_genotype = gt_val,
+          sv_confidence = sv_conf,
+          n_evidence_sources = n_ev,
+          has_bp_del = has_bp_del,
+          has_internal_del = has_internal_del,
+          is_discordant = is_discordant
+        )
+      }
+    }
+  }
+
+  sample_inv_states <- if (length(sample_states_rows) > 0) {
+    rbindlist(sample_states_rows)
+  } else {
+    data.table(sample_id = character(), inv_id = character(),
+               sv_genotype = character(), sv_confidence = character(),
+               n_evidence_sources = integer(), has_bp_del = logical(),
+               has_internal_del = logical(), is_discordant = logical())
+  }
+
+  # ── Package and save ──
+  sv_prior <- list(
+    chrom = chr,
+    n_inv_calls = nrow(chr_inv),
+    n_het_dels_breakpoint = nrow(breakpoint_dels),
+    n_het_dels_internal = nrow(internal_dels),
+
+    # Test 01 (was cheat1): INV calls with per-sample genotypes — anchor samples
+    inv_calls = chr_inv[, .(inv_id, chrom, bp1, bp2, svlen, qual, caller,
+                             is_precise, cipos, ciend, pe, sr, ct,
+                             n_carriers, n_het, n_hom_inv, af,
+                             confidence_level)],
+    gt_matrix = gt_matrix,
+
+    # Test 02 (was cheat2): het-DELs at breakpoints
+    breakpoint_dels = breakpoint_dels,
+    test02_verification = test02_dt,
+
+    # Test 03 (was cheat3): het-DELs inside inversions (for decomposition)
+    internal_dels = internal_dels,
+
+    # Test 08 (was cheat8): BND-triangulated inversions (extend anchor samples)
+    bnd_triangulated = if (nrow(bnd_pairs_all) > 0) {
+      bnd_pairs_all[chrom == chr]
+    } else data.table(),
+
+    # Combined per-sample states
+    sample_inv_states = sample_inv_states,
+
+    # Metadata
+    params = list(
+      bp_match_window = BP_MATCH_WINDOW,
+      min_del_size = MIN_DEL_SIZE,
+      min_inv_size = MIN_INV_SIZE,
+      max_inv_size = MAX_INV_SIZE
+    ),
+    built = Sys.time()
+  )
+
+  rds_out <- file.path(SV_PRIOR_DIR, paste0("sv_prior_", chr, ".rds"))
+  saveRDS(sv_prior, rds_out)
+  message("[sv_prior]   → ", rds_out)
+
+  # Summary
+  n_high_conf <- sum(sample_inv_states$sv_confidence == "HIGH")
+  n_discordant <- sum(sample_inv_states$is_discordant)
+  n_anchors <- sum(sample_inv_states$sv_genotype != "MISSING" &
+                    sample_inv_states$sv_confidence %in% c("HIGH", "MEDIUM"))
+
+  summary_rows[[length(summary_rows) + 1L]] <- data.table(
+    chrom = chr,
+    n_inv_calls = nrow(chr_inv),
+    n_inv_delly = sum(chr_inv$caller == "delly"),
+    n_inv_manta = sum(chr_inv$caller == "manta"),
+    n_breakpoint_dels = nrow(breakpoint_dels),
+    n_internal_dels = nrow(internal_dels),
+    n_test02_confirmed = sum(test02_dt$test02_concordant, na.rm = TRUE),
+    n_bnd_triangulated = nrow(bnd_pairs_all[chrom == chr]),
+    n_anchor_assignments = n_anchors,
+    n_high_conf = n_high_conf,
+    n_discordant = n_discordant
+  )
+}
+
+# =============================================================================
+# GENOME-WIDE SUMMARY
+# =============================================================================
+
+summary_dt <- if (length(summary_rows) > 0) rbindlist(summary_rows) else data.table()
+f_summ <- file.path(SV_PRIOR_DIR, "sv_prior_summary.tsv")
+fwrite(summary_dt, f_summ, sep = "\t")
+
+message("\n[sv_prior] ═══ GENOME-WIDE SUMMARY ═══")
+if (nrow(summary_dt) > 0) {
+  message("  Chromosomes:          ", nrow(summary_dt))
+  message("  Total INV calls:      ", sum(summary_dt$n_inv_calls))
+  message("    DELLY:              ", sum(summary_dt$n_inv_delly))
+  message("    Manta:              ", sum(summary_dt$n_inv_manta))
+  message("  Breakpoint het-DELs:  ", sum(summary_dt$n_breakpoint_dels))
+  message("  Internal het-DELs:    ", sum(summary_dt$n_internal_dels))
+  message("  Test 02 confirmed:    ", sum(summary_dt$n_test02_confirmed))
+  message("  BND triangulated :  ", sum(summary_dt$n_bnd_triangulated))
+  message("  Anchor assignments:   ", sum(summary_dt$n_anchor_assignments))
+  message("  HIGH confidence:      ", sum(summary_dt$n_high_conf))
+  message("  Discordant:           ", sum(summary_dt$n_discordant))
+}
+message("\n[sv_prior] Output: ", SV_PRIOR_DIR)
+message("[sv_prior] Summary: ", f_summ)
+message("\n[DONE] Flashlight build complete")
+
+# ── Register in evidence registry (SV breakpoints per chr) ──
+tryCatch({
+  if (.bridge_available && exists("reg") && !is.null(reg) && !is.null(reg$add_evidence)) {
+    # C00 runs BEFORE C01d, so candidates don't exist yet.
+    # We store per-chromosome SV readiness. Per-candidate SV assignment
+    # happens later when C01d reads the sv_prior and scores D7.
+    message("[sv_prior] Registry: SV data available for ", nrow(summary_dt), " chromosomes")
+  }
+}, error = function(e) message("[sv_prior] Registry note: ", conditionMessage(e)))
